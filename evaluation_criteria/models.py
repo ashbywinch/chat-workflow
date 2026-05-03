@@ -1,45 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Literal, Optional
-
-
-class ConversationAction(BaseModel):
-    """LLM's decision about conversation flow with discriminator field."""
-
-    action: Literal["continue", "success", "failure"]
-    message: Optional[str] = None
-    criteria: Optional["EvaluationCriteria"] = None
-
-    @model_validator(mode="after")
-    def validate_action_consistency(self):
-        if self.action in ["continue", "failure"] and not self.message:
-            raise ValueError(f"{self.action} action requires message")
-        if self.action == "success" and not self.criteria:
-            raise ValueError("success action requires criteria")
-        return self
-
-
-class ConversationResult(BaseModel):
-    """Result of a conversation turn."""
-
-    criteria: Optional["EvaluationCriteria"] = None
-    message: str
-    is_complete: bool
-
-    @classmethod
-    def continuing(cls, message: str) -> "ConversationResult":
-        return cls(criteria=None, message=message, is_complete=False)
-
-    @classmethod
-    def success(cls, criteria: "EvaluationCriteria") -> "ConversationResult":
-        return cls(
-            criteria=criteria,
-            message="Criteria generated successfully!",
-            is_complete=True,
-        )
-
-    @classmethod
-    def failure(cls, message: str) -> "ConversationResult":
-        return cls(criteria=None, message=f"Failed: {message}", is_complete=True)
+from typing import List, Optional
 
 
 class Criterion(BaseModel):
@@ -77,13 +37,11 @@ class EvaluationCriteria(BaseModel):
     @model_validator(mode="after")
     def validate_business_rules(self):
         """Validate business rules for EvaluationCriteria."""
-        from .exceptions import CriteriaValidationError
+        from prompt_core.exceptions import CriteriaValidationError
 
-        # Rule 1: Must have at least 2 criteria
         if len(self.criteria) < 2:
             raise CriteriaValidationError("Must have at least 2 criteria")
 
-        # Rule 2: Must include "budget" criterion (case-insensitive)
         if not any(c.name.lower() == "budget" for c in self.criteria):
             raise CriteriaValidationError(
                 "Must include a criterion named 'budget' (case-insensitive)"
@@ -97,7 +55,6 @@ class EvaluationCriteria(BaseModel):
         weight: float = 1.0,
         ideal_value: Optional[str] = None,
     ):
-        """Helper method to add a criterion."""
         self.criteria.append(
             Criterion(
                 name=name,
@@ -108,16 +65,10 @@ class EvaluationCriteria(BaseModel):
         )
 
     def total_weight(self) -> float:
-        """Calculate the total weight of all criteria."""
         return sum(criterion.weight for criterion in self.criteria)
 
     def normalized_weights(self) -> List[float]:
-        """Get normalized weights (sum to 1.0)."""
         total = self.total_weight()
         if total == 0:
             return [0.0] * len(self.criteria)
         return [criterion.weight / total for criterion in self.criteria]
-
-
-ConversationAction.model_rebuild()
-ConversationResult.model_rebuild()

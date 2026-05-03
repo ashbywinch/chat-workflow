@@ -1,18 +1,21 @@
-# Product Specification: Conversational Evaluation Criteria Generator
+# Product Specification: Domain-agnostic library allowing the creation of complex structured conversations (flows) that end users can have with LLMs, giving a heavily "human in the loop" approach to designing agents with a deterministic control flow.
 
 ## Overview
-A tool that helps users create structured evaluation criteria for decision-making through natural conversation with an AI assistant.
+The "unit" of this library is functions that the flow author creates, using a dedicated decorator, which take and return Pydantic objects whose correctness is verified. The flow author writes the Pydantic types and then authors the functions. Such a function would normally contain a specialised prompt requesting the LLM to facilitate the generation of the object to be returned. Alternatively, the function might compose other such functions using standard Python control flow primitives and libraries to achieve a more complex result. For example, one function might return EvaluationCriteria, another might return a Shortlist of options, and a third function would combine these two and evaluate the Shortlist against the Criteria to generate and return a Decision.
 
 ## Problem Statement
-When making important decisions (like choosing birthday presents, hiring candidates, or selecting products), people need clear criteria to evaluate options. Creating good criteria is hard - it requires thinking through what matters, prioritizing factors, and ensuring nothing important is missed.
+Tools to build agent workflows often force workflow authors to build graph structures using visual tools. This is extremely limited compared to the use of program code more directly.
+They also aren't great at supporting fully flexible "human in the loop" architectures where the human has most of the knowledge and intuition that the workflow requires, and the workflow functions as a coach/facilitator.
+In addition they don't have good support for ensuring the excellence/correctness of all the output.
 
 ## Solution
-An AI-powered assistant that guides users through a conversation to define clear, structured evaluation criteria. The assistant asks questions, clarifies needs, and produces a well-organized criteria list ready for decision-making.
+An AI-powered assistant that guides users through an arbitrarily complex structured conversation to define clear, structured end results. For example, a detailed business plan containing a number of distinct sections, each of which requires at least one sub-conversation.
+A python library that allows flow authors to build up these conversation flows, define "what good looks like" for each subunit of the conversation (using Pydantic)
 
 ## User Experience
 
-### Primary Use Case: Guided Criteria Creation
-1. **User starts** with a general idea (e.g., "help me choose birthday presents for a 7-year-old")
+### Simple Use Case: Guided Criteria Creation
+1. **User starts** with a general idea (e.g., "help me decide on evaluation criteria for birthday presents for a 7-year-old")
 2. **AI assistant asks questions** to understand requirements:
    - "What's your budget range?"
    - "Are there any age-appropriate considerations?"
@@ -25,50 +28,60 @@ An AI-powered assistant that guides users through a conversation to define clear
    - Importance weights (1-10 scale)
    - Optional ideal/target values
 
+### More complex use case: Decision making
+1. **User starts** by describing the nature of the decision ("I need to choose a birthday present for my nephew"). There is a "create_decision" function made by the workflow author that returns a Pydantic Decision object that will contain the actual decision the user makes..
+2. **Assistant continues** by first facilitating the creation of evaluation criteria as described in the previous example, in a function that returns a Pydantic EvaluationCriteria object. So the create_decision function has had to call a create_evaluation_criteria function to generate the EvaluationCriteria.
+4. **Assistant moves on**, facilitating the user to develop a set of options, perhaps including ideas the user already has, perhaps also including options the agent has found on the internet using an MCP for web search. So the create_decision function now calls create_option_shortlist that creates an OptionShortlist Pydantic object.
+6. **Assistant continues** in the create_decision function, calling create_assessment and passing the options and the criteria. create_assessment has the LLM evaluate the options against the given criteria and return an Assessment object that shows how each shortlisted option stacks up.
+7. **Agent makes a preliminary Decision** based on the Assessment.
+8. **Final Decision is generated** by create_decision function, a Decision object is returned and the task is complete.
+
+The LLM's context is always composed from the parameters passed to each function and the prompt added by the function itself. That is, context established prior to the function call is not visible to the LLM unless it's explicitly passed to the function.
+
 ### Key Features
 
 #### 1. Natural Conversation Interface
 - Chat-based interaction - users talk like they would with a human expert
 - AI asks one question at a time to avoid overwhelming users
-- Assistant understands context and builds on previous answers
 
 #### 2. Structured Output Generation
-- Always produces valid, complete criteria lists
-- Ensures minimum requirements are met:
-  - At least 2 evaluation factors
-  - Always includes "budget" consideration (case-insensitive)
+- Each flow function always produces valid, complete Pydantic objects, or else raises an exception
 - Output is machine-readable for further analysis or integration
 
 #### 3. Intelligent Limits
-- **Max 10 conversation turns** - prevents endless loops
-- **Three clear outcomes**:
-  - ✅ **Success**: Valid criteria generated
+Within an individual flow function:
+- **Each conversation has a turn limit** - prevents endless loops
+- **Three clear outcomes from each LLM call**:
+  - ✅ **Success**: Valid object generated
   - 🔄 **Continue**: More questions needed
   - ❌ **Failure**: Can't proceed (user gives up or insufficient info)
-- **Business rule enforcement**: Won't produce invalid criteria
+- **Business rule enforcement**: Won't produce invalid objects 
 
 #### 4. User-Friendly Error Handling
 - Clear explanations when things go wrong
 - No technical jargon in error messages
 - Graceful failure with actionable suggestions
 
+#### 5. Minimal Boilerplate for Workflow Authors 
+The authors of workflows must be able to author these workflows within a dedicated library for that workflow, that only contains the workflow functions themselves. All framework code must be generic, decoupled from the workflows and must be situated in the prompt-core library. There must be no requirement for the workflow author to copy and amend framework code for each workflow function they write.
+
 ## Target Users
 
-### Primary User: Decision Makers
-- Individuals facing personal decisions (gifts, purchases, etc.)
-- Professionals making business decisions (hiring, vendor selection)
-- Teams needing collaborative evaluation frameworks
+### Primary User: Individuals wanting structured professional coaching/facilitation support
+
+- Individuals with complex problems (help me meal plan, help me plan care for my disabled child, help me get my extension built)
+- Professionals with complex problems (help me make a business plan, help me manage my time, help me create new brand artifacts)
 
 ### Secondary User: Facilitators
-- Coaches helping clients make decisions
-- Consultants creating evaluation frameworks for clients
-- Educators teaching decision-making skills
+- Professionals with specialist knowledge wanting to make and use or resell agents that provide structured coaching/facilitation in their domain
+- For example: Architects wanting to streamline the qualification, conversion and onboarding of leads by having potential customers chat to an agent about their ideas.
+- For example: Business coaches wanting to sell access to software that can coach you through creating a business plan.
 
-## Usage Scenarios
+## Usage Scenario
 
-### Scenario 1: Personal Gift Selection
+### Generate evaluation criteria 
 ```
-User: "I need help choosing a birthday gift for my 7-year-old niece"
+User: "I need a birthday gift for my 7-year-old niece"
 Assistant: "I can help with that! What's your budget for this gift?"
 User: "Around $50"
 Assistant: "Great. Does she have any particular interests or hobbies?"
@@ -79,46 +92,15 @@ Assistant: "Perfect. Are there any safety considerations for her age?"
     safety, age_appropriateness, entertainment_value
 ```
 
-### Scenario 2: Hiring Decision
-```
-User: "We're hiring a software developer"
-Assistant: "What technical skills are most important for this role?"
-User: "Python and cloud experience"
-Assistant: "What about soft skills or team fit considerations?"
-User: "Good communication and collaborative mindset"
-[Conversation continues...]
-✅ Success: Generated criteria with factors: technical_skills, 
-    communication, collaboration, experience_level, cultural_fit
-```
+### 2. Debugging Tools 
 
-### Scenario 3: Product Comparison
-```
-User: "We need to choose a new project management tool"
-Assistant: "What are your key requirements for this tool?"
-User: "Must integrate with our existing systems"
-Assistant: "What's your budget range for this tool?"
-[Conversation continues...]
-✅ Success: Generated criteria with factors: integration_capability, 
-    budget, user_friendliness, feature_set, scalability
-```
+- Each time a user goes through a flow, we finish by asking the user to evaluate the conversation itself and provide comments. We log these so that the workflow author can improve their workflow over time to be more useful.
 
-## Business Rules (Non-Negotiable)
+### 3. Usability
 
-### 1. Criteria Quality
-- **Minimum 2 criteria**: Every decision needs at least 2 factors to compare
-- **Must include "budget"**: Financial consideration is essential (case-insensitive)
-- **Clear descriptions**: Each criterion explains what it measures
-- **Weighted importance**: Each factor has 1-10 importance rating
-
-### 2. Conversation Limits
-- **Configurable limit to the number of conversation turns**: Prevents excessive API costs and user fatigue
-- **Clear exit points**: Users can stop anytime, assistant can declare when stuck
-- **No infinite loops**: Assistant recognizes unproductive conversations
-
-### 3. Output Standards
-- **Always valid structure**: Output always meets technical specifications
-- **Machine-readable**: Can be exported, analyzed, or integrated
-- **Human-friendly**: Clear, understandable format for users
+- We want workflow authors with a knowlege of coding to find it intuitive to build their workflows using this library
+- Workflow authors should be able to use commercially available coding agents to build workflows using this library, so the library should be easy to use by coding agents.
+- Users should find it easy and friendly to use the resulting workflows. The experience should be comparable to having a chat with a human.
 
 ## Success Metrics
 
@@ -139,31 +121,29 @@ Assistant: "What's your budget range for this tool?"
 - **Environment configuration**: API key management for different providers
 
 ### Future Potential
-- The intention is to build a framework that allows the user and LLM to collaborate in making arbitrarily deep nested objects, for example, a business plan with many sections, where detailed validation criteria (both deterministic and otherwise) are applied to the structure and content.
-- These objects may be saved as Markdown.
-- The objects may consist of lists of proposed actions that can be reviewed and then be carried out programmatically (like a more structured version of tool calling)
-- The functions that create these objects can be composed just like normal functions can, so our LLM object creating tool should be Turing complete.
-- The system will be self modifying. After each session with the LLM, we'll work with the user to generate a list of system modifications that would make it produce better results on its next run.
-- We will be using Temporal to provide checkpoint/restart functionality.
+- We're going to make the workflows self modifying, that is, users will be able to provide feedback in real time and have the workflows update.
+- We're likely to use Temporal to make sure users can restart sessions.
+- We'll make it so workflows can save critical outputs (objects), maybe as Markdown, maybe into a Minio/formkiq/onyx setup, so that users can start to create a knowledge base around their life/business and continue to use these objects (business plan, meal plan, brand guidlines, etc) as inputs to future workflows.
 
 ## Philosophy
 
 ### Design Principles
 1. **Conversation First**: Natural dialogue over forms or checklists
-2. **Structured Second**: Behind-the-scenes structure, front-end simplicity
+2. **Structured Second**: Behind-the-scenes structure, front-end simplicity, for both end users and workflow authors.
 3. **Fail Helpfully**: Clear explanations, not technical errors
 
 ### Technical Philosophy
 - **Infrastructure exposure**: Tests fail when API keys missing (exposes setup issues)
-- **Real validation**: Use actual LLMs to verify prompts work, not just mocks
+- **Real validation**: Comprehensive suite of evals (as well as unit tests) to make sure our code changes work with real LLMs, not just mocks
 - **Clean boundaries**: Clear separation of concerns. Low coupling. 
 
 ## Why This Matters
 
-Good decisions require clear criteria. This tool makes criteria creation:
-- **Accessible**: No expertise in evaluation frameworks needed
-- **Thorough**: Systematic approach ensures nothing is missed  
+This tool makes workflow creation:
+- **Accessible**: No expertise in the framework needed
 - **Structured**: Results are usable for analysis and comparison
+And workflow use is:
+- **Thorough**: Systematic semi-deterministic approach ensures nothing is missed  
 - **Adaptable**: Works for personal, professional, and team decisions
 
 The conversation format makes what can feel like a dry, analytical task into an engaging, thoughtful dialogue that produces better outcomes.
