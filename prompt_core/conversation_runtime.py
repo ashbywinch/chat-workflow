@@ -215,6 +215,7 @@ def leaf(func: Callable) -> Callable:
     """Auto-orchestrates a leaf function using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
+    Accepts either 'io'/'state' parameters or 'tools' (ConversationTools).
     """
     from .exceptions import ConversationFailedError
 
@@ -227,16 +228,21 @@ def leaf(func: Callable) -> Callable:
 
     @wraps(func)
     def wrapper(*args, **kwargs):
+        tools = kwargs.pop("tools", None)
         io = kwargs.pop("io", None)
         state = kwargs.pop("state", None)
 
-        if io is None:
-            raise TypeError(f"Leaf function '{func.__name__}' requires 'io' parameter")
+        if tools is None and io is not None:
+            state = state or ConversationFlowState()
+            tools = ConversationTools(io=io, state=state)
 
-        if state is None:
-            state = ConversationFlowState()
+        if tools is None:
+            raise TypeError(
+                f"Leaf function '{func.__name__}' requires 'io' or 'tools' parameter"
+            )
 
-        tools = ConversationTools(io=io, state=state)
+        state = tools.state
+
         system_prompt = _format_docstring(func.__doc__, **kwargs)
         max_turns = kwargs.pop("max_turns", 10)
 

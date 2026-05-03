@@ -293,5 +293,83 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertIn("Invalid action received: invalid_action", str(context.exception))
 
 
+class TestWorkflowIntegration(unittest.TestCase):
+    def setUp(self):
+        self.valid_criteria = EvaluationCriteria(
+            context="test context",
+            criteria=[
+                Criterion(name="budget", description="Budget constraint", weight=8.0),
+                Criterion(name="quality", description="Quality level", weight=7.0),
+            ],
+        )
+
+    @patch(
+        "prompt_core.conversation_runtime.StructuredConversationOrchestrator._call_llm"
+    )
+    def test_leaf_accepts_tools_parameter(self, mock_call_llm):
+        from prompt_core import ConversationTools, ConversationFlowState
+        from evaluation_criteria.flows import generate_criteria
+
+        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
+            action="success", result=self.valid_criteria
+        )
+
+        mock_io = Mock()
+        mock_io.echo = Mock()
+        mock_io.prompt = Mock(return_value="test response")
+
+        state = ConversationFlowState()
+        tools = ConversationTools(io=mock_io, state=state)
+
+        result = generate_criteria(context="test", max_turns=5, tools=tools)
+
+        self.assertIsInstance(result, EvaluationCriteria)
+        self.assertEqual(len(result.criteria), 2)
+
+    @patch(
+        "prompt_core.conversation_runtime.StructuredConversationOrchestrator._call_llm"
+    )
+    def test_leaf_accepts_io_parameter(self, mock_call_llm):
+        from evaluation_criteria.flows import generate_criteria
+
+        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
+            action="success", result=self.valid_criteria
+        )
+
+        mock_io = Mock()
+        mock_io.echo = Mock()
+        mock_io.prompt = Mock(return_value="test response")
+
+        result = generate_criteria(context="test", max_turns=5, io=mock_io)
+
+        self.assertIsInstance(result, EvaluationCriteria)
+
+    @patch(
+        "prompt_core.conversation_runtime.StructuredConversationOrchestrator._call_llm"
+    )
+    def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
+        from evaluation_criteria.flows import run_reviewed_criteria_conversation
+        from prompt_core import ConversationFlowState
+
+        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
+            action="success", result=self.valid_criteria
+        )
+
+        mock_io = Mock()
+        mock_io.echo = Mock()
+        mock_io.prompt = Mock(return_value="looks good")
+
+        state = ConversationFlowState()
+
+        result = run_reviewed_criteria_conversation(
+            context="test context",
+            max_turns=5,
+            io=mock_io,
+            state=state,
+        )
+
+        self.assertIsInstance(result, EvaluationCriteria)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

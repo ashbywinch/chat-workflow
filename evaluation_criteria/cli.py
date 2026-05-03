@@ -20,7 +20,6 @@ from prompt_core.exceptions import (
 from prompt_core.session_logging import log_session
 
 from .flows import run_reviewed_criteria_conversation
-from .presentation import print_criteria
 
 app = typer.Typer(help="Generate and work with evaluation criteria using LLMs")
 
@@ -45,9 +44,13 @@ def handle_error(error: Exception):
             f"\n✗ Configuration error: {error.message}", err=True, fg=typer.colors.RED
         )
     elif isinstance(error, APIKeyError):
-        typer.secho(f"\n✗ API key error: {error.message}", err=True, fg=typer.colors.RED)
+        typer.secho(
+            f"\n✗ API key error: {error.message}", err=True, fg=typer.colors.RED
+        )
     elif isinstance(error, ProviderNotSupportedError):
-        typer.secho(f"\n✗ Provider error: {error.message}", err=True, fg=typer.colors.RED)
+        typer.secho(
+            f"\n✗ Provider error: {error.message}", err=True, fg=typer.colors.RED
+        )
     elif isinstance(error, ProviderNotFoundError):
         typer.secho(
             f"\n✗ Provider not found: {error.message}", err=True, fg=typer.colors.RED

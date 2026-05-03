@@ -15,26 +15,23 @@ NC := \033[0m # No Color
 
 help:
 	@echo "Available commands:"
-	@echo "  ${GREEN}make${NC}          	 - Get project ready to run (setup + sync)"
-	@echo "  ${GREEN}make setup${NC}      - Install uv if not present"
-	@echo "  ${GREEN}make help${NC}          - Show this help message"
-	@echo "  ${GREEN}make test${NC}          - Run unit tests (no API key required)"
-	@echo "  ${GREEN}make test-verbose${NC}  - Run unit tests with verbose output"
-	@echo "  ${GREEN}make evals${NC}        - Run evaluation tests with real API (requires API key)"
-	@echo "  ${GREEN}make evals-verbose${NC} - Run evaluation tests with verbose output"
-	@echo "  ${GREEN}make test-all${NC}      - Run unit tests + evals"
-	@echo "  ${GREEN}make coverage${NC}      - Run tests with coverage report"
-	@echo "  ${GREEN}make lint${NC}          - Run code linting (black + ruff)"
-	@echo "  ${GREEN}make format${NC}        - Auto-fix linting issues"
-	@echo "  ${GREEN}make clean${NC}         - Clean up generated files"
+	@echo "  ${GREEN}make${NC}              Get project ready to run (setup + sync)"
+	@echo "  ${GREEN}make setup${NC}        Install uv if not present, sync dependencies"
+	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)"
+	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output"
+	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)"
+	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output"
+	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
+	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
+	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
+	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
+	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)"
 
 # Setup: Install uv if not present, then sync dependencies
 setup:
 	@uv --version >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 	@uv sync --all-extras
-
-run:
-	source .venv/bin/activate
+	@echo "${GREEN}✓ Setup complete.${NC} Run ${YELLOW}source .venv/bin/activate${NC} to use ${YELLOW}prompt-core${NC} command."
 
 test: setup lint test-unit
 
@@ -61,17 +58,17 @@ coverage: setup
 
 # Linting with black and ruff
 lint: setup
-	.venv/bin/black --check --target-version py312 prompt_core/ tests/
-	.venv/bin/ruff check prompt_core/ tests/
+	.venv/bin/black --check --target-version py312 prompt_core/ evaluation_criteria/ tests/
+	.venv/bin/ruff check prompt_core/ evaluation_criteria/ tests/
 
 # Auto-fix linting issues
 format: setup
-	.venv/bin/black --target-version py312 prompt_core/ tests/
-	.venv/bin/ruff check --fix prompt_core/ tests/
+	.venv/bin/black --target-version py312 prompt_core/ evaluation_criteria/ tests/
+	.venv/bin/ruff check --fix prompt_core/ evaluation_criteria/ tests/
 
-# Clean up generated files
+# Clean up generated files (removes .venv to catch build errors like CI)
 clean:
-	@rm -rf htmlcov/
+	@rm -rf .venv htmlcov/
 	@rm -f .coverage
 	@rm -f coverage.xml
 	@rm -f test-results.xml

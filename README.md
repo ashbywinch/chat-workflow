@@ -20,8 +20,9 @@ git clone <repo> && cd prompt-core && make
 # edit config.json to set your provider + model
 export OPENROUTER_API_KEY=your-key    # or OPENAI_API_KEY, etc.
 
-# 3. Run
-prompt-core converse --context "evaluating job offers"
+# 3. Activate and run
+source .venv/bin/activate
+prompt-core --context "evaluating job offers"
 ```
 
 See [QUICKSTART.md](QUICKSTART.md) for a 5-minute contributor guide.
@@ -30,23 +31,31 @@ See [QUICKSTART.md](QUICKSTART.md) for a 5-minute contributor guide.
 
 ```bash
 # Interactive conversation
-prompt-core converse --context "choosing a laptop"
+prompt-core --context "choosing a laptop"
 
 # With output file
-prompt-core converse --context "hiring criteria" --output criteria.json
+prompt-core --context "hiring criteria" --output criteria.json
 
 # Custom max turns
-prompt-core converse --context "gift ideas" --max-turns 5
+prompt-core --context "gift ideas" --max-turns 5
 ```
 
 ## Python API
 
 ```python
-from prompt_core.conversation import ConversationOrchestrator
+from evaluation_criteria.flows import run_reviewed_criteria_conversation
+from prompt_core import ConversationFlowState
 
-orchestrator = ConversationOrchestrator(initial_context="evaluating coffee makers")
-result = orchestrator.process_turn("I need a budget espresso machine")
-# result.is_complete, result.criteria, result.message
+class MyIO:
+    def echo(self, message: str) -> None: print(message)
+    def prompt(self, label: str) -> str: return input(label + ": ")
+
+criteria = run_reviewed_criteria_conversation(
+    context="evaluating coffee makers",
+    max_turns=10,
+    io=MyIO(),
+    state=ConversationFlowState(),
+)
 ```
 
 ## Documentation
