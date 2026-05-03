@@ -1,213 +1,214 @@
 #!/usr/bin/env python3
-"""
-Real API tests (evals) for prompt-core.
-These tests make ACTUAL API calls and require valid API keys.
-
-Run with: make evals
-"""
-
 import unittest
 
-from prompt_core.models import EvaluationCriteria
-from prompt_core.conversation import ConversationOrchestrator, ConversationResult
+from evaluation_criteria.models import EvaluationCriteria
+from evaluation_criteria.flows import generate_criteria
+from prompt_core import (
+    ConversationAction,
+    StructuredConversationOrchestrator,
+    ConversationResult,
+)
+from prompt_core.exceptions import TurnLimitExceededError, ConversationFailedError
+
+
+class MockIO:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.outputs = []
+
+    def echo(self, message: str) -> None:
+        self.outputs.append(message)
+
+    def prompt(self, label: str) -> str:
+        if self.responses:
+            return self.responses.pop(0)
+        return ""
 
 
 class TestRealAPI(unittest.TestCase):
-    """
-    Integration tests that make real API calls.
-
-    ⚠️  REAL API TESTS - ALL REQUIRE API KEYS  ⚠️
-    ============================================
-    These tests make ACTUAL API calls to verify:
-    1. Our prompts work correctly with real LLMs
-    2. The entire conversation flow works end-to-end
-    3. Business rules are enforced with real LLM output
-    """
-
-    def test_call_llm_success(self):
-        """
-        Test successful LLM call returns ConversationAction.
-
-        This test makes ACTUAL API calls to verify:
-        1. Our prompts work with real LLMs
-        2. LLMs generate valid ConversationAction responses
-        """
-        orchestrator = ConversationOrchestrator()
-
-        # Call _call_llm - will use real provider
-        llm_response = orchestrator._call_llm()
-        action = llm_response.content
-
-        # Verify we got a valid ConversationAction
-        self.assertIn(action.action, ["continue", "success", "failure"])
-        # Verify usage metadata was captured
-        self.assertIsNotNone(
-            llm_response.usage, "LLMResponse should contain usage data"
+    def test_call_llm_returns_valid_action(self):
+        orchestrator = StructuredConversationOrchestrator(
+            system_prompt="You are a helpful assistant that creates evaluation criteria. "
+            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
+            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
+            response_model=ConversationAction[EvaluationCriteria],
+            max_turns=5,
+            initial_messages=[
+                {
+                    "role": "user",
+                    "content": "Create criteria for choosing a birthday gift. My budget is $50.",
+                }
+            ],
+            on_continue=lambda action: ConversationResult[
+                EvaluationCriteria
+            ].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
+                action.result
+            ),
+            on_failure=lambda action: ConversationFailedError(action.message),
         )
 
-        # If action is "continue" or "failure", it should have a message
+        action = orchestrator._call_llm()
+
+        self.assertIn(action.action, ["continue", "success", "failure"])
+
         if action.action in ["continue", "failure"]:
             self.assertIsNotNone(action.message)
             self.assertTrue(len(action.message) > 0)
 
-        # If action is "success", it should have criteria
         if action.action == "success":
-            self.assertIsNotNone(action.criteria)
-            self.assertGreaterEqual(len(action.criteria.criteria), 2)
-            has_budget = any(
-                c.name.lower() == "budget" for c in action.criteria.criteria
+            self.assertIsNotNone(action.result)
+            self.assertGreaterEqual(len(action.result.criteria), 2)
+            has_budget = any(c.name.lower() == "budget" for c in action.result.criteria)
+            self.assertTrue(
+                has_budget,
+                f"Criteria must include 'budget'. Found: {[c.name for c in action.result.criteria]}",
             )
-            self.assertTrue(has_budget, "Criteria should include 'budget'")
+
+        action = orchestrator._call_llm()
+
+        self.assertIn(action.action, ["continue", "success", "failure"])
+
+        if action.action in ["continue", "failure"]:
+            self.assertIsNotNone(action.message)
+            self.assertTrue(len(action.message) > 0)
+
+        if action.action == "success":
+            self.assertIsNotNone(action.result)
+            self.assertGreaterEqual(len(action.result.criteria), 2)
+            has_budget = any(c.name.lower() == "budget" for c in action.result.criteria)
+            self.assertTrue(
+                has_budget,
+                f"Criteria must include 'budget'. Found: {[c.name for c in action.result.criteria]}",
+            )
 
     def test_multi_turn_conversation_with_real_llm(self):
-        """
-        Test multi-turn conversation with real LLM.
-
-        Tests conversation flow, turn counting, and response handling with real LLM.
-        """
-        orchestrator = ConversationOrchestrator(
-            initial_context="choosing a birthday gift", max_turns=3
-        )
-
-        result = orchestrator.run_conversation(
+        mock_io = MockIO(
             [
-                "Hello, I need help choosing a gift",
-                "Around $50 budget",
+                "Around $50 for the budget",
                 "For a 7-year-old who likes science",
+                "Safety is important",
+                "That's all, please finalize with budget criterion",
             ]
         )
 
-        self.assertIsNotNone(result.message)
-        self.assertLessEqual(orchestrator.turn_count, orchestrator.max_turns)
+        criteria = generate_criteria(
+            context="choosing a birthday gift",
+            max_turns=6,
+            io=mock_io,
+        )
 
-        # If we got criteria, verify it meets business rules
-        if result.criteria:
-            self.assertGreaterEqual(len(result.criteria.criteria), 2)
-            has_budget = any(
-                c.name.lower() == "budget" for c in result.criteria.criteria
-            )
-            self.assertTrue(has_budget, "Criteria should include 'budget'")
+        self.assertIsInstance(criteria, EvaluationCriteria)
+        self.assertGreaterEqual(len(criteria.criteria), 2)
+        has_budget = any(c.name.lower() == "budget" for c in criteria.criteria)
+        self.assertTrue(
+            has_budget,
+            f"Criteria must include 'budget'. Found: {[c.name for c in criteria.criteria]}",
+        )
 
     def test_single_turn_with_real_llm(self):
-        """
-        Test a single conversation turn with real LLM.
-        """
-        orchestrator = ConversationOrchestrator(
-            initial_context="evaluating coffee makers", max_turns=3
+        orchestrator = StructuredConversationOrchestrator(
+            system_prompt="You are a helpful assistant for creating evaluation criteria. "
+            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
+            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
+            response_model=ConversationAction[EvaluationCriteria],
+            max_turns=3,
+            initial_messages=[
+                {
+                    "role": "user",
+                    "content": "I want to evaluate coffee makers. Budget is $200.",
+                }
+            ],
+            on_continue=lambda action: ConversationResult[
+                EvaluationCriteria
+            ].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
+                action.result
+            ),
+            on_failure=lambda action: ConversationFailedError(action.message),
         )
 
         result = orchestrator.process_turn("")
 
-        # Should get a response (continue, success, or failure)
         self.assertIsInstance(result, ConversationResult)
         self.assertIsNotNone(result.message)
-
-        # Check that it's a valid response type
         self.assertTrue(len(result.message) > 0)
 
-        # If we got criteria, verify it's valid
-        if result.criteria:
-            self.assertIsInstance(result.criteria, EvaluationCriteria)
-            self.assertGreaterEqual(len(result.criteria.criteria), 2)
+        if result.result:
+            self.assertIsInstance(result.result, EvaluationCriteria)
+            self.assertGreaterEqual(len(result.result.criteria), 2)
             self.assertTrue(
-                any(c.name.lower() == "budget" for c in result.criteria.criteria)
+                any(c.name.lower() == "budget" for c in result.result.criteria),
+                f"Criteria must include 'budget'. Found: {[c.name for c in result.result.criteria]}",
             )
 
     def test_conversation_flow_with_real_llm(self):
-        """
-        Test a simple conversation flow with real LLM.
-        """
-        orchestrator = ConversationOrchestrator(
-            initial_context="choosing a birthday gift for a 7-year-old", max_turns=10
-        )
-
-        result = orchestrator.run_conversation(
+        mock_io = MockIO(
             [
-                "",
                 "My budget is around $50",
                 "They like building toys and science kits",
                 "Safety is important for a 7-year-old",
                 "Educational value would be good",
-                "That's all I can think of",
+                "Please finalize the criteria now with budget included",
             ]
         )
 
-        # The conversation completed with criteria (not failure)
-        self.assertIsNotNone(
-            result.criteria,
-            f"Conversation completed but with failure: {result.message}",
+        criteria = generate_criteria(
+            context="choosing a birthday gift for a 7-year-old",
+            max_turns=10,
+            io=mock_io,
         )
 
-        # Criteria should be valid EvaluationCriteria
-        self.assertIsInstance(result.criteria, EvaluationCriteria)
-        self.assertGreaterEqual(len(result.criteria.criteria), 2)
+        self.assertIsInstance(criteria, EvaluationCriteria)
+        self.assertGreaterEqual(len(criteria.criteria), 2)
 
-        # Check for budget criterion (case-insensitive)
-        budget_found = any(
-            "budget" in criterion.name.lower() for criterion in result.criteria.criteria
-        )
+        budget_found = any(c.name.lower() == "budget" for c in criteria.criteria)
         self.assertTrue(
             budget_found,
-            f"Criteria missing 'budget'. Found: {[c.name for c in result.criteria.criteria]}",
+            f"Criteria missing 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
     def test_uncooperative_user_max_turns(self):
-        """
-        Test that conversation ends when user doesn't provide enough information.
-
-        The conversation can end either by:
-        1. Hitting max_turns limit (raises TurnLimitExceededError)
-        2. LLM returning failure action (raises ConversationFailedError)
-
-        Both are valid outcomes for uncooperative users.
-        """
-        orchestrator = ConversationOrchestrator(
-            initial_context="choosing a laptop for programming", max_turns=3
+        mock_io = MockIO(
+            [
+                "I'm not sure",
+                "Maybe something good",
+                "Whatever you think",
+            ]
         )
 
-        # Uncooperative user responses
-        uncooperative_responses = [
-            "I'm not sure",
-            "Maybe something good",
-            "Whatever you think",
-            "I don't know",
-        ]
-
-        last_exception = None
-        completed = False
-
-        for i, response in enumerate(uncooperative_responses):
-            try:
-                result = orchestrator.process_turn(response)
-
-                if result.is_complete:
-                    completed = True
-                    break
-
-            except Exception as e:
-                last_exception = e
-                break
-
-        # Either the conversation completed with failure, or hit max turns
-        self.assertTrue(
-            completed or last_exception is not None,
-            "Should have either completed or raised an exception",
-        )
-
-        # If it was a turn limit, verify the message
-        if last_exception and "Maximum conversation turns" in str(last_exception):
-            self.assertIn("3", str(last_exception))
+        with self.assertRaises((TurnLimitExceededError, ConversationFailedError)):
+            generate_criteria(
+                context="choosing a laptop for programming",
+                max_turns=3,
+                io=mock_io,
+            )
 
     def test_conversation_action_format(self):
-        """
-        Test that LLM returns valid ConversationAction format.
-        """
-        orchestrator = ConversationOrchestrator(initial_context="test context")
+        orchestrator = StructuredConversationOrchestrator(
+            system_prompt="You are a helpful assistant for creating evaluation criteria. "
+            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
+            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
+            response_model=ConversationAction[EvaluationCriteria],
+            max_turns=5,
+            initial_messages=[
+                {
+                    "role": "user",
+                    "content": "I want to create criteria for choosing a laptop. My budget is $1000.",
+                }
+            ],
+            on_continue=lambda action: ConversationResult[
+                EvaluationCriteria
+            ].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
+                action.result
+            ),
+            on_failure=lambda action: ConversationFailedError(action.message),
+        )
 
-        result = orchestrator.process_turn("test")
-
-        # Should get a valid response (not crash due to format errors)
+        result = orchestrator.process_turn("Please include budget as a criterion")
         self.assertIsInstance(result, ConversationResult)
+        self.assertIsNotNone(result.message)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,6 @@ from .exceptions import (
     ProviderNotFoundError,
     ProviderNotSupportedError,
 )
-from .models import EvaluationCriteria
 
 load_dotenv()
 
@@ -126,66 +125,6 @@ def get_client(
     # Use TOOLS mode when model supports function calling, otherwise JSON mode
     mode = instructor.Mode.TOOLS if supports_tools else instructor.Mode.JSON
     return instructor.from_litellm(completion, mode=mode)
-
-
-def generate_evaluation_criteria(
-    context: str = "birthday presents for a child",
-    temperature: Optional[float] = None,
-    max_retries: Optional[int] = None,
-) -> EvaluationCriteria:
-    """
-    Generate evaluation criteria for a given context using LLM.
-
-    Args:
-        context: The context for evaluation (e.g., "birthday presents for a 7-year-old")
-        temperature: Sampling temperature (0.0 to 2.0, defaults to configured temperature)
-        max_retries: Maximum number of retry attempts (defaults to configured max_retries)
-
-    Returns:
-        EvaluationCriteria object with generated criteria
-    """
-    from .config import config
-
-    client = get_client()
-
-    # Use provided values or fall back to config
-    model = config.model
-    temperature = temperature or config.temperature
-    max_retries = max_retries or config.max_retries
-
-    prompt = f"""
-    You are an expert at creating evaluation criteria for decision making.
-    
-    Create a comprehensive set of criteria for evaluating options in this context: {context}
-    
-    For each criterion, provide:
-    1. A clear name
-    2. A detailed description of what it measures
-    3. A weight from 0.0 to 10.0 indicating importance
-    4. An ideal or target value if applicable
-    
-    The criteria should be specific, measurable, and relevant to the context.
-    Include both objective and subjective criteria where appropriate.
-    """
-
-    criteria = client.chat.completions.create(
-        model=model,
-        temperature=temperature,
-        max_retries=max_retries,
-        timeout=config.request_timeout_seconds,
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a helpful assistant that creates structured evaluation criteria.",
-            },
-            {"role": "user", "content": prompt},
-        ],
-        response_model=EvaluationCriteria,
-    )
-
-    # Set the context on the returned object
-    criteria.context = context
-    return criteria
 
 
 def list_available_providers() -> dict:

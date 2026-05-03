@@ -1,7 +1,7 @@
 [project]
 name = "prompt-core"
 version = "0.1.0"
-description = "Add your description here"
+description = "Framework for building structured LLM conversation workflows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -19,6 +19,9 @@ prompt-core = "prompt_core.cli:main"
 [build-system]
 requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["prompt_core*", "evaluation_criteria*"]
 
 [project.optional-dependencies]
 dev = [
