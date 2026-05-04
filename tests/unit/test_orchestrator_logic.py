@@ -348,7 +348,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         "prompt_core.conversation_runtime.StructuredConversationOrchestrator._call_llm"
     )
     def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
-        from evaluation_criteria.flows import run_reviewed_criteria_conversation
+        from evaluation_criteria.flows import generate_reviewed_criteria
         from prompt_core import ConversationFlowState
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
@@ -361,7 +361,7 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         state = ConversationFlowState()
 
-        result = run_reviewed_criteria_conversation(
+        result = generate_reviewed_criteria(
             context="test context",
             max_turns=5,
             io=mock_io,

@@ -3,6 +3,7 @@
 
 # Variables
 PYTHON := .venv/bin/python
+OUT := .venv/bin/prompt-core
 PYTEST := .venv/bin/pytest
 UNITTEST := .venv/bin/python -m unittest
 COVERAGE := .venv/bin/coverage
@@ -15,8 +16,7 @@ NC := \033[0m # No Color
 
 help:
 	@echo "Available commands:"
-	@echo "  ${GREEN}make${NC}              Get project ready to run (setup + sync)"
-	@echo "  ${GREEN}make setup${NC}        Install uv if not present, sync dependencies"
+	@echo "  ${GREEN}make setup${NC}        Make project ready for development
 	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)"
 	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output"
 	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)"
@@ -27,11 +27,12 @@ help:
 	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
 	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)"
 
-# Setup: Install uv if not present, then sync dependencies
 setup:
 	@uv --version >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 	@uv sync --all-extras
-	@echo "${GREEN}✓ Setup complete.${NC} Run ${YELLOW}source .venv/bin/activate${NC} to use ${YELLOW}prompt-core${NC} command."
+
+run:
+	@$(OUT)
 
 test: setup lint test-unit
 

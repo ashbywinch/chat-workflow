@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-import json
 
-from prompt_core import leaf, workflow, ConversationTools
+from typing import TypeVar
+from prompt_core import chat, workflow, ConversationTools
+from pydantic import BaseModel
 
 from .models import EvaluationCriteria
 from .presentation import print_criteria
 
 
-@leaf
+@chat
 def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCriteria:
     """You are a helpful assistant guiding the user to create evaluation criteria.
     You have up to {max_turns} turns.
@@ -33,62 +34,47 @@ def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCrite
     """
     pass
 
+ModelType = TypeVar('ModelType', bound=BaseModel)
 
-@leaf
-def refine_criteria(
-    initial_criteria: EvaluationCriteria, max_turns: int = 5
-) -> EvaluationCriteria:
-    """You are running a short refinement conversation for existing evaluation criteria.
-    Goal: help the user keep or update the criteria and return a final result.
+@chat
+def refine(initial_object: ModelType, max_turns: int = 5) -> ModelType:
+    """You are running a short refinement conversation for an existing object.
+    Goal: Check whether the user wants to keep this version of the object or change anything about it. Return the object with any updates.
 
     Rules:
     - Ask one question at a time.
     - Use only user-provided feedback.
-    - Preserve the original context unless the user asks to change it.
+    - Preserve the original object contents exactly unless the user asks to change it.
     - Turn limit: {max_turns} total turns.
 
     Response actions:
-    - action="continue": ask one focused follow-up question.
-    - action="success": return final criteria with action.result (updated or unchanged).
+    - action="continue": further questions are required.
+    - action="success": return the object (updated or unchanged).
     - action="failure": only if the user refuses to engage.
 
-    When returning action="success", your criteria MUST include a criterion named "budget" (lowercase). This is a validation requirement - criteria without "budget" will be rejected.
-
-    Here is the current criteria to review:
-    {criteria_json}
+    Here is the current object to review:
+    {initial_object.model_dump()}
     """
     pass
 
 
 @workflow
-def run_reviewed_criteria_conversation(
+def generate_reviewed_criteria(
     context: str = "", max_turns: int = 10, *, tools: ConversationTools
 ) -> EvaluationCriteria:
     initial = generate_criteria(context=context, max_turns=max_turns, tools=tools)
+    final = None
+    while final is None or initial.model_dump() != final.model_dump():
+        print_criteria(
+            criteria=initial,
+            title="Initial criteria:",
+            echo=tools.io.echo,
+        )
 
-    print_criteria(
-        criteria=initial,
-        title="Initial criteria:",
-        echo=tools.io.echo,
-    )
-
-    tools.io.echo(
-        "\nAssistant: What do you think about these criteria? "
-        "We can keep them or update them."
-    )
-
-    criteria_json = json.dumps(initial.model_dump(), indent=2)
-    final = refine_criteria(
-        initial_criteria=initial,
-        max_turns=max_turns,
-        criteria_json=criteria_json,
-        tools=tools,
-    )
-
-    print_criteria(
-        criteria=final,
-        title="Final criteria:",
-        echo=tools.io.echo,
-    )
+        final = refine(
+            initial_object=initial,
+            max_turns=max_turns,
+            tools=tools,
+        )
 
     return final

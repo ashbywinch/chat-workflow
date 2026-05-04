@@ -6,7 +6,7 @@ from .conversation_runtime import (
     ConversationResult,
     ConversationTools,
     StructuredConversationOrchestrator,
-    leaf,
+    chat,
     workflow,
 )
 from .llm_interaction import get_client, list_available_providers
@@ -19,7 +19,7 @@ __all__ = [
     "ConversationResult",
     "ConversationTools",
     "StructuredConversationOrchestrator",
-    "leaf",
+    "chat",
     "workflow",
     "get_client",
     "list_available_providers",

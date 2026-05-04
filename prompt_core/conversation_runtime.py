@@ -195,10 +195,7 @@ def _get_return_type(func: Callable) -> type[BaseModel] | None:
     if return_type is None:
         return None
 
-    if isinstance(return_type, type) and issubclass(return_type, BaseModel):
-        return return_type
-
-    return None
+    return return_type
 
 
 def _format_docstring(docstring: str | None, **kwargs) -> str:
@@ -211,8 +208,8 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
         return docstring
 
 
-def leaf(func: Callable) -> Callable:
-    """Auto-orchestrates a leaf function using its docstring as system prompt.
+def chat(func: Callable) -> Callable:
+    """Auto-orchestrates an LLM chat function using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts either 'io'/'state' parameters or 'tools' (ConversationTools).
@@ -220,10 +217,12 @@ def leaf(func: Callable) -> Callable:
     from .exceptions import ConversationFailedError
 
     return_type = _get_return_type(func)
+    if isinstance(return_type, TypeVar):
+        return_type = return_type.__bound__
 
-    if return_type is None:
+    if not issubclass(return_type, BaseModel):
         raise TypeError(
-            f"Leaf function '{func.__name__}' must have a Pydantic model return type"
+            f"Leaf function '{func.__name__}' must have a Pydantic model return type, type is {return_type}"
         )
 
     @wraps(func)
@@ -238,7 +237,7 @@ def leaf(func: Callable) -> Callable:
 
         if tools is None:
             raise TypeError(
-                f"Leaf function '{func.__name__}' requires 'io' or 'tools' parameter"
+                f"Chat function '{func.__name__}' requires 'io' or 'tools' parameter"
             )
 
         state = tools.state
