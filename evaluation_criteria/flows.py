@@ -28,10 +28,6 @@ def generate_criteria(
     - If the user is vague, ask clarifying questions.
     - If the user is uncooperative or refuses to provide useful information, use action="failure".
 
-    Output actions:
-    - action="continue": ask the next helpful question.
-    - action="success": return complete criteria with action.result.
-    - action="failure": end the conversation when useful criteria cannot be produced.
     """
     pass
 
@@ -54,13 +50,6 @@ def refine(
     - Use only user-provided feedback.
     - Preserve the original object contents exactly unless the user asks to change it.
 
-    Response actions:
-    - action="continue": further questions are required.
-    - action="success": return the object (updated or unchanged).
-    - action="failure": only if the user refuses to engage.
-
-    Here is the current object to review:
-    {initial_object.model_dump()}
     """
     pass
 
