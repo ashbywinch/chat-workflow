@@ -26,7 +26,7 @@ def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCrite
     Output actions:
     - action="continue": ask the next helpful question.
     - action="success": return complete criteria with action.result.
-    - action="failure": end the conversation when useful criteria cannot be produced (no result needed).
+    - action="failure": end the conversation when useful criteria cannot be produced.
 
     When returning action="success", your criteria MUST include a criterion named "budget" (lowercase). This is a validation requirement - criteria without "budget" will be rejected.
 
@@ -34,7 +34,9 @@ def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCrite
     """
     pass
 
-ModelType = TypeVar('ModelType', bound=BaseModel)
+
+ModelType = TypeVar("ModelType", bound=BaseModel)
+
 
 @chat
 def refine(initial_object: ModelType, max_turns: int = 5) -> ModelType:
@@ -62,19 +64,22 @@ def refine(initial_object: ModelType, max_turns: int = 5) -> ModelType:
 def generate_reviewed_criteria(
     context: str = "", max_turns: int = 10, *, tools: ConversationTools
 ) -> EvaluationCriteria:
-    initial = generate_criteria(context=context, max_turns=max_turns, tools=tools)
-    final = None
-    while final is None or initial.model_dump() != final.model_dump():
+    criteria = generate_criteria(context=context, max_turns=max_turns, tools=tools)
+
+    while True:
         print_criteria(
-            criteria=initial,
-            title="Initial criteria:",
+            criteria=criteria,
+            title="Current criteria:",
             echo=tools.io.echo,
         )
 
-        final = refine(
-            initial_object=initial,
+        refined = refine(
+            initial_object=criteria,
             max_turns=max_turns,
             tools=tools,
         )
 
-    return final
+        if refined.model_dump() == criteria.model_dump():
+            return refined
+
+        criteria = refined

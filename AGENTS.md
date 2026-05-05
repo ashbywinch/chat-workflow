@@ -11,11 +11,12 @@ Generates structured `EvaluationCriteria` objects via multi-turn LLM conversatio
 | File | What |
 |------|------|
 | `prompt_core/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
-| `prompt_core/conversation.py` | `ConversationOrchestrator`, `ConversationAction` models, system prompt |
+| `prompt_core/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
 | `prompt_core/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `prompt_core/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `prompt_core/exceptions.py` | Custom exception hierarchy |
 | `prompt_core/cli.py` | Typer CLI (`converse` command) |
+| `evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
 
 ## Conventions
 
@@ -113,6 +114,28 @@ If branch -d fails because there are outstanding changes then return to step 2
 - `ConversationAction` is a single discriminator model with `action: Literal["continue", "success", "failure"]`
 - `ConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
 - Turn limit raises `TurnLimitExceededError`; failure action raises `ConversationFailedError`
+
+## Debugging LLM Interactions
+
+When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
+
+```bash
+PROMPT_CORE_DEBUG=1 make evals
+```
+
+Or for a single test:
+```bash
+PROMPT_CORE_DEBUG=1 .venv/bin/python -m unittest tests.evals.test_real_api.TestRealAPI.test_name -v
+```
+
+This streams all LLM requests/responses to stderr with timing:
+```
+[15:44:16.001] ━━━ LLM REQUEST ━━━
+[15:44:16.001] Model: openrouter/google/gemini-2.0-flash-lite-001
+[15:44:16.001] [0] system: You are a helpful assistant...
+[15:44:16.001] Waiting for response...
+[15:44:17.234] ━━━ LLM RESPONSE (1233ms) ━━━
+```
 
 ## Reference Docs
 

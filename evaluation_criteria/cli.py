@@ -72,7 +72,9 @@ def handle_error(error: Exception):
         typer.secho(
             f"\n✗ Unexpected error: {str(error)[:200]}", err=True, fg=typer.colors.RED
         )
-        message = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        message = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
         typer.secho(f"\n {message}")
     raise typer.Exit(1)
 

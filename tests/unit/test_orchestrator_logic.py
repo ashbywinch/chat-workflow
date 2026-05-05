@@ -370,6 +370,200 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         self.assertIsInstance(result, EvaluationCriteria)
 
+    @patch(
+        "prompt_core.conversation_runtime.StructuredConversationOrchestrator._call_llm"
+    )
+    def test_workflow_refinement_loop(self, mock_call_llm):
+        from evaluation_criteria.flows import generate_reviewed_criteria
+        from prompt_core import ConversationFlowState
+
+        initial_criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget", weight=8.0),
+                Criterion(name="quality", description="Quality", weight=7.0),
+            ],
+        )
+
+        refined_criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget", weight=8.0),
+                Criterion(name="quality", description="Quality", weight=9.0),
+            ],
+        )
+
+        mock_call_llm.side_effect = [
+            ConversationAction[EvaluationCriteria](
+                action="success", result=initial_criteria
+            ),
+            ConversationAction[EvaluationCriteria](
+                action="success", result=refined_criteria
+            ),
+            ConversationAction[EvaluationCriteria](
+                action="success", result=refined_criteria
+            ),
+        ]
+
+        mock_io = Mock()
+        mock_io.echo = Mock()
+        mock_io.prompt = Mock(return_value="change quality weight")
+
+        state = ConversationFlowState()
+
+        result = generate_reviewed_criteria(
+            context="test context",
+            max_turns=5,
+            io=mock_io,
+            state=state,
+        )
+
+        self.assertIsInstance(result, EvaluationCriteria)
+        self.assertEqual(result.criteria[1].weight, 9.0)
+
+
+class TestChatDecoratorTypeVarResolution(unittest.TestCase):
+    """Tests for TypeVar resolution in the @chat decorator.
+
+    The 'refine' function in evaluation_criteria.flows uses a TypeVar with
+    'from __future__ import annotations', which causes inspect.signature()
+    to return string annotations. The decorator resolution logic must use
+    typing.get_type_hints() instead of inspect.signature() to correctly
+    match parameter annotations to return type TypeVars.
+    """
+
+    def test_inspect_signature_returns_strings_with_future_annotations(self):
+        """Verify that inspect.signature gives string annotations for functions
+        with 'from __future__ import annotations', proving the bug mechanism."""
+        from evaluation_criteria.flows import refine
+        import typing
+        import inspect
+
+        hints = typing.get_type_hints(refine)
+        return_type = hints.get("return")
+
+        from typing import TypeVar
+
+        self.assertIsInstance(return_type, TypeVar)
+
+        # inspect.signature() returns strings due to from __future__ import annotations
+        sig = inspect.signature(refine)
+        param_annotation = sig.parameters["initial_object"].annotation
+
+        self.assertIsInstance(param_annotation, str)
+        self.assertEqual(param_annotation, "ModelType")
+
+        # String != TypeVar -> the bug: resolution fails
+        self.assertNotEqual(param_annotation, return_type)
+
+        # typing.get_type_hints() resolves correctly
+        self.assertIn("initial_object", hints)
+        self.assertEqual(hints["initial_object"], return_type)
+
+    def test_get_type_hints_resolves_typevar(self):
+        """typing.get_type_hints() properly resolves parameter annotations
+        even with from __future__ import annotations - the fix must use this."""
+        from evaluation_criteria.flows import refine
+        import typing
+
+        hints = typing.get_type_hints(refine)
+        return_type = hints.get("return")
+
+        # Find params that share the return TypeVar using get_type_hints
+        typevar_params = [
+            name
+            for name, annotation in hints.items()
+            if name != "return" and annotation == return_type
+        ]
+
+        self.assertEqual(
+            typevar_params,
+            ["initial_object"],
+            "get_type_hints correctly identifies 'initial_object' as the TypeVar-matching param",
+        )
+
+    def test_refine_decorator_resolves_typevar_to_concrete_type(self):
+        """The @chat decorator on refine() must resolve the TypeVar to the
+        concrete type passed via initial_object. This exercises the full
+        resolution logic through the decorator - before the fix, response_model
+        stayed as ConversationAction[ModelType] (unresolved).
+        """
+        from unittest.mock import patch, Mock
+        from evaluation_criteria.flows import refine
+        from evaluation_criteria.models import EvaluationCriteria, Criterion
+        from prompt_core import (
+            StructuredConversationOrchestrator,
+            ConversationAction,
+            ConversationFlowState,
+            ConversationTools,
+        )
+
+        criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget constraint", weight=8.0),
+                Criterion(name="quality", description="Quality level", weight=7.0),
+            ],
+        )
+
+        # Capture what response_model the decorator passes to the orchestrator
+        captured_response_model = []
+
+        original_init = StructuredConversationOrchestrator.__init__
+
+        def tracking_init(self, **kwargs):
+            captured_response_model.append(kwargs.get("response_model"))
+            return original_init(self, **kwargs)
+
+        with (
+            patch.object(StructuredConversationOrchestrator, "__init__", tracking_init),
+            patch.object(
+                StructuredConversationOrchestrator, "_call_llm"
+            ) as mock_call_llm,
+        ):
+            mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
+                action="success", result=criteria
+            )
+
+            mock_io = Mock()
+            mock_io.echo = Mock()
+            mock_io.prompt = Mock(return_value="looks good")
+
+            state = ConversationFlowState()
+            tools = ConversationTools(io=mock_io, state=state)
+
+            result = refine(initial_object=criteria, max_turns=5, tools=tools)
+
+            self.assertIsInstance(result, EvaluationCriteria)
+
+        # The key assertion: response_model must be parameterized with the
+        # concrete type (EvaluationCriteria), not the unresolved TypeVar
+        self.assertEqual(
+            len(captured_response_model),
+            1,
+            "Expected exactly 1 orchestrator to be created",
+        )
+
+        response_model = captured_response_model[0]
+        self.assertIsNotNone(response_model, "response_model should be set")
+
+        # Check the inner type param via pydantic generic metadata
+        # (pydantic v2 doesn't use standard typing.get_args())
+        metadata = response_model.__pydantic_generic_metadata__
+        args = metadata.get("args", ())
+        self.assertEqual(
+            len(args),
+            1,
+            f"Expected 1 type arg in {response_model}, got args={args}",
+        )
+
+        inner_type = args[0]
+        self.assertIs(
+            inner_type,
+            EvaluationCriteria,
+            f"response_model inner type should be EvaluationCriteria, got {inner_type}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

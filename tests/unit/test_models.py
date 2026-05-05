@@ -200,19 +200,19 @@ class TestConversationActionModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             ConversationAction[EvaluationCriteria](action="continue", message=None)
 
-        self.assertIn("continue action requires message", str(context.exception))
+        self.assertIn("continue action requires a message", str(context.exception))
 
     def test_action_validation_success_without_result(self):
         with self.assertRaises(ValueError) as context:
             ConversationAction[EvaluationCriteria](action="success", result=None)
 
-        self.assertIn("success action requires result", str(context.exception))
+        self.assertIn("success action requires a result", str(context.exception))
 
     def test_action_validation_failure_without_message(self):
         with self.assertRaises(ValueError) as context:
             ConversationAction[EvaluationCriteria](action="failure", message=None)
 
-        self.assertIn("failure action requires message", str(context.exception))
+        self.assertIn("failure action requires a message", str(context.exception))
 
 
 class TestConversationResultModel(unittest.TestCase):
