@@ -22,6 +22,12 @@ Generates structured `EvaluationCriteria` objects via multi-turn LLM conversatio
 
 - **Business rules live in Pydantic models** (`model_validator`), not prompts.
 - **Prompts give behavioral guidance only** — Instructor handles schema formatting.
+- **Must communicate rules in the JSON schema, not just the model_validator.** A `model_validator` only fires *after* the LLM returns data — it's enforcement, not communication. The LLM reads the JSON schema (appended by Instructor to the system message) to understand what to produce. So rules must be encoded in ways that propagate to `model_json_schema()`:
+  - Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`) — these inject directly into the schema.
+  - Use `Field(description=...)` with plain-English conditional rules (e.g. `'Required when action is "success". Must be null when action is "continue".'`).
+  - Use class docstrings — Pydantic v2 emits them as the model's `"description"` in JSON schema.
+  - Use `model_config = dict(json_schema_extra=...)` for non-standard but model-level annotations the LLM should see.
+  - Test schemas with `Model.model_json_schema()` and verify each rule is visible in the output.
 - **`max_turns`** appears in both the system prompt (f-string) and the code guard.
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally.
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them.
@@ -107,6 +113,7 @@ If branch -d fails because there are outstanding changes then return to step 2
 2. DO give behavioral examples and conversation strategies.
 3. ALWAYS use f-strings for turn limits (`{self.max_turns}`), never hardcode.
 4. FOCUS on "what to do", not "what not to do".
+5. If the LLM repeatedly fails to satisfy a Pydantic rule, the rule is not visible enough in the JSON schema. Fix the schema (see Conventions), not the prompt.
 
 ## Critical Patterns
 
