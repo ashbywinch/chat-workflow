@@ -451,7 +451,8 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         param_annotation = sig.parameters["initial_object"].annotation
 
         self.assertIsInstance(param_annotation, str)
-        self.assertEqual(param_annotation, "ModelType")
+        self.assertIn("ModelType", param_annotation)
+        self.assertIn("Annotated", param_annotation)
 
         # String != TypeVar -> the bug: resolution fails
         self.assertNotEqual(param_annotation, return_type)
@@ -563,6 +564,200 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             EvaluationCriteria,
             f"response_model inner type should be EvaluationCriteria, got {inner_type}",
         )
+
+
+class TestAutoParamInjection(unittest.TestCase):
+    """Tests for automatic parameter injection via _build_params_section."""
+
+    def test_build_params_section_basic_params(self):
+        """Params without Annotated metadata show type, name, and value."""
+        from prompt_core.conversation_runtime import _build_params_section
+
+        def sample(context: str = "", max_turns: int = 10):
+            pass
+
+        section = _build_params_section(sample, {"context": "party", "max_turns": 5})
+
+        self.assertIn("## Parameters", section)
+        self.assertIn("`context` (str)", section)
+        self.assertIn('"party"', section)
+        self.assertIn("`max_turns` (int)", section)
+        self.assertIn("5", section)
+
+    def test_build_params_section_with_annotated(self):
+        """Annotated[T, 'desc'] descriptions appear in the output."""
+        from prompt_core.conversation_runtime import _build_params_section
+        from typing import Annotated
+
+        def sample(
+            context: Annotated[str, "The party theme"] = "",
+            max_turns: Annotated[int, "Turn limit"] = 10,
+        ):
+            pass
+
+        section = _build_params_section(sample, {"context": "birthday"})
+
+        self.assertIn("The party theme", section)
+        self.assertIn("Turn limit", section)
+        self.assertIn("`context` (str)", section)
+        self.assertIn("`max_turns` (int)", section)
+
+    def test_build_params_section_excludes_internal(self):
+        """tools, io, state, debug are excluded from the section."""
+        from prompt_core.conversation_runtime import _build_params_section
+
+        def sample(
+            context: str = "",
+            tools: object = None,
+            io: object = None,
+            state: object = None,
+            debug: object = None,
+        ):
+            pass
+
+        section = _build_params_section(sample, {"context": "test"})
+
+        self.assertIn("context", section)
+        self.assertNotIn("tools", section)
+        self.assertNotIn("io ", section)  # space to avoid matching 'io' in other words
+        self.assertNotIn("state", section)
+        self.assertNotIn("debug", section)
+
+    def test_build_params_section_shows_default_when_no_runtime_value(self):
+        """When a param is not in kwargs, its default is shown instead."""
+        from prompt_core.conversation_runtime import _build_params_section
+
+        def sample(max_turns: int = 10):
+            pass
+
+        section = _build_params_section(sample, {})
+
+        self.assertIn("Default: 10", section)
+
+    def test_chat_decorator_includes_params_section_in_system_prompt(self):
+        """The @chat decorator appends the params section to the system prompt."""
+        from unittest.mock import patch, Mock
+        from prompt_core.conversation_runtime import (
+            StructuredConversationOrchestrator,
+            ConversationTools,
+            ConversationFlowState,
+        )
+        from evaluation_criteria.models import EvaluationCriteria, Criterion
+
+        captured_system_prompt = []
+
+        original_init = StructuredConversationOrchestrator.__init__
+
+        def tracking_init(self, **kwargs):
+            captured_system_prompt.append(kwargs.get("system_prompt", ""))
+            return original_init(self, **kwargs)
+
+        valid_criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget constraint", weight=8.0),
+                Criterion(name="quality", description="Quality level", weight=7.0),
+            ],
+        )
+
+        with (
+            patch.object(StructuredConversationOrchestrator, "__init__", tracking_init),
+            patch.object(
+                StructuredConversationOrchestrator, "_call_llm"
+            ) as mock_call_llm,
+        ):
+            mock_call_llm.return_value = type(
+                "MockAction",
+                (),
+                {"action": "success", "message": None, "result": valid_criteria},
+            )()
+
+            mock_io = Mock()
+            mock_io.echo = Mock()
+            mock_io.prompt = Mock(return_value="test")
+            state = ConversationFlowState()
+            tools = ConversationTools(io=mock_io, state=state)
+
+            from evaluation_criteria.flows import generate_criteria
+
+            result = generate_criteria(
+                context="birthday ideas", max_turns=5, tools=tools
+            )
+
+            self.assertIsInstance(result, EvaluationCriteria)
+
+        self.assertEqual(len(captured_system_prompt), 1)
+        prompt = captured_system_prompt[0]
+
+        # Should contain the auto-injected parameters section
+        self.assertIn("## Parameters", prompt)
+        self.assertIn("`context` (str)", prompt)
+        self.assertIn("`max_turns` (int)", prompt)
+
+        # Should NOT contain internal params
+        self.assertNotIn("tools", prompt)
+
+    def test_chat_decorator_preserves_inline_interpolation(self):
+        """{initial_object.model_dump()} style interpolation still works."""
+        from unittest.mock import patch, Mock
+        from prompt_core.conversation_runtime import (
+            StructuredConversationOrchestrator,
+            ConversationTools,
+            ConversationFlowState,
+        )
+        from evaluation_criteria.models import EvaluationCriteria, Criterion
+
+        captured_system_prompt = []
+
+        original_init = StructuredConversationOrchestrator.__init__
+
+        def tracking_init(self, **kwargs):
+            captured_system_prompt.append(kwargs.get("system_prompt", ""))
+            return original_init(self, **kwargs)
+
+        criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget", weight=8.0),
+                Criterion(name="quality", description="Quality", weight=7.0),
+            ],
+        )
+
+        with (
+            patch.object(StructuredConversationOrchestrator, "__init__", tracking_init),
+            patch.object(
+                StructuredConversationOrchestrator, "_call_llm"
+            ) as mock_call_llm,
+        ):
+            mock_call_llm.return_value = type(
+                "MockAction",
+                (),
+                {"action": "success", "message": None, "result": criteria},
+            )()
+
+            mock_io = Mock()
+            mock_io.echo = Mock()
+            mock_io.prompt = Mock(return_value="looks good")
+            state = ConversationFlowState()
+            tools = ConversationTools(io=mock_io, state=state)
+
+            from evaluation_criteria.flows import refine
+
+            result = refine(initial_object=criteria, max_turns=3, tools=tools)
+
+            self.assertIsInstance(result, EvaluationCriteria)
+
+        self.assertEqual(len(captured_system_prompt), 1)
+        prompt = captured_system_prompt[0]
+
+        # Should contain inline interpolation result (model_dump output)
+        self.assertIn("budget", prompt)
+        self.assertIn("quality", prompt)
+
+        # Should ALSO contain the auto-injected params section
+        self.assertIn("## Parameters", prompt)
+        self.assertIn("`initial_object` (~ModelType)", prompt)
+        self.assertIn("`max_turns` (int)", prompt)
 
 
 if __name__ == "__main__":
