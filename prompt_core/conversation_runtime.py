@@ -9,15 +9,21 @@ from functools import wraps
 from typing import Any, Callable, Generic, Protocol, TypeVar, Literal
 from datetime import datetime
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 TResult = TypeVar("TResult")
 
 
 class ConversationAction(BaseModel, Generic[TResult]):
     action: Literal["continue", "success", "failure"]
-    message: str | None = None
-    result: TResult | None = None
+    message: str | None = Field(
+        default=None,
+        description='Message for the user. Required when action is "continue" or "failure". Must be null when action is "success".',
+    )
+    result: TResult | None = Field(
+        default=None,
+        description='The criteria object. Required when action is "success". Must be null when action is "continue" or "failure".',
+    )
 
     @model_validator(mode="after")
     def validate_action_consistency(self):

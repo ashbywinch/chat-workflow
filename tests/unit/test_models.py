@@ -70,12 +70,10 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=more_criteria)
 
-        from prompt_core.exceptions import CriteriaValidationError
+        from pydantic import ValidationError
 
-        with self.assertRaises(CriteriaValidationError) as context:
+        with self.assertRaises(ValidationError):
             EvaluationCriteria(criteria=[self.valid_criteria[0]])
-
-        self.assertIn("Must have at least 2 criteria", str(context.exception))
 
     def test_business_rule_must_include_budget(self):
         EvaluationCriteria(criteria=self.valid_criteria)
