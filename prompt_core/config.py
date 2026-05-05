@@ -4,6 +4,7 @@ Reads from config.json and environment variables.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Dict, Any
 from dotenv import load_dotenv
@@ -101,6 +102,11 @@ class Config:
     def model_supports_tools(self) -> bool:
         """Whether the configured model supports tool/function calling."""
         return self._config_data["llm"].get("model_supports_tools", False)
+
+    @property
+    def debug(self) -> bool:
+        """Whether to enable debug tracing of LLM interactions."""
+        return os.environ.get("PROMPT_CORE_DEBUG", "").lower() in ("1", "true", "yes")
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a configuration value by dot-separated key."""

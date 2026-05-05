@@ -19,7 +19,8 @@ from prompt_core.exceptions import (
 )
 from prompt_core.session_logging import log_session
 
-from .flows import run_reviewed_criteria_conversation
+from .flows import generate_reviewed_criteria
+import traceback
 
 app = typer.Typer(help="Generate and work with evaluation criteria using LLMs")
 
@@ -71,6 +72,10 @@ def handle_error(error: Exception):
         typer.secho(
             f"\n✗ Unexpected error: {str(error)[:200]}", err=True, fg=typer.colors.RED
         )
+        message = "".join(
+            traceback.format_exception(type(error), error, error.__traceback__)
+        )
+        typer.secho(f"\n {message}")
     raise typer.Exit(1)
 
 
@@ -99,7 +104,7 @@ def converse(
         if context:
             typer.echo(f"Context: {context}")
 
-        criteria = run_reviewed_criteria_conversation(
+        criteria = generate_reviewed_criteria(
             context=context,
             max_turns=max_turns,
             io=io,

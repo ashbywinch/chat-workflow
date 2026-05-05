@@ -10,6 +10,8 @@ from prompt_core import (
 )
 from prompt_core.exceptions import TurnLimitExceededError, ConversationFailedError
 
+from tests.conftest import timeout
+
 
 class MockIO:
     def __init__(self, responses):
@@ -26,6 +28,7 @@ class MockIO:
 
 
 class TestRealAPI(unittest.TestCase):
+    @timeout(10)
     def test_call_llm_returns_valid_action(self):
         orchestrator = StructuredConversationOrchestrator(
             system_prompt="You are a helpful assistant that creates evaluation criteria. "
@@ -82,6 +85,7 @@ class TestRealAPI(unittest.TestCase):
                 f"Criteria must include 'budget'. Found: {[c.name for c in action.result.criteria]}",
             )
 
+    @timeout(10)
     def test_multi_turn_conversation_with_real_llm(self):
         mock_io = MockIO(
             [
@@ -106,6 +110,7 @@ class TestRealAPI(unittest.TestCase):
             f"Criteria must include 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
+    @timeout(10)
     def test_single_turn_with_real_llm(self):
         orchestrator = StructuredConversationOrchestrator(
             system_prompt="You are a helpful assistant for creating evaluation criteria. "
@@ -142,6 +147,7 @@ class TestRealAPI(unittest.TestCase):
                 f"Criteria must include 'budget'. Found: {[c.name for c in result.result.criteria]}",
             )
 
+    @timeout(10)
     def test_conversation_flow_with_real_llm(self):
         mock_io = MockIO(
             [
@@ -168,6 +174,7 @@ class TestRealAPI(unittest.TestCase):
             f"Criteria missing 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
+    @timeout(10)
     def test_uncooperative_user_max_turns(self):
         mock_io = MockIO(
             [
@@ -184,6 +191,7 @@ class TestRealAPI(unittest.TestCase):
                 io=mock_io,
             )
 
+    @timeout(10)
     def test_conversation_action_format(self):
         orchestrator = StructuredConversationOrchestrator(
             system_prompt="You are a helpful assistant for creating evaluation criteria. "

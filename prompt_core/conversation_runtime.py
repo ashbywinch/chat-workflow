@@ -2,26 +2,54 @@
 
 from __future__ import annotations
 
+import json
+import sys
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, Callable, Generic, Protocol, TypeVar, Literal
+from datetime import datetime
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 TResult = TypeVar("TResult")
 
 
 class ConversationAction(BaseModel, Generic[TResult]):
     action: Literal["continue", "success", "failure"]
-    message: str | None = None
-    result: TResult | None = None
+    message: str | None = Field(
+        default=None,
+        description='Message for the user. Required when action is "continue" or "failure". Must be null when action is "success".',
+    )
+    result: TResult | None = Field(
+        default=None,
+        description='The criteria object. Required when action is "success". Must be null when action is "continue" or "failure".',
+    )
 
     @model_validator(mode="after")
     def validate_action_consistency(self):
-        if self.action in ["continue", "failure"] and not self.message:
-            raise ValueError(f"{self.action} action requires message")
-        if self.action == "success" and self.result is None:
-            raise ValueError("success action requires result")
+        if self.action == "continue":
+            if not self.message:
+                raise ValueError(
+                    "continue action requires a message field with your question for the user. "
+                    "Do not include a result field."
+                )
+            if self.result is not None:
+                raise ValueError(
+                    "continue action cannot include result. "
+                    "Use action='success' if you have complete criteria to return."
+                )
+        elif self.action == "failure":
+            if not self.message:
+                raise ValueError(
+                    "failure action requires a message field explaining why."
+                )
+            if self.result is not None:
+                raise ValueError("failure action cannot include result.")
+        elif self.action == "success":
+            if self.result is None:
+                raise ValueError(
+                    "success action requires a result field with the complete criteria."
+                )
         return self
 
 
@@ -58,6 +86,75 @@ class ConversationIO(Protocol):
     def prompt(self, label: str) -> str: ...
 
 
+class ConversationDebug(Protocol):
+    """Protocol for debugging LLM conversations.
+
+    Implement this to receive debug events during conversation flow.
+    """
+
+    def on_request(self, messages: list[dict[str, str]], model: str) -> None:
+        """Called before sending request to LLM."""
+        ...
+
+    def on_response(self, response: Any, duration_ms: float) -> None:
+        """Called after receiving response from LLM."""
+        ...
+
+    def on_error(self, error: Exception) -> None:
+        """Called when an error occurs."""
+        ...
+
+
+class StreamingDebug:
+    """A debug callback that prints LLM interactions to stdout in real-time.
+
+    Usage:
+        debug = StreamingDebug()
+        orchestrator = StructuredConversationOrchestrator(..., debug=debug)
+    """
+
+    def __init__(self, file: Any = None, include_timestamps: bool = True):
+        self.file = file or sys.stderr
+        self.include_timestamps = include_timestamps
+        self._request_start: datetime | None = None
+
+    def _timestamp(self) -> str:
+        if self.include_timestamps:
+            return f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] "
+        return ""
+
+    def _print(self, message: str) -> None:
+        print(message, file=self.file, flush=True)
+
+    def on_request(self, messages: list[dict[str, str]], model: str) -> None:
+        self._request_start = datetime.now()
+        self._print(f"{self._timestamp()}━━━ LLM REQUEST ━━━")
+        self._print(f"{self._timestamp()}Model: {model}")
+        for i, msg in enumerate(messages):
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            if len(content) > 500:
+                content = content[:500] + "..."
+            self._print(f"{self._timestamp()}[{i}] {role}: {content}")
+        self._print(f"{self._timestamp()}Waiting for response...")
+
+    def on_response(self, response: Any, duration_ms: float) -> None:
+        self._print(f"{self._timestamp()}━━━ LLM RESPONSE ({duration_ms:.0f}ms) ━━━")
+        try:
+            if hasattr(response, "model_dump"):
+                self._print(
+                    f"{self._timestamp()}{json.dumps(response.model_dump(), indent=2)}"
+                )
+            else:
+                self._print(f"{self._timestamp()}{response}")
+        except Exception:
+            self._print(f"{self._timestamp()}{response}")
+
+    def on_error(self, error: Exception) -> None:
+        self._print(f"{self._timestamp()}━━━ ERROR ━━━")
+        self._print(f"{self._timestamp()}{type(error).__name__}: {error}")
+
+
 class ConversationResultLike(Protocol):
     message: str
     is_complete: bool
@@ -82,6 +179,7 @@ class StructuredConversationOrchestrator:
         on_continue: Callable[[ActionLike], ConversationResultLike],
         on_success: Callable[[ActionLike], ConversationResultLike],
         on_failure: Callable[[ActionLike], Exception],
+        debug: ConversationDebug | None = None,
     ):
         from .config import config
 
@@ -95,6 +193,7 @@ class StructuredConversationOrchestrator:
         self.on_continue = on_continue
         self.on_success = on_success
         self.on_failure = on_failure
+        self.debug = debug
 
         for message in initial_messages or []:
             self.messages.append(message)
@@ -130,18 +229,33 @@ class StructuredConversationOrchestrator:
 
         try:
             client = get_client(supports_tools=config.model_supports_tools)
-            return client.chat.completions.create(
+
+            if self.debug:
+                self.debug.on_request(self.messages, self.model)
+                start = datetime.now()
+
+            response = client.chat.completions.create(
                 model=self.model,
                 messages=self.messages,
                 response_model=self.response_model,
                 max_retries=config.max_retries,
                 timeout=config.request_timeout_seconds,
             )
+
+            if self.debug:
+                duration_ms = (datetime.now() - start).total_seconds() * 1000
+                self.debug.on_response(response, duration_ms)
+
+            return response
         except ImportError as e:
             raise ProviderNotFoundError(
                 f"No LLM providers available. {e}\n"
                 "Install litellm for multi-provider LLM support: uv add litellm"
             )
+        except Exception as e:
+            if self.debug:
+                self.debug.on_error(e)
+            raise
 
 
 @dataclass
@@ -195,24 +309,56 @@ def _get_return_type(func: Callable) -> type[BaseModel] | None:
     if return_type is None:
         return None
 
-    if isinstance(return_type, type) and issubclass(return_type, BaseModel):
-        return return_type
-
-    return None
+    return return_type
 
 
 def _format_docstring(docstring: str | None, **kwargs) -> str:
+    """Format a docstring with kwargs, supporting method calls like {var.method()}.
+
+    Python's str.format() does NOT support method calls - {obj.method()} is
+    parsed as accessing an attribute named 'method()' (with parens as part
+    of the name). This function pre-processes the docstring to evaluate
+    such method calls before delegating to str.format().
+    """
+    import re
+
     if not docstring:
         return ""
 
+    # Pattern to match {identifier.method_name()} - method calls on objects
+    # This handles cases like {initial_object.model_dump()}
+    method_pattern = re.compile(r"\{(\w+)\.(\w+)\(\)\}")
+
+    def replace_method_call(match: re.Match) -> str:
+        var_name = match.group(1)
+        method_name = match.group(2)
+
+        if var_name not in kwargs:
+            # Let str.format handle missing keys (will raise KeyError)
+            return match.group(0)
+
+        obj = kwargs[var_name]
+        method = getattr(obj, method_name, None)
+
+        if method is None or not callable(method):
+            # Method doesn't exist, return original placeholder
+            return match.group(0)
+
+        # Call the method and return string representation
+        result = method()
+        return str(result) if not isinstance(result, str) else result
+
+    # Pre-process method calls
+    processed = method_pattern.sub(replace_method_call, docstring)
+
     try:
-        return docstring.format(**kwargs)
+        return processed.format(**kwargs)
     except KeyError:
-        return docstring
+        return processed
 
 
-def leaf(func: Callable) -> Callable:
-    """Auto-orchestrates a leaf function using its docstring as system prompt.
+def chat(func: Callable) -> Callable:
+    """Auto-orchestrates an LLM chat function using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts either 'io'/'state' parameters or 'tools' (ConversationTools).
@@ -220,17 +366,27 @@ def leaf(func: Callable) -> Callable:
     from .exceptions import ConversationFailedError
 
     return_type = _get_return_type(func)
+    is_generic = isinstance(return_type, TypeVar)
 
-    if return_type is None:
+    if is_generic:
+        bound_type = return_type.__bound__
+        if not issubclass(bound_type, BaseModel):
+            raise TypeError(
+                f"Leaf function '{func.__name__}' TypeVar bound must be a Pydantic model, bound is {bound_type}"
+            )
+    elif not issubclass(return_type, BaseModel):
         raise TypeError(
-            f"Leaf function '{func.__name__}' must have a Pydantic model return type"
+            f"Leaf function '{func.__name__}' must have a Pydantic model return type, type is {return_type}"
         )
 
     @wraps(func)
     def wrapper(*args, **kwargs):
+        from .config import config
+
         tools = kwargs.pop("tools", None)
         io = kwargs.pop("io", None)
         state = kwargs.pop("state", None)
+        debug = kwargs.pop("debug", None)
 
         if tools is None and io is not None:
             state = state or ConversationFlowState()
@@ -238,27 +394,51 @@ def leaf(func: Callable) -> Callable:
 
         if tools is None:
             raise TypeError(
-                f"Leaf function '{func.__name__}' requires 'io' or 'tools' parameter"
+                f"Chat function '{func.__name__}' requires 'io' or 'tools' parameter"
             )
 
         state = tools.state
+
+        # Resolve TypeVar return type from actual argument
+        actual_return_type = return_type
+        if is_generic:
+            import typing
+
+            # Use get_type_hints() instead of inspect.signature() for annotations
+            # because functions with 'from __future__ import annotations' store
+            # annotations as strings, making them uncomparable to TypeVar objects.
+            param_hints = typing.get_type_hints(func)
+            typevar_params = [
+                name
+                for name, annotation in param_hints.items()
+                if name != "return" and annotation == return_type
+            ]
+            for param_name in typevar_params:
+                if param_name in kwargs:
+                    actual_return_type = type(kwargs[param_name])
+                    break
+
+        # Enable debug tracing if PROMPT_CORE_DEBUG env var is set
+        if debug is None and config.debug:
+            debug = StreamingDebug()
 
         system_prompt = _format_docstring(func.__doc__, **kwargs)
         max_turns = kwargs.pop("max_turns", 10)
 
         orchestrator = StructuredConversationOrchestrator(
             system_prompt=system_prompt,
-            response_model=ConversationAction[return_type],
+            response_model=ConversationAction[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
-            on_continue=lambda action: ConversationResult[return_type].continuing(
-                action.message
-            ),
-            on_success=lambda action: ConversationResult[return_type].success(
+            on_continue=lambda action: ConversationResult[
+                actual_return_type
+            ].continuing(action.message),
+            on_success=lambda action: ConversationResult[actual_return_type].success(
                 action.result,
                 message="Completed successfully!",
             ),
             on_failure=lambda action: ConversationFailedError(action.message),
+            debug=debug,
         )
 
         result = tools.chat(orchestrator=orchestrator, first_user_input="")

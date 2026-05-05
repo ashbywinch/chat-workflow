@@ -24,10 +24,17 @@ class Criterion(BaseModel):
 
 
 class EvaluationCriteria(BaseModel):
-    """A list of criteria for evaluating possible choices."""
+    """A list of criteria for evaluating possible choices.
+
+    Validation rules:
+    - Must contain at least 2 criteria.
+    - Must include a criterion with name "budget" (case-insensitive match).
+    """
 
     criteria: List[Criterion] = Field(
-        default_factory=list, description="List of evaluation criteria"
+        default_factory=list,
+        description="List of evaluation criteria (minimum 2 required, must include one named 'budget')",
+        min_length=2,
     )
     context: str = Field(
         default="General decision making",

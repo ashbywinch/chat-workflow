@@ -1,8 +1,9 @@
 # Makefile for prompt-core test automation
-.PHONY: help setup test test-verbose evals evals-verbose test-unit test-all coverage lint format clean
+.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint format clean
 
 # Variables
 PYTHON := .venv/bin/python
+OUT := .venv/bin/prompt-core
 PYTEST := .venv/bin/pytest
 UNITTEST := .venv/bin/python -m unittest
 COVERAGE := .venv/bin/coverage
@@ -15,23 +16,24 @@ NC := \033[0m # No Color
 
 help:
 	@echo "Available commands:"
-	@echo "  ${GREEN}make${NC}              Get project ready to run (setup + sync)"
-	@echo "  ${GREEN}make setup${NC}        Install uv if not present, sync dependencies"
-	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)"
-	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output"
-	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)"
-	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output"
-	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
-	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
-	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
-	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
-	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)"
+	@echo "  ${GREEN}make setup${NC}        Make project ready for development
+	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)
+	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output
+	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)
+	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output
+	@echo "  ${GREEN}make evals-debug${NC}   Run evals with LLM tracing (streams requests/responses)
+	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals
+	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report
+	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)
+	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues
+	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)
 
-# Setup: Install uv if not present, then sync dependencies
 setup:
 	@uv --version >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
 	@uv sync --all-extras
-	@echo "${GREEN}✓ Setup complete.${NC} Run ${YELLOW}source .venv/bin/activate${NC} to use ${YELLOW}prompt-core${NC} command."
+
+run:
+	@$(OUT) --context "A birthday present"
 
 test: setup lint test-unit
 
@@ -46,6 +48,10 @@ evals: setup lint
 
 evals-verbose: setup lint
 	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
+
+evals-debug: setup lint
+	@echo "${YELLOW}Running evals with LLM debug tracing...${NC}"
+	@PROMPT_CORE_DEBUG=1 ${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
 
 test-all: test evals
 

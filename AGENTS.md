@@ -11,16 +11,23 @@ Generates structured `EvaluationCriteria` objects via multi-turn LLM conversatio
 | File | What |
 |------|------|
 | `prompt_core/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
-| `prompt_core/conversation.py` | `ConversationOrchestrator`, `ConversationAction` models, system prompt |
+| `prompt_core/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
 | `prompt_core/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `prompt_core/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `prompt_core/exceptions.py` | Custom exception hierarchy |
 | `prompt_core/cli.py` | Typer CLI (`converse` command) |
+| `evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
 
 ## Conventions
 
 - **Business rules live in Pydantic models** (`model_validator`), not prompts.
 - **Prompts give behavioral guidance only** — Instructor handles schema formatting.
+- **Must communicate rules in the JSON schema, not just the model_validator.** A `model_validator` only fires *after* the LLM returns data — it's enforcement, not communication. The LLM reads the JSON schema (appended by Instructor to the system message) to understand what to produce. So rules must be encoded in ways that propagate to `model_json_schema()`:
+  - Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`) — these inject directly into the schema.
+  - Use `Field(description=...)` with plain-English conditional rules (e.g. `'Required when action is "success". Must be null when action is "continue".'`).
+  - Use class docstrings — Pydantic v2 emits them as the model's `"description"` in JSON schema.
+  - Use `model_config = dict(json_schema_extra=...)` for non-standard but model-level annotations the LLM should see.
+  - Test schemas with `Model.model_json_schema()` and verify each rule is visible in the output.
 - **`max_turns`** appears in both the system prompt (f-string) and the code guard.
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally.
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them.
@@ -106,6 +113,7 @@ If branch -d fails because there are outstanding changes then return to step 2
 2. DO give behavioral examples and conversation strategies.
 3. ALWAYS use f-strings for turn limits (`{self.max_turns}`), never hardcode.
 4. FOCUS on "what to do", not "what not to do".
+5. If the LLM repeatedly fails to satisfy a Pydantic rule, the rule is not visible enough in the JSON schema. Fix the schema (see Conventions), not the prompt.
 
 ## Critical Patterns
 
@@ -113,6 +121,28 @@ If branch -d fails because there are outstanding changes then return to step 2
 - `ConversationAction` is a single discriminator model with `action: Literal["continue", "success", "failure"]`
 - `ConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
 - Turn limit raises `TurnLimitExceededError`; failure action raises `ConversationFailedError`
+
+## Debugging LLM Interactions
+
+When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
+
+```bash
+PROMPT_CORE_DEBUG=1 make evals
+```
+
+Or for a single test:
+```bash
+PROMPT_CORE_DEBUG=1 .venv/bin/python -m unittest tests.evals.test_real_api.TestRealAPI.test_name -v
+```
+
+This streams all LLM requests/responses to stderr with timing:
+```
+[15:44:16.001] ━━━ LLM REQUEST ━━━
+[15:44:16.001] Model: openrouter/google/gemini-2.0-flash-lite-001
+[15:44:16.001] [0] system: You are a helpful assistant...
+[15:44:16.001] Waiting for response...
+[15:44:17.234] ━━━ LLM RESPONSE (1233ms) ━━━
+```
 
 ## Reference Docs
 
