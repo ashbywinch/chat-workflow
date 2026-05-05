@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-
-from typing import TypeVar
+from typing import Annotated, TypeVar
 from prompt_core import chat, workflow, ConversationTools
 from pydantic import BaseModel
 
@@ -12,9 +11,15 @@ from .presentation import print_criteria
 
 
 @chat
-def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCriteria:
+def generate_criteria(
+    context: Annotated[
+        str, "The topic or domain for which to generate evaluation criteria"
+    ] = "",
+    max_turns: Annotated[
+        int, "Maximum number of conversation turns before giving up"
+    ] = 10,
+) -> EvaluationCriteria:
     """You are a helpful assistant guiding the user to create evaluation criteria.
-    You have up to {max_turns} turns.
 
     Behavior:
     - Ask one question at a time.
@@ -23,12 +28,6 @@ def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCrite
     - If the user is vague, ask clarifying questions.
     - If the user is uncooperative or refuses to provide useful information, use action="failure".
 
-    Output actions:
-    - action="continue": ask the next helpful question.
-    - action="success": return complete criteria with action.result.
-    - action="failure": end the conversation when useful criteria cannot be produced.
-
-    Context: {context}
     """
     pass
 
@@ -37,7 +36,12 @@ ModelType = TypeVar("ModelType", bound=BaseModel)
 
 
 @chat
-def refine(initial_object: ModelType, max_turns: int = 5) -> ModelType:
+def refine(
+    initial_object: Annotated[
+        ModelType, "The object to review and potentially modify based on user feedback"
+    ],
+    max_turns: Annotated[int, "Maximum number of refinement turns"] = 5,
+) -> ModelType:
     """You are running a short refinement conversation for an existing object.
     Goal: Check whether the user wants to keep this version of the object or change anything about it. Return the object with any updates.
 
@@ -45,15 +49,7 @@ def refine(initial_object: ModelType, max_turns: int = 5) -> ModelType:
     - Ask one question at a time.
     - Use only user-provided feedback.
     - Preserve the original object contents exactly unless the user asks to change it.
-    - Turn limit: {max_turns} total turns.
 
-    Response actions:
-    - action="continue": further questions are required.
-    - action="success": return the object (updated or unchanged).
-    - action="failure": only if the user refuses to engage.
-
-    Here is the current object to review:
-    {initial_object.model_dump()}
     """
     pass
 

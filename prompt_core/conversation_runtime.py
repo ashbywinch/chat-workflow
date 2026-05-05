@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import sys
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import Any, Callable, Generic, Protocol, TypeVar, Literal
 from datetime import datetime
+
+import typing
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -301,8 +304,6 @@ class ConversationTools:
 
 
 def _get_return_type(func: Callable) -> type[BaseModel] | None:
-    import typing
-
     hints = typing.get_type_hints(func)
     return_type = hints.get("return")
 
@@ -357,6 +358,113 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
         return processed
 
 
+# Internal params that the @chat decorator consumes and should NOT
+# appear in the auto-generated parameters section of the system prompt.
+_INTERNAL_PARAMS: frozenset = frozenset({"tools", "io", "state", "debug"})
+
+
+def _get_typed_hint(func: Callable, param_name: str) -> Any:
+    """Get the resolved type hint for a parameter, preserving Annotated metadata.
+
+    Uses typing.get_type_hints with include_extras=True so that
+    Annotated[T, "description"] wrappers survive resolution,
+    even through ``from __future__ import annotations``.
+    """
+    try:
+        hints = typing.get_type_hints(func, include_extras=True)
+        return hints.get(param_name)
+    except Exception:
+        return None
+
+
+def _unwrap_annotated(hint: Any) -> Any:
+    """Strip Annotated wrapper to get the bare type."""
+    origin = typing.get_origin(hint)
+    if origin is typing.Annotated:
+        return typing.get_args(hint)[0]
+    return hint
+
+
+def _get_param_description(func: Callable, param_name: str) -> str | None:
+    """Extract an optional description string from Annotated[T, \"desc\"]."""
+    hint = _get_typed_hint(func, param_name)
+    if hint is None:
+        return None
+    origin = typing.get_origin(hint)
+    if origin is not typing.Annotated:
+        return None
+    args = typing.get_args(hint)
+    for arg in args[1:]:
+        if isinstance(arg, str):
+            return arg
+    return None
+
+
+def _format_type_name(hint: Any) -> str:
+    """Render a type hint as a human-readable name."""
+    hint = _unwrap_annotated(hint)
+    if hint is None:
+        return "Any"
+    if isinstance(hint, TypeVar):
+        return str(hint)
+    if hasattr(hint, "__name__"):
+        return hint.__name__
+    return str(hint)
+
+
+def _format_param_value(value: Any) -> str:
+    """Render a parameter value for inclusion in the system prompt."""
+    if isinstance(value, str):
+        return json.dumps(value)
+    if isinstance(value, BaseModel):
+        return str(value)
+    return repr(value)
+
+
+def _build_params_section(func: Callable, runtime_kwargs: dict) -> str:
+    """Build a ``## Parameters`` section from the function signature.
+
+    For every user-defined parameter (excluding internal plumbing like
+    *tools*, *io*, *state*, *debug*) this emits:
+
+    - Parameter name and resolved type
+    - An optional description extracted from ``Annotated[T, "desc"]``
+    - The runtime value when the function was called, or the default
+
+    The section is appended to the system prompt so that workflow
+    authors no longer need to manually write ``{param}`` placeholders
+    in docstrings.
+    """
+    sig = inspect.signature(func)
+    lines: list[str] = []
+
+    for param_name, param in sig.parameters.items():
+        if param_name in _INTERNAL_PARAMS:
+            continue
+
+        type_name = _format_type_name(_get_typed_hint(func, param_name))
+        description = _get_param_description(func, param_name)
+
+        # Build one parameter entry
+        parts = [f"- `{param_name}` ({type_name})"]
+        if description:
+            parts.append(f": {description}")
+
+        # Show the effective value
+        if param_name in runtime_kwargs:
+            parts.append(
+                f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}"
+            )
+        elif param.default is not inspect.Parameter.empty:
+            parts.append(f"\n  Default: {_format_param_value(param.default)}")
+
+        lines.append("".join(parts))
+
+    if not lines:
+        return ""
+    return "\n\n## Parameters\n" + "\n".join(lines)
+
+
 def chat(func: Callable) -> Callable:
     """Auto-orchestrates an LLM chat function using its docstring as system prompt.
 
@@ -402,8 +510,6 @@ def chat(func: Callable) -> Callable:
         # Resolve TypeVar return type from actual argument
         actual_return_type = return_type
         if is_generic:
-            import typing
-
             # Use get_type_hints() instead of inspect.signature() for annotations
             # because functions with 'from __future__ import annotations' store
             # annotations as strings, making them uncomparable to TypeVar objects.
@@ -422,7 +528,18 @@ def chat(func: Callable) -> Callable:
         if debug is None and config.debug:
             debug = StreamingDebug()
 
+        # Build auto-generated parameters section from function signature.
+        # This makes ALL user-defined params visible to the LLM without
+        # requiring the author to manually write {param} placeholders.
+        params_section = _build_params_section(func, kwargs)
+
+        # Format docstring: interpolates {param} and {obj.method()}
         system_prompt = _format_docstring(func.__doc__, **kwargs)
+
+        # Append parameter metadata so every param is documented
+        if params_section:
+            system_prompt += params_section
+
         max_turns = kwargs.pop("max_turns", 10)
 
         orchestrator = StructuredConversationOrchestrator(
