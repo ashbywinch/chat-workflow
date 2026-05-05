@@ -28,8 +28,6 @@ def generate_criteria(context: str = "", max_turns: int = 10) -> EvaluationCrite
     - action="success": return complete criteria with action.result.
     - action="failure": end the conversation when useful criteria cannot be produced.
 
-    When returning action="success", your criteria MUST include a criterion named "budget" (lowercase). This is a validation requirement - criteria without "budget" will be rejected.
-
     Context: {context}
     """
     pass
