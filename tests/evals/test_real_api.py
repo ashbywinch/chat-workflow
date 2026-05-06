@@ -2,17 +2,17 @@
 import unittest
 from pathlib import Path
 
-from evaluation_criteria.models import EvaluationCriteria
-from evaluation_criteria.flows import generate_criteria
-from prompt_core import (
+from workflows.evaluation_criteria.models import EvaluationCriteria
+from workflows.evaluation_criteria.flows import generate_criteria
+from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
     ConversationResult,
     ConversationTools,
     StructuredConversationOrchestrator,
 )
-from prompt_core.config import Config
-from prompt_core.exceptions import TurnLimitExceededError, ConversationFailedError
+from chat_workflow.config import Config
+from chat_workflow.exceptions import TurnLimitExceededError, ConversationFailedError
 
 from tests.conftest import timeout
 

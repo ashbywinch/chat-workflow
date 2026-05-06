@@ -1,9 +1,9 @@
-# Makefile for prompt-core test automation
+# Makefile for chat-workflow test automation
 .PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint format clean
 
 # Variables
 PYTHON := .venv/bin/python
-OUT := .venv/bin/prompt-core
+OUT := .venv/bin/chat-workflow
 PYTEST := .venv/bin/pytest
 UNITTEST := .venv/bin/python -m unittest
 COVERAGE := .venv/bin/coverage
@@ -51,7 +51,7 @@ evals-verbose: setup lint
 
 evals-debug: setup lint
 	@echo "${YELLOW}Running evals with LLM debug tracing...${NC}"
-	@PROMPT_CORE_DEBUG=1 ${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
+	@CHAT_WORKFLOW_DEBUG=1 ${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
 
 test-all: test evals
 
@@ -64,13 +64,13 @@ coverage: setup
 
 # Linting with black and ruff
 lint: setup
-	.venv/bin/black --check --target-version py312 prompt_core/ evaluation_criteria/ tests/
-	.venv/bin/ruff check prompt_core/ evaluation_criteria/ tests/
+	.venv/bin/black --check --target-version py312 chat_workflow/ workflows/ tests/
+	.venv/bin/ruff check chat_workflow/ workflows/ tests/
 
 # Auto-fix linting issues
 format: setup
-	.venv/bin/black --target-version py312 prompt_core/ evaluation_criteria/ tests/
-	.venv/bin/ruff check --fix prompt_core/ evaluation_criteria/ tests/
+	.venv/bin/black --target-version py312 chat_workflow/ workflows/ tests/
+	.venv/bin/ruff check --fix chat_workflow/ workflows/ tests/
 
 # Clean up generated files (removes .venv to catch build errors like CI)
 clean:

@@ -1,4 +1,4 @@
-# AGENTS.md — Prompt Core
+# AGENTS.md — Chat Workflow
 
 AI agent onboarding. For human onboarding, see [README.md](README.md).
 
@@ -10,13 +10,13 @@ This is a library that enables LLM workflow authors to generated structured and 
 
 | File | What |
 |------|------|
-| `evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
-| `prompt_core/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
-| `prompt_core/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
-| `prompt_core/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
-| `prompt_core/exceptions.py` | Custom exception hierarchy |
-| `prompt_core/cli.py` | Typer CLI (`converse` command) |
-| `evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
+| `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
+| `chat_workflow/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
+| `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
+| `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
+| `chat_workflow/exceptions.py` | Custom exception hierarchy |
+| `chat_workflow/cli.py` | Typer CLI (`converse` command) |
+| `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
 
 ## Conventions
 
@@ -94,7 +94,7 @@ The library provides two decorators for authoring workflow functions:
 Use `@chat` on functions that directly interact with the LLM. The function body is a `pass` stub — the decorator handles everything.
 
 ```python
-from prompt_core import chat
+from chat_workflow import chat
 
 @chat
 def my_workflow_step(
@@ -120,7 +120,7 @@ def my_workflow_step(
 Use `@workflow` on functions that compose multiple `@chat` steps. It injects a `ConversationTools` object so the function can pass `tools=tools` to child functions.
 
 ```python
-from prompt_core import workflow, ConversationTools
+from chat_workflow import workflow, ConversationTools
 
 @workflow
 def composite_step(
@@ -206,12 +206,12 @@ The CLI provides `TyperConversationIO` (using `typer.echo`/`typer.prompt`). For 
 When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
 
 ```bash
-PROMPT_CORE_DEBUG=1 make evals
+CHAT_WORKFLOW_DEBUG=1 make evals
 ```
 
 Or for a single test:
 ```bash
-PROMPT_CORE_DEBUG=1 .venv/bin/python -m unittest tests.evals.test_real_api.TestRealAPI.test_name -v
+CHAT_WORKFLOW_DEBUG=1 .venv/bin/python -m unittest tests.evals.test_real_api.TestRealAPI.test_name -v
 ```
 
 This streams all LLM requests/responses to stderr with timing:

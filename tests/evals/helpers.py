@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from prompt_core import ConversationFlowState, ConversationTools
-from prompt_core.config import Config
+from chat_workflow import ConversationFlowState, ConversationTools
+from chat_workflow.config import Config
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.json"

@@ -1,9 +1,9 @@
-"""EvaluationCriteria workflow functions using the prompt-core framework."""
+"""EvaluationCriteria workflow functions using the chat-workflow framework."""
 
 from __future__ import annotations
 
 from typing import Annotated, TypeVar
-from prompt_core import chat, workflow, ConversationTools
+from chat_workflow import chat, workflow, ConversationTools
 from pydantic import BaseModel
 
 from .models import EvaluationCriteria

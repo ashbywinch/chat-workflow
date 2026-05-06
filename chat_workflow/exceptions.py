@@ -1,10 +1,10 @@
 """
-Custom exceptions for prompt-core with helpful error messages.
+Custom exceptions for chat-workflow with helpful error messages.
 """
 
 
-class PromptCoreError(Exception):
-    """Base exception for all prompt-core errors."""
+class ChatWorkflowError(Exception):
+    """Base exception for all chat-workflow errors."""
 
     def __init__(self, message: str = ""):
         super().__init__(message)
@@ -14,7 +14,7 @@ class PromptCoreError(Exception):
         return self.message if self.message else super().__str__()
 
 
-class ConfigurationError(PromptCoreError):
+class ConfigurationError(ChatWorkflowError):
     """Configuration-related errors."""
 
     pass
@@ -32,7 +32,7 @@ class APIKeyError(ConfigurationError):
     pass
 
 
-class ProviderError(PromptCoreError):
+class ProviderError(ChatWorkflowError):
     """LLM provider-related errors."""
 
     pass
@@ -50,7 +50,7 @@ class ProviderNotFoundError(ProviderError):
     pass
 
 
-class ValidationError(PromptCoreError):
+class ValidationError(ChatWorkflowError):
     """Validation errors for business rules."""
 
     pass
@@ -65,7 +65,7 @@ class CriteriaValidationError(ValidationError):
         super().__init__(message)
 
 
-class ConversationError(PromptCoreError):
+class ConversationError(ChatWorkflowError):
     """Conversation flow errors."""
 
     pass
@@ -87,7 +87,7 @@ class ConversationFailedError(ConversationError):
         super().__init__(message)
 
 
-class APIError(PromptCoreError):
+class APIError(ChatWorkflowError):
     """External API errors."""
 
     pass
@@ -111,7 +111,7 @@ class RateLimitError(APIError):
     pass
 
 
-class ModelError(PromptCoreError):
+class ModelError(ChatWorkflowError):
     """Model-related errors."""
 
     pass

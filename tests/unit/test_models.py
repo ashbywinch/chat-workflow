@@ -2,8 +2,8 @@
 import unittest
 from pydantic import ValidationError
 
-from evaluation_criteria.models import EvaluationCriteria, Criterion
-from prompt_core import ConversationAction, ConversationResult
+from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
+from chat_workflow import ConversationAction, ConversationResult
 
 
 class TestCriterionModel(unittest.TestCase):
@@ -90,7 +90,7 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=budget_allcaps)
 
-        from prompt_core.exceptions import CriteriaValidationError
+        from chat_workflow.exceptions import CriteriaValidationError
 
         no_budget = [
             Criterion(name="cost", description="Cost constraint", weight=8.0),

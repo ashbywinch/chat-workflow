@@ -44,7 +44,7 @@ class EvaluationCriteria(BaseModel):
     @model_validator(mode="after")
     def validate_business_rules(self):
         """Validate business rules for EvaluationCriteria."""
-        from prompt_core.exceptions import CriteriaValidationError
+        from chat_workflow.exceptions import CriteriaValidationError
 
         if len(self.criteria) < 2:
             raise CriteriaValidationError("Must have at least 2 criteria")

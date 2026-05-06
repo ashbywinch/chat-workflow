@@ -1,4 +1,4 @@
-"""Configuration management for prompt-core. Reads from config.json."""
+"""Configuration management for chat-workflow. Reads from config.json."""
 
 import json
 import os
@@ -80,7 +80,7 @@ class Config:
 
     @property
     def debug(self) -> bool:
-        return os.environ.get("PROMPT_CORE_DEBUG", "").lower() in ("1", "true", "yes")
+        return os.environ.get("CHAT_WORKFLOW_DEBUG", "").lower() in ("1", "true", "yes")
 
     def __str__(self) -> str:
         return json.dumps(self._config_data, indent=2)
