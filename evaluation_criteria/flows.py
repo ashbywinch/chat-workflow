@@ -56,11 +56,15 @@ def refine(
 
 @workflow
 def generate_reviewed_criteria(
-    context: str = "", max_turns: int = 10, *, tools: ConversationTools
+    context: str = "",
+    max_turns: int = 10,
+    max_refinements: int = 3,
+    *,
+    tools: ConversationTools,
 ) -> EvaluationCriteria:
     criteria = generate_criteria(context=context, max_turns=max_turns, tools=tools)
 
-    while True:
+    for _ in range(max_refinements):
         print_criteria(
             criteria=criteria,
             title="Current criteria:",
@@ -77,3 +81,5 @@ def generate_reviewed_criteria(
             return refined
 
         criteria = refined
+
+    return criteria

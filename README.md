@@ -6,7 +6,8 @@ A Python library for generating structured evaluation criteria through natural c
 
 ## What Is This?
 
-You talk to an AI assistant about a decision (e.g. "birthday presents for a 7-year-old"). It asks questions, you answer. After a few turns it produces a validated set of weighted `EvaluationCriteria` — ready to use for scoring options.
+This is a library that allows workflow authors to easily build LLM assisted workflows in code. Within a workflow, an LLM will act as facilitator for the creation of complex structured and validated data.
+There is a sample workflow where a user can create EvaluationCriteria for a decision.
 
 Built with **Pydantic** (data models + business rules), **Instructor** (structured LLM output), and **litellm** (multi-provider LLM support).
 
@@ -43,14 +44,14 @@ prompt-core --context "gift ideas" --max-turns 5
 ## Python API
 
 ```python
-from evaluation_criteria.flows import run_reviewed_criteria_conversation
+from evaluation_criteria.flows import generate_reviewed_criteria
 from prompt_core import ConversationFlowState
 
 class MyIO:
     def echo(self, message: str) -> None: print(message)
     def prompt(self, label: str) -> str: return input(label + ": ")
 
-criteria = run_reviewed_criteria_conversation(
+criteria = generate_reviewed_criteria(
     context="evaluating coffee makers",
     max_turns=10,
     io=MyIO(),

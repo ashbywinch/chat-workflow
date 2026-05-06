@@ -1,0 +1,174 @@
+"""Tests for prompt_core.config: Config reads from a caller-provided path."""
+
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+
+from prompt_core.config import Config
+
+
+class TestConfig(unittest.TestCase):
+    """Config requires an explicit path to config.json — no auto-discovery."""
+
+    def _write_temp_config(self, content: dict) -> str:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(content, f)
+            return f.name
+
+    def test_missing_config_file_raises_error(self):
+        from prompt_core.exceptions import ConfigFileError
+
+        with self.assertRaises(ConfigFileError):
+            Config(Path("/nonexistent/config.json"))
+
+    def test_invalid_json_raises_error(self):
+        from prompt_core.exceptions import ConfigFileError
+
+        temp_path = tempfile.mktemp(suffix=".json")
+        try:
+            with open(temp_path, "w") as f:
+                f.write("not valid json {{{")
+            with self.assertRaises(ConfigFileError):
+                Config(Path(temp_path))
+        finally:
+            os.unlink(temp_path)
+
+    def test_io_error_raises_config_file_error(self):
+        from prompt_core.exceptions import ConfigFileError
+
+        temp_path = tempfile.mktemp(suffix=".json")
+        try:
+            with open(temp_path, "w") as f:
+                json.dump({"llm": {"provider": "x", "model": "y"}}, f)
+            os.chmod(temp_path, 0o000)
+            with self.assertRaises(ConfigFileError):
+                Config(Path(temp_path))
+        finally:
+            os.chmod(temp_path, 0o644)
+            os.unlink(temp_path)
+
+    def test_missing_provider_raises_error(self):
+        from prompt_core.exceptions import ConfigurationError
+
+        temp_path = self._write_temp_config({"llm": {"model": "gpt-4"}})
+        try:
+            with self.assertRaises(ConfigurationError):
+                Config(Path(temp_path))
+        finally:
+            os.unlink(temp_path)
+
+    def test_missing_model_raises_error(self):
+        from prompt_core.exceptions import ConfigurationError
+
+        temp_path = self._write_temp_config({"llm": {"provider": "openai"}})
+        try:
+            with self.assertRaises(ConfigurationError):
+                Config(Path(temp_path))
+        finally:
+            os.unlink(temp_path)
+
+    def test_empty_provider_raises_error(self):
+        from prompt_core.exceptions import ConfigurationError
+
+        temp_path = self._write_temp_config({"llm": {"provider": "", "model": "gpt-4"}})
+        try:
+            with self.assertRaises(ConfigurationError):
+                Config(Path(temp_path))
+        finally:
+            os.unlink(temp_path)
+
+    def test_empty_model_raises_error(self):
+        from prompt_core.exceptions import ConfigurationError
+
+        temp_path = self._write_temp_config(
+            {"llm": {"provider": "openai", "model": ""}}
+        )
+        try:
+            with self.assertRaises(ConfigurationError):
+                Config(Path(temp_path))
+        finally:
+            os.unlink(temp_path)
+
+    def test_all_properties_from_config(self):
+        data = {
+            "llm": {
+                "provider": "openrouter",
+                "model": "openrouter/google/gemini-2.0-flash-lite-001",
+                "temperature": 0.3,
+                "max_retries": 5,
+                "request_timeout_seconds": 60,
+                "model_supports_tools": True,
+            }
+        }
+        temp_path = self._write_temp_config(data)
+        try:
+            cfg = Config(Path(temp_path))
+            self.assertEqual(cfg.provider, "openrouter")
+            self.assertEqual(cfg.model, "openrouter/google/gemini-2.0-flash-lite-001")
+            self.assertEqual(cfg.temperature, 0.3)
+            self.assertEqual(cfg.max_retries, 5)
+            self.assertEqual(cfg.request_timeout_seconds, 60)
+            self.assertTrue(cfg.model_supports_tools)
+        finally:
+            os.unlink(temp_path)
+
+    def test_default_values_applied(self):
+        temp_path = self._write_temp_config(
+            {"llm": {"provider": "anthropic", "model": "claude-3-opus"}}
+        )
+        try:
+            cfg = Config(Path(temp_path))
+            self.assertEqual(cfg.temperature, 0.7)
+            self.assertEqual(cfg.max_retries, 3)
+            self.assertEqual(cfg.request_timeout_seconds, 30)
+            self.assertFalse(cfg.model_supports_tools)
+        finally:
+            os.unlink(temp_path)
+
+    def test_partial_overrides(self):
+        temp_path = self._write_temp_config(
+            {
+                "llm": {
+                    "provider": "openai",
+                    "model": "gpt-4",
+                    "temperature": 0.5,
+                    "request_timeout_seconds": 120,
+                }
+            }
+        )
+        try:
+            cfg = Config(Path(temp_path))
+            self.assertEqual(cfg.temperature, 0.5)
+            self.assertEqual(cfg.max_retries, 3)
+            self.assertEqual(cfg.request_timeout_seconds, 120)
+            self.assertFalse(cfg.model_supports_tools)
+        finally:
+            os.unlink(temp_path)
+
+    def test_str_representation(self):
+        temp_path = self._write_temp_config(
+            {"llm": {"provider": "test-p", "model": "test-m"}}
+        )
+        try:
+            cfg = Config(Path(temp_path))
+            s = str(cfg)
+            self.assertIn("test-p", s)
+            self.assertIn("test-m", s)
+        finally:
+            os.unlink(temp_path)
+
+    def test_debug_from_env(self):
+        temp_path = self._write_temp_config(
+            {"llm": {"provider": "test-p", "model": "test-m"}}
+        )
+        try:
+            cfg = Config(Path(temp_path))
+            self.assertFalse(cfg.debug)
+        finally:
+            os.unlink(temp_path)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

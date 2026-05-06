@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 import unittest
+from pathlib import Path
 
 from evaluation_criteria.models import EvaluationCriteria
 from evaluation_criteria.flows import generate_criteria
 from prompt_core import (
     ConversationAction,
-    StructuredConversationOrchestrator,
+    ConversationFlowState,
     ConversationResult,
+    ConversationTools,
+    StructuredConversationOrchestrator,
 )
+from prompt_core.config import Config
 from prompt_core.exceptions import TurnLimitExceededError, ConversationFailedError
 
 from tests.conftest import timeout
+
+_CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
 
 
 class MockIO:
@@ -36,6 +42,10 @@ class TestRealAPI(unittest.TestCase):
             "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=5,
+            model=_CONFIG.model,
+            provider=_CONFIG.provider,
+            max_retries=_CONFIG.max_retries,
+            request_timeout_seconds=_CONFIG.request_timeout_seconds,
             initial_messages=[
                 {
                     "role": "user",
@@ -99,7 +109,9 @@ class TestRealAPI(unittest.TestCase):
         criteria = generate_criteria(
             context="choosing a birthday gift",
             max_turns=6,
-            io=mock_io,
+            tools=ConversationTools(
+                io=mock_io, state=ConversationFlowState(), config=_CONFIG
+            ),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -118,6 +130,10 @@ class TestRealAPI(unittest.TestCase):
             "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=3,
+            model=_CONFIG.model,
+            provider=_CONFIG.provider,
+            max_retries=_CONFIG.max_retries,
+            request_timeout_seconds=_CONFIG.request_timeout_seconds,
             initial_messages=[
                 {
                     "role": "user",
@@ -162,7 +178,9 @@ class TestRealAPI(unittest.TestCase):
         criteria = generate_criteria(
             context="choosing a birthday gift for a 7-year-old",
             max_turns=10,
-            io=mock_io,
+            tools=ConversationTools(
+                io=mock_io, state=ConversationFlowState(), config=_CONFIG
+            ),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -188,7 +206,9 @@ class TestRealAPI(unittest.TestCase):
             generate_criteria(
                 context="choosing a laptop for programming",
                 max_turns=3,
-                io=mock_io,
+                tools=ConversationTools(
+                    io=mock_io, state=ConversationFlowState(), config=_CONFIG
+                ),
             )
 
     @timeout(10)
@@ -199,6 +219,10 @@ class TestRealAPI(unittest.TestCase):
             "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=5,
+            model=_CONFIG.model,
+            provider=_CONFIG.provider,
+            max_retries=_CONFIG.max_retries,
+            request_timeout_seconds=_CONFIG.request_timeout_seconds,
             initial_messages=[
                 {
                     "role": "user",

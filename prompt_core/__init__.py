@@ -1,4 +1,3 @@
-from .config import config
 from .conversation_runtime import (
     ConversationAction,
     ConversationDebug,
@@ -14,7 +13,6 @@ from .conversation_runtime import (
 from .llm_interaction import get_client, list_available_providers
 
 __all__ = [
-    "config",
     "ConversationAction",
     "ConversationDebug",
     "ConversationFlowState",

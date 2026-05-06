@@ -3,8 +3,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 
 def get_logs_dir() -> Path:
     logs_dir = Path.home() / ".prompt-core" / "logs"
@@ -39,11 +37,5 @@ def log_session(
         },
     }
 
-    handler_id = logger.add(log_path, level="INFO", format="{message}")
-    try:
-        logger.info(json.dumps(session_data, indent=2))
-    finally:
-        logger.remove(handler_id)
-
-    logger.info("Session logged to {}", log_path)
+    log_path.write_text(json.dumps(session_data, indent=2))
     return log_path

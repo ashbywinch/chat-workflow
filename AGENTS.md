@@ -4,13 +4,13 @@ AI agent onboarding. For human onboarding, see [README.md](README.md).
 
 ## What This Project Does
 
-Generates structured `EvaluationCriteria` objects via multi-turn LLM conversation. The LLM guides a user through questions, then produces a validated Pydantic model with weighted criteria (min 2, must include "budget").
+This is a library that enables LLM workflow authors to generated structured and validated data via multi-turn LLM conversations, which may be arbitrarily nested, looped, etc in code. A chat step has an LLM guide a user through the process of generating the structured data. The workflow author composes the chat steps and data definitions/validations into arbitrarily complex workflows. 
 
 ## Key Files
 
 | File | What |
 |------|------|
-| `prompt_core/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
+| `evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
 | `prompt_core/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
 | `prompt_core/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `prompt_core/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
@@ -45,66 +45,29 @@ make lint           # black --check + ruff check
 
 ## Git Workflow
 
-**After making a PR or at the start of a new session**
-
-1. Check for outstanding work on the current branch
-Outstanding work may include: uncommitted changes, unpushed commits, pushed commits that are not in a PR yet, or a PR that hasn't merged (perhaps due to failing CI).
+### Quick Reference
 
 ```bash
-# Check for uncommitted changes
+# Check outstanding work on current branch
 git status
-
-# Check current branch and recent commits
-BRANCH=$(git branch --show-current)
 git log --oneline -3
-
-# Get default base branch for this repo
+BRANCH=$(git branch --show-current)
 BASE_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
-
-# Check whether this branch exists on origin and has pushed commits not yet in base
-git fetch origin
-git ls-remote --exit-code --heads origin "$BRANCH"
 git log --oneline "origin/$BASE_BRANCH..origin/$BRANCH"
+gh pr list --head "$BRANCH" --state open --json number,url --jq '.[] | [.number, .url] | @tsv'
 
-# Check whether this branch has an open PR
-gh pr list --head "$BRANCH" --state open --json number,state,url --jq '.[] | [.number, .state, .url] | @tsv'
+# Before pushing: run ALL tests locally
+make test && make evals
 
-# If the git log above shows commits but gh pr list prints nothing,
-# changes were pushed to the branch but no PR exists yet.
-
-# If a PR exists for this branch, watch its CI checks
-gh pr checks --watch
-```
-
-2. If there is outstanding work, encourage the user to complete that work first before continuing. Reuse step 1 whenever necessary to ensure that work is completed and fully merged.
-
-3. Only once the existing work is fully merged to main, start the new work:
-
-```bash
-# Start new work (only after previous PR is merged)
-git branch -d <last-branch>                 # Safe: -d refuses if unmerged
+# Start new work from fresh branch off main
 git checkout main && git pull origin main && git checkout -b <new-branch>
 ```
-If branch -d fails because there are outstanding changes then return to step 2
 
-**To push changes**
-
-1. Run ALL tests locally before pushing:
-   ```bash
-   make test    # Unit tests, fast
-   make evals   # Real API tests, requires API key, ~90s
-   ```
-
-2. If tests/evals fail locally: fix them before pushing. CI will run them again and fail the same way.
-
-3. Stage, commit, push, and then:
-   ```bash
-   gh pr checks <number> --watch
-   ```
-
-**Rules:**
-- Start every new piece of work from a fresh branch off main. Never reuse a branch whose PR has been merged.
-- If your PR is open but not yet merged: wait, or ask. Don't push more commits without confirmation.
+### Rules
+- Start every new piece of work from a fresh branch off main.
+- If outstanding work exists (unmerged PR, unpushed commits), finish that work first.
+- Run both `make test` and `make evals` before pushing.
+- origin/main is protected — all changes go through PRs.
 
 
 ## Prompt Design Rules
@@ -118,9 +81,125 @@ If branch -d fails because there are outstanding changes then return to step 2
 ## Critical Patterns
 
 - All development must be done on a branch. origin/main is protected.
-- `ConversationAction` is a single discriminator model with `action: Literal["continue", "success", "failure"]`
-- `ConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
+- `ConversationAction` is a Generic BaseModel with `action: Literal["continue", "success", "failure"]` and a `model_validator` for consistency
+- `StructuredConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
 - Turn limit raises `TurnLimitExceededError`; failure action raises `ConversationFailedError`
+
+## Decorator API: `@chat` vs `@workflow`
+
+The library provides two decorators for authoring workflow functions:
+
+### `@chat` — Auto-orchestrated leaf functions
+
+Use `@chat` on functions that directly interact with the LLM. The function body is a `pass` stub — the decorator handles everything.
+
+```python
+from prompt_core import chat
+
+@chat
+def my_workflow_step(
+    context: str = "",
+    max_turns: int = 10,
+) -> EvaluationCriteria:
+    """System prompt for the LLM goes here. {param} interpolation works."""
+    pass
+```
+
+**How it works:**
+1. Inspects the return type (must be a Pydantic `BaseModel`)
+2. Uses the docstring as the system prompt and appends an auto-generated `## Parameters` section (all params with types, descriptions, and runtime values)
+3. Wraps the return type in `ConversationAction[ReturnType]` as the LLM response model
+4. Creates a `StructuredConversationOrchestrator` with default callbacks
+5. Runs the multi-turn conversation via `ConversationTools.chat()`
+6. Returns the inner Pydantic object
+
+**Required parameters:** `io` or `tools` — provides the I/O interface for user interaction.
+
+### `@workflow` — Composite functions
+
+Use `@workflow` on functions that compose multiple `@chat` steps. It injects a `ConversationTools` object so the function can pass `tools=tools` to child functions.
+
+```python
+from prompt_core import workflow, ConversationTools
+
+@workflow
+def composite_step(
+    context: str = "",
+    max_turns: int = 10,
+    tools: ConversationTools,
+) -> EvaluationCriteria:
+    criteria = generate_criteria(context=context, max_turns=max_turns, tools=tools)
+    # ... additional logic ...
+    return criteria
+```
+
+**How it works:**
+1. If `tools` is already provided (e.g., called from another `@workflow`), passes through
+2. Otherwise, creates a `ConversationTools` from the `io` and `state` parameters
+3. Calls the function body with `tools` injected
+
+### Parameter Descriptions via `Annotated`
+
+Use `typing.Annotated[T, "description"]` to add descriptions that appear in the auto-generated `## Parameters` section of the system prompt:
+
+```python
+from typing import Annotated
+
+@chat
+def generate_criteria(
+    context: Annotated[
+        str, "The topic or domain for which to generate evaluation criteria"
+    ] = "",
+    max_turns: Annotated[
+        int, "Maximum number of conversation turns before giving up"
+    ] = 10,
+) -> EvaluationCriteria:
+    ...
+```
+
+This produces `## Parameters` entries like:
+```
+- `context` (str): The topic or domain for which to generate evaluation criteria
+  Value: "choosing a birthday gift"
+- `max_turns` (int): Maximum number of conversation turns before giving up
+  Value: 10
+```
+
+### Docstring Interpolation
+
+The docstring supports:
+- `{param_name}` — simple parameter substitution
+- `{param.method()}` — method calls on parameter values (e.g., `{initial_object.model_dump()}`)
+
+### Generic Refinement with TypeVar
+
+The `refine()` function uses `TypeVar` to work with any Pydantic model:
+
+```python
+ModelType = TypeVar("ModelType", bound=BaseModel)
+
+@chat
+def refine(
+    initial_object: Annotated[ModelType, "The object to review"],
+    max_turns: Annotated[int, "Maximum refinement turns"] = 5,
+) -> ModelType:
+    """System prompt for refinement..."""
+    pass
+```
+
+The `@chat` decorator resolves the `TypeVar` to the concrete type passed as `initial_object` at runtime.
+
+### ConversationIO Protocol
+
+All `@chat` functions require an I/O adapter implementing:
+
+```python
+class ConversationIO(Protocol):
+    def echo(self, message: str) -> None: ...   # Display message to user
+    def prompt(self, label: str) -> str: ...     # Get input from user
+```
+
+The CLI provides `TyperConversationIO` (using `typer.echo`/`typer.prompt`). For tests, use `unittest.mock.Mock()`.
 
 ## Debugging LLM Interactions
 
