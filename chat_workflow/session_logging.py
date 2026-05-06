@@ -5,7 +5,7 @@ from typing import Any
 
 
 def get_logs_dir() -> Path:
-    logs_dir = Path.home() / ".prompt-core" / "logs"
+    logs_dir = Path.home() / ".chat-workflow" / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     return logs_dir
 

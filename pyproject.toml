@@ -1,5 +1,5 @@
 [project]
-name = "prompt-core"
+name = "chat-workflow"
 version = "0.1.0"
 description = "Framework for building structured LLM conversation workflows"
 readme = "README.md"
@@ -13,14 +13,14 @@ dependencies = [
 ]
 
 [project.scripts]
-prompt-core = "prompt_core.cli:main"
+chat-workflow = "chat_workflow.cli:main"
 
 [build-system]
 requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["prompt_core*", "evaluation_criteria*"]
+include = ["chat_workflow*", "workflows*"]
 
 [project.optional-dependencies]
 dev = [

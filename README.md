@@ -1,4 +1,4 @@
-# Prompt Core
+# Chat Workflow
 
 A Python library for generating structured evaluation criteria through natural conversation with an LLM.
 
@@ -15,7 +15,7 @@ Built with **Pydantic** (data models + business rules), **Instructor** (structur
 
 ```bash
 # 1. Install
-git clone <repo> && cd prompt-core && make
+git clone <repo> && cd chat-workflow && make
 
 # 2. Configure
 # edit config.json to set your provider + model
@@ -23,7 +23,7 @@ export OPENROUTER_API_KEY=your-key    # or OPENAI_API_KEY, etc.
 
 # 3. Activate and run
 source .venv/bin/activate
-prompt-core --context "evaluating job offers"
+chat-workflow --context "evaluating job offers"
 ```
 
 See [QUICKSTART.md](QUICKSTART.md) for a 5-minute contributor guide.
@@ -32,20 +32,20 @@ See [QUICKSTART.md](QUICKSTART.md) for a 5-minute contributor guide.
 
 ```bash
 # Interactive conversation
-prompt-core --context "choosing a laptop"
+chat-workflow --context "choosing a laptop"
 
 # With output file
-prompt-core --context "hiring criteria" --output criteria.json
+chat-workflow --context "hiring criteria" --output criteria.json
 
 # Custom max turns
-prompt-core --context "gift ideas" --max-turns 5
+chat-workflow --context "gift ideas" --max-turns 5
 ```
 
 ## Python API
 
 ```python
-from evaluation_criteria.flows import generate_reviewed_criteria
-from prompt_core import ConversationFlowState
+from workflows.evaluation_criteria.flows import generate_reviewed_criteria
+from chat_workflow import ConversationFlowState
 
 class MyIO:
     def echo(self, message: str) -> None: print(message)

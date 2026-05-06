@@ -2,13 +2,13 @@
 import unittest
 from unittest.mock import patch
 
-from evaluation_criteria.models import EvaluationCriteria, Criterion
-from prompt_core import (
+from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
+from chat_workflow import (
     ConversationAction,
     ConversationResult,
     StructuredConversationOrchestrator,
 )
-from prompt_core.exceptions import TurnLimitExceededError, ConversationFailedError
+from chat_workflow.exceptions import TurnLimitExceededError, ConversationFailedError
 
 
 class MockInstructorClient:
@@ -75,7 +75,7 @@ class TestLLMInteraction(unittest.TestCase):
             on_failure=lambda action: ConversationFailedError(action.message),
         )
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_with_validation_error(self, mock_get_client):
         mock_client = MockInstructorClient()
         mock_client.responses = [ValueError("Validation failed after 3 retries")]
@@ -88,7 +88,7 @@ class TestLLMInteraction(unittest.TestCase):
 
         self.assertIn("Validation failed", str(context.exception))
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_with_api_error(self, mock_get_client):
         mock_client = MockInstructorClient()
         mock_client.responses = [Exception("API error: Invalid API key")]
@@ -101,7 +101,7 @@ class TestLLMInteraction(unittest.TestCase):
 
         self.assertIn("API error", str(context.exception))
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_passes_correct_parameters(self, mock_get_client):
         mock_client = MockInstructorClient()
         expected_action = ConversationAction[EvaluationCriteria](
@@ -126,7 +126,7 @@ class TestLLMInteraction(unittest.TestCase):
             30,
         )
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_success_completion(self, mock_get_client):
         success_action = ConversationAction[EvaluationCriteria](
             action="success", result=self.valid_criteria
@@ -149,7 +149,7 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertEqual(response_model, ConversationAction[EvaluationCriteria])
         self.assertEqual(max_retries, 3)
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_turn_limit_enforcement(self, mock_get_client):
         continue_action = ConversationAction[EvaluationCriteria](
             action="continue", message="Tell me more"
@@ -171,7 +171,7 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertIn("10", str(context.exception))
         self.assertEqual(mock_client.call_count, 10)
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_with_custom_max_turns(self, mock_get_client):
         continue_action = ConversationAction[EvaluationCriteria](
             action="continue", message="Continue please"
@@ -192,7 +192,7 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertIn("3", str(context.exception))
         self.assertEqual(mock_client.call_count, 3)
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_failure_action_termination(self, mock_get_client):
         failure_action = ConversationAction[EvaluationCriteria](
             action="failure", message="Cannot generate criteria with given information"
@@ -210,7 +210,7 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertIn("Cannot generate criteria", str(context.exception))
         self.assertEqual(mock_client.call_count, 1)
 
-    @patch("prompt_core.llm_interaction.get_client")
+    @patch("chat_workflow.llm_interaction.get_client")
     def test_validation_error_propagation(self, mock_get_client):
         mock_client = MockInstructorClient()
         mock_client.responses = [

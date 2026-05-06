@@ -63,7 +63,7 @@ Within an individual flow function:
 - Graceful failure with actionable suggestions
 
 #### 5. Minimal Boilerplate for Workflow Authors 
-The authors of workflows must be able to author these workflows within a dedicated library for that workflow, that only contains the workflow functions themselves. All framework code must be generic, decoupled from the workflows and must be situated in the prompt-core library. There must be no requirement for the workflow author to copy and amend framework code for each workflow function they write.
+The authors of workflows must be able to author these workflows within a dedicated library for that workflow, that only contains the workflow functions themselves. All framework code must be generic, decoupled from the workflows and must be situated in the chat-workflow library. There must be no requirement for the workflow author to copy and amend framework code for each workflow function they write.
 
 ## Target Users
 

@@ -42,7 +42,7 @@ def test_multi_turn_conversation(self, mock_call_llm):
 
 ### 2. LLM Interaction (mock `get_client`)
 ```python
-@patch('prompt_core.llm_interaction.get_client')
+@patch('chat_workflow.llm_interaction.get_client')
 def test_call_llm_success(self, mock_get_client):
     mock_client = Mock()
     mock_client.chat.completions.create.return_value = ConversationAction[...](

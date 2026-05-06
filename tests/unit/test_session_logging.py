@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for prompt_core.session_logging.
+Tests for chat_workflow.session_logging.
 
 Verifies that get_logs_dir() creates the expected directory and that
 log_session() writes correct JSON content to the returned file path.
@@ -17,15 +17,15 @@ class TestGetLogsDir(unittest.TestCase):
     """Tests for get_logs_dir()."""
 
     def test_get_logs_dir_creates_directory(self):
-        """get_logs_dir() must create ~/.prompt-core/logs/ and return the path."""
-        from prompt_core.session_logging import get_logs_dir
+        """get_logs_dir() must create ~/.chat-workflow/logs/ and return the path."""
+        from chat_workflow.session_logging import get_logs_dir
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_home = Path(tmpdir)
             with patch("pathlib.Path.home", return_value=fake_home):
                 result = get_logs_dir()
 
-            expected = fake_home / ".prompt-core" / "logs"
+            expected = fake_home / ".chat-workflow" / "logs"
             self.assertEqual(result, expected)
             self.assertTrue(result.exists(), "The logs directory should exist")
             self.assertTrue(result.is_dir(), "The logs directory should be a directory")
@@ -48,12 +48,12 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_writes_file(self):
         """log_session() must create a file at the returned path."""
-        from prompt_core.session_logging import log_session
+        from chat_workflow.session_logging import log_session
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
             with patch(
-                "prompt_core.session_logging.get_logs_dir", return_value=fake_logs_dir
+                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
             ):
                 result_path = log_session(
                     messages=self._sample_messages(),
@@ -84,7 +84,7 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_content(self):
         """log_session() must write valid JSON with correct field values."""
-        from prompt_core.session_logging import log_session
+        from chat_workflow.session_logging import log_session
 
         messages = self._sample_messages()
         criteria = self._sample_criteria()
@@ -92,7 +92,7 @@ class TestLogSession(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
             with patch(
-                "prompt_core.session_logging.get_logs_dir", return_value=fake_logs_dir
+                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
             ):
                 result_path = log_session(
                     messages=messages,
@@ -119,12 +119,12 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_none_criteria(self):
         """log_session() must handle criteria=None without error."""
-        from prompt_core.session_logging import log_session
+        from chat_workflow.session_logging import log_session
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
             with patch(
-                "prompt_core.session_logging.get_logs_dir", return_value=fake_logs_dir
+                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
             ):
                 result_path = log_session(
                     messages=self._sample_messages(),
@@ -146,14 +146,14 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_with_feedback(self):
         """log_session() must include feedback_text in the output when provided."""
-        from prompt_core.session_logging import log_session
+        from chat_workflow.session_logging import log_session
 
         feedback = "The model needs improvement on budget estimation."
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
             with patch(
-                "prompt_core.session_logging.get_logs_dir", return_value=fake_logs_dir
+                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
             ):
                 result_path = log_session(
                     messages=self._sample_messages(),
@@ -176,12 +176,12 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_empty_messages(self):
         """log_session() must handle an empty messages list."""
-        from prompt_core.session_logging import log_session
+        from chat_workflow.session_logging import log_session
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
             with patch(
-                "prompt_core.session_logging.get_logs_dir", return_value=fake_logs_dir
+                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
             ):
                 result_path = log_session(
                     messages=[],
@@ -202,13 +202,13 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_timestamp_format(self):
         """The timestamp field must be a valid ISO-8601 string."""
-        from prompt_core.session_logging import log_session
+        from chat_workflow.session_logging import log_session
         from datetime import datetime
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
             with patch(
-                "prompt_core.session_logging.get_logs_dir", return_value=fake_logs_dir
+                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
             ):
                 result_path = log_session(
                     messages=self._sample_messages(),

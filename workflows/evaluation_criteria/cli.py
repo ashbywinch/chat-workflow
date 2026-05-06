@@ -5,24 +5,24 @@ from typing import Optional
 
 import typer
 
-from prompt_core import (
+from chat_workflow import (
     ConversationFlowState,
     ConversationIO,
     ConversationTools,
 )
-from prompt_core.config import Config
-from prompt_core.exceptions import (
+from chat_workflow.config import Config
+from chat_workflow.exceptions import (
     APIKeyError,
+    ChatWorkflowError,
     ConfigFileError,
     ConfigurationError,
     ConversationFailedError,
     CriteriaValidationError,
-    PromptCoreError,
     ProviderNotFoundError,
     ProviderNotSupportedError,
     TurnLimitExceededError,
 )
-from prompt_core.session_logging import log_session
+from chat_workflow.session_logging import log_session
 
 from .flows import generate_reviewed_criteria
 import traceback
@@ -71,7 +71,7 @@ def handle_error(error: Exception):
         typer.secho(
             f"\n✗ Validation error: {error.message}", err=True, fg=typer.colors.RED
         )
-    elif isinstance(error, PromptCoreError):
+    elif isinstance(error, ChatWorkflowError):
         typer.secho(f"\n✗ Error: {error.message}", err=True, fg=typer.colors.RED)
     else:
         typer.secho(

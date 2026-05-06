@@ -1,4 +1,4 @@
-"""Tests for prompt_core.config: Config reads from a caller-provided path."""
+"""Tests for chat_workflow.config: Config reads from a caller-provided path."""
 
 import json
 import os
@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from prompt_core.config import Config
+from chat_workflow.config import Config
 
 
 class TestConfig(unittest.TestCase):
@@ -18,13 +18,13 @@ class TestConfig(unittest.TestCase):
             return f.name
 
     def test_missing_config_file_raises_error(self):
-        from prompt_core.exceptions import ConfigFileError
+        from chat_workflow.exceptions import ConfigFileError
 
         with self.assertRaises(ConfigFileError):
             Config(Path("/nonexistent/config.json"))
 
     def test_invalid_json_raises_error(self):
-        from prompt_core.exceptions import ConfigFileError
+        from chat_workflow.exceptions import ConfigFileError
 
         temp_path = tempfile.mktemp(suffix=".json")
         try:
@@ -36,7 +36,7 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_io_error_raises_config_file_error(self):
-        from prompt_core.exceptions import ConfigFileError
+        from chat_workflow.exceptions import ConfigFileError
 
         temp_path = tempfile.mktemp(suffix=".json")
         try:
@@ -50,7 +50,7 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_missing_provider_raises_error(self):
-        from prompt_core.exceptions import ConfigurationError
+        from chat_workflow.exceptions import ConfigurationError
 
         temp_path = self._write_temp_config({"llm": {"model": "gpt-4"}})
         try:
@@ -60,7 +60,7 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_missing_model_raises_error(self):
-        from prompt_core.exceptions import ConfigurationError
+        from chat_workflow.exceptions import ConfigurationError
 
         temp_path = self._write_temp_config({"llm": {"provider": "openai"}})
         try:
@@ -70,7 +70,7 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_empty_provider_raises_error(self):
-        from prompt_core.exceptions import ConfigurationError
+        from chat_workflow.exceptions import ConfigurationError
 
         temp_path = self._write_temp_config({"llm": {"provider": "", "model": "gpt-4"}})
         try:
@@ -80,7 +80,7 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_empty_model_raises_error(self):
-        from prompt_core.exceptions import ConfigurationError
+        from chat_workflow.exceptions import ConfigurationError
 
         temp_path = self._write_temp_config(
             {"llm": {"provider": "openai", "model": ""}}

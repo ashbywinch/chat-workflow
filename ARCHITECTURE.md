@@ -1,12 +1,12 @@
-# Prompt Core - Architecture Overview
+# Chat Workflow - Architecture Overview
 
 ## Quick Navigation Guide
 
 ### **Core Files (Read These First)**
-1. `evaluation_criteria/models.py` - Data models & business rule validation
-2. `prompt_core/conversation_runtime.py` - Conversation orchestration & decorators  
-3. `prompt_core/llm_interaction.py` - LLM provider abstraction
-4. `prompt_core/exceptions.py` - Custom exception hierarchy
+1. `workflows/evaluation_criteria/models.py` - Data models & business rule validation
+2. `chat_workflow/conversation_runtime.py` - Conversation orchestration & decorators  
+3. `chat_workflow/llm_interaction.py` - LLM provider abstraction
+4. `chat_workflow/exceptions.py` - Custom exception hierarchy
 
 ### **Configuration Files**
 - `config.json` - LLM provider and model settings (REQUIRED)
@@ -26,7 +26,7 @@
 
 ## File Responsibilities
 
-### `prompt_core/conversation_runtime.py` - Conversation Logic
+### `chat_workflow/conversation_runtime.py` - Conversation Logic
 ```python
 # Core class: StructuredConversationOrchestrator
 # - Manages turn state (max_turns configurable)
@@ -68,8 +68,8 @@ User Input → LLM Response → Instructor → Pydantic Validation
 
 | Task | Primary File | Key Function/Method |
 |------|--------------|---------------------|
-| Add business rule | `evaluation_criteria/models.py` | `EvaluationCriteria.validate_business_rules()` |
-| Modify generic prompt | `prompt_core/conversation_runtime.py` | `@chat` decorator system prompt |
+| Add business rule | `workflows/evaluation_criteria/models.py` | `EvaluationCriteria.validate_business_rules()` |
+| Modify generic prompt | `chat_workflow/conversation_runtime.py` | `@chat` decorator system prompt |
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
 
@@ -81,11 +81,11 @@ User Input → LLM Response → Instructor → Pydantic Validation
 ## Quick Start for Common Changes
 
 ### Modify Conversation Flow  
-1. Edit `@chat`-decorated function docstrings in `evaluation_criteria/flows.py`
+1. Edit `@chat`-decorated function docstrings in `workflows/evaluation_criteria/flows.py`
 2. Check `StructuredConversationOrchestrator.process_turn()` logic in `conversation_runtime.py`
 3. Update `tests/unit/test_orchestrator_logic.py`
 
 ### Add LLM Provider
-1. Update `prompt_core/llm_interaction.py` `get_client()`
+1. Update `chat_workflow/llm_interaction.py` `get_client()`
 2. Add provider configuration handling
 
