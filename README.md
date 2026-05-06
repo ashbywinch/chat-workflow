@@ -1,47 +1,78 @@
 # Chat Workflow
 
-A Python library for generating structured evaluation criteria through natural conversation with an LLM.
-
-**Human docs are here. AI agents should read [AGENTS.md](AGENTS.md) for onboarding.**
+A Python library for building structured LLM conversations (workflows) that generate validated data through natural dialogue.
 
 ## What Is This?
 
-This is a library that allows workflow authors to easily build LLM assisted workflows in code. Within a workflow, an LLM will act as facilitator for the creation of complex structured and validated data.
-There is a sample workflow where a user can create EvaluationCriteria for a decision.
+Chat Workflow is a framework that enables developers to create guided conversation flows where LLMs act as facilitators for generating complex, structured data. Workflow authors define Pydantic models for their data and write conversation functions that guide users through natural dialogue to produce validated outputs.
 
 Built with **Pydantic** (data models + business rules), **Instructor** (structured LLM output), and **litellm** (multi-provider LLM support).
 
+## Key Features
+
+- **Natural Conversation Interface**: Users interact through chat-based dialogue, just like talking to a human expert
+- **Structured Output Generation**: Every flow produces valid, complete Pydantic objects or raises clear exceptions
+- **Validation-First Design**: Information about "What good output looks like" lives in Pydantic models and are validated programmatically
+- **Multi-Turn Conversation Management**: Stateful orchestrator handles dialogue flow with configurable turn limits
+- **Multi-Provider LLM Support**: Works with OpenAI, Google, OpenRouter, and other providers via litellm
+- **Human-in-the-Loop Architecture**: LLMs act as coaches/facilitators, leveraging human knowledge and intuition
+- **Deterministic Control Flow**: Authors compose flows using standard Python control structures
+
 ## Quick Start
 
+### Installation
+
 ```bash
-# 1. Install
-git clone <repo> && cd chat-workflow && make
+# Clone the repository
+git clone <repo> && cd chat-workflow
 
-# 2. Configure
-# edit config.json to set your provider + model
-export OPENROUTER_API_KEY=your-key    # or OPENAI_API_KEY, etc.
+# Set up the development environment
+make
+```
 
-# 3. Activate and run
+### Configuration
+
+1. **Edit `config.json`** to set your preferred LLM provider and model:
+
+```json
+{
+  "provider": "openrouter",
+  "model": "google/gemini-2.0-flash-lite-001",
+  "temperature": 0.7,
+  "max_retries": 3
+}
+```
+
+2. **Set your API key** environment variable:
+
+```bash
+export OPENROUTER_API_KEY=your-key-here  # or OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
+```
+
+### Run the Example Workflow
+
+```bash
+# Activate the virtual environment
 source .venv/bin/activate
+
+# Run the evaluation criteria workflow
 chat-workflow --context "evaluating job offers"
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for a 5-minute contributor guide.
-
-## Usage
+### Command Line Usage
 
 ```bash
 # Interactive conversation
 chat-workflow --context "choosing a laptop"
 
-# With output file
+# Save output to a file
 chat-workflow --context "hiring criteria" --output criteria.json
 
-# Custom max turns
+# Customize conversation length
 chat-workflow --context "gift ideas" --max-turns 5
 ```
 
-## Python API
+### Python API
 
 ```python
 from workflows.evaluation_criteria.flows import generate_reviewed_criteria
@@ -63,13 +94,15 @@ criteria = generate_reviewed_criteria(
 
 | For | Read |
 |-----|------|
-| Human onboarding (this page) | `README.md` |
-| AI agent onboarding | `AGENTS.md` |
-| 5-minute contributor guide | `QUICKSTART.md` |
-| Architecture & key patterns | `ARCHITECTURE.md` |
-| Product specification | `spec.md` |
-| Testing strategy | `docs/TESTING.md` |
+| **Getting Started** | [User Guide](docs/user-guide.md) |
+| **Using Existing Workflows** | [Example: Evaluation Criteria](docs/example-evaluation-criteria.md) |
+| **Building New Workflows** | [Workflow Author Guide](docs/workflow-author-guide.md) |
+| **Contributing to the Framework** | [Contributor Guide](docs/contributor-guide.md) |
+| **Testing Strategy** | [Testing Guide](docs/TESTING.md) |
+| **Product Specification** | [Product Spec](spec.md) |
+
+**AI Agents**: Read [AGENTS.md](AGENTS.md) for agent-specific onboarding and routing.
 
 ## License
 
-MIT
+MIT License
