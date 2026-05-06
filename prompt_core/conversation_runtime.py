@@ -183,15 +183,20 @@ class StructuredConversationOrchestrator:
         on_success: Callable[[ActionLike], ConversationResultLike],
         on_failure: Callable[[ActionLike], Exception],
         debug: ConversationDebug | None = None,
+        model: str = "default-model",
+        provider: str = "openrouter",
+        max_retries: int = 3,
+        request_timeout_seconds: int = 30,
     ):
-        from .config import config
-
         self.messages: list[dict[str, str]] = [
             {"role": "system", "content": system_prompt}
         ]
         self.turn_count = 0
         self.max_turns = max_turns
-        self.model = config.model
+        self.model = model
+        self._provider = provider
+        self._max_retries = max_retries
+        self._request_timeout_seconds = request_timeout_seconds
         self.response_model = response_model
         self.on_continue = on_continue
         self.on_success = on_success
@@ -226,12 +231,11 @@ class StructuredConversationOrchestrator:
         raise InvalidResponseError(f"Invalid action received: {action.action}")
 
     def _call_llm(self) -> ActionLike:
-        from .config import config
         from .exceptions import ProviderNotFoundError
         from .llm_interaction import get_client
 
         try:
-            client = get_client(supports_tools=config.model_supports_tools)
+            client = get_client(provider=self._provider)
 
             if self.debug:
                 self.debug.on_request(self.messages, self.model)
@@ -241,8 +245,8 @@ class StructuredConversationOrchestrator:
                 model=self.model,
                 messages=self.messages,
                 response_model=self.response_model,
-                max_retries=config.max_retries,
-                timeout=config.request_timeout_seconds,
+                max_retries=self._max_retries,
+                timeout=self._request_timeout_seconds,
             )
 
             if self.debug:
@@ -283,6 +287,7 @@ def _record_orchestrator(
 class ConversationTools:
     io: ConversationIO
     state: ConversationFlowState
+    config: Any = None
 
     def chat(
         self,
@@ -360,7 +365,7 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
 
 # Internal params that the @chat decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
-_INTERNAL_PARAMS: frozenset = frozenset({"tools", "io", "state", "debug"})
+_INTERNAL_PARAMS: frozenset = frozenset({"tools", "debug", "io", "state"})
 
 
 def _get_typed_hint(func: Callable, param_name: str) -> Any:
@@ -489,20 +494,12 @@ def chat(func: Callable) -> Callable:
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        from .config import config
-
         tools = kwargs.pop("tools", None)
-        io = kwargs.pop("io", None)
-        state = kwargs.pop("state", None)
         debug = kwargs.pop("debug", None)
-
-        if tools is None and io is not None:
-            state = state or ConversationFlowState()
-            tools = ConversationTools(io=io, state=state)
 
         if tools is None:
             raise TypeError(
-                f"Chat function '{func.__name__}' requires 'io' or 'tools' parameter"
+                f"Chat function '{func.__name__}' requires 'tools' parameter"
             )
 
         state = tools.state
@@ -510,9 +507,6 @@ def chat(func: Callable) -> Callable:
         # Resolve TypeVar return type from actual argument
         actual_return_type = return_type
         if is_generic:
-            # Use get_type_hints() instead of inspect.signature() for annotations
-            # because functions with 'from __future__ import annotations' store
-            # annotations as strings, making them uncomparable to TypeVar objects.
             param_hints = typing.get_type_hints(func)
             typevar_params = [
                 name
@@ -524,23 +518,15 @@ def chat(func: Callable) -> Callable:
                     actual_return_type = type(kwargs[param_name])
                     break
 
-        # Enable debug tracing if PROMPT_CORE_DEBUG env var is set
-        if debug is None and config.debug:
-            debug = StreamingDebug()
-
-        # Build auto-generated parameters section from function signature.
-        # This makes ALL user-defined params visible to the LLM without
-        # requiring the author to manually write {param} placeholders.
         params_section = _build_params_section(func, kwargs)
-
-        # Format docstring: interpolates {param} and {obj.method()}
         system_prompt = _format_docstring(func.__doc__, **kwargs)
-
-        # Append parameter metadata so every param is documented
         if params_section:
             system_prompt += params_section
 
         max_turns = kwargs.pop("max_turns", 10)
+
+        if debug is None and tools.config.debug:
+            debug = StreamingDebug()
 
         orchestrator = StructuredConversationOrchestrator(
             system_prompt=system_prompt,
@@ -556,6 +542,10 @@ def chat(func: Callable) -> Callable:
             ),
             on_failure=lambda action: ConversationFailedError(action.message),
             debug=debug,
+            model=tools.config.model,
+            provider=tools.config.provider,
+            max_retries=tools.config.max_retries,
+            request_timeout_seconds=tools.config.request_timeout_seconds,
         )
 
         result = tools.chat(orchestrator=orchestrator, first_user_input="")
@@ -572,7 +562,7 @@ def chat(func: Callable) -> Callable:
 
 
 def workflow(func: Callable) -> Callable:
-    """Injects ConversationTools for composite functions that call other workflows."""
+    """Passes through to the wrapped function. Caller must provide ``tools=``."""
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -580,14 +570,8 @@ def workflow(func: Callable) -> Callable:
         if tools is not None:
             return func(*args, **kwargs)
 
-        io = kwargs.pop("io", None)
-        if io is None:
-            raise TypeError(
-                f"Workflow function '{func.__name__}' requires 'io' parameter"
-            )
-
-        state = kwargs.pop("state", None) or ConversationFlowState()
-        runtime_tools = ConversationTools(io=io, state=state)
-        return func(*args, tools=runtime_tools, **kwargs)
+        raise TypeError(
+            f"Workflow function '{func.__name__}' requires 'tools' parameter"
+        )
 
     return wrapper

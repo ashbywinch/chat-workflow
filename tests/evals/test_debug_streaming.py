@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 import unittest
 from io import StringIO
+from pathlib import Path
 
 from evaluation_criteria.models import EvaluationCriteria
 from evaluation_criteria.flows import generate_criteria
 from prompt_core import (
     ConversationAction,
-    StructuredConversationOrchestrator,
+    ConversationFlowState,
     ConversationResult,
+    ConversationTools,
+    StructuredConversationOrchestrator,
     StreamingDebug,
 )
+from prompt_core.config import Config
 from prompt_core.exceptions import ConversationFailedError
 from tests.conftest import timeout
+
+_CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
 
 
 class MockIO:
@@ -84,6 +90,10 @@ class TestDebugStreaming(unittest.TestCase):
             system_prompt="You are a helpful assistant.",
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=3,
+            model=_CONFIG.model,
+            provider=_CONFIG.provider,
+            max_retries=_CONFIG.max_retries,
+            request_timeout_seconds=_CONFIG.request_timeout_seconds,
             initial_messages=[
                 {
                     "role": "user",
@@ -128,7 +138,9 @@ class TestDebugStreaming(unittest.TestCase):
         criteria = generate_criteria(
             context="choosing a birthday gift",
             max_turns=6,
-            io=mock_io,
+            tools=ConversationTools(
+                io=mock_io, state=ConversationFlowState(), config=_CONFIG
+            ),
             debug=debug,
         )
 

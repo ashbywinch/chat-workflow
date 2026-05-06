@@ -47,3 +47,4 @@ Thumbs.db
 *.log
 evaluation_criteria.json
 .opencode/
+.sisyphus/

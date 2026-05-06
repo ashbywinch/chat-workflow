@@ -15,6 +15,16 @@ from prompt_core.exceptions import (
 )
 
 
+class FakeConfig:
+    """Lightweight config double for tests. Production uses Config(Path(...))."""
+
+    model = "test-model"
+    provider = "test-provider"
+    max_retries = 3
+    request_timeout_seconds = 30
+    debug = False
+
+
 class TestStructuredConversationOrchestrator(unittest.TestCase):
     def setUp(self):
         self.valid_criteria = EvaluationCriteria(
@@ -26,12 +36,11 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         )
 
     def test_orchestrator_initialization(self):
-        from prompt_core.config import config
-
         orchestrator = StructuredConversationOrchestrator(
             system_prompt="Test prompt",
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=5,
+            model="test-model",
             initial_messages=[{"role": "user", "content": "Initial context: test"}],
             on_continue=lambda action: ConversationResult[
                 EvaluationCriteria
@@ -44,7 +53,7 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
 
         self.assertEqual(orchestrator.turn_count, 0)
         self.assertEqual(orchestrator.max_turns, 5)
-        self.assertEqual(orchestrator.model, config.model)
+        self.assertEqual(orchestrator.model, "test-model")
         self.assertEqual(len(orchestrator.messages), 2)
         self.assertEqual(orchestrator.messages[0]["role"], "system")
         self.assertEqual(orchestrator.messages[1]["role"], "user")
@@ -319,7 +328,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.prompt = Mock(return_value="test response")
 
         state = ConversationFlowState()
-        tools = ConversationTools(io=mock_io, state=state)
+        tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_criteria(context="test", max_turns=5, tools=tools)
 
@@ -329,7 +338,9 @@ class TestWorkflowIntegration(unittest.TestCase):
     @patch(
         "prompt_core.conversation_runtime.StructuredConversationOrchestrator._call_llm"
     )
-    def test_leaf_accepts_io_parameter(self, mock_call_llm):
+    def test_leaf_accepts_tools_via_io(self, mock_call_llm):
+        """Caller can pass io+state+config to build tools themselves."""
+        from prompt_core import ConversationTools, ConversationFlowState
         from evaluation_criteria.flows import generate_criteria
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
@@ -340,7 +351,13 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="test response")
 
-        result = generate_criteria(context="test", max_turns=5, io=mock_io)
+        tools = ConversationTools(
+            io=mock_io,
+            state=ConversationFlowState(),
+            config=FakeConfig(),
+        )
+
+        result = generate_criteria(context="test", max_turns=5, tools=tools)
 
         self.assertIsInstance(result, EvaluationCriteria)
 
@@ -349,7 +366,7 @@ class TestWorkflowIntegration(unittest.TestCase):
     )
     def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
         from evaluation_criteria.flows import generate_reviewed_criteria
-        from prompt_core import ConversationFlowState
+        from prompt_core import ConversationTools, ConversationFlowState
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="success", result=self.valid_criteria
@@ -360,12 +377,12 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.prompt = Mock(return_value="looks good")
 
         state = ConversationFlowState()
+        tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_reviewed_criteria(
             context="test context",
             max_turns=5,
-            io=mock_io,
-            state=state,
+            tools=tools,
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
@@ -375,7 +392,7 @@ class TestWorkflowIntegration(unittest.TestCase):
     )
     def test_workflow_refinement_loop(self, mock_call_llm):
         from evaluation_criteria.flows import generate_reviewed_criteria
-        from prompt_core import ConversationFlowState
+        from prompt_core import ConversationTools, ConversationFlowState
 
         initial_criteria = EvaluationCriteria(
             context="test",
@@ -410,12 +427,12 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.prompt = Mock(return_value="change quality weight")
 
         state = ConversationFlowState()
+        tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_reviewed_criteria(
             context="test context",
             max_turns=5,
-            io=mock_io,
-            state=state,
+            tools=tools,
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
@@ -531,7 +548,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             mock_io.prompt = Mock(return_value="looks good")
 
             state = ConversationFlowState()
-            tools = ConversationTools(io=mock_io, state=state)
+            tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
             result = refine(initial_object=criteria, max_turns=5, tools=tools)
 
@@ -676,7 +693,7 @@ class TestAutoParamInjection(unittest.TestCase):
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="test")
             state = ConversationFlowState()
-            tools = ConversationTools(io=mock_io, state=state)
+            tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
             from evaluation_criteria.flows import generate_criteria
 
@@ -689,12 +706,10 @@ class TestAutoParamInjection(unittest.TestCase):
         self.assertEqual(len(captured_system_prompt), 1)
         prompt = captured_system_prompt[0]
 
-        # Should contain the auto-injected parameters section
         self.assertIn("## Parameters", prompt)
         self.assertIn("`context` (str)", prompt)
         self.assertIn("`max_turns` (int)", prompt)
 
-        # Should NOT contain internal params
         self.assertNotIn("tools", prompt)
 
     def test_chat_decorator_preserves_inline_interpolation(self):
@@ -739,7 +754,7 @@ class TestAutoParamInjection(unittest.TestCase):
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="looks good")
             state = ConversationFlowState()
-            tools = ConversationTools(io=mock_io, state=state)
+            tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
             from evaluation_criteria.flows import refine
 

@@ -5,7 +5,12 @@ from typing import Optional
 
 import typer
 
-from prompt_core import ConversationFlowState, ConversationIO
+from prompt_core import (
+    ConversationFlowState,
+    ConversationIO,
+    ConversationTools,
+)
+from prompt_core.config import Config
 from prompt_core.exceptions import (
     APIKeyError,
     ConfigFileError,
@@ -99,16 +104,44 @@ def converse(
     typer.echo(f"Starting conversation... (Ctrl+C to quit, max {max_turns} turns)")
     io = TyperConversationIO()
     flow_state = ConversationFlowState()
+    config = Config(Path(__file__).parent.parent / "config.json")
+    tools = ConversationTools(io=io, state=flow_state, config=config)
+
+    def _log_and_exit(
+        criteria_dict: dict | None,
+        default_success: bool = True,
+        feedback: str | None = None,
+    ) -> None:
+        judgement = typer.confirm(
+            "\nWas this experience successful?", default=default_success
+        )
+        if not judgement:
+            feedback = typer.prompt("What went wrong? (optional)", default="")
+            if feedback == "":
+                feedback = None
+
+        try:
+            path = log_session(
+                messages=flow_state.messages,
+                criteria=criteria_dict,
+                success_judgement=judgement,
+                feedback_text=feedback,
+                model=flow_state.model,
+                turn_count=flow_state.turn_count,
+                context=context,
+            )
+            typer.echo(f"\n📝 Session logged to: {path}")
+        except Exception as log_err:
+            typer.secho(
+                f"\n⚠️  Failed to log session: {log_err}", fg=typer.colors.YELLOW
+            )
 
     try:
         if context:
             typer.echo(f"Context: {context}")
 
         criteria = generate_reviewed_criteria(
-            context=context,
-            max_turns=max_turns,
-            io=io,
-            state=flow_state,
+            context=context, max_turns=max_turns, tools=tools
         )
 
         if output:
@@ -116,29 +149,7 @@ def converse(
                 json.dump(criteria.model_dump(), f, indent=2)
             typer.echo(f"\n✓ Saved to {output}")
 
-        success_judgement = typer.confirm(
-            "\nWas this experience successful?", default=True
-        )
-
-        feedback_text: str | None = None
-        if not success_judgement:
-            feedback_text = typer.prompt("What went wrong? (optional)", default="")
-            if feedback_text == "":
-                feedback_text = None
-
-        try:
-            log_path = log_session(
-                messages=flow_state.messages,
-                criteria=criteria.model_dump(),
-                success_judgement=success_judgement,
-                feedback_text=feedback_text,
-                model=flow_state.model,
-                turn_count=flow_state.turn_count,
-                context=context,
-            )
-            typer.echo(f"\n📝 Session logged to: {log_path}")
-        except Exception as e:
-            typer.secho(f"\n⚠️  Failed to log session: {e}", fg=typer.colors.YELLOW)
+        _log_and_exit(criteria_dict=criteria.model_dump(), default_success=True)
 
     except KeyboardInterrupt:
         typer.echo("\n\nConversation cancelled.")
@@ -147,39 +158,13 @@ def converse(
         typer.secho(
             f"\n✗ Conversation failed: {e.message}", err=True, fg=typer.colors.RED
         )
-        success_judgement = typer.confirm(
-            "\nWas this experience successful?", default=False
-        )
-        feedback_text: str | None = None
-        if not success_judgement:
-            feedback_text = typer.prompt("What went wrong? (optional)", default="")
-            if feedback_text == "":
-                feedback_text = None
-
-        log_path = log_session(
-            messages=flow_state.messages,
-            criteria=None,
-            success_judgement=success_judgement,
-            feedback_text=feedback_text,
-            model=flow_state.model,
-            turn_count=flow_state.turn_count,
-            context=context,
-        )
-        typer.echo(f"\n📝 Session logged to: {log_path}")
+        _log_and_exit(criteria_dict=None, default_success=False)
         raise typer.Exit(1)
     except TurnLimitExceededError as e:
         typer.secho(f"\n✗ {e.message}", err=True, fg=typer.colors.RED)
-
-        log_path = log_session(
-            messages=flow_state.messages,
-            criteria=None,
-            success_judgement=False,
-            feedback_text="Turn limit reached",
-            model=flow_state.model,
-            turn_count=flow_state.turn_count,
-            context=context,
+        _log_and_exit(
+            criteria_dict=None, default_success=False, feedback="Turn limit reached"
         )
-        typer.echo(f"\n📝 Session logged to: {log_path}")
         raise typer.Exit(1)
     except Exception as e:
         handle_error(e)

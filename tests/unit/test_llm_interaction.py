@@ -114,18 +114,16 @@ class TestLLMInteraction(unittest.TestCase):
 
         orchestrator._call_llm()
 
-        from prompt_core.config import config
-
         self.assertEqual(mock_client.call_count, 1)
         model, messages, response_model, max_retries = mock_client.last_call_args
 
-        self.assertEqual(model, config.model)
+        self.assertEqual(model, "default-model")
         self.assertEqual(messages, orchestrator.messages)
         self.assertEqual(response_model, ConversationAction[EvaluationCriteria])
         self.assertEqual(max_retries, 3)
         self.assertEqual(
             mock_client.last_call_kwargs.get("timeout"),
-            config.request_timeout_seconds,
+            30,
         )
 
     @patch("prompt_core.llm_interaction.get_client")
