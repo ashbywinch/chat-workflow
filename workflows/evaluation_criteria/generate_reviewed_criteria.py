@@ -6,7 +6,6 @@ from chat_workflow import workflow, ConversationTools
 
 from .evaluation_criteria import EvaluationCriteria
 from .refine import refine
-from .presentation import print_criteria
 
 
 @workflow
@@ -17,13 +16,12 @@ def generate_reviewed_criteria(
     *,
     tools: ConversationTools,
 ) -> EvaluationCriteria:
-    criteria = EvaluationCriteria.generate(
+    criteria = EvaluationCriteria.generate_from_chat(
         context=context, max_turns=max_turns, tools=tools
     )
 
     for _ in range(max_refinements):
-        print_criteria(
-            criteria=criteria,
+        criteria.echo(
             title="Current criteria:",
             echo=tools.io.echo,
         )

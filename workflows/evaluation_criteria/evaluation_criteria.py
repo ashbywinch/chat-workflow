@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Callable
 from chat_workflow import chat
 
 
@@ -64,6 +64,26 @@ class EvaluationCriteria(BaseModel):
 
         """
         pass
+
+    def echo(
+        self: EvaluationCriteria,
+        title: str,
+        echo: Callable[[str], None],
+    ) -> None:
+        echo(f"\n{title}")
+        echo(f"✓ Generated {len(self.criteria)} criteria")
+        echo(f"Context: {self.context}")
+
+        for i, criterion in enumerate(self.criteria, 1):
+            echo(f"\n{i}. {criterion.name} (weight: {criterion.weight})")
+            echo(f"   Description: {criterion.description}")
+            if criterion.ideal_value:
+                echo(f"   Ideal: {criterion.ideal_value}")
+
+        echo("\nNormalized weights (sum to 1.0):")
+        normalized = self.criteria.normalized_weights()
+        for criterion, weight in zip(self.criteria, normalized):
+            echo(f"  {criterion.name}: {weight:.3f}")
 
     @model_validator(mode="after")
     def validate_business_rules(self):
