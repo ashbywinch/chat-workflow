@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-chat-workflow = "chat_workflow.cli:main"
+chat-workflow = "chat_workflow.cli:app"
 
 [build-system]
 requires = ["setuptools>=64.0"]
@@ -26,5 +26,6 @@ include = ["chat_workflow*", "workflows*"]
 dev = [
     "black>=24.0.0",
     "coverage>=7.0.0",
+    "python-lsp-server>=1.12.0",
     "ruff>=0.11.0",
 ]
