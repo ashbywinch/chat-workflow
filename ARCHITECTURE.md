@@ -2,6 +2,9 @@
 
 ## Quick Navigation Guide
 
+This project uses uv to manage dependencies
+There is a Makefile. All git workflows go through the Makefile.
+
 ### **Core Files (Read These First)**
 1. `workflows/evaluation_criteria/models.py` - Data models & business rule validation
 2. `chat_workflow/conversation_runtime.py` - Conversation orchestration & decorators  
@@ -81,7 +84,7 @@ User Input → LLM Response → Instructor → Pydantic Validation
 ## Quick Start for Common Changes
 
 ### Modify Conversation Flow  
-1. Edit `@chat`-decorated function docstrings in `workflows/evaluation_criteria/flows.py`
+1. Edit `@chat`-decorated function docstrings in `workflows/evaluation_criteria/evaluation_criteria.py`
 2. Check `StructuredConversationOrchestrator.process_turn()` logic in `conversation_runtime.py`
 3. Update `tests/unit/test_orchestrator_logic.py`
 
