@@ -574,4 +574,5 @@ def workflow(func: Callable) -> Callable:
             f"Workflow function '{func.__name__}' requires 'tools' parameter"
         )
 
+    wrapper._is_workflow = True
     return wrapper

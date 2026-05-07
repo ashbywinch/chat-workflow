@@ -16,7 +16,7 @@ export OPENROUTER_API_KEY=your-key    # or OPENAI_API_KEY, etc.
 
 # 3. Activate and run
 source .venv/bin/activate
-chat-workflow --context "evaluating job offers"
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers"
 ```
 
 ## Installation
@@ -91,44 +91,66 @@ The `chat-workflow` command provides an interactive conversation interface to ge
 Start a conversation with a context:
 
 ```bash
-chat-workflow --context "choosing a laptop"
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
 ```
 
 The LLM will guide you through a conversation to generate structured evaluation criteria for your decision.
 
 ### Command Options
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--context` | `-c` | Initial context for the conversation | (required) |
-| `--output` | `-o` | Save successful criteria to JSON file | (none) |
-| `--max-turns` | `-t` | Maximum number of conversation turns | 10 |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--context` | Initial context for the conversation | "" |
+| `--max-turns` | Maximum number of conversation turns | 10 |
+| `--max-refinements` | Maximum number of refinement rounds | 3 |
 
 ### Examples
 
 **Interactive conversation**:
 ```bash
-chat-workflow --context "choosing a laptop"
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
 ```
 
-**Save output to a file**:
+**Customize conversation length**:
 ```bash
-chat-workflow --context "hiring criteria" --output criteria.json
-```
-
-**Limit conversation length**:
-```bash
-chat-workflow --context "gift ideas" --max-turns 5
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
 ```
 
 **Combine options**:
 ```bash
-chat-workflow --context "evaluating job offers" --output job-criteria.json --max-turns 8
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers" --max-turns 8 --max-refinements 2
+```
+
+The LLM will guide you through a conversation to generate structured evaluation criteria for your decision.
+
+### Command Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--context` | Initial context for the conversation | "" |
+| `--max-turns` | Maximum number of conversation turns | 10 |
+| `--max-refinements` | Maximum number of refinement rounds | 3 |
+
+### Examples
+
+**Interactive conversation**:
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
+```
+
+**Limit conversation length**:
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
+```
+
+**Customize refinement rounds**:
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers" --max-refinements 2
 ```
 
 ## Conversation Flow
 
-When you run `chat-workflow`, here's what happens:
+When you run `chat-workflow evaluation-criteria generate-reviewed-criteria`, here's what happens:
 
 1. **Initialization**: The LLM introduces itself and explains the process
 2. **Context gathering**: You provide initial context about your decision
@@ -153,7 +175,7 @@ If you reach the turn limit, the conversation ends and any criteria generated so
 
 ## Output Files
 
-When you use the `--output` option, the generated criteria are saved as JSON:
+The generated criteria are displayed at the end of the conversation. You can copy and save them manually if needed:
 
 ```json
 {
@@ -211,7 +233,7 @@ When you use the `--output` option, the generated criteria are saved as JSON:
 Enable debug logging to see detailed LLM interactions:
 
 ```bash
-CHAT_WORKFLOW_DEBUG=1 chat-workflow --context "test"
+CHAT_WORKFLOW_DEBUG=1 chat-workflow evaluation-criteria generate-reviewed-criteria --context "test"
 ```
 
 This streams all LLM requests and responses to stderr with timing information.

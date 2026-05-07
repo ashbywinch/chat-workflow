@@ -6,7 +6,7 @@ This document provides AI agents with specific guidance for working with the Cha
 
 ## What This Project Does
 
-Chat Workflow is a Python library that enables LLM workflow authors to generate structured and validated data through multi-turn LLM conversations. Workflow authors compose chat steps and data definitions into arbitrarily complex workflows using standard Python control flow.
+Chat Workflow is a Python library that can be used to write workflows. Workflows can generate structured and validated data through multi-turn LLM conversations with users. Workflow authors compose chat steps and data definitions into arbitrarily complex workflows using standard Python control flow.
 
 ## Decision Tree: What Do You Want to Do?
 

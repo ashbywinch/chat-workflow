@@ -33,7 +33,7 @@ setup:
 	@uv sync --all-extras
 
 run:
-	@$(OUT) --context "A birthday present"
+	@$(OUT) evaluation-criteria generate-reviewed-criteria --context "A birthday present"
 
 test: setup lint test-unit
 

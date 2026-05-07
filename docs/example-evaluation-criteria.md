@@ -19,9 +19,8 @@ The `EvaluationCriteria` workflow helps users create structured evaluation crite
 |------|---------|
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
 | `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
-| `workflows/evaluation_criteria/cli.py` | CLI implementation using Typer |
 | `workflows/evaluation_criteria/presentation.py` | Display helpers for conversation output |
-| `chat_workflow/cli.py` | Main CLI entrypoint that delegates to the workflow |
+| `chat_workflow/cli.py` | Main CLI with automatic workflow discovery |
 
 ## Business Rules
 
@@ -73,30 +72,32 @@ class EvaluationCriteria(BaseModel):
 
 ```bash
 # Interactive conversation
-chat-workflow --context "choosing a laptop"
-
-# With output file
-chat-workflow --context "hiring criteria" --output criteria.json
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
 
 # Custom max turns
-chat-workflow --context "gift ideas" --max-turns 5
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
+
+# Custom refinement rounds
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "hiring criteria" --max-refinements 2
+
+# See all options
+chat-workflow evaluation-criteria generate-reviewed-criteria --help
 ```
 
 ### Python API
 
 ```python
 from workflows.evaluation_criteria.flows import generate_reviewed_criteria
-from chat_workflow import ConversationFlowState
+from chat_workflow import ConversationTools, ConversationFlowState, ConversationIO
 
-class MyIO:
+class MyIO(ConversationIO):
     def echo(self, message: str) -> None: print(message)
     def prompt(self, label: str) -> str: return input(label + ": ")
 
 criteria = generate_reviewed_criteria(
     context="evaluating coffee makers",
     max_turns=10,
-    io=MyIO(),
-    state=ConversationFlowState(),
+    tools=ConversationTools(io=MyIO(), state=ConversationFlowState()),
 )
 ```
 
@@ -181,6 +182,8 @@ def generate_reviewed_criteria(
 
     return criteria
 ```
+
+**Note**: Functions decorated with `@workflow` are automatically discovered by the CLI. Their parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
 
 ## Critical Code Locations
 

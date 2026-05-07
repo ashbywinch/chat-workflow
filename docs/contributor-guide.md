@@ -14,7 +14,7 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
-| `chat_workflow/cli.py` | Typer CLI (`converse` command) |
+| `chat_workflow/cli.py` | CLI with automatic workflow discovery |
 | `chat_workflow/session_logging.py` | Conversation session logging |
 | `chat_workflow/__init__.py` | Public API exports |
 
@@ -46,6 +46,12 @@ Example workflows live in the `workflows/` directory.
 - Unified client for multiple providers via `get_client()`
 - Supports: OpenAI, Google, OpenRouter, etc.
 - Uses instructor for structured output
+
+#### `chat_workflow/cli.py` - CLI with Auto-Discovery
+- Discovers `@workflow` functions in `workflows/` directory
+- Converts function parameters to CLI options (excluding `tools`, `io`, `state`, `debug`)
+- Uses `__signature__` override with `typing.get_type_hints()` for type resolution
+- Handles `from __future__ import annotations` string annotations
 
 #### `config.py` - Configuration Management
 - Singleton configuration manager
@@ -178,6 +184,7 @@ tests/
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
 | Modify conversation flow | `chat_workflow/conversation_runtime.py` | `StructuredConversationOrchestrator.process_turn()` |
 | Add LLM provider | `chat_workflow/llm_interaction.py` | `get_client()` |
+| Modify CLI auto-discovery | `chat_workflow/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
 
 ## Quick Start for Common Changes
 
@@ -189,6 +196,13 @@ tests/
 ### Add LLM Provider
 1. Update `chat_workflow/llm_interaction.py` `get_client()`
 2. Add provider configuration handling
+
+### Modify CLI Auto-Discovery
+1. Check `chat_workflow/cli.py` `build_cli_app()` function
+2. The `@workflow` decorator sets `_is_workflow = True` on functions
+3. CLI discovers these functions via `discover_workflow_functions()` 
+4. Function parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options
+5. Function names are converted to kebab-case for command names
 
 ## Reference Docs
 

@@ -55,6 +55,8 @@ def composite_step(
 2. Otherwise, creates a `ConversationTools` from the `io` and `state` parameters
 3. Calls the function body with `tools` injected
 
+**CLI auto-discovery**: Functions decorated with `@workflow` are automatically discovered by the CLI. Their parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
+
 ## Pydantic Model Patterns
 
 ### Business Rules in Models, Not Prompts
@@ -204,7 +206,9 @@ The CLI provides `TyperConversationIO` (using `typer.echo`/`typer.prompt`). For 
 ### Custom I/O Implementation
 
 ```python
-class MyIO:
+from chat_workflow import ConversationTools, ConversationFlowState, ConversationIO
+
+class MyIO(ConversationIO):
     def echo(self, message: str) -> None:
         print(f"Assistant: {message}")
     
@@ -215,8 +219,7 @@ class MyIO:
 result = my_workflow_step(
     context="example",
     max_turns=10,
-    io=MyIO(),
-    state=ConversationFlowState(),
+    tools=ConversationTools(io=MyIO(), state=ConversationFlowState()),
 )
 ```
 

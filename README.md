@@ -1,6 +1,6 @@
 # Chat Workflow
 
-Chat Workflow is a framework that enables developers to create guided conversation flows, where LLMs act as facilitators for generating complex, structured data. Workflow authors define Pydantic models for their data and write conversation functions that can be combined to guide users through natural dialogue to produce validated outputs.
+Chat Workflow is a framework for developers to create guided conversation flows, where LLMs act as facilitators for generating complex, structured data. Workflow authors define Pydantic models for their data and write conversation functions that can be combined programmatically to guide users through natural dialogue to produce validated outputs.
 
 ## Key Features
 
@@ -50,38 +50,20 @@ export OPENROUTER_API_KEY=your-key-here  # or OPENAI_API_KEY, ANTHROPIC_API_KEY,
 source .venv/bin/activate
 
 # Run the evaluation criteria workflow
-chat-workflow --context "evaluating job offers"
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers"
 ```
 
 ### Command Line Usage
 
 ```bash
-# Interactive conversation
-chat-workflow --context "choosing a laptop"
+# List available workflows
+chat-workflow --help
 
-# Save output to a file
-chat-workflow --context "hiring criteria" --output criteria.json
+# Run the evaluation criteria workflow
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
 
 # Customize conversation length
-chat-workflow --context "gift ideas" --max-turns 5
-```
-
-### Python API
-
-```python
-from workflows.evaluation_criteria.flows import generate_reviewed_criteria
-from chat_workflow import ConversationFlowState
-
-class MyIO:
-    def echo(self, message: str) -> None: print(message)
-    def prompt(self, label: str) -> str: return input(label + ": ")
-
-criteria = generate_reviewed_criteria(
-    context="evaluating coffee makers",
-    max_turns=10,
-    io=MyIO(),
-    state=ConversationFlowState(),
-)
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
 ```
 
 ## Documentation
