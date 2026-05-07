@@ -1,5 +1,7 @@
+from __future__ import annotations
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional
+from typing import List, Optional, Annotated
+from chat_workflow import chat
 
 
 class Criterion(BaseModel):
@@ -40,6 +42,28 @@ class EvaluationCriteria(BaseModel):
         default="General decision making",
         description="Context for these evaluation criteria (e.g., 'Birthday presents for a 7-year-old child')",
     )
+
+    @chat
+    @classmethod
+    def generate_from_chat(
+        context: Annotated[
+            str, "The topic or domain for which to generate evaluation criteria"
+        ] = "",
+        max_turns: Annotated[
+            int, "Maximum number of conversation turns before giving up"
+        ] = 10,
+    ) -> EvaluationCriteria:
+        """You are a helpful assistant guiding the user to create evaluation criteria.
+
+        Behavior:
+        - Ask one question at a time.
+        - Start broad, then ask specific follow-ups.
+        - Base output only on information explicitly provided by the user.
+        - If the user is vague, ask clarifying questions.
+        - If the user is uncooperative or refuses to provide useful information, use action="failure".
+
+        """
+        pass
 
     @model_validator(mode="after")
     def validate_business_rules(self):

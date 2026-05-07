@@ -2,7 +2,10 @@
 import unittest
 from unittest.mock import patch
 
-from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
+from workflows.evaluation_criteria.evaluation_criteria import (
+    EvaluationCriteria,
+    Criterion,
+)
 from chat_workflow import (
     ConversationAction,
     ConversationResult,
