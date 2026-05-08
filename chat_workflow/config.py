@@ -5,12 +5,18 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .llm_interaction import ProviderType
+
 
 class Config:
     """Configuration manager for LLM settings.
 
     The caller provides the path to config.json. No auto-discovery.
     """
+
+    _VALID_PROVIDERS = frozenset({
+        "openai", "google", "anthropic", "groq", "together", "azure", "openrouter"
+    })
 
     def __init__(self, config_path: Path):
         from .exceptions import ConfigFileError, ConfigurationError
@@ -44,6 +50,13 @@ class Config:
                 "Missing required field in config.json: llm.provider"
             )
 
+        provider = self._config_data["llm"]["provider"]
+        if provider not in self._VALID_PROVIDERS:
+            raise ConfigurationError(
+                f"Invalid provider in config.json: {provider}. "
+                f"Valid providers: {', '.join(sorted(self._VALID_PROVIDERS))}"
+            )
+
         if not self._config_data.get("llm", {}).get("model"):
             raise ConfigurationError("Missing required field in config.json: llm.model")
 
@@ -55,7 +68,7 @@ class Config:
                 base[key] = value
 
     @property
-    def provider(self) -> str:
+    def provider(self) -> "ProviderType":
         return self._config_data["llm"]["provider"]
 
     @property

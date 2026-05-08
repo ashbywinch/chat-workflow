@@ -14,7 +14,43 @@ from typing import Any, Generic, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
-TResult = TypeVar("TResult")
+from .llm_interaction import ProviderType
+
+
+class _DebugTimer:
+    """Context manager that times an LLM call and emits debug events.
+
+    Usage:
+        timer = _DebugTimer(debug, messages, model)
+        with timer:
+            response = client.chat.completions.create(...)
+        timer.emit_response(response)
+    """
+
+    def __init__(
+        self,
+        debug: ConversationDebug | None,
+        messages: list[dict[str, str]],
+        model: str,
+    ):
+        self._debug = debug
+        self._messages = messages
+        self._model = model
+        self._start: datetime | None = None
+
+    def __enter__(self) -> _DebugTimer:
+        if self._debug:
+            self._debug.on_request(self._messages, self._model)
+            self._start = datetime.now()
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        pass
+
+    def emit_response(self, response: object) -> None:
+        if self._debug and self._start is not None:
+            duration_ms = (datetime.now() - self._start).total_seconds() * 1000
+            self._debug.on_response(response, duration_ms)
 
 
 class ConversationAction(BaseModel, Generic[TResult]):
@@ -84,11 +120,6 @@ class ConversationResult(BaseModel, Generic[TResult]):
         return cls(result=None, message=message, is_complete=True)
 
 
-class ActionLike(Protocol):
-    action: str
-    message: str | None
-
-
 class ConversationIO(Protocol):
     def echo(self, message: str) -> None: ...
 
@@ -105,7 +136,7 @@ class ConversationDebug(Protocol):
         """Called before sending request to LLM."""
         ...
 
-    def on_response(self, response: Any, duration_ms: float) -> None:
+    def on_response(self, response: Any, duration_ms: int) -> None:
         """Called after receiving response from LLM."""
         ...
 
@@ -147,7 +178,7 @@ class StreamingDebug:
             self._print(f"{self._timestamp()}[{i}] {role}: {content}")
         self._print(f"{self._timestamp()}Waiting for response...")
 
-    def on_response(self, response: Any, duration_ms: float) -> None:
+    def on_response(self, response: Any, duration_ms: int) -> None:
         self._print(f"{self._timestamp()}━━━ LLM RESPONSE ({duration_ms:.0f}ms) ━━━")
         try:
             if hasattr(response, "model_dump"):
@@ -164,17 +195,12 @@ class StreamingDebug:
         self._print(f"{self._timestamp()}{type(error).__name__}: {error}")
 
 
-class ConversationResultLike(Protocol):
-    message: str
-    is_complete: bool
-
-
 class ConversationOrchestratorLike(Protocol):
     messages: list[dict[str, str]]
     turn_count: int
     model: str
 
-    def process_turn(self, user_input: str) -> ConversationResultLike: ...
+    def process_turn(self, user_input: str) -> ConversationResult: ...
 
 
 class StructuredConversationOrchestrator:
@@ -182,15 +208,15 @@ class StructuredConversationOrchestrator:
         self,
         *,
         system_prompt: str,
-        response_model: type[ActionLike],
+        response_model: type[ConversationAction],
         max_turns: int,
         initial_messages: list[dict[str, str]] | None,
-        on_continue: Callable[[ActionLike], ConversationResultLike],
-        on_success: Callable[[ActionLike], ConversationResultLike],
-        on_failure: Callable[[ActionLike], Exception],
+        on_continue: Callable[[ConversationAction], ConversationResult],
+        on_success: Callable[[ConversationAction], ConversationResult],
+        on_failure: Callable[[ConversationAction], Exception],
         debug: ConversationDebug | None = None,
         model: str = "default-model",
-        provider: str = "openrouter",
+        provider: ProviderType = "openrouter",
         max_retries: int = 3,
         request_timeout_seconds: int = 30,
     ):
@@ -200,7 +226,7 @@ class StructuredConversationOrchestrator:
         self.turn_count = 0
         self.max_turns = max_turns
         self.model = model
-        self._provider = provider
+        self._provider: ProviderType = provider
         self._max_retries = max_retries
         self._request_timeout_seconds = request_timeout_seconds
         self.response_model = response_model
@@ -212,7 +238,7 @@ class StructuredConversationOrchestrator:
         for message in initial_messages or []:
             self.messages.append(message)
 
-    def process_turn(self, user_input: str) -> ConversationResultLike:
+    def process_turn(self, user_input: str) -> ConversationResult:
         from .exceptions import InvalidResponseError, TurnLimitExceededError
 
         if self.turn_count >= self.max_turns:
@@ -236,29 +262,25 @@ class StructuredConversationOrchestrator:
 
         raise InvalidResponseError(f"Invalid action received: {action.action}")
 
-    def _call_llm(self) -> ActionLike:
+    def _call_llm(self) -> ConversationAction:
         from .exceptions import ProviderNotFoundError
         from .llm_interaction import get_client
 
         try:
             client = get_client(provider=self._provider)
+            timer = _DebugTimer(self.debug, self.messages, self.model)
 
-            if self.debug:
-                self.debug.on_request(self.messages, self.model)
-                start = datetime.now()
+            with timer:
+                # instructor patches the client with extra params that pyright stubs don't know about
+                response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
+                    model=self.model,
+                    messages=self.messages,  # pyright: ignore[reportArgumentType]
+                    response_model=self.response_model,
+                    max_retries=self._max_retries,
+                    timeout=self._request_timeout_seconds,
+                )
 
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=self.messages,
-                response_model=self.response_model,
-                max_retries=self._max_retries,
-                timeout=self._request_timeout_seconds,
-            )
-
-            if self.debug:
-                duration_ms = (datetime.now() - start).total_seconds() * 1000
-                self.debug.on_response(response, duration_ms)
-
+            timer.emit_response(response)
             return response
         except ImportError as e:
             raise ProviderNotFoundError(
@@ -299,7 +321,7 @@ class ConversationTools:
         self,
         orchestrator: ConversationOrchestratorLike,
         first_user_input: str,
-    ) -> ConversationResultLike:
+    ) -> ConversationResult:
         try:
             result = orchestrator.process_turn(first_user_input)
             self.io.echo(f"\nAssistant: {result.message}")
@@ -314,7 +336,7 @@ class ConversationTools:
             _record_orchestrator(self.state, orchestrator)
 
 
-def _get_return_type(func: Callable) -> type[BaseModel] | None:
+def _get_return_type(func: Callable[..., Any]) -> type[BaseModel] | None:
     hints = typing.get_type_hints(func)
     return_type = hints.get("return")
 
@@ -341,7 +363,7 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
     # This handles cases like {initial_object.model_dump()}
     method_pattern = re.compile(r"\{(\w+)\.(\w+)\(\)\}")
 
-    def replace_method_call(match: re.Match) -> str:
+    def replace_method_call(match: re.Match[str]) -> str:
         var_name = match.group(1)
         method_name = match.group(2)
 
@@ -371,10 +393,10 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
 
 # Internal params that the @chat decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
-_INTERNAL_PARAMS: frozenset = frozenset({"tools", "debug", "io", "state"})
+_INTERNAL_PARAMS: frozenset[str] = frozenset({"tools", "debug", "io", "state"})
 
 
-def _get_typed_hint(func: Callable, param_name: str) -> Any:
+def _get_typed_hint(func: Callable[..., Any], param_name: str) -> Any:
     """Get the resolved type hint for a parameter, preserving Annotated metadata.
 
     Uses typing.get_type_hints with include_extras=True so that
@@ -396,7 +418,7 @@ def _unwrap_annotated(hint: Any) -> Any:
     return hint
 
 
-def _get_param_description(func: Callable, param_name: str) -> str | None:
+def _get_param_description(func: Callable[..., Any], param_name: str) -> str | None:
     """Extract an optional description string from Annotated[T, \"desc\"]."""
     hint = _get_typed_hint(func, param_name)
     if hint is None:
@@ -432,7 +454,7 @@ def _format_param_value(value: Any) -> str:
     return repr(value)
 
 
-def _build_params_section(func: Callable, runtime_kwargs: dict) -> str:
+def _build_params_section(func: Callable[..., Any], runtime_kwargs: dict[str, Any]) -> str:
     """Build a ``## Parameters`` section from the function signature.
 
     For every user-defined parameter (excluding internal plumbing like
@@ -476,7 +498,7 @@ def _build_params_section(func: Callable, runtime_kwargs: dict) -> str:
     return "\n\n## Parameters\n" + "\n".join(lines)
 
 
-def chat(func: Callable) -> Callable:
+def chat(func: Callable[..., Any]) -> Callable[..., Any]:
     """Auto-orchestrates an LLM chat function using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
@@ -567,7 +589,7 @@ def chat(func: Callable) -> Callable:
     return wrapper
 
 
-def workflow(func: Callable) -> Callable:
+def workflow(func: Callable[..., Any]) -> Callable[..., Any]:
     """Passes through to the wrapped function. Caller must provide ``tools=``."""
 
     @wraps(func)

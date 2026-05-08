@@ -37,7 +37,7 @@ _PROVIDER_API_KEY_ENV = {
 }
 
 
-def get_client(provider: ProviderType):
+def get_client(provider: str):
     """Get an instructor-patched LLM client for *provider*.
 
     The API key is read from the corresponding environment variable
@@ -68,5 +68,5 @@ def get_client(provider: ProviderType):
     return instructor.from_litellm(completion, mode=mode)
 
 
-def list_available_providers() -> dict:
+def list_available_providers() -> dict[str, bool]:
     return {p: bool(os.getenv(e)) for p, e in _PROVIDER_API_KEY_ENV.items()}

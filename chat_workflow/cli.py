@@ -95,7 +95,7 @@ def discover_workflows() -> dict[str, Path]:
     return workflows
 
 
-def discover_workflow_functions(module) -> dict[str, Callable]:
+def discover_workflow_functions(module) -> dict[str, Callable[..., Any]]:
     functions = {}
     for name, obj in inspect.getmembers(module):
         if inspect.isfunction(obj) and getattr(obj, "_is_workflow", False):
@@ -108,7 +108,7 @@ def _snake_to_kebab(name: str) -> str:
 
 
 def _execute_workflow(
-    func: Callable,
+    func: Callable[..., Any],
     user_params: dict[str, Any],
 ):
     """Run a workflow function with framework plumbing."""

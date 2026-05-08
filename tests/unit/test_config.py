@@ -12,7 +12,7 @@ from chat_workflow.config import Config
 class TestConfig(unittest.TestCase):
     """Config requires an explicit path to config.json — no auto-discovery."""
 
-    def _write_temp_config(self, content: dict) -> str:
+    def _write_temp_config(self, content: dict[str, object]) -> str:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(content, f)
             return f.name
