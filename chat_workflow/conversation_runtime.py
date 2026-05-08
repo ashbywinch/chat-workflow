@@ -17,7 +17,10 @@ from pydantic import BaseModel, Field, model_validator
 from .llm_interaction import ProviderType
 
 
-class _DebugTimer:
+TResult = TypeVar("TResult")
+
+
+class _DebugTimer(Generic[TResult]):
     """Context manager that times an LLM call and emits debug events.
 
     Usage:
@@ -38,7 +41,7 @@ class _DebugTimer:
         self._model = model
         self._start: datetime | None = None
 
-    def __enter__(self) -> _DebugTimer:
+    def __enter__(self) -> _DebugTimer[TResult]:
         if self._debug:
             self._debug.on_request(self._messages, self._model)
             self._start = datetime.now()
@@ -47,9 +50,10 @@ class _DebugTimer:
     def __exit__(self, *exc_info: object) -> None:
         pass
 
-    def emit_response(self, response: object) -> None:
+    def emit_response(self, response: ConversationAction[TResult]) -> None:
         if self._debug and self._start is not None:
-            duration_ms = (datetime.now() - self._start).total_seconds() * 1000
+            delta = datetime.now() - self._start
+            duration_ms = delta.seconds * 1000 + delta.microseconds // 1000
             self._debug.on_response(response, duration_ms)
 
 
@@ -195,25 +199,25 @@ class StreamingDebug:
         self._print(f"{self._timestamp()}{type(error).__name__}: {error}")
 
 
-class ConversationOrchestratorLike(Protocol):
+class ConversationOrchestratorLike(Protocol, Generic[TResult]):
     messages: list[dict[str, str]]
     turn_count: int
     model: str
 
-    def process_turn(self, user_input: str) -> ConversationResult: ...
+    def process_turn(self, user_input: str) -> ConversationResult[TResult]: ...
 
 
-class StructuredConversationOrchestrator:
+class StructuredConversationOrchestrator(Generic[TResult]):
     def __init__(
         self,
         *,
         system_prompt: str,
-        response_model: type[ConversationAction],
+        response_model: type[ConversationAction[TResult]],
         max_turns: int,
         initial_messages: list[dict[str, str]] | None,
-        on_continue: Callable[[ConversationAction], ConversationResult],
-        on_success: Callable[[ConversationAction], ConversationResult],
-        on_failure: Callable[[ConversationAction], Exception],
+        on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]],
+        on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]],
+        on_failure: Callable[[ConversationAction[TResult]], Exception],
         debug: ConversationDebug | None = None,
         model: str = "default-model",
         provider: ProviderType = "openrouter",
@@ -230,15 +234,15 @@ class StructuredConversationOrchestrator:
         self._max_retries = max_retries
         self._request_timeout_seconds = request_timeout_seconds
         self.response_model = response_model
-        self.on_continue = on_continue
-        self.on_success = on_success
-        self.on_failure = on_failure
+        self.on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = on_continue
+        self.on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = on_success
+        self.on_failure: Callable[[ConversationAction[TResult]], Exception] = on_failure
         self.debug = debug
 
         for message in initial_messages or []:
             self.messages.append(message)
 
-    def process_turn(self, user_input: str) -> ConversationResult:
+    def process_turn(self, user_input: str) -> ConversationResult[TResult]:
         from .exceptions import InvalidResponseError, TurnLimitExceededError
 
         if self.turn_count >= self.max_turns:
@@ -250,8 +254,9 @@ class StructuredConversationOrchestrator:
         self.turn_count += 1
         action = self._call_llm()
 
-        if getattr(action, "message", None):
-            self.messages.append({"role": "assistant", "content": action.message})
+        message = action.message
+        if message:
+            self.messages.append({"role": "assistant", "content": message})
 
         if action.action == "continue":
             return self.on_continue(action)
@@ -262,7 +267,7 @@ class StructuredConversationOrchestrator:
 
         raise InvalidResponseError(f"Invalid action received: {action.action}")
 
-    def _call_llm(self) -> ConversationAction:
+    def _call_llm(self) -> ConversationAction[TResult]:
         from .exceptions import ProviderNotFoundError
         from .llm_interaction import get_client
 
@@ -296,15 +301,15 @@ class StructuredConversationOrchestrator:
 @dataclass
 class ConversationFlowState:
     messages: list[dict[str, str]] = field(default_factory=list)
-    model: str = "unknown"
+    model: str = "unknown" # TODO: this is not type safe
     turn_count: int = 0
     initial_result: Any = None
     final_result: Any = None
 
 
-def _record_orchestrator(
+def _record_orchestrator[T](
     state: ConversationFlowState,
-    orchestrator: ConversationOrchestratorLike,
+    orchestrator: ConversationOrchestratorLike[T],
 ) -> None:
     state.messages.extend(orchestrator.messages)
     state.turn_count += orchestrator.turn_count
@@ -317,11 +322,11 @@ class ConversationTools:
     state: ConversationFlowState
     config: Any = None
 
-    def chat(
+    def chat[TResult](
         self,
-        orchestrator: ConversationOrchestratorLike,
+        orchestrator: ConversationOrchestratorLike[TResult],
         first_user_input: str,
-    ) -> ConversationResult:
+    ) -> ConversationResult[TResult]:
         try:
             result = orchestrator.process_turn(first_user_input)
             self.io.echo(f"\nAssistant: {result.message}")
@@ -515,7 +520,7 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
             raise TypeError(
                 f"Leaf function '{func.__name__}' TypeVar bound must be a Pydantic model, bound is {bound_type}"
             )
-    elif not issubclass(return_type, BaseModel):
+    elif return_type is None or not issubclass(return_type, BaseModel):
         raise TypeError(
             f"Leaf function '{func.__name__}' must have a Pydantic model return type, type is {return_type}"
         )
@@ -563,12 +568,12 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
             initial_messages=None,
             on_continue=lambda action: ConversationResult[
                 actual_return_type
-            ].continuing(action.message),
+            ].continuing(action.message or ""),
             on_success=lambda action: ConversationResult[actual_return_type].success(
                 action.result,
                 message="Completed successfully!",
             ),
-            on_failure=lambda action: ConversationFailedError(action.message),
+            on_failure=lambda action: ConversationFailedError(action.message or "No reason given"),
             debug=debug,
             model=tools.config.model,
             provider=tools.config.provider,
@@ -602,5 +607,5 @@ def workflow(func: Callable[..., Any]) -> Callable[..., Any]:
             f"Workflow function '{func.__name__}' requires 'tools' parameter"
         )
 
-    wrapper._is_workflow = True
+    wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]  # pyright: ignore[reportAttributeAccessIssue]
     return wrapper
