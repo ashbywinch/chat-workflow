@@ -63,9 +63,9 @@ coverage: setup
 	@echo "${GREEN}Coverage report generated: htmlcov/index.html${NC}"
 
 # Linting with ruff
-# TODO: add uvx basedpyright back into the lint instructions
 lint: setup
 	.venv/bin/ruff check chat_workflow/ workflows/ tests/
+	uvx basedpyright
 
 # Auto-fix linting issues
 format: setup

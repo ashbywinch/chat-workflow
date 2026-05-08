@@ -12,14 +12,12 @@ ModelType = TypeVar("ModelType", bound=BaseModel)
 
 
 @chat
-def refine(
-    initial_object: Annotated[
-        ModelType, "The object to review and potentially modify based on user feedback"
-    ],
+def refine(  # pyright: ignore[reportReturnType]
+    initial_object: Annotated[ModelType, "The object to review and potentially modify based on user feedback"],
     max_turns: Annotated[int, "Maximum number of refinement turns"] = 5,
-) -> ModelType:
+) -> ModelType:  # pyright: ignore[reportReturnType]
     """You are running a short refinement conversation for an existing object.
-    Goal: Check whether the user wants to keep this version of the object or change 
+    Goal: Check whether the user wants to keep this version of the object or change
     anything about it. Return the object with any updates.
 
     Rules:
@@ -28,4 +26,5 @@ def refine(
     - Preserve the original object contents exactly unless the user asks to change it.
 
     """
-    pass
+    ...
+    pass  # noqa: covered by @chat decorator

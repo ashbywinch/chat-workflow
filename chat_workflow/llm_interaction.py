@@ -10,16 +10,13 @@ from litellm import completion
 
 from .exceptions import (
     APIKeyError,
-    ProviderNotFoundError,
     ProviderNotSupportedError,
 )
 
 load_dotenv()
 litellm.suppress_debug_info = True
 
-ProviderType = Literal[
-    "openai", "google", "anthropic", "groq", "together", "azure", "openrouter"
-]
+ProviderType = Literal["openai", "google", "anthropic", "groq", "together", "azure", "openrouter"]
 
 _PROVIDER_API_KEY_ENV = {
     "openai": "OPENAI_API_KEY",
@@ -41,15 +38,13 @@ def get_client(provider: str):
 
     if provider not in _PROVIDER_API_KEY_ENV:
         raise ProviderNotSupportedError(
-            f"Unsupported provider: {provider}. "
-            f"Supported: {', '.join(_PROVIDER_API_KEY_ENV)}"
+            f"Unsupported provider: {provider}. Supported: {', '.join(_PROVIDER_API_KEY_ENV)}"
         )
 
     api_key = os.getenv(_PROVIDER_API_KEY_ENV[provider])
     if not api_key:
         raise APIKeyError(
-            f"{_PROVIDER_API_KEY_ENV[provider]} not set. "
-            f"Get your API key and set this environment variable."
+            f"{_PROVIDER_API_KEY_ENV[provider]} not set. Get your API key and set this environment variable."
         )
 
     os.environ[provider.upper() + "_API_KEY"] = api_key

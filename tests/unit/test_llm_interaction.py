@@ -48,9 +48,7 @@ class MockInstructorClient:
                 else:
                     raise ValueError("No more responses in mock")
 
-            return ConversationAction[EvaluationCriteria](
-                action="continue", message="Test question"
-            )
+            return ConversationAction[EvaluationCriteria](action="continue", message="Test question")
 
 
 class TestLLMInteraction(unittest.TestCase):
@@ -69,12 +67,8 @@ class TestLLMInteraction(unittest.TestCase):
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=max_turns,
             initial_messages=None,
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
+            on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
             on_failure=lambda action: ConversationFailedError(action.message),
         )
 
@@ -107,9 +101,7 @@ class TestLLMInteraction(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_passes_correct_parameters(self, mock_get_client):
         mock_client = MockInstructorClient()
-        expected_action = ConversationAction[EvaluationCriteria](
-            action="continue", message="Test"
-        )
+        expected_action = ConversationAction[EvaluationCriteria](action="continue", message="Test")
         mock_client.responses = [expected_action]
         mock_get_client.return_value = mock_client
 
@@ -131,9 +123,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_success_completion(self, mock_get_client):
-        success_action = ConversationAction[EvaluationCriteria](
-            action="success", result=self.valid_criteria
-        )
+        success_action = ConversationAction[EvaluationCriteria](action="success", result=self.valid_criteria)
 
         mock_client = MockInstructorClient()
         mock_client.responses = [success_action]
@@ -154,9 +144,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_turn_limit_enforcement(self, mock_get_client):
-        continue_action = ConversationAction[EvaluationCriteria](
-            action="continue", message="Tell me more"
-        )
+        continue_action = ConversationAction[EvaluationCriteria](action="continue", message="Tell me more")
         mock_client = MockInstructorClient()
         mock_client.responses = [continue_action] * 20
         mock_get_client.return_value = mock_client
@@ -176,9 +164,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_with_custom_max_turns(self, mock_get_client):
-        continue_action = ConversationAction[EvaluationCriteria](
-            action="continue", message="Continue please"
-        )
+        continue_action = ConversationAction[EvaluationCriteria](action="continue", message="Continue please")
         mock_client = MockInstructorClient()
         mock_client.responses = [continue_action] * 5
         mock_get_client.return_value = mock_client
@@ -216,9 +202,7 @@ class TestLLMInteraction(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_validation_error_propagation(self, mock_get_client):
         mock_client = MockInstructorClient()
-        mock_client.responses = [
-            ValueError("Validation failed: Invalid JSON structure")
-        ]
+        mock_client.responses = [ValueError("Validation failed: Invalid JSON structure")]
         mock_get_client.return_value = mock_client
 
         orchestrator = self._create_orchestrator()

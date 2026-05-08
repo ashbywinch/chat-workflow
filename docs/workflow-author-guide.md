@@ -52,23 +52,28 @@ def generate_essay(
 
 ## Pydantic Model Patterns
 
+### Good prompts 
+
+DO give behavioral examples and conversation strategies in your prompt
+
+FOCUS on "what to do", not "what not to do"
+
 ### Business Rules in Models, Not Prompts
 
-Business rules live in Pydantic models (`model_validator`), and don't need to be duplicated in the prompt. 
+Business rules live in your Pydantic models, from where they are automatically added to the system prompt when you write a @chat function that returns a model. You shouldn't need to add business rules to prompts that you write.
 
 ### Communicate Rules in JSON Schema
 
-A `model_validator` only fires *after* the LLM returns data. It's enforcement, not communication. The JSON schema for the model, on the other hand, is sent to the LLM up front to understand what to produce. So rules should be encoded in ways that propagate to `model_json_schema()`:
+You can add `model_validators` to your Pydantic model. These will be used to verify what the LLM returns, but they aren't enough get the rules automatically added to your prompts. If the LLM repeatedly fails to satisfy your business rule, the rule is not visible enough in the model. Here's how to fix the model:
 
-#### Visible to the LLM and verified automatically:
+#### Best option if you can: Pydantic field constraints.
 
-- Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`). This is the best option wherever possible.
+- Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`). These are visible in your prompt and will be verified automatically when the LLM returns an object.
 
-#### Visible to the LLM but not verified automatically:
+#### Second best option: Docstrings and descriptions
 - Use `Field(description=...)` with plain-English conditional rules (e.g. `'Required when action is "success". Must be null when action is "continue".'`). 
 - Use class docstrings for class-level validation. These will appear in the JSON schema. 
-
-You'll need to write a `model_validator` if you want these rules to be validated programmatically.
+- Write a `model_validator` that validates the same rules programmatically. Your validator will be called when the LLM returns an object.
 
 You can test schemas with `Model.model_json_schema()` to verify that your rules are all visible in the output.
 

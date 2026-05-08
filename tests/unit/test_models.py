@@ -2,9 +2,9 @@
 import unittest
 
 from pydantic import ValidationError
-from workflows.evaluation_criteria.models import Criterion, EvaluationCriteria
 
 from chat_workflow import ConversationAction, ConversationResult
+from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
 class TestCriterionModel(unittest.TestCase):
@@ -48,9 +48,7 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
 
     def test_evaluation_criteria_creation(self):
-        criteria = EvaluationCriteria(
-            context="Choosing a laptop", criteria=self.valid_criteria
-        )
+        criteria = EvaluationCriteria(context="Choosing a laptop", criteria=self.valid_criteria)
 
         self.assertEqual(criteria.context, "Choosing a laptop")
         self.assertEqual(len(criteria.criteria), 2)
@@ -66,9 +64,7 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
     def test_business_rule_at_least_two_criteria(self):
         EvaluationCriteria(criteria=self.valid_criteria)
 
-        more_criteria = self.valid_criteria + [
-            Criterion(name="features", description="Feature set", weight=6.0)
-        ]
+        more_criteria = self.valid_criteria + [Criterion(name="features", description="Feature set", weight=6.0)]
         EvaluationCriteria(criteria=more_criteria)
 
         from pydantic import ValidationError
@@ -161,9 +157,7 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
 
 class TestConversationActionModel(unittest.TestCase):
     def test_conversation_action_continue(self):
-        action = ConversationAction[EvaluationCriteria](
-            action="continue", message="What's your budget?"
-        )
+        action = ConversationAction[EvaluationCriteria](action="continue", message="What's your budget?")
 
         self.assertEqual(action.action, "continue")
         self.assertEqual(action.message, "What's your budget?")
@@ -178,18 +172,14 @@ class TestConversationActionModel(unittest.TestCase):
             ],
         )
 
-        action = ConversationAction[EvaluationCriteria](
-            action="success", result=criteria
-        )
+        action = ConversationAction[EvaluationCriteria](action="success", result=criteria)
 
         self.assertEqual(action.action, "success")
         self.assertIsNone(action.message)
         self.assertEqual(action.result, criteria)
 
     def test_conversation_action_failure(self):
-        action = ConversationAction[EvaluationCriteria](
-            action="failure", message="Can't help with that"
-        )
+        action = ConversationAction[EvaluationCriteria](action="failure", message="Can't help with that")
 
         self.assertEqual(action.action, "failure")
         self.assertEqual(action.message, "Can't help with that")
@@ -225,9 +215,7 @@ class TestConversationResultModel(unittest.TestCase):
         )
 
     def test_continuing_factory_method(self):
-        result = ConversationResult[EvaluationCriteria].continuing(
-            "Please tell me more"
-        )
+        result = ConversationResult[EvaluationCriteria].continuing("Please tell me more")
 
         self.assertEqual(result.message, "Please tell me more")
         self.assertIsNone(result.result)

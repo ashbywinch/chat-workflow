@@ -56,12 +56,8 @@ class TestRealAPI(unittest.TestCase):
                     "content": "Create criteria for choosing a birthday gift. My budget is $50.",
                 }
             ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
+            on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
             on_failure=lambda action: ConversationFailedError(action.message),
         )
 
@@ -113,9 +109,7 @@ class TestRealAPI(unittest.TestCase):
         criteria = generate_criteria(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(
-                io=mock_io, state=ConversationFlowState(), config=_CONFIG
-            ),
+            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -148,12 +142,8 @@ class TestRealAPI(unittest.TestCase):
                     "content": "I want to evaluate coffee makers. Budget is $200.",
                 }
             ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
+            on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
             on_failure=lambda action: ConversationFailedError(action.message),
         )
 
@@ -186,9 +176,7 @@ class TestRealAPI(unittest.TestCase):
         criteria = generate_criteria(
             context="choosing a birthday gift for a 7-year-old",
             max_turns=10,
-            tools=ConversationTools(
-                io=mock_io, state=ConversationFlowState(), config=_CONFIG
-            ),
+            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -214,9 +202,7 @@ class TestRealAPI(unittest.TestCase):
             generate_criteria(
                 context="choosing a laptop for programming",
                 max_turns=3,
-                tools=ConversationTools(
-                    io=mock_io, state=ConversationFlowState(), config=_CONFIG
-                ),
+                tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
             )
 
     @timeout(10)
@@ -241,12 +227,8 @@ class TestRealAPI(unittest.TestCase):
                     "content": "I want to create criteria for choosing a laptop. My budget is $1000.",
                 }
             ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
+            on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
             on_failure=lambda action: ConversationFailedError(action.message),
         )
 

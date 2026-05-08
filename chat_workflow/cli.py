@@ -50,36 +50,24 @@ def handle_error(error: Exception):
             fg=typer.colors.RED,
         )
     elif isinstance(error, ConfigurationError):
-        typer.secho(
-            f"\nConfiguration error: {error.message}", err=True, fg=typer.colors.RED
-        )
+        typer.secho(f"\nConfiguration error: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, APIKeyError):
         typer.secho(f"\nAPI key error: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ProviderNotSupportedError):
         typer.secho(f"\nProvider error: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ProviderNotFoundError):
-        typer.secho(
-            f"\nProvider not found: {error.message}", err=True, fg=typer.colors.RED
-        )
+        typer.secho(f"\nProvider not found: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, TurnLimitExceededError):
         typer.secho(f"\n{error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ConversationFailedError):
-        typer.secho(
-            f"\nConversation failed: {error.message}", err=True, fg=typer.colors.RED
-        )
+        typer.secho(f"\nConversation failed: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ValidationError):
-        typer.secho(
-            f"\nValidation error: {error.message}", err=True, fg=typer.colors.RED
-        )
+        typer.secho(f"\nValidation error: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ChatWorkflowError):
         typer.secho(f"\nError: {error.message}", err=True, fg=typer.colors.RED)
     else:
-        typer.secho(
-            f"\nUnexpected error: {str(error)[:200]}", err=True, fg=typer.colors.RED
-        )
-        message = "".join(
-            traceback.format_exception(type(error), error, error.__traceback__)
-        )
+        typer.secho(f"\nUnexpected error: {str(error)[:200]}", err=True, fg=typer.colors.RED)
+        message = "".join(traceback.format_exception(type(error), error, error.__traceback__))
         typer.secho(f"\n{message}")
     raise typer.Exit(1)
 
@@ -119,9 +107,7 @@ def _execute_workflow(
     tools = ConversationTools(io=io, state=flow_state, config=config)
 
     def _log_and_exit(result_dict, default_success=True, feedback=None):
-        judgement = typer.confirm(
-            "\nWas this experience successful?", default=default_success
-        )
+        judgement = typer.confirm("\nWas this experience successful?", default=default_success)
         if not judgement:
             feedback = typer.prompt("What went wrong? (optional)", default="")
             if feedback == "":
@@ -153,18 +139,14 @@ def _execute_workflow(
         raise typer.Exit(1) from None
     except TurnLimitExceededError as e:
         typer.secho(f"{e.message}", err=True, fg=typer.colors.RED)
-        _log_and_exit(
-            result_dict=None, default_success=False, feedback="Turn limit reached"
-        )
+        _log_and_exit(result_dict=None, default_success=False, feedback="Turn limit reached")
         raise typer.Exit(1) from None
     except Exception as e:
         handle_error(e)
 
 
 def build_cli_app() -> typer.Typer:
-    app = typer.Typer(
-        help="Chat Workflow CLI - Generate structured data through LLM conversations"
-    )
+    app = typer.Typer(help="Chat Workflow CLI - Generate structured data through LLM conversations")
 
     for workflow_name in discover_workflows():
         module_name = f"workflows.{workflow_name}.flows"
@@ -199,11 +181,7 @@ def build_cli_app() -> typer.Typer:
             for param in user_params:
                 # Use resolved type hint if available, fall back to str
                 annotation = type_hints.get(param.name, str)
-                default = (
-                    param.default
-                    if param.default is not inspect.Parameter.empty
-                    else None
-                )
+                default = param.default if param.default is not inspect.Parameter.empty else None
                 sig_params.append(
                     inspect.Parameter(
                         param.name,
@@ -218,7 +196,7 @@ def build_cli_app() -> typer.Typer:
                 _execute_workflow(_func, workflow_params)
 
             # Override the signature so Typer generates proper CLI options
-            run_cmd.__signature__ = inspect.Signature(  # pyright: ignore[reportAttributeAccessIssue]
+            run_cmd.__signature__ = inspect.Signature(  # pyright: ignore
                 parameters=sig_params,
                 return_annotation=inspect.Parameter.empty,
             )

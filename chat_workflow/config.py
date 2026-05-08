@@ -14,9 +14,7 @@ class Config:
     The caller provides the path to config.json. No auto-discovery.
     """
 
-    _VALID_PROVIDERS = frozenset({
-        "openai", "google", "anthropic", "groq", "together", "azure", "openrouter"
-    })
+    _VALID_PROVIDERS = frozenset({"openai", "google", "anthropic", "groq", "together", "azure", "openrouter"})
 
     def __init__(self, config_path: Path):
         from .exceptions import ConfigFileError, ConfigurationError
@@ -32,8 +30,7 @@ class Config:
 
         if not config_path.exists():
             raise ConfigFileError(
-                f"Configuration file not found: {config_path}\n"
-                f"Refer to config.json.example for the required format."
+                f"Configuration file not found: {config_path}\nRefer to config.json.example for the required format."
             )
 
         try:
@@ -46,9 +43,7 @@ class Config:
             raise ConfigFileError(f"Could not read {config_path}: {e}") from e
 
         if not self._config_data.get("llm", {}).get("provider"):
-            raise ConfigurationError(
-                "Missing required field in config.json: llm.provider"
-            )
+            raise ConfigurationError("Missing required field in config.json: llm.provider")
 
         provider = self._config_data["llm"]["provider"]
         if provider not in self._VALID_PROVIDERS:

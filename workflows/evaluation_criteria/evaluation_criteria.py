@@ -11,12 +11,8 @@ from chat_workflow import chat
 class Criterion(BaseModel):
     """A single criterion for evaluating options."""
 
-    name: str = Field(
-        ..., description="Name of the criterion (e.g., 'Educational Value', 'Safety')"
-    )
-    description: str = Field(
-        ..., description="Detailed description of what this criterion measures"
-    )
+    name: str = Field(..., description="Name of the criterion (e.g., 'Educational Value', 'Safety')")
+    description: str = Field(..., description="Detailed description of what this criterion measures")
     weight: float = Field(
         default=1.0,
         ge=0.0,
@@ -48,15 +44,11 @@ class EvaluationCriteria(BaseModel):
     @classmethod
     def generate_from_chat(
         cls,
-        context: Annotated[
-            str, "The topic or domain for which to generate evaluation criteria"
-        ],
-        max_turns: Annotated[
-            int, "Maximum number of conversation turns before giving up"
-        ] = 10,
+        context: Annotated[str, "The topic or domain for which to generate evaluation criteria"],
+        max_turns: Annotated[int, "Maximum number of conversation turns before giving up"] = 10,
     ) -> EvaluationCriteria:
         """You are a helpful assistant guiding the user to create evaluation criteria.
-        Assume the user is an expert on their topic but they know nothing about 
+        Assume the user is an expert on their topic but they know nothing about
         creating good evaluation criteria.
 
         Behavior:
@@ -64,23 +56,20 @@ class EvaluationCriteria(BaseModel):
         - Start broad, then ask specific follow-ups.
         - Base output only on information explicitly provided by the user.
         - If the user is vague, ask clarifying questions.
-        - If the user is uncooperative or refuses to provide useful information, 
+        - If the user is uncooperative or refuses to provide useful information,
             use action="failure".
 
         """
-        pass
-
+        ...  # type: ignore[reportReturnType]
 
     @model_validator(mode="after")
     def validate_business_rules(self):
-        """Any validation rules that can't be handled by field attributes 
+        """Any validation rules that can't be handled by field attributes
         like min_length"""
         from chat_workflow.exceptions import ValidationError
 
         if not any(c.name.lower() == "budget" for c in self.criteria):
-            raise ValidationError(
-                "Must include a criterion named 'budget' (case-insensitive)"
-            )
+            raise ValidationError("Must include a criterion named 'budget' (case-insensitive)")
         return self
 
     def echo(
@@ -99,10 +88,10 @@ class EvaluationCriteria(BaseModel):
                 echo(f"   Ideal: {criterion.ideal_value}")
 
         echo("\nNormalized weights (sum to 1.0):")
-        normalized = self.criteria.normalized_weights()
+        normalized = self.normalized_weights()
         for criterion, weight in zip(self.criteria, normalized, strict=False):
             echo(f"  {criterion.name}: {weight:.3f}")
-            
+
     def add_criterion(
         self,
         name: str,

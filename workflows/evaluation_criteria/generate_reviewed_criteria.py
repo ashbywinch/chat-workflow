@@ -16,9 +16,7 @@ def generate_reviewed_criteria(
     *,
     tools: ConversationTools,
 ) -> EvaluationCriteria:
-    criteria = EvaluationCriteria.generate_from_chat(
-        context=context, max_turns=max_turns, tools=tools
-    )
+    criteria = EvaluationCriteria.generate_from_chat(context=context, max_turns=max_turns, tools=tools)
 
     for _ in range(max_refinements):
         criteria.echo(

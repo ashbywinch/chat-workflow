@@ -60,9 +60,7 @@ class TestDebugStreaming(unittest.TestCase):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        action = ConversationAction[EvaluationCriteria](
-            action="continue", message="What is your budget?"
-        )
+        action = ConversationAction[EvaluationCriteria](action="continue", message="What is your budget?")
         debug.on_response(action, duration_ms=123.45)
 
         output = debug_output.getvalue()
@@ -101,12 +99,8 @@ class TestDebugStreaming(unittest.TestCase):
                     "content": "Create criteria for choosing a laptop. Budget $1000.",
                 }
             ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
+            on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+            on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
             on_failure=lambda action: ConversationFailedError(action.message),
             debug=debug,
         )
@@ -139,9 +133,7 @@ class TestDebugStreaming(unittest.TestCase):
         criteria = generate_criteria(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(
-                io=mock_io, state=ConversationFlowState(), config=_CONFIG
-            ),
+            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
             debug=debug,
         )
 

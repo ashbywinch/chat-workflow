@@ -55,6 +55,7 @@ class ValidationError(ChatWorkflowError):
 
     pass
 
+
 class ConversationError(ChatWorkflowError):
     """Conversation flow errors."""
 

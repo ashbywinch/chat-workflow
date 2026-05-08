@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from .llm_interaction import ProviderType
 
-
 TResult = TypeVar("TResult")
 
 
@@ -89,16 +88,12 @@ class ConversationAction(BaseModel, Generic[TResult]):
                 )
         elif self.action == "failure":
             if not self.message:
-                raise ValueError(
-                    "failure action requires a message field explaining why."
-                )
+                raise ValueError("failure action requires a message field explaining why.")
             if self.result is not None:
                 raise ValueError("failure action cannot include result.")
         elif self.action == "success":
             if self.result is None:
-                raise ValueError(
-                    "success action requires a result field with the complete criteria."
-                )
+                raise ValueError("success action requires a result field with the complete criteria.")
         return self
 
 
@@ -186,9 +181,7 @@ class StreamingDebug:
         self._print(f"{self._timestamp()}━━━ LLM RESPONSE ({duration_ms:.0f}ms) ━━━")
         try:
             if hasattr(response, "model_dump"):
-                self._print(
-                    f"{self._timestamp()}{json.dumps(response.model_dump(), indent=2)}"
-                )
+                self._print(f"{self._timestamp()}{json.dumps(response.model_dump(), indent=2)}")
             else:
                 self._print(f"{self._timestamp()}{response}")
         except Exception:
@@ -224,9 +217,7 @@ class StructuredConversationOrchestrator(Generic[TResult]):
         max_retries: int = 3,
         request_timeout_seconds: int = 30,
     ):
-        self.messages: list[dict[str, str]] = [
-            {"role": "system", "content": system_prompt}
-        ]
+        self.messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
         self.turn_count = 0
         self.max_turns = max_turns
         self.model = model
@@ -289,8 +280,7 @@ class StructuredConversationOrchestrator(Generic[TResult]):
             return response
         except ImportError as e:
             raise ProviderNotFoundError(
-                f"No LLM providers available. {e}\n"
-                "Install litellm for multi-provider LLM support: uv add litellm"
+                f"No LLM providers available. {e}\nInstall litellm for multi-provider LLM support: uv add litellm"
             ) from e
         except Exception as e:
             if self.debug:
@@ -301,7 +291,7 @@ class StructuredConversationOrchestrator(Generic[TResult]):
 @dataclass
 class ConversationFlowState:
     messages: list[dict[str, str]] = field(default_factory=list)
-    model: str = "unknown" # TODO: this is not type safe
+    model: str = "unknown"  # TODO: this is not type safe
     turn_count: int = 0
     initial_result: Any = None
     final_result: Any = None
@@ -490,9 +480,7 @@ def _build_params_section(func: Callable[..., Any], runtime_kwargs: dict[str, An
 
         # Show the effective value
         if param_name in runtime_kwargs:
-            parts.append(
-                f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}"
-            )
+            parts.append(f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}")
         elif param.default is not inspect.Parameter.empty:
             parts.append(f"\n  Default: {_format_param_value(param.default)}")
 
@@ -531,9 +519,7 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
         debug = kwargs.pop("debug", None)
 
         if tools is None:
-            raise TypeError(
-                f"Chat function '{func.__name__}' requires 'tools' parameter"
-            )
+            raise TypeError(f"Chat function '{func.__name__}' requires 'tools' parameter")
 
         state = tools.state
 
@@ -542,9 +528,7 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
         if is_generic:
             param_hints = typing.get_type_hints(func)
             typevar_params = [
-                name
-                for name, annotation in param_hints.items()
-                if name != "return" and annotation == return_type
+                name for name, annotation in param_hints.items() if name != "return" and annotation == return_type
             ]
             for param_name in typevar_params:
                 if param_name in kwargs:
@@ -566,9 +550,7 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
             response_model=ConversationAction[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
-            on_continue=lambda action: ConversationResult[
-                actual_return_type
-            ].continuing(action.message or ""),
+            on_continue=lambda action: ConversationResult[actual_return_type].continuing(action.message or ""),
             on_success=lambda action: ConversationResult[actual_return_type].success(
                 action.result,
                 message="Completed successfully!",
@@ -585,9 +567,7 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
         state.initial_result = result
 
         if result.result is None:
-            raise ConversationFailedError(
-                "Conversation completed but no result was produced"
-            )
+            raise ConversationFailedError("Conversation completed but no result was produced")
 
         return result.result
 
@@ -603,9 +583,7 @@ def workflow(func: Callable[..., Any]) -> Callable[..., Any]:
         if tools is not None:
             return func(*args, **kwargs)
 
-        raise TypeError(
-            f"Workflow function '{func.__name__}' requires 'tools' parameter"
-        )
+        raise TypeError(f"Workflow function '{func.__name__}' requires 'tools' parameter")
 
     wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]  # pyright: ignore[reportAttributeAccessIssue]
     return wrapper

@@ -18,10 +18,7 @@ class TestGetClient(unittest.TestCase):
         from chat_workflow.exceptions import APIKeyError
         from chat_workflow.llm_interaction import get_client
 
-        with (
-            patch.dict("os.environ", {}, clear=True),
-            self.assertRaises(APIKeyError)
-        ):
+        with patch.dict("os.environ", {}, clear=True), self.assertRaises(APIKeyError):
             get_client("openai")
 
     def test_provider_case_insensitive(self):
@@ -29,7 +26,7 @@ class TestGetClient(unittest.TestCase):
 
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=True),
-            patch("chat_workflow.llm_interaction.instructor") as mock_instructor
+            patch("chat_workflow.llm_interaction.instructor") as mock_instructor,
         ):
             mock_instructor.from_litellm.return_value = "client"
             result = get_client("OpenAI")
@@ -51,9 +48,7 @@ class TestGetClient(unittest.TestCase):
             with (
                 self.subTest(provider=provider_name),
                 patch.dict("os.environ", {env_var: "test-key"}, clear=True),
-                patch(
-                    "chat_workflow.llm_interaction.instructor"
-                ) as mock_instructor
+                patch("chat_workflow.llm_interaction.instructor") as mock_instructor,
             ):
                 mock_instructor.from_litellm.return_value = "client"
                 result = get_client(provider_name)
@@ -61,7 +56,6 @@ class TestGetClient(unittest.TestCase):
 
 
 class TestListAvailableProviders(unittest.TestCase):
-
     def test_all_unset(self):
         from chat_workflow.llm_interaction import list_available_providers
 
