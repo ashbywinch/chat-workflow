@@ -3,7 +3,10 @@
 import os
 from typing import Literal
 
+import instructor
+import litellm
 from dotenv import load_dotenv
+from litellm import completion
 
 from .exceptions import (
     APIKeyError,
@@ -12,16 +15,7 @@ from .exceptions import (
 )
 
 load_dotenv()
-
-try:
-    import instructor
-    import litellm
-    from litellm import completion
-
-    litellm.suppress_debug_info = True
-    LITELLM_AVAILABLE = True
-except ImportError:
-    LITELLM_AVAILABLE = False
+litellm.suppress_debug_info = True
 
 ProviderType = Literal[
     "openai", "google", "anthropic", "groq", "together", "azure", "openrouter"
@@ -43,11 +37,6 @@ def get_client(provider: str):
     The API key is read from the corresponding environment variable
     (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``).
     """
-    if not LITELLM_AVAILABLE:
-        raise ProviderNotFoundError(
-            "litellm not installed. Install with: uv add litellm"
-        )
-
     provider = provider.lower()
 
     if provider not in _PROVIDER_API_KEY_ENV:

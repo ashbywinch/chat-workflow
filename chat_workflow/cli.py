@@ -218,7 +218,7 @@ def build_cli_app() -> typer.Typer:
                 _execute_workflow(_func, workflow_params)
 
             # Override the signature so Typer generates proper CLI options
-            run_cmd.__signature__ = inspect.Signature(
+            run_cmd.__signature__ = inspect.Signature(  # pyright: ignore[reportAttributeAccessIssue]
                 parameters=sig_params,
                 return_annotation=inspect.Parameter.empty,
             )
