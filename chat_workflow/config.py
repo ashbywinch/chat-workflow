@@ -31,13 +31,13 @@ class Config:
             )
 
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 file_config = json.load(f)
                 self._merge_config(self._config_data, file_config)
         except json.JSONDecodeError as e:
-            raise ConfigFileError(f"Invalid JSON in {config_path}: {e}")
-        except IOError as e:
-            raise ConfigFileError(f"Could not read {config_path}: {e}")
+            raise ConfigFileError(f"Invalid JSON in {config_path}: {e}") from e
+        except OSError as e:
+            raise ConfigFileError(f"Could not read {config_path}: {e}") from e
 
         if not self._config_data.get("llm", {}).get("provider"):
             raise ConfigurationError(

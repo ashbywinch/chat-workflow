@@ -5,12 +5,12 @@ from __future__ import annotations
 import inspect
 import json
 import sys
-from dataclasses import dataclass, field
-from functools import wraps
-from typing import Any, Callable, Generic, Protocol, TypeVar, Literal
-from datetime import datetime
-
 import typing
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from functools import wraps
+from typing import Any, Generic, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -21,11 +21,17 @@ class ConversationAction(BaseModel, Generic[TResult]):
     action: Literal["continue", "success", "failure"]
     message: str | None = Field(
         default=None,
-        description='Message for the user. Required when action is "continue" or "failure". Must be null when action is "success".',
+        description=(
+            'Message for the user. Required when action is "continue" or "failure". '
+            'Must be null when action is "success".'
+        ),
     )
     result: TResult | None = Field(
         default=None,
-        description='The criteria object. Required when action is "success". Must be null when action is "continue" or "failure".',
+        description=(
+            'The criteria object. Required when action is "success". '
+            'Must be null when action is "continue" or "failure".'
+        ),
     )
 
     @model_validator(mode="after")
@@ -62,7 +68,7 @@ class ConversationResult(BaseModel, Generic[TResult]):
     is_complete: bool
 
     @classmethod
-    def continuing(cls, message: str) -> "ConversationResult[TResult]":
+    def continuing(cls, message: str) -> ConversationResult[TResult]:
         return cls(result=None, message=message, is_complete=False)
 
     @classmethod
@@ -70,11 +76,11 @@ class ConversationResult(BaseModel, Generic[TResult]):
         cls,
         result: TResult,
         message: str = "Completed successfully!",
-    ) -> "ConversationResult[TResult]":
+    ) -> ConversationResult[TResult]:
         return cls(result=result, message=message, is_complete=True)
 
     @classmethod
-    def failure(cls, message: str) -> "ConversationResult[TResult]":
+    def failure(cls, message: str) -> ConversationResult[TResult]:
         return cls(result=None, message=message, is_complete=True)
 
 
@@ -258,7 +264,7 @@ class StructuredConversationOrchestrator:
             raise ProviderNotFoundError(
                 f"No LLM providers available. {e}\n"
                 "Install litellm for multi-provider LLM support: uv add litellm"
-            )
+            ) from e
         except Exception as e:
             if self.debug:
                 self.debug.on_error(e)

@@ -3,9 +3,11 @@
 
 import importlib
 import inspect
+import traceback
 import typing
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import typer
 
@@ -21,14 +23,12 @@ from chat_workflow.exceptions import (
     ConfigFileError,
     ConfigurationError,
     ConversationFailedError,
-    CriteriaValidationError,
     ProviderNotFoundError,
     ProviderNotSupportedError,
     TurnLimitExceededError,
+    ValidationError,
 )
 from chat_workflow.session_logging import log_session
-
-import traceback
 
 # Parameters injected by the framework, not exposed as CLI options
 _INTERNAL_PARAMS = frozenset({"tools", "io", "state", "debug"})
@@ -67,7 +67,7 @@ def handle_error(error: Exception):
         typer.secho(
             f"\nConversation failed: {error.message}", err=True, fg=typer.colors.RED
         )
-    elif isinstance(error, CriteriaValidationError):
+    elif isinstance(error, ValidationError):
         typer.secho(
             f"\nValidation error: {error.message}", err=True, fg=typer.colors.RED
         )
@@ -146,17 +146,17 @@ def _execute_workflow(
         _log_and_exit(result_dict=result.model_dump(), default_success=True)
     except KeyboardInterrupt:
         typer.echo("\n\nConversation cancelled.")
-        raise typer.Exit(0)
+        raise typer.Exit(0) from None
     except ConversationFailedError as e:
         typer.secho(f"Conversation failed: {e.message}", err=True, fg=typer.colors.RED)
         _log_and_exit(result_dict=None, default_success=False)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except TurnLimitExceededError as e:
         typer.secho(f"{e.message}", err=True, fg=typer.colors.RED)
         _log_and_exit(
             result_dict=None, default_success=False, feedback="Turn limit reached"
         )
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except Exception as e:
         handle_error(e)
 
@@ -214,8 +214,8 @@ def build_cli_app() -> typer.Typer:
                 )
 
             # Define the wrapper callback
-            def run_cmd(*args, **workflow_params):
-                _execute_workflow(func, workflow_params)
+            def run_cmd(*args, _func=func, **workflow_params):
+                _execute_workflow(_func, workflow_params)
 
             # Override the signature so Typer generates proper CLI options
             run_cmd.__signature__ = inspect.Signature(

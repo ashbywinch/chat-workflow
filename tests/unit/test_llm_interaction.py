@@ -2,16 +2,16 @@
 import unittest
 from unittest.mock import patch
 
-from workflows.evaluation_criteria.evaluation_criteria import (
-    EvaluationCriteria,
-    Criterion,
-)
 from chat_workflow import (
     ConversationAction,
     ConversationResult,
     StructuredConversationOrchestrator,
 )
-from chat_workflow.exceptions import TurnLimitExceededError, ConversationFailedError
+from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
+from workflows.evaluation_criteria.evaluation_criteria import (
+    Criterion,
+    EvaluationCriteria,
+)
 
 
 class MockInstructorClient:

@@ -6,9 +6,9 @@ Verifies that get_logs_dir() creates the expected directory and that
 log_session() writes correct JSON content to the returned file path.
 """
 
-import unittest
 import json
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
@@ -202,8 +202,9 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_timestamp_format(self):
         """The timestamp field must be a valid ISO-8601 string."""
-        from chat_workflow.session_logging import log_session
         from datetime import datetime
+
+        from chat_workflow.session_logging import log_session
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)

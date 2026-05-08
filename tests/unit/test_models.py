@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import unittest
-from pydantic import ValidationError
 
-from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
+from pydantic import ValidationError
+from workflows.evaluation_criteria.models import Criterion, EvaluationCriteria
+
 from chat_workflow import ConversationAction, ConversationResult
 
 

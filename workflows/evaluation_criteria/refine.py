@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from typing import Annotated, TypeVar
-from chat_workflow import chat
+
 from pydantic import BaseModel
+
+from chat_workflow import chat
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -17,7 +19,8 @@ def refine(
     max_turns: Annotated[int, "Maximum number of refinement turns"] = 5,
 ) -> ModelType:
     """You are running a short refinement conversation for an existing object.
-    Goal: Check whether the user wants to keep this version of the object or change anything about it. Return the object with any updates.
+    Goal: Check whether the user wants to keep this version of the object or change 
+    anything about it. Return the object with any updates.
 
     Rules:
     - Ask one question at a time.

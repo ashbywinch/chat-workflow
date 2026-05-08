@@ -15,8 +15,8 @@ load_dotenv()
 
 try:
     import instructor
-    from litellm import completion
     import litellm
+    from litellm import completion
 
     litellm.suppress_debug_info = True
     LITELLM_AVAILABLE = True

@@ -55,16 +55,6 @@ class ValidationError(ChatWorkflowError):
 
     pass
 
-
-class CriteriaValidationError(ValidationError):
-    """Evaluation criteria validation errors."""
-
-    def __init__(self, message: str = ""):
-        if not message:
-            message = "Evaluation criteria validation failed"
-        super().__init__(message)
-
-
 class ConversationError(ChatWorkflowError):
     """Conversation flow errors."""
 

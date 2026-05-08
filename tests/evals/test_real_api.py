@@ -2,8 +2,9 @@
 import unittest
 from pathlib import Path
 
-from workflows.evaluation_criteria.models import EvaluationCriteria
 from workflows.evaluation_criteria.flows import generate_criteria
+from workflows.evaluation_criteria.models import EvaluationCriteria
+
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
@@ -12,8 +13,7 @@ from chat_workflow import (
     StructuredConversationOrchestrator,
 )
 from chat_workflow.config import Config
-from chat_workflow.exceptions import TurnLimitExceededError, ConversationFailedError
-
+from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
 from tests.conftest import timeout
 
 _CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
@@ -37,9 +37,13 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_call_llm_returns_valid_action(self):
         orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant that creates evaluation criteria. "
-            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
-            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
+            system_prompt=(
+                "You are a helpful assistant that creates evaluation criteria. "
+                "When returning action='success' with criteria, you MUST include "
+                "a criterion named 'budget' (lowercase). "
+                "Use action='continue' to ask questions, action='success' to return criteria, "
+                "action='failure' if unable to help."
+            ),
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=5,
             model=_CONFIG.model,
@@ -125,9 +129,13 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_single_turn_with_real_llm(self):
         orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant for creating evaluation criteria. "
-            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
-            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
+            system_prompt=(
+                "You are a helpful assistant for creating evaluation criteria. "
+                "When returning action='success' with criteria, you MUST include "
+                "a criterion named 'budget' (lowercase). "
+                "Use action='continue' to ask questions, action='success' to return criteria, "
+                "action='failure' if unable to help."
+            ),
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=3,
             model=_CONFIG.model,
@@ -214,9 +222,13 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_conversation_action_format(self):
         orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant for creating evaluation criteria. "
-            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
-            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
+            system_prompt=(
+                "You are a helpful assistant for creating evaluation criteria. "
+                "When returning action='success' with criteria, you MUST include "
+                "a criterion named 'budget' (lowercase). "
+                "Use action='continue' to ask questions, action='success' to return criteria, "
+                "action='failure' if unable to help."
+            ),
             response_model=ConversationAction[EvaluationCriteria],
             max_turns=5,
             model=_CONFIG.model,

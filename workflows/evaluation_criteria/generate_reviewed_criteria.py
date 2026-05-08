@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from chat_workflow import workflow, ConversationTools
+from chat_workflow import ConversationTools, workflow
 
 from .evaluation_criteria import EvaluationCriteria
 from .refine import refine

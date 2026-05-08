@@ -3,15 +3,16 @@ import unittest
 from io import StringIO
 from pathlib import Path
 
-from workflows.evaluation_criteria.models import EvaluationCriteria
 from workflows.evaluation_criteria.flows import generate_criteria
+from workflows.evaluation_criteria.models import EvaluationCriteria
+
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
     ConversationResult,
     ConversationTools,
-    StructuredConversationOrchestrator,
     StreamingDebug,
+    StructuredConversationOrchestrator,
 )
 from chat_workflow.config import Config
 from chat_workflow.exceptions import ConversationFailedError

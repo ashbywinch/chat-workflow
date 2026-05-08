@@ -2,7 +2,8 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
+from workflows.evaluation_criteria.models import Criterion, EvaluationCriteria
+
 from chat_workflow import (
     ConversationAction,
     ConversationResult,
@@ -10,8 +11,8 @@ from chat_workflow import (
 )
 from chat_workflow.exceptions import (
     ConversationFailedError,
-    TurnLimitExceededError,
     InvalidResponseError,
+    TurnLimitExceededError,
 )
 
 
@@ -316,8 +317,9 @@ class TestWorkflowIntegration(unittest.TestCase):
         "chat_workflow.conversation_runtime.StructuredConversationOrchestrator._call_llm"
     )
     def test_leaf_accepts_tools_parameter(self, mock_call_llm):
-        from chat_workflow import ConversationTools, ConversationFlowState
         from workflows.evaluation_criteria.flows import generate_criteria
+
+        from chat_workflow import ConversationFlowState, ConversationTools
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="success", result=self.valid_criteria
@@ -340,8 +342,9 @@ class TestWorkflowIntegration(unittest.TestCase):
     )
     def test_leaf_accepts_tools_via_io(self, mock_call_llm):
         """Caller can pass io+state+config to build tools themselves."""
-        from chat_workflow import ConversationTools, ConversationFlowState
         from workflows.evaluation_criteria.flows import generate_criteria
+
+        from chat_workflow import ConversationFlowState, ConversationTools
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="success", result=self.valid_criteria
@@ -366,7 +369,8 @@ class TestWorkflowIntegration(unittest.TestCase):
     )
     def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
         from workflows.evaluation_criteria.flows import generate_reviewed_criteria
-        from chat_workflow import ConversationTools, ConversationFlowState
+
+        from chat_workflow import ConversationFlowState, ConversationTools
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="success", result=self.valid_criteria
@@ -392,7 +396,8 @@ class TestWorkflowIntegration(unittest.TestCase):
     )
     def test_workflow_refinement_loop(self, mock_call_llm):
         from workflows.evaluation_criteria.flows import generate_reviewed_criteria
-        from chat_workflow import ConversationTools, ConversationFlowState
+
+        from chat_workflow import ConversationFlowState, ConversationTools
 
         initial_criteria = EvaluationCriteria(
             context="test",
@@ -452,9 +457,10 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
     def test_inspect_signature_returns_strings_with_future_annotations(self):
         """Verify that inspect.signature gives string annotations for functions
         with 'from __future__ import annotations', proving the bug mechanism."""
-        from workflows.evaluation_criteria.flows import refine
-        import typing
         import inspect
+        import typing
+
+        from workflows.evaluation_criteria.flows import refine
 
         hints = typing.get_type_hints(refine)
         return_type = hints.get("return")
@@ -481,8 +487,9 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
     def test_get_type_hints_resolves_typevar(self):
         """typing.get_type_hints() properly resolves parameter annotations
         even with from __future__ import annotations - the fix must use this."""
-        from workflows.evaluation_criteria.flows import refine
         import typing
+
+        from workflows.evaluation_criteria.flows import refine
 
         hints = typing.get_type_hints(refine)
         return_type = hints.get("return")
@@ -506,14 +513,16 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         resolution logic through the decorator - before the fix, response_model
         stayed as ConversationAction[ModelType] (unresolved).
         """
-        from unittest.mock import patch, Mock
+        from unittest.mock import Mock, patch
+
         from workflows.evaluation_criteria.flows import refine
-        from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
+        from workflows.evaluation_criteria.models import Criterion, EvaluationCriteria
+
         from chat_workflow import (
-            StructuredConversationOrchestrator,
             ConversationAction,
             ConversationFlowState,
             ConversationTools,
+            StructuredConversationOrchestrator,
         )
 
         criteria = EvaluationCriteria(
@@ -603,8 +612,9 @@ class TestAutoParamInjection(unittest.TestCase):
 
     def test_build_params_section_with_annotated(self):
         """Annotated[T, 'desc'] descriptions appear in the output."""
-        from chat_workflow.conversation_runtime import _build_params_section
         from typing import Annotated
+
+        from chat_workflow.conversation_runtime import _build_params_section
 
         def sample(
             context: Annotated[str, "The party theme"] = "",
@@ -653,13 +663,15 @@ class TestAutoParamInjection(unittest.TestCase):
 
     def test_chat_decorator_includes_params_section_in_system_prompt(self):
         """The @chat decorator appends the params section to the system prompt."""
-        from unittest.mock import patch, Mock
+        from unittest.mock import Mock, patch
+
+        from workflows.evaluation_criteria.models import Criterion, EvaluationCriteria
+
         from chat_workflow.conversation_runtime import (
-            StructuredConversationOrchestrator,
-            ConversationTools,
             ConversationFlowState,
+            ConversationTools,
+            StructuredConversationOrchestrator,
         )
-        from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
 
         captured_system_prompt = []
 
@@ -714,13 +726,15 @@ class TestAutoParamInjection(unittest.TestCase):
 
     def test_chat_decorator_preserves_inline_interpolation(self):
         """{initial_object.model_dump()} style interpolation still works."""
-        from unittest.mock import patch, Mock
+        from unittest.mock import Mock, patch
+
+        from workflows.evaluation_criteria.models import Criterion, EvaluationCriteria
+
         from chat_workflow.conversation_runtime import (
-            StructuredConversationOrchestrator,
-            ConversationTools,
             ConversationFlowState,
+            ConversationTools,
+            StructuredConversationOrchestrator,
         )
-        from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
 
         captured_system_prompt = []
 
