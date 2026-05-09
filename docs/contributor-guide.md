@@ -36,7 +36,7 @@ Example workflows live in the `workflows/` directory.
 
 #### `chat_workflow/conversation_runtime.py` - Conversation Logic
 - Core class: `StructuredConversationOrchestrator`
-- Manages turn state (max_turns configurable)
+- Manages turn state (`max_turns` configurable)
 - Receives system prompt from `@chat` decorator
 - Three outcomes: continue/success/failure
 
@@ -78,6 +78,7 @@ make lint           # ruff and basedpyright
 - If we read in untyped data (for example, json as a string), coerce it to the narrow type as near to the edge as possible (i.e. in a cli or in unit tests). If we write untyped data, de-type it as close to the edge as possible.
 - If tempted to #ignore a basedpyright error, think first. Is there a code or architecture smell that we should fix?
 - Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
+- If you see a circular import, this is a code smell. Fix the smell, don't bodge the import
 
 
 ## Git Workflow

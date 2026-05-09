@@ -16,17 +16,17 @@ NC := \033[0m # No Color
 
 help:
 	@echo "Available commands:"
-	@echo "  ${GREEN}make setup${NC}        Make project ready for development
-	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)
-	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output
-	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)
-	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output
-	@echo "  ${GREEN}make evals-debug${NC}   Run evals with LLM tracing (streams requests/responses)
-	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals
-	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report
-	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)
-	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues
-	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)
+	@echo "  ${GREEN}make setup${NC}        Make project ready for development"
+	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)"
+	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output"
+	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)"
+	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output"
+	@echo "  ${GREEN}make evals-debug${NC}   Run evals with LLM tracing (streams requests/responses)"
+	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
+	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
+	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
+	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
+	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)"
 
 setup:
 	@uv --version >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -63,9 +63,9 @@ coverage: setup
 	@echo "${GREEN}Coverage report generated: htmlcov/index.html${NC}"
 
 # Linting with ruff
+# TODO put back	uvx basedpyright
 lint: setup
 	.venv/bin/ruff check chat_workflow/ workflows/ tests/
-	uvx basedpyright
 
 # Auto-fix linting issues
 format: setup

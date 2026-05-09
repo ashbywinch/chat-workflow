@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -46,7 +46,7 @@ class EvaluationCriteria(BaseModel):
         cls,
         context: Annotated[str, "The topic or domain for which to generate evaluation criteria"],
         max_turns: Annotated[int, "Maximum number of conversation turns before giving up"] = 10,
-    ) -> EvaluationCriteria:
+    ) -> Self:
         """You are a helpful assistant guiding the user to create evaluation criteria.
         Assume the user is an expert on their topic but they know nothing about
         creating good evaluation criteria.

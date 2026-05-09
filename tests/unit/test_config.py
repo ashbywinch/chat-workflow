@@ -144,17 +144,17 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_str_representation(self):
-        temp_path = self._write_temp_config({"llm": {"provider": "test-p", "model": "test-m"}})
+        temp_path = self._write_temp_config({"llm": {"provider": "anthropic", "model": "test-m"}})
         try:
             cfg = Config(Path(temp_path))
             s = str(cfg)
-            self.assertIn("test-p", s)
+            self.assertIn("anthropic", s)
             self.assertIn("test-m", s)
         finally:
             os.unlink(temp_path)
 
     def test_debug_from_env(self):
-        temp_path = self._write_temp_config({"llm": {"provider": "test-p", "model": "test-m"}})
+        temp_path = self._write_temp_config({"llm": {"provider": "anthropic", "model": "test-m"}})
         try:
             cfg = Config(Path(temp_path))
             self.assertFalse(cfg.debug)
