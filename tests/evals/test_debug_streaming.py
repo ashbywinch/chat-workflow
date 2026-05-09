@@ -3,9 +3,6 @@ import unittest
 from io import StringIO
 from pathlib import Path
 
-from workflows.evaluation_criteria.flows import generate_criteria
-from workflows.evaluation_criteria.models import EvaluationCriteria
-
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
@@ -17,6 +14,7 @@ from chat_workflow import (
 from chat_workflow.config import Config
 from chat_workflow.exceptions import ConversationFailedError
 from tests.conftest import timeout
+from workflows.evaluation_criteria import EvaluationCriteria
 
 _CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
 
@@ -130,7 +128,7 @@ class TestDebugStreaming(unittest.TestCase):
             ]
         )
 
-        criteria = generate_criteria(
+        criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
             tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),

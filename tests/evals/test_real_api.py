@@ -2,9 +2,6 @@
 import unittest
 from pathlib import Path
 
-from workflows.evaluation_criteria.flows import generate_criteria
-from workflows.evaluation_criteria.models import EvaluationCriteria
-
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
@@ -15,6 +12,7 @@ from chat_workflow import (
 from chat_workflow.config import Config
 from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
 from tests.conftest import timeout
+from workflows.evaluation_criteria import EvaluationCriteria
 
 _CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
 
@@ -106,7 +104,7 @@ class TestRealAPI(unittest.TestCase):
             ]
         )
 
-        criteria = generate_criteria(
+        criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
             tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
@@ -173,7 +171,7 @@ class TestRealAPI(unittest.TestCase):
             ]
         )
 
-        criteria = generate_criteria(
+        criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift for a 7-year-old",
             max_turns=10,
             tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
@@ -199,7 +197,7 @@ class TestRealAPI(unittest.TestCase):
         )
 
         with self.assertRaises((TurnLimitExceededError, ConversationFailedError)):
-            generate_criteria(
+            EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop for programming",
                 max_turns=3,
                 tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),

@@ -64,9 +64,7 @@ class TestWorkflow:
             mod = importlib.util.module_from_spec(spec)
 
             # Add project root to sys.path so chat_workflow is importable
-            project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             old_path = sys.path.copy()
             sys.path.insert(0, project_root)
             try:
@@ -78,7 +76,7 @@ class TestWorkflow:
                 )
                 self.assertTrue(
                     hasattr(mod.TestWorkflow, "generate"),
-"TestWorkflow should have 'generate' method",
+                    "TestWorkflow should have 'generate' method",
                 )
             finally:
                 sys.path[:] = old_path
@@ -120,9 +118,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
 
             mod = importlib.util.module_from_spec(spec)
 
-            project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             old_path = sys.path.copy()
             sys.path.insert(0, project_root)
             try:
@@ -164,9 +160,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
 
             mod = importlib.util.module_from_spec(spec)
 
-            project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             old_path = sys.path.copy()
             sys.path.insert(0, project_root)
             try:
@@ -211,9 +205,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
 
             mod = importlib.util.module_from_spec(spec)
 
-            project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             old_path = sys.path.copy()
             sys.path.insert(0, project_root)
             try:
@@ -262,9 +254,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
 
             mod = importlib.util.module_from_spec(spec)
 
-            project_root = os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            )
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             old_path = sys.path.copy()
             sys.path.insert(0, project_root)
             try:
