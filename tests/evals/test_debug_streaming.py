@@ -6,13 +6,10 @@ from pathlib import Path
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
-    ConversationResult,
     ConversationTools,
     StreamingDebug,
-    StructuredConversationOrchestrator,
 )
 from chat_workflow.config import Config
-from chat_workflow.exceptions import ConversationFailedError
 from tests.conftest import timeout
 from workflows.evaluation_criteria import EvaluationCriteria
 
@@ -80,35 +77,29 @@ class TestDebugStreaming(unittest.TestCase):
 
     @timeout(10)
     def test_orchestrator_with_debug(self):
+        """Verify debug output captures LLM interaction when using @chat decorator."""
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant.",
-            response_model=ConversationAction[EvaluationCriteria],
-            max_turns=3,
-            model=_CONFIG.model,
-            provider=_CONFIG.provider,
-            max_retries=_CONFIG.max_retries,
-            request_timeout_seconds=_CONFIG.request_timeout_seconds,
-            initial_messages=[
-                {
-                    "role": "user",
-                    "content": "Create criteria for choosing a laptop. Budget $1000.",
-                }
-            ],
-            on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
-            on_failure=lambda action: ConversationFailedError(action.message),
-            debug=debug,
+        mock_io = MockIO(
+            [
+                "Around $50 for the budget",
+                "That's all, please finalize.",
+            ]
         )
 
         try:
-            orchestrator._call_llm()
+            criteria = EvaluationCriteria.generate_from_chat(
+                context="choosing a laptop",
+                max_turns=6,
+                tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+                debug=debug,
+            )
 
             output = debug_output.getvalue()
             self.assertIn("LLM REQUEST", output)
             self.assertIn("LLM RESPONSE", output)
+            self.assertIsInstance(criteria, EvaluationCriteria)
         except Exception:
             output = debug_output.getvalue()
             if "LLM REQUEST" in output:

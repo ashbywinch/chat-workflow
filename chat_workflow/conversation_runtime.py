@@ -388,7 +388,7 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
 
 # Internal params that the @chat decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
-_INTERNAL_PARAMS: frozenset[str] = frozenset({"tools", "debug", "io", "state"})
+_INTERNAL_PARAMS: frozenset[str] = frozenset({"tools", "debug", "io", "state", "cls"})
 
 
 def _get_typed_hint(func: Callable[..., Any], param_name: str) -> Any:
@@ -562,6 +562,16 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
         system_prompt = _format_docstring(raw_func.__doc__, **kwargs)
         if params_section:
             system_prompt += params_section
+
+# Append validation guidance right before instructor injects the JSON
+        # schema. This tells the LLM to respect field descriptions and
+        # constraints without duplicating any specific rule.
+        system_prompt += (
+            "\n\n## Output Format\n"
+            "The JSON schema below defines the expected output. "
+            "Field descriptions and constraints communicate validation rules "
+            "that your response must satisfy."
+        )
 
         max_turns = kwargs.pop("max_turns", 10)
 

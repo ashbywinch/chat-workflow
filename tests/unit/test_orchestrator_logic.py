@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import unittest
 from unittest.mock import Mock, patch
 
@@ -700,6 +701,241 @@ class TestAutoParamInjection(unittest.TestCase):
         self.assertIn("## Parameters", prompt)
         self.assertIn("`initial_object` (~ModelType)", prompt)
         self.assertIn("`max_turns` (int)", prompt)
+
+
+class TestWhatGetsSentToTheLLM(unittest.TestCase):
+    """Tests that verify the actual messages sent to the LLM contain the
+    correct schema and parameters."""
+
+    def _capture_instructor_messages(self, func, *args, **kwargs):
+        """Patch instructor+litellm to capture what gets sent to the LLM,
+        including the schema injected by instructor."""
+        import litellm as _litellm
+
+
+        captured = {"messages": None, "response_model": None}
+
+        # Patch litellm.completion so instructor's patched client calls our capture
+        original_completion = _litellm.completion
+
+        def capturing_completion(**llm_kwargs):
+            captured["messages"] = llm_kwargs.get("messages")
+            captured["response_model"] = llm_kwargs.get("response_model")
+            # Return a minimal fake response instructor can parse
+            content = json.dumps({
+                "action": "success",
+                "message": None,
+                "result": {
+                    "criteria": [
+                        {"name": "budget", "description": "cost", "weight": 5.0, "ideal_value": None},
+                        {"name": "quality", "description": "how good", "weight": 3.0, "ideal_value": None},
+                    ],
+                    "context": "test",
+                },
+            })
+            choice = type('FakeChoice', (), {
+                'message': type('FakeMsg', (), {
+                    'parsed': None,
+                    'content': content,
+                    'tool_calls': None,
+                    'role': 'assistant',
+                    'function_call': None,
+                    'tool_call': None,
+                    'model_dump': lambda self: {"role": "assistant", "content": content},
+                })(),
+                'finish_reason': 'stop',
+                'index': 0,
+            })()
+            resp = type('FakeResponse', (), {
+                'choices': [choice],
+                'model_dump': lambda self: {'choices': [{'message': {'role': 'assistant', 'content': content}}]},
+            })()
+            return resp
+
+        _litellm.completion = capturing_completion
+
+        # Patch get_client to return instructor client with our patched litellm
+        def patched_get_client(provider):
+            import instructor
+            return instructor.from_litellm(_litellm.completion, mode=instructor.Mode.JSON)
+
+        import chat_workflow.llm_interaction as li
+        original_li_get_client = li.get_client
+
+        li.get_client = patched_get_client
+
+        try:
+            func(*args, **kwargs)
+        finally:
+            _litellm.completion = original_completion
+            li.get_client = original_li_get_client
+
+        return captured
+
+    def test_evaluation_criteria_system_prompt_contains_evaluation_criteria_schema(self):
+        """The system prompt sent to the LLM must include the JSON schema
+        for EvaluationCriteria (with minItems:2, weight range, etc.) so the
+        LLM knows the validation rules before generating."""
+        from unittest.mock import Mock
+
+        from chat_workflow import ConversationFlowState, ConversationTools
+        from workflows.evaluation_criteria import EvaluationCriteria
+
+        mock_io = Mock()
+        mock_io.echo = Mock()
+        mock_io.prompt = Mock(return_value="done")
+
+        tools = ConversationTools(
+            io=mock_io,
+            state=ConversationFlowState(),
+            config=FakeConfig(),
+        )
+
+        captured = self._capture_instructor_messages(
+            EvaluationCriteria.generate_from_chat,
+            context="test",
+            max_turns=2,
+            tools=tools,
+        )
+
+        self.assertIsNotNone(captured["messages"], "No messages captured")
+        system_msg = None
+        for msg in captured["messages"]:
+            if msg.get("role") == "system":
+                system_msg = msg["content"]
+                break
+
+        self.assertIsNotNone(system_msg, "No system message found")
+
+        self.assertIn(
+            "EvaluationCriteria",
+            system_msg,
+            "Instructor must inject EvaluationCriteria schema into the system prompt",
+        )
+
+        self.assertIn(
+            "minItems",
+            system_msg,
+            "Json schema must include minItems constraint on criteria",
+        )
+
+        self.assertIn(
+            "maximum",
+            system_msg,
+            "Json schema must include maximum constraint on weight field",
+        )
+        self.assertIn(
+            "minimum",
+            system_msg,
+            "Json schema must include minimum constraint on weight field",
+        )
+
+        self.assertIn(
+            "Criterion",
+            system_msg,
+            "Json schema must include Criterion definition",
+        )
+
+        self.assertIn(
+            "ask one question at a time",
+            system_msg.lower(),
+            "System prompt must contain behavioral guidance from docstring",
+        )
+
+        # Validation guidance injected by @chat decorator before schema
+        self.assertIn(
+            "## Output Format",
+            system_msg,
+            "@chat decorator injects Output Format section as validation guidance",
+        )
+        self.assertIn(
+            "Field descriptions and constraints communicate validation rules",
+            system_msg,
+            "Validation guidance tells LLM to check field descriptions and constraints",
+        )
+
+        # --- Validation communicated via Field() metadata in the JSON schema ---
+        # The "must include budget" rule is in the criteria field description,
+        # which Pydantic renders into the JSON schema as the property description.
+        # This is how the LLM learns about it before generating.
+        self.assertIn(
+            "must include one named 'budget'",
+            system_msg,
+            "Field description: criteria list must include 'budget'",
+        )
+
+        # Weight range communicated via the field description (ge=0.0/le=10.0
+        # appear as minimum/maximum in the schema, already checked above).
+        self.assertIn(
+            "Importance weight from 0.0",
+            system_msg,
+            "Field description: weight range 0.0 to 10.0",
+        )
+
+        # Criterion class docstring appears as the item description in schema
+        self.assertIn(
+            "A single criterion for evaluating options",
+            system_msg,
+            "Criterion class docstring guides LLM on what a criterion is",
+        )
+
+        # EvaluationCriteria class docstring appears as model description
+        self.assertIn(
+            "A list of criteria for evaluating possible choices",
+            system_msg,
+            "EvaluationCriteria class docstring gives context to the LLM",
+        )
+
+        # --- Validation communicated ONLY via model_validator (post-hoc) ---
+        # This is the gap: the budget requirement also lives in the
+        # model_validator but is NOT visible in the JSON schema. The LLM
+        # can only learn about it from the field description above.
+        # Assert it's NOT in the prompt to prove the gap exists.
+        self.assertNotIn(
+            "Must include a criterion named 'budget'",
+            system_msg,
+            "model_validator message is NOT in the schema — the LLM never sees it",
+        )
+
+        self.assertNotIn(
+            "`cls`",
+            system_msg,
+            "The `cls` parameter (classmethod convention) must NOT appear in the system prompt",
+        )
+
+    def test_evaluation_criteria_params_section_has_context_and_max_turns(self):
+        """The generated params section must contain context and max_turns
+        with their correct runtime values."""
+        from unittest.mock import Mock
+
+        from chat_workflow import ConversationFlowState, ConversationTools
+        from workflows.evaluation_criteria import EvaluationCriteria
+
+        mock_io = Mock()
+        mock_io.echo = Mock()
+        mock_io.prompt = Mock(return_value="done")
+
+        tools = ConversationTools(
+            io=mock_io,
+            state=ConversationFlowState(),
+            config=FakeConfig(),
+        )
+
+        captured = self._capture_instructor_messages(
+            EvaluationCriteria.generate_from_chat,
+            context="test",
+            max_turns=2,
+            tools=tools,
+        )
+
+        system_msg = next(
+            msg["content"] for msg in captured["messages"] if msg.get("role") == "system"
+        )
+        self.assertIn("## Parameters", system_msg)
+        self.assertIn("`context`", system_msg)
+        self.assertIn("`max_turns`", system_msg)
+        self.assertIn('"test"', system_msg)
+        self.assertIn("2", system_msg)
 
 
 if __name__ == "__main__":
