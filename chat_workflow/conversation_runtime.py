@@ -88,12 +88,16 @@ class ConversationAction(BaseModel, Generic[TResult]):
                 )
         elif self.action == "failure":
             if not self.message:
-                raise ValueError("failure action requires a message field explaining why.")
+                raise ValueError(
+                    "failure action requires a message field explaining why."
+                )
             if self.result is not None:
                 raise ValueError("failure action cannot include result.")
         elif self.action == "success":
             if self.result is None:
-                raise ValueError("success action requires a result field with the complete criteria.")
+                raise ValueError(
+                    "success action requires a result field with the complete criteria."
+                )
         return self
 
 
@@ -181,7 +185,9 @@ class StreamingDebug:
         self._print(f"{self._timestamp()}━━━ LLM RESPONSE ({duration_ms:.0f}ms) ━━━")
         try:
             if hasattr(response, "model_dump"):
-                self._print(f"{self._timestamp()}{json.dumps(response.model_dump(), indent=2)}")
+                self._print(
+                    f"{self._timestamp()}{json.dumps(response.model_dump(), indent=2)}"
+                )
             else:
                 self._print(f"{self._timestamp()}{response}")
         except Exception:
@@ -208,8 +214,12 @@ class StructuredConversationOrchestrator(Generic[TResult]):
         response_model: type[ConversationAction[TResult]],
         max_turns: int,
         initial_messages: list[dict[str, str]] | None,
-        on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]],
-        on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]],
+        on_continue: Callable[
+            [ConversationAction[TResult]], ConversationResult[TResult]
+        ],
+        on_success: Callable[
+            [ConversationAction[TResult]], ConversationResult[TResult]
+        ],
         on_failure: Callable[[ConversationAction[TResult]], Exception],
         debug: ConversationDebug | None = None,
         model: str = "default-model",
@@ -217,7 +227,9 @@ class StructuredConversationOrchestrator(Generic[TResult]):
         max_retries: int = 3,
         request_timeout_seconds: int = 30,
     ):
-        self.messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+        self.messages: list[dict[str, str]] = [
+            {"role": "system", "content": system_prompt}
+        ]
         self.turn_count = 0
         self.max_turns = max_turns
         self.model = model
@@ -225,8 +237,12 @@ class StructuredConversationOrchestrator(Generic[TResult]):
         self._max_retries = max_retries
         self._request_timeout_seconds = request_timeout_seconds
         self.response_model = response_model
-        self.on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = on_continue
-        self.on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = on_success
+        self.on_continue: Callable[
+            [ConversationAction[TResult]], ConversationResult[TResult]
+        ] = on_continue
+        self.on_success: Callable[
+            [ConversationAction[TResult]], ConversationResult[TResult]
+        ] = on_success
         self.on_failure: Callable[[ConversationAction[TResult]], Exception] = on_failure
         self.debug = debug
 
@@ -268,12 +284,14 @@ class StructuredConversationOrchestrator(Generic[TResult]):
 
             with timer:
                 # instructor patches the client with extra params that pyright stubs don't know about
-                response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
-                    model=self.model,
-                    messages=self.messages,  # pyright: ignore[reportArgumentType]
-                    response_model=self.response_model,
-                    max_retries=self._max_retries,
-                    timeout=self._request_timeout_seconds,
+                response = (
+                    client.chat.completions.create(  # pyright: ignore[reportCallIssue]
+                        model=self.model,
+                        messages=self.messages,  # pyright: ignore[reportArgumentType]
+                        response_model=self.response_model,
+                        max_retries=self._max_retries,
+                        timeout=self._request_timeout_seconds,
+                    )
                 )
 
             timer.emit_response(response)
@@ -449,7 +467,9 @@ def _format_param_value(value: Any) -> str:
     return repr(value)
 
 
-def _build_params_section(func: Callable[..., Any], runtime_kwargs: dict[str, Any]) -> str:
+def _build_params_section(
+    func: Callable[..., Any], runtime_kwargs: dict[str, Any]
+) -> str:
     """Build a ``## Parameters`` section from the function signature.
 
     For every user-defined parameter (excluding internal plumbing like
@@ -480,7 +500,9 @@ def _build_params_section(func: Callable[..., Any], runtime_kwargs: dict[str, An
 
         # Show the effective value
         if param_name in runtime_kwargs:
-            parts.append(f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}")
+            parts.append(
+                f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}"
+            )
         elif param.default is not inspect.Parameter.empty:
             parts.append(f"\n  Default: {_format_param_value(param.default)}")
 
@@ -499,19 +521,8 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     from .exceptions import ConversationFailedError
 
-    return_type = _get_return_type(func)
-    is_generic = isinstance(return_type, TypeVar)
-
-    if is_generic:
-        bound_type = return_type.__bound__
-        if not issubclass(bound_type, BaseModel):
-            raise TypeError(
-                f"Leaf function '{func.__name__}' TypeVar bound must be a Pydantic model, bound is {bound_type}"
-            )
-    elif return_type is None or not issubclass(return_type, BaseModel):
-        raise TypeError(
-            f"Leaf function '{func.__name__}' must have a Pydantic model return type, type is {return_type}"
-        )
+    # Unwrap classmethod to get the underlying function for introspection
+    raw_func = func.__func__ if isinstance(func, classmethod) else func
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -519,24 +530,69 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
         debug = kwargs.pop("debug", None)
 
         if tools is None:
-            raise TypeError(f"Chat function '{func.__name__}' requires 'tools' parameter")
+            raise TypeError(
+                f"Chat function '{func.__name__}' requires 'tools' parameter"
+            )
 
         state = tools.state
 
-        # Resolve TypeVar return type from actual argument
-        actual_return_type = return_type
-        if is_generic:
-            param_hints = typing.get_type_hints(func)
+        return_type = _get_return_type(raw_func)
+
+        if return_type is typing.Self:
+            qualname = raw_func.__qualname__
+            parts = qualname.rsplit(".", 1)
+            if len(parts) < 2:
+                raise TypeError(
+                    f"Leaf function '{func.__name__}' uses Self return type "
+                    "but is not a method on a class"
+                )
+            class_name = parts[0]
+            cls = raw_func.__globals__.get(class_name)
+            if cls is None or not (
+                isinstance(cls, type) and issubclass(cls, BaseModel)
+            ):
+                raise TypeError(
+                    f"Leaf function '{func.__name__}' Self return type resolves "
+                    f"to '{class_name}' which is not a Pydantic model subclass"
+                )
+            actual_return_type = cls
+
+        elif isinstance(return_type, TypeVar):
+            bound_type = return_type.__bound__
+            if bound_type is None or not issubclass(bound_type, BaseModel):
+                raise TypeError(
+                    f"Leaf function '{func.__name__}' TypeVar bound must be "
+                    f"a Pydantic model, bound is {bound_type}"
+                )
+            actual_return_type = return_type
+            param_hints = typing.get_type_hints(raw_func)
             typevar_params = [
-                name for name, annotation in param_hints.items() if name != "return" and annotation == return_type
+                name
+                for name, annotation in param_hints.items()
+                if name != "return" and annotation == return_type
             ]
             for param_name in typevar_params:
                 if param_name in kwargs:
                     actual_return_type = type(kwargs[param_name])
                     break
+                sig = inspect.signature(raw_func)
+                param_names = list(sig.parameters.keys())
+                if param_name in param_names:
+                    idx = param_names.index(param_name)
+                    if idx < len(args):
+                        actual_return_type = type(args[idx])
+                        break
 
-        params_section = _build_params_section(func, kwargs)
-        system_prompt = _format_docstring(func.__doc__, **kwargs)
+        elif return_type is None or not issubclass(return_type, BaseModel):
+            raise TypeError(
+                f"Leaf function '{func.__name__}' must have a Pydantic model "
+                f"return type, type is {return_type}"
+            )
+        else:
+            actual_return_type = return_type
+
+        params_section = _build_params_section(raw_func, kwargs)
+        system_prompt = _format_docstring(raw_func.__doc__, **kwargs)
         if params_section:
             system_prompt += params_section
 
@@ -550,12 +606,16 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
             response_model=ConversationAction[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
-            on_continue=lambda action: ConversationResult[actual_return_type].continuing(action.message or ""),
+            on_continue=lambda action: ConversationResult[
+                actual_return_type
+            ].continuing(action.message or ""),
             on_success=lambda action: ConversationResult[actual_return_type].success(
                 action.result,
                 message="Completed successfully!",
             ),
-            on_failure=lambda action: ConversationFailedError(action.message or "No reason given"),
+            on_failure=lambda action: ConversationFailedError(
+                action.message or "No reason given"
+            ),
             debug=debug,
             model=tools.config.model,
             provider=tools.config.provider,
@@ -567,7 +627,9 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
         state.initial_result = result
 
         if result.result is None:
-            raise ConversationFailedError("Conversation completed but no result was produced")
+            raise ConversationFailedError(
+                "Conversation completed but no result was produced"
+            )
 
         return result.result
 
@@ -583,7 +645,9 @@ def workflow(func: Callable[..., Any]) -> Callable[..., Any]:
         if tools is not None:
             return func(*args, **kwargs)
 
-        raise TypeError(f"Workflow function '{func.__name__}' requires 'tools' parameter")
+        raise TypeError(
+            f"Workflow function '{func.__name__}' requires 'tools' parameter"
+        )
 
     wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]  # pyright: ignore[reportAttributeAccessIssue]
     return wrapper

@@ -11,21 +11,22 @@ form like typing.Self.
 Mirrors the pattern from workflows/evaluation_criteria/evaluation_criteria.py:43-49
 which uses Self as a classmethod return type.
 """
+
+import importlib.util
 import os
 import sys
 import tempfile
 import unittest
-import importlib.util
 from typing import TypeVar
 
 from pydantic import BaseModel
 
 
 class TestChatDecoratorSelfTypeError(unittest.TestCase):
-    """Prove that Self return type in @chat decorator raises TypeError."""
+    """Prove that Self return type in @chat decorator no longer raises at import time."""
 
-    def test_self_return_type_raises_typeerror(self):
-        """Importing a module with @chat + Self return type should raise TypeError."""
+    def test_self_return_type_imports_successfully(self):
+        """Importing a module with @chat + Self return type should succeed (no TypeError)."""
         module_code = """
 from typing import Self
 from pydantic import BaseModel, Field
@@ -54,7 +55,8 @@ class TestWorkflow:
                 f.write(module_code)
 
             spec = importlib.util.spec_from_file_location(
-                "test_self_module", module_path,
+                "test_self_module",
+                module_path,
             )
             self.assertIsNotNone(spec, "Failed to create module spec")
             self.assertIsNotNone(spec.loader, "Module spec has no loader")
@@ -68,17 +70,18 @@ class TestWorkflow:
             old_path = sys.path.copy()
             sys.path.insert(0, project_root)
             try:
-                with self.assertRaises(TypeError) as ctx:
-                    spec.loader.exec_module(mod)
+                # Should NOT raise - Self type resolution is deferred to call time
+                spec.loader.exec_module(mod)
+                self.assertTrue(
+                    hasattr(mod, "TestWorkflow"),
+                    "Module should have TestWorkflow class",
+                )
+                self.assertTrue(
+                    hasattr(mod.TestWorkflow, "generate"),
+"TestWorkflow should have 'generate' method",
+                )
             finally:
                 sys.path[:] = old_path
-
-            error_msg = str(ctx.exception)
-            self.assertIn(
-                "issubclass() arg 1 must be a class",
-                error_msg,
-                f"Expected 'issubclass() arg 1 must be a class' in error, got: {error_msg}",
-            )
 
 
 class TestChatDecoratorTypeVar(unittest.TestCase):
@@ -109,7 +112,8 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
                 f.write(module_code)
 
             spec = importlib.util.spec_from_file_location(
-                "test_typevar_success", module_path,
+                "test_typevar_success",
+                module_path,
             )
             self.assertIsNotNone(spec, "Failed to create module spec")
             self.assertIsNotNone(spec.loader, "Module spec has no loader")
@@ -152,7 +156,8 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
                 f.write(module_code)
 
             spec = importlib.util.spec_from_file_location(
-                "test_typevar_import", module_path,
+                "test_typevar_import",
+                module_path,
             )
             self.assertIsNotNone(spec, "Failed to create module spec")
             self.assertIsNotNone(spec.loader, "Module spec has no loader")
@@ -198,7 +203,8 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
                 f.write(module_code)
 
             spec = importlib.util.spec_from_file_location(
-                "test_typevar_tools", module_path,
+                "test_typevar_tools",
+                module_path,
             )
             self.assertIsNotNone(spec, "Failed to create module spec")
             self.assertIsNotNone(spec.loader, "Module spec has no loader")
@@ -248,7 +254,8 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
                 f.write(module_code)
 
             spec = importlib.util.spec_from_file_location(
-                "test_typevar_bound", module_path,
+                "test_typevar_bound",
+                module_path,
             )
             self.assertIsNotNone(spec, "Failed to create module spec")
             self.assertIsNotNone(spec.loader, "Module spec has no loader")
