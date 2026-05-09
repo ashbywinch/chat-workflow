@@ -87,13 +87,13 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=budget_allcaps)
 
-                        from chat_workflow.exceptions import ValidationError
+        from chat_workflow.exceptions import ValidationError
 
-                        no_budget = [
-                            Criterion(name="cost", description="Cost constraint", weight=8.0),
-                            Criterion(name="quality", description="Quality level", weight=7.0),
-                        ]
-                        with self.assertRaises(ValidationError) as context:
+        no_budget = [
+            Criterion(name="cost", description="Cost constraint", weight=8.0),
+            Criterion(name="quality", description="Quality level", weight=7.0),
+        ]
+        with self.assertRaises(ValidationError) as context:
             EvaluationCriteria(criteria=no_budget)
 
         self.assertIn("Must include a criterion named 'budget'", str(context.exception))
