@@ -334,7 +334,7 @@ class TestWorkflowIntegration(unittest.TestCase):
     @patch("chat_workflow.conversation_runtime.StructuredConversationOrchestrator._call_llm")
     def test_workflow_refinement_loop(self, mock_call_llm):
 
-        from workflows.evaluate_criteria import generate_reviewed_criteria
+        from workflows.evaluation_criteria import generate_reviewed_criteria
 
         from chat_workflow import ConversationFlowState, ConversationTools
 
