@@ -81,6 +81,7 @@ make lint           # ruff and basedpyright
 - If tempted to #ignore a basedpyright error, think first. Is there a code or architecture smell that we should fix?
 - Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
 - If you see a circular import, this is a code smell. Fix the smell, don't bodge the import
+- **Prefer libraries over reinvention**: Before writing non-trivial code from scratch, check whether a library already solves the problem. Adding a dev dependency has no user-facing cost. Adding a production dependency is often the right call too. The decision criterion is simplicity and readability: a library call that replaces 30 lines of custom code is worth it; a library that adds more complexity than the code it replaces is not.
 
 
 ## Git Workflow
