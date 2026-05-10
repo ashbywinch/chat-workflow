@@ -86,9 +86,8 @@ def _build_system_prompt(
     if params_section:
         system_prompt += params_section
 
-    # Append validation guidance right before instructor injects the JSON
-    # schema. This tells the LLM to respect field descriptions and
-    # constraints without duplicating any specific rule.
+    # Guide the LLM to respect field descriptions and constraints.
+    # Instructor injects the JSON schema automatically after this.
     system_prompt += (
         "\n\n## Output Format\n"
         "The JSON schema below defines the expected output. "

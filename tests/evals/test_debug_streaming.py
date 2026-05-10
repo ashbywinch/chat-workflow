@@ -83,8 +83,9 @@ class TestDebugStreaming(unittest.TestCase):
 
         mock_io = MockIO(
             [
-                "Around $50 for the budget",
-                "That's all, please finalize.",
+                "Performance, battery life, and portability",
+                "I need it for software development and travel",
+                "That's all, please finalize",
             ]
         )
 
@@ -102,8 +103,8 @@ class TestDebugStreaming(unittest.TestCase):
             self.assertIsInstance(criteria, EvaluationCriteria)
         except Exception:
             output = debug_output.getvalue()
-            if "LLM REQUEST" in output:
-                self.assertIn("ERROR", output)
+            self.assertIn("LLM REQUEST", output)
+            self.assertIn("LLM RESPONSE", output)
             raise
 
     @timeout(10)
@@ -113,9 +114,8 @@ class TestDebugStreaming(unittest.TestCase):
 
         mock_io = MockIO(
             [
-                "Around $50 for the budget",
-                "For a 7-year-old who likes science",
-                "That's all, please finalize with budget criterion",
+                "Around $50, for a 7-year-old who likes science",
+                "That's all, please finalize",
             ]
         )
 

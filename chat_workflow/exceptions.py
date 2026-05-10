@@ -76,6 +76,7 @@ class ConversationFailedError(ConversationError):
     def __init__(self, reason: str):
         message = f"LLM indicated failure: {reason}"
         super().__init__(message)
+        self.messages: list[dict[str, str]] | None = None
 
 
 class APIError(ChatWorkflowError):

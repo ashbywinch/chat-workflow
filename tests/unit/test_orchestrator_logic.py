@@ -89,6 +89,30 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertEqual(orchestrator.turn_count, 1)
 
     @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    def test_process_turn_failure_transcript_not_duplicated(self, mock_call_llm):
+        """On failure, the conversation transcript must appear exactly once
+        in the error message — not 0 (missing) and not 2+ (duplicated from
+        both error.__str__ and error.message)."""
+        orchestrator = StructuredConversationOrchestrator(
+            config=make_orchestrator_config()
+        )
+
+        action = ConversationAction[EvaluationCriteria](
+            action="failure", message="I don't have enough information"
+        )
+        mock_call_llm.return_value = action
+
+        with self.assertRaises(ConversationFailedError) as context:
+            orchestrator.process_turn("Something vague")
+
+        error_msg = str(context.exception)
+        transcript_count = error_msg.count("CONVERSATION TRANSCRIPT")
+        self.assertEqual(
+            transcript_count, 1,
+            f"Expected exactly 1 CONVERSATION TRANSCRIPT, found {transcript_count}",
+        )
+
+    @patch.object(StructuredConversationOrchestrator, "_call_llm")
     def test_process_turn_empty_input(self, mock_call_llm):
         orchestrator = StructuredConversationOrchestrator(
             config=make_orchestrator_config()

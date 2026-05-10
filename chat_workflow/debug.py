@@ -62,6 +62,8 @@ class StreamingDebug:
         self.file = file or sys.stderr
         self.include_timestamps = include_timestamps
         self._request_start: datetime | None = None
+        self._shown_message_count: int = 0
+        self._last_messages: list[dict[str, str]] = []
 
     def _timestamp(self) -> str:
         if self.include_timestamps:
@@ -71,16 +73,24 @@ class StreamingDebug:
     def _print(self, message: str) -> None:
         print(message, file=self.file, flush=True)
 
-    def on_request(self, messages: list[dict[str, str]], model: str) -> None:
-        self._request_start = datetime.now()
-        self._print(f"{self._timestamp()}━━━ LLM REQUEST ━━━")
-        self._print(f"{self._timestamp()}Model: {model}")
-        for i, msg in enumerate(messages):
+    def _print_messages(self, messages: list[dict[str, str]], start: int, truncate: bool = True) -> None:
+        for i in range(start, len(messages)):
+            msg = messages[i]
             role = msg.get("role", "unknown")
             content = msg.get("content", "")
-            if len(content) > 500:
+            if truncate and len(content) > 500:
                 content = content[:500] + "..."
             self._print(f"{self._timestamp()}[{i}] {role}: {content}")
+
+    def on_request(self, messages: list[dict[str, str]], model: str) -> None:
+        self._request_start = datetime.now()
+        self._last_messages = messages
+        self._print(f"{self._timestamp()}━━━ LLM REQUEST ━━━")
+        self._print(f"{self._timestamp()}Model: {model}")
+        if self._shown_message_count > 0 and self._shown_message_count < len(messages):
+            self._print(f"{self._timestamp()}  [... {self._shown_message_count} prior messages]")
+        self._print_messages(messages, start=self._shown_message_count, truncate=True)
+        self._shown_message_count = len(messages)
         self._print(f"{self._timestamp()}Waiting for response...")
 
     def on_response(self, response: Any, duration_ms: int) -> None:
@@ -94,5 +104,13 @@ class StreamingDebug:
             self._print(f"{self._timestamp()}{response}")
 
     def on_error(self, error: Exception) -> None:
-        self._print(f"{self._timestamp()}━━━ ERROR ━━━")
-        self._print(f"{self._timestamp()}{type(error).__name__}: {error}")
+        lines: list[str] = []
+        if self._last_messages:
+            lines.append(f"{self._timestamp()}━━━ CONVERSATION TRANSCRIPT ━━━")
+            for i, msg in enumerate(self._last_messages):
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                lines.append(f"{self._timestamp()}[{i}] {role}: {content}")
+        lines.append(f"{self._timestamp()}━━━ ERROR ━━━")
+        lines.append(f"{self._timestamp()}{type(error).__name__}: {error}")
+        self._print("\n".join(lines))

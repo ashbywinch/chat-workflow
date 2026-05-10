@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -75,7 +76,16 @@ class StructuredConversationOrchestrator(Generic[TResult]):
         if action.action == "success":
             return self.on_success(action)
         if action.action == "failure":
-            raise self.on_failure(action)
+            error = self.on_failure(action)
+            error.messages = list(self.messages)  # type: ignore[attr-defined]
+            transcript = "".join(
+                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}"
+                for i, m in enumerate(self.messages)
+            )
+            error.message = f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━{transcript}"
+            if self.debug:
+                self.debug.on_error(error)
+            raise error
 
         raise InvalidResponseError(f"Invalid action received: {action.action}")
 
@@ -88,10 +98,12 @@ class StructuredConversationOrchestrator(Generic[TResult]):
             timer = _DebugTimer(self.debug, self.messages, self.model)
 
             with timer:
-                # instructor patches the client with extra params that pyright stubs don't know about
+                # Pass a copy of messages — Instructor patches messages
+                # in-place with the JSON schema. Using a copy keeps our
+                # conversation history clean across turns.
                 response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
                     model=self.model,
-                    messages=self.messages,  # pyright: ignore[reportArgumentType]
+                    messages=copy.deepcopy(self.messages),  # pyright: ignore[reportArgumentType]
                     response_model=self.response_model,
                     max_retries=self._max_retries,
                     timeout=self._request_timeout_seconds,
