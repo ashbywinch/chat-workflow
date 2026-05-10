@@ -123,31 +123,6 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluati
 
 The LLM will guide you through a conversation to generate structured evaluation criteria for your decision.
 
-### Command Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--context` | Initial context for the conversation | "" |
-| `--max-turns` | Maximum number of conversation turns | 10 |
-| `--max-refinements` | Maximum number of refinement rounds | 3 |
-
-### Examples
-
-**Interactive conversation**:
-```bash
-chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
-```
-
-**Limit conversation length**:
-```bash
-chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
-```
-
-**Customize refinement rounds**:
-```bash
-chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers" --max-refinements 2
-```
-
 ## Conversation Flow
 
 When you run `chat-workflow evaluation-criteria generate-reviewed-criteria`, here's what happens:

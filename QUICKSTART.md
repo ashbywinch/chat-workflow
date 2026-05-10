@@ -1,5 +1,7 @@
 # Quick Start for New Contributors
 
+This guide is for new contributors who want to start working on the chat-workflow library quickly. It covers the essential files, commands, and code locations to answer the question: "What do I need to know to make my first change?"
+
 ## 30-Second Overview
 - **Goal**: Generate evaluation criteria via LLM conversation
 - **Core**: `ConversationOrchestrator` manages multi-turn dialogue  
@@ -12,6 +14,8 @@
 3. `tests/unit/test_models.py` - See business rule tests
 4. `tests/unit/test_orchestrator_logic.py` - See conversation flow tests
 5. `spec.md` - Product requirements
+
+For a deeper understanding, see the [Contributor Guide](docs/contributor-guide.md) and [Architecture Overview](ARCHITECTURE.md).
 
 ## Critical Code Locations
 ```python
@@ -28,7 +32,7 @@ chat_workflow/llm_interaction.py:44  # get_client() - provider setup
 
 ## Configuration
 
-> Prompt design rules are documented in [AGENTS.md](AGENTS.md#prompt-design-rules).
+> Configuration is managed through config.json and environment variables. See the [User Guide](docs/user-guide.md) for detailed setup instructions.
 ```bash
 # 1. Copy config template
 # Edit config.json to set provider/model

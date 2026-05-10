@@ -122,12 +122,14 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 
 These principles guide the module structure and naming conventions in the framework.
 
-### Avoid "utils" Modules
+### Module Naming
 
-Name modules after their domain, not their category. A module called "utils" has no single responsibility. It becomes a grab bag that grows without bound.
+Avoid generic words like "utils", "manager", "tools" in module names. Use domain-driven names instead.
 
 - `prompt_builder.py` not `prompt_utils.py`
 - `metadata.py` not `utils/introspection.py`
+
+A module named "utils" is a grab bag. It has no single responsibility. It grows without bound. Name modules after what they do.
 
 ### Prefer Flat Module Structure
 
@@ -150,10 +152,6 @@ If you find yourself adding a function to a module that doesn't match its stated
 ### DRY: Extract Shared Logic
 
 When the same pattern appears in multiple places, extract it into a dedicated module. The `prompt_builder.py` and `metadata.py` modules were extracted from `conversation_runtime.py` because prompt formatting and type introspection are used by `decorators.py` and are conceptually separate concerns.
-
-### Rich Models Are OK
-
-Pydantic models can carry convenience methods. A model that validates data can also provide methods that operate on that data. Don't extract every method into a service class just for purity. Use judgment.
 
 ## Debugging LLM Interactions
 
@@ -237,7 +235,7 @@ tests/
 
 ## Reference Docs
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — Deeper architecture and file responsibilities
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — Architecture overview, core files, and critical patterns
 - [QUICKSTART.md](../QUICKSTART.md) — 5-minute contributor guide with critical code locations
 - [spec.md](../spec.md) — Product specification and philosophy
 - [TESTING.md](TESTING.md) — Full testing strategy and patterns

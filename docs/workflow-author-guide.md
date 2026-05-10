@@ -324,22 +324,7 @@ def create_and_refine_data(
     return refined_data
 ```
 
-## Debugging LLM Interactions
-
-When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
-
-```bash
-CHAT_WORKFLOW_DEBUG=1 python -m pytest tests/your_test.py
-```
-
-This streams all LLM requests/responses to stderr with timing:
-```
-[15:44:16.001] ━━━ LLM REQUEST ━━━
-[15:44:16.001] Model: openrouter/google/gemini-2.0-flash-lite-001
-[15:44:16.001] [0] system: You are a helpful assistant...
-[15:44:16.001] Waiting for response...
-[15:44:17.234] ━━━ LLM RESPONSE (1233ms) ━━━
-```
+For debugging LLM interactions, see the [Contributor Guide](contributor-guide.md#debugging-llm-interactions).
 
 ## Next Steps
 

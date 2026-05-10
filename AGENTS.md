@@ -119,24 +119,4 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 - Run both `make test` and `make evals` before pushing.
 - origin/main is protected — all changes go through PRs.
 
-## Debugging LLM Interactions
-
-When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
-
-```bash
-CHAT_WORKFLOW_DEBUG=1 make evals
-```
-
-Or for a single test:
-```bash
-CHAT_WORKFLOW_DEBUG=1 .venv/bin/python -m unittest tests.evals.test_real_api.TestRealAPI.test_name -v
-```
-
-This streams all LLM requests/responses to stderr with timing:
-```
-[15:44:16.001] ━━━ LLM REQUEST ━━━
-[15:44:16.001] Model: openrouter/google/gemini-2.0-flash-lite-001
-[15:44:16.001] [0] system: You are a helpful assistant...
-[15:44:16.001] Waiting for response...
-[15:44:17.234] ━━━ LLM RESPONSE (1233ms) ━━━
-```
+For debugging LLM interactions, see the [Contributor Guide](docs/contributor-guide.md#debugging-llm-interactions).

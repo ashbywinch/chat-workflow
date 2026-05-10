@@ -41,17 +41,6 @@ Each doc file covers one topic for one audience. If you need to cover a subtopic
 
 Before adding content to a doc, check if it already exists elsewhere. If it does, link to it instead of repeating it. If it doesn't, put it in the most logical place and link from other docs.
 
-## General Documentation Conventions
-
-### Module Naming
-
-Avoid generic words like "utils", "manager", "tools" in module names. Use domain-driven names instead.
-
-- `prompt_builder.py` not `prompt_utils.py`
-- `metadata.py` not `utils/introspection.py`
-
-A module named "utils" is a grab bag. It has no single responsibility. It grows without bound. Name modules after what they do.
-
 ## Documentation Checklist
 
 Use this to evaluate whether a doc follows Context Efficiency:

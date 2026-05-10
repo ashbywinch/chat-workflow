@@ -1,3 +1,5 @@
+This document is for anyone interested in the product vision for chat-workflow. It covers the problem statement, solution, user experience, and philosophy to answer the question: "What is this library trying to achieve and why?"
+
 # Product Specification: Domain-agnostic library allowing the creation of complex structured conversations (flows) that end users can have with LLMs, giving a heavily "human in the loop" approach to designing agents with a deterministic control flow.
 
 ## Overview

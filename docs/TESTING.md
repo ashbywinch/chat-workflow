@@ -1,5 +1,7 @@
 # Testing Strategy
 
+This guide is for developers contributing to the chat-workflow library. It describes the testing strategy and patterns to answer the question: "How should I test changes to this library?"
+
 ## Philosophy
 
 1. **Fail fast with exceptions** — code raises, doesn't return failure objects
