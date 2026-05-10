@@ -114,7 +114,9 @@ class TestDebugStreaming(unittest.TestCase):
 
         mock_io = MockIO(
             [
-                "Around $50, for a 7-year-old who likes science",
+                "Around $50 budget",
+                "For a 7-year-old who likes science",
+                "Safety and educational value",
                 "That's all, please finalize",
             ]
         )
