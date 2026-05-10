@@ -8,28 +8,29 @@ class TestGetClient(unittest.TestCase):
     """get_client validates provider and reads API key from env."""
 
     def test_unsupported_provider_raises_error(self):
-        from chat_workflow.llm_interaction import get_client
         from chat_workflow.exceptions import ProviderNotSupportedError
+        from chat_workflow.llm_interaction import get_client
 
         with self.assertRaises(ProviderNotSupportedError):
             get_client("nonexistent")
 
     def test_missing_api_key_raises_error(self):
-        from chat_workflow.llm_interaction import get_client
         from chat_workflow.exceptions import APIKeyError
+        from chat_workflow.llm_interaction import get_client
 
-        with patch.dict("os.environ", {}, clear=True):
-            with self.assertRaises(APIKeyError):
-                get_client("openai")
+        with patch.dict("os.environ", {}, clear=True), self.assertRaises(APIKeyError):
+            get_client("openai")
 
     def test_provider_case_insensitive(self):
         from chat_workflow.llm_interaction import get_client
 
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=True):
-            with patch("chat_workflow.llm_interaction.instructor") as mock_instructor:
-                mock_instructor.from_litellm.return_value = "client"
-                result = get_client("OpenAI")
-                self.assertEqual(result, "client")
+        with (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=True),
+            patch("chat_workflow.llm_interaction.instructor") as mock_instructor,
+        ):
+            mock_instructor.from_litellm.return_value = "client"
+            result = get_client("OpenAI")
+            self.assertEqual(result, "client")
 
     def test_multiple_providers(self):
         from chat_workflow.llm_interaction import get_client
@@ -44,18 +45,17 @@ class TestGetClient(unittest.TestCase):
         }
 
         for provider_name, env_var in providers.items():
-            with self.subTest(provider=provider_name):
-                with patch.dict("os.environ", {env_var: "test-key"}, clear=True):
-                    with patch(
-                        "chat_workflow.llm_interaction.instructor"
-                    ) as mock_instructor:
-                        mock_instructor.from_litellm.return_value = "client"
-                        result = get_client(provider_name)
-                        self.assertEqual(result, "client")
+            with (
+                self.subTest(provider=provider_name),
+                patch.dict("os.environ", {env_var: "test-key"}, clear=True),
+                patch("chat_workflow.llm_interaction.instructor") as mock_instructor,
+            ):
+                mock_instructor.from_litellm.return_value = "client"
+                result = get_client(provider_name)
+                self.assertEqual(result, "client")
 
 
 class TestListAvailableProviders(unittest.TestCase):
-
     def test_all_unset(self):
         from chat_workflow.llm_interaction import list_available_providers
 

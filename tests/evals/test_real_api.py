@@ -2,19 +2,18 @@
 import unittest
 from pathlib import Path
 
-from workflows.evaluation_criteria.models import EvaluationCriteria
-from workflows.evaluation_criteria.flows import generate_criteria
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
     ConversationResult,
     ConversationTools,
+    OrchestratorConfig,
     StructuredConversationOrchestrator,
 )
 from chat_workflow.config import Config
-from chat_workflow.exceptions import TurnLimitExceededError, ConversationFailedError
-
+from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
 from tests.conftest import timeout
+from workflows.evaluation_criteria import EvaluationCriteria
 
 _CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
 
@@ -37,28 +36,30 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_call_llm_returns_valid_action(self):
         orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant that creates evaluation criteria. "
-            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
-            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
-            response_model=ConversationAction[EvaluationCriteria],
-            max_turns=5,
-            model=_CONFIG.model,
-            provider=_CONFIG.provider,
-            max_retries=_CONFIG.max_retries,
-            request_timeout_seconds=_CONFIG.request_timeout_seconds,
-            initial_messages=[
-                {
-                    "role": "user",
-                    "content": "Create criteria for choosing a birthday gift. My budget is $50.",
-                }
-            ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
-            on_failure=lambda action: ConversationFailedError(action.message),
+            config=OrchestratorConfig(
+                system_prompt=(
+                    "You are a helpful assistant that creates evaluation criteria. "
+                    "When returning action='success' with criteria, you MUST include "
+                    "a criterion named 'budget' (lowercase). "
+                    "Use action='continue' to ask questions, action='success' to return criteria, "
+                    "action='failure' if unable to help."
+                ),
+                response_model=ConversationAction[EvaluationCriteria],
+                max_turns=5,
+                model=_CONFIG.model,
+                provider=_CONFIG.provider,
+                max_retries=_CONFIG.max_retries,
+                request_timeout_seconds=_CONFIG.request_timeout_seconds,
+                initial_messages=[
+                    {
+                        "role": "user",
+                        "content": "Create criteria for choosing a birthday gift. My budget is $50.",
+                    }
+                ],
+                on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+                on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
+                on_failure=lambda action: ConversationFailedError(action.message),
+            )
         )
 
         action = orchestrator._call_llm()
@@ -106,12 +107,10 @@ class TestRealAPI(unittest.TestCase):
             ]
         )
 
-        criteria = generate_criteria(
+        criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(
-                io=mock_io, state=ConversationFlowState(), config=_CONFIG
-            ),
+            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -125,28 +124,30 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_single_turn_with_real_llm(self):
         orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant for creating evaluation criteria. "
-            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
-            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
-            response_model=ConversationAction[EvaluationCriteria],
-            max_turns=3,
-            model=_CONFIG.model,
-            provider=_CONFIG.provider,
-            max_retries=_CONFIG.max_retries,
-            request_timeout_seconds=_CONFIG.request_timeout_seconds,
-            initial_messages=[
-                {
-                    "role": "user",
-                    "content": "I want to evaluate coffee makers. Budget is $200.",
-                }
-            ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
-            on_failure=lambda action: ConversationFailedError(action.message),
+            config=OrchestratorConfig(
+                system_prompt=(
+                    "You are a helpful assistant for creating evaluation criteria. "
+                    "When returning action='success' with criteria, you MUST include "
+                    "a criterion named 'budget' (lowercase). "
+                    "Use action='continue' to ask questions, action='success' to return criteria, "
+                    "action='failure' if unable to help."
+                ),
+                response_model=ConversationAction[EvaluationCriteria],
+                max_turns=3,
+                model=_CONFIG.model,
+                provider=_CONFIG.provider,
+                max_retries=_CONFIG.max_retries,
+                request_timeout_seconds=_CONFIG.request_timeout_seconds,
+                initial_messages=[
+                    {
+                        "role": "user",
+                        "content": "I want to evaluate coffee makers. Budget is $200.",
+                    }
+                ],
+                on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+                on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
+                on_failure=lambda action: ConversationFailedError(action.message),
+            )
         )
 
         result = orchestrator.process_turn("")
@@ -175,12 +176,10 @@ class TestRealAPI(unittest.TestCase):
             ]
         )
 
-        criteria = generate_criteria(
+        criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift for a 7-year-old",
             max_turns=10,
-            tools=ConversationTools(
-                io=mock_io, state=ConversationFlowState(), config=_CONFIG
-            ),
+            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -203,39 +202,39 @@ class TestRealAPI(unittest.TestCase):
         )
 
         with self.assertRaises((TurnLimitExceededError, ConversationFailedError)):
-            generate_criteria(
+            EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop for programming",
                 max_turns=3,
-                tools=ConversationTools(
-                    io=mock_io, state=ConversationFlowState(), config=_CONFIG
-                ),
+                tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
             )
 
     @timeout(10)
     def test_conversation_action_format(self):
         orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant for creating evaluation criteria. "
-            "When returning action='success' with criteria, you MUST include a criterion named 'budget' (lowercase). "
-            "Use action='continue' to ask questions, action='success' to return criteria, action='failure' if unable to help.",
-            response_model=ConversationAction[EvaluationCriteria],
-            max_turns=5,
-            model=_CONFIG.model,
-            provider=_CONFIG.provider,
-            max_retries=_CONFIG.max_retries,
-            request_timeout_seconds=_CONFIG.request_timeout_seconds,
-            initial_messages=[
-                {
-                    "role": "user",
-                    "content": "I want to create criteria for choosing a laptop. My budget is $1000.",
-                }
-            ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
-            on_failure=lambda action: ConversationFailedError(action.message),
+            config=OrchestratorConfig(
+                system_prompt=(
+                    "You are a helpful assistant for creating evaluation criteria. "
+                    "When returning action='success' with criteria, you MUST include "
+                    "a criterion named 'budget' (lowercase). "
+                    "Use action='continue' to ask questions, action='success' to return criteria, "
+                    "action='failure' if unable to help."
+                ),
+                response_model=ConversationAction[EvaluationCriteria],
+                max_turns=5,
+                model=_CONFIG.model,
+                provider=_CONFIG.provider,
+                max_retries=_CONFIG.max_retries,
+                request_timeout_seconds=_CONFIG.request_timeout_seconds,
+                initial_messages=[
+                    {
+                        "role": "user",
+                        "content": "I want to create criteria for choosing a laptop. My budget is $1000.",
+                    }
+                ],
+                on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
+                on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
+                on_failure=lambda action: ConversationFailedError(action.message),
+            )
         )
 
         result = orchestrator.process_turn("Please include budget as a criterion")

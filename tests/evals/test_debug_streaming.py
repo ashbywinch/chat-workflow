@@ -3,19 +3,15 @@ import unittest
 from io import StringIO
 from pathlib import Path
 
-from workflows.evaluation_criteria.models import EvaluationCriteria
-from workflows.evaluation_criteria.flows import generate_criteria
 from chat_workflow import (
     ConversationAction,
     ConversationFlowState,
-    ConversationResult,
     ConversationTools,
-    StructuredConversationOrchestrator,
     StreamingDebug,
 )
 from chat_workflow.config import Config
-from chat_workflow.exceptions import ConversationFailedError
 from tests.conftest import timeout
+from workflows.evaluation_criteria import EvaluationCriteria
 
 _CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
 
@@ -59,9 +55,7 @@ class TestDebugStreaming(unittest.TestCase):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        action = ConversationAction[EvaluationCriteria](
-            action="continue", message="What is your budget?"
-        )
+        action = ConversationAction[EvaluationCriteria](action="continue", message="What is your budget?")
         debug.on_response(action, duration_ms=123.45)
 
         output = debug_output.getvalue()
@@ -83,43 +77,34 @@ class TestDebugStreaming(unittest.TestCase):
 
     @timeout(10)
     def test_orchestrator_with_debug(self):
+        """Verify debug output captures LLM interaction when using @chat decorator."""
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        orchestrator = StructuredConversationOrchestrator(
-            system_prompt="You are a helpful assistant.",
-            response_model=ConversationAction[EvaluationCriteria],
-            max_turns=3,
-            model=_CONFIG.model,
-            provider=_CONFIG.provider,
-            max_retries=_CONFIG.max_retries,
-            request_timeout_seconds=_CONFIG.request_timeout_seconds,
-            initial_messages=[
-                {
-                    "role": "user",
-                    "content": "Create criteria for choosing a laptop. Budget $1000.",
-                }
-            ],
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
-            on_failure=lambda action: ConversationFailedError(action.message),
-            debug=debug,
+        mock_io = MockIO(
+            [
+                "Performance, battery life, and portability",
+                "I need it for software development and travel",
+                "That's all, please finalize",
+            ]
         )
 
         try:
-            orchestrator._call_llm()
+            criteria = EvaluationCriteria.generate_from_chat(
+                context="choosing a laptop",
+                max_turns=6,
+                tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+                debug=debug,
+            )
 
             output = debug_output.getvalue()
             self.assertIn("LLM REQUEST", output)
             self.assertIn("LLM RESPONSE", output)
+            self.assertIsInstance(criteria, EvaluationCriteria)
         except Exception:
             output = debug_output.getvalue()
-            if "LLM REQUEST" in output:
-                self.assertIn("ERROR", output)
+            self.assertIn("LLM REQUEST", output)
+            self.assertIn("LLM RESPONSE", output)
             raise
 
     @timeout(10)
@@ -129,18 +114,17 @@ class TestDebugStreaming(unittest.TestCase):
 
         mock_io = MockIO(
             [
-                "Around $50 for the budget",
+                "Around $50 budget",
                 "For a 7-year-old who likes science",
-                "That's all, please finalize with budget criterion",
+                "Safety and educational value",
+                "That's all, please finalize",
             ]
         )
 
-        criteria = generate_criteria(
+        criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(
-                io=mock_io, state=ConversationFlowState(), config=_CONFIG
-            ),
+            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
             debug=debug,
         )
 

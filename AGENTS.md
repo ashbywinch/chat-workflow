@@ -48,6 +48,14 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 - Conversation flow design
 - Integration patterns
 
+### 5. Write Documentation
+**Goal**: Create or update project documentation.
+
+**Read**: [Writing Documentation Guide](docs/writing-documentation.md)
+- Context Efficiency principle
+- SOLID/DRY principles for documentation
+- Documentation structure and conventions
+
 ## Critical Agent Information
 
 ### Key Files for Quick Understanding
@@ -61,23 +69,6 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow/cli.py` | Typer CLI (`converse` command) |
 | `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
-
-### Essential Conventions (Preserved from Original)
-
-- **Business rules live in Pydantic models** (`model_validator`), not prompts.
-- **Prompts give behavioral guidance only** — Instructor handles schema formatting.
-- **Must communicate rules in the JSON schema, not just the model_validator.** A `model_validator` only fires *after* the LLM returns data — it's enforcement, not communication. The LLM reads the JSON schema (appended by Instructor to the system message) to understand what to produce.
-- **`max_turns`** appears in both the system prompt (f-string) and the code guard.
-- **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally.
-- **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them.
-
-### Prompt Design Rules (Critical for Agent Work)
-
-1. NEVER mention Pydantic class names, field types or validation rules in prompts.
-2. DO give behavioral examples and conversation strategies.
-3. ALWAYS use f-strings for turn limits (`{self.max_turns}`), never hardcode.
-4. FOCUS on "what to do", not "what not to do".
-5. If the LLM repeatedly fails to satisfy a Pydantic rule, the rule is not visible enough in the JSON schema. Fix the schema (see Conventions), not the prompt.
 
 ### Development Commands
 
@@ -99,6 +90,7 @@ make lint           # black --check + ruff check
 | [Example: Evaluation Criteria](docs/example-evaluation-criteria.md) | Complete sample workflow walkthrough | Learning by example |
 | [Workflow Author Guide](docs/workflow-author-guide.md) | Building new conversation flows | Developers creating workflows |
 | [Contributor Guide](docs/contributor-guide.md) | Developing the framework itself | Library contributors |
+| [Writing Documentation Guide](docs/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
 | [Testing Guide](docs/TESTING.md) | Testing strategy and patterns | Quality assurance |
 | [Product Spec](spec.md) | Product requirements and philosophy | Understanding vision |
 
@@ -127,24 +119,4 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 - Run both `make test` and `make evals` before pushing.
 - origin/main is protected — all changes go through PRs.
 
-## Debugging LLM Interactions
-
-When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
-
-```bash
-CHAT_WORKFLOW_DEBUG=1 make evals
-```
-
-Or for a single test:
-```bash
-CHAT_WORKFLOW_DEBUG=1 .venv/bin/python -m unittest tests.evals.test_real_api.TestRealAPI.test_name -v
-```
-
-This streams all LLM requests/responses to stderr with timing:
-```
-[15:44:16.001] ━━━ LLM REQUEST ━━━
-[15:44:16.001] Model: openrouter/google/gemini-2.0-flash-lite-001
-[15:44:16.001] [0] system: You are a helpful assistant...
-[15:44:16.001] Waiting for response...
-[15:44:17.234] ━━━ LLM RESPONSE (1233ms) ━━━
-```
+For debugging LLM interactions, see the [Contributor Guide](docs/contributor-guide.md#debugging-llm-interactions).

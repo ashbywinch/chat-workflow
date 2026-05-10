@@ -2,77 +2,21 @@
 import unittest
 from unittest.mock import patch
 
-from workflows.evaluation_criteria.models import EvaluationCriteria, Criterion
 from chat_workflow import (
     ConversationAction,
-    ConversationResult,
     StructuredConversationOrchestrator,
 )
-from chat_workflow.exceptions import TurnLimitExceededError, ConversationFailedError
-
-
-class MockInstructorClient:
-    def __init__(self, responses=None):
-        self.responses = responses or []
-        self.call_count = 0
-        self.last_call_args = None
-        self.last_call_kwargs = None
-        self.chat = self.MockChatCompletions(self)
-
-    class MockChatCompletions:
-        def __init__(self, parent):
-            self.parent = parent
-            self.completions = self
-
-        def create(
-            self,
-            model=None,
-            messages=None,
-            response_model=None,
-            max_retries=None,
-            **kwargs,
-        ):
-            self.parent.call_count += 1
-            self.parent.last_call_args = (model, messages, response_model, max_retries)
-            self.parent.last_call_kwargs = kwargs
-
-            if self.parent.responses:
-                if len(self.parent.responses) > 0:
-                    response = self.parent.responses.pop(0)
-                    if isinstance(response, Exception):
-                        raise response
-                    return response
-                else:
-                    raise ValueError("No more responses in mock")
-
-            return ConversationAction[EvaluationCriteria](
-                action="continue", message="Test question"
-            )
+from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
+from tests.conftest import MockInstructorClient, make_orchestrator_config, make_valid_criteria
+from workflows.evaluation_criteria.evaluation_criteria import (
+    EvaluationCriteria,
+)
 
 
 class TestLLMInteraction(unittest.TestCase):
-    def setUp(self):
-        self.valid_criteria = EvaluationCriteria(
-            context="test",
-            criteria=[
-                Criterion(name="budget", description="Budget", weight=8.0),
-                Criterion(name="quality", description="Quality", weight=7.0),
-            ],
-        )
-
     def _create_orchestrator(self, max_turns=10):
         return StructuredConversationOrchestrator(
-            system_prompt="Test prompt",
-            response_model=ConversationAction[EvaluationCriteria],
-            max_turns=max_turns,
-            initial_messages=None,
-            on_continue=lambda action: ConversationResult[
-                EvaluationCriteria
-            ].continuing(action.message),
-            on_success=lambda action: ConversationResult[EvaluationCriteria].success(
-                action.result
-            ),
-            on_failure=lambda action: ConversationFailedError(action.message),
+            config=make_orchestrator_config(max_turns=max_turns)
         )
 
     @patch("chat_workflow.llm_interaction.get_client")
@@ -104,9 +48,7 @@ class TestLLMInteraction(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_passes_correct_parameters(self, mock_get_client):
         mock_client = MockInstructorClient()
-        expected_action = ConversationAction[EvaluationCriteria](
-            action="continue", message="Test"
-        )
+        expected_action = ConversationAction[EvaluationCriteria](action="continue", message="Test")
         mock_client.responses = [expected_action]
         mock_get_client.return_value = mock_client
 
@@ -128,9 +70,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_success_completion(self, mock_get_client):
-        success_action = ConversationAction[EvaluationCriteria](
-            action="success", result=self.valid_criteria
-        )
+        success_action = ConversationAction[EvaluationCriteria](action="success", result=make_valid_criteria())
 
         mock_client = MockInstructorClient()
         mock_client.responses = [success_action]
@@ -141,7 +81,7 @@ class TestLLMInteraction(unittest.TestCase):
         result = orchestrator.process_turn("Let's create criteria for test")
 
         self.assertTrue(result.is_complete)
-        self.assertEqual(result.result, self.valid_criteria)
+        self.assertEqual(result.result, make_valid_criteria())
         self.assertIn("success", result.message.lower())
 
         self.assertEqual(mock_client.call_count, 1)
@@ -151,9 +91,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_turn_limit_enforcement(self, mock_get_client):
-        continue_action = ConversationAction[EvaluationCriteria](
-            action="continue", message="Tell me more"
-        )
+        continue_action = ConversationAction[EvaluationCriteria](action="continue", message="Tell me more")
         mock_client = MockInstructorClient()
         mock_client.responses = [continue_action] * 20
         mock_get_client.return_value = mock_client
@@ -173,9 +111,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_with_custom_max_turns(self, mock_get_client):
-        continue_action = ConversationAction[EvaluationCriteria](
-            action="continue", message="Continue please"
-        )
+        continue_action = ConversationAction[EvaluationCriteria](action="continue", message="Continue please")
         mock_client = MockInstructorClient()
         mock_client.responses = [continue_action] * 5
         mock_get_client.return_value = mock_client
@@ -213,9 +149,7 @@ class TestLLMInteraction(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_validation_error_propagation(self, mock_get_client):
         mock_client = MockInstructorClient()
-        mock_client.responses = [
-            ValueError("Validation failed: Invalid JSON structure")
-        ]
+        mock_client.responses = [ValueError("Validation failed: Invalid JSON structure")]
         mock_get_client.return_value = mock_client
 
         orchestrator = self._create_orchestrator()

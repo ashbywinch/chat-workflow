@@ -6,9 +6,9 @@ Verifies that get_logs_dir() creates the expected directory and that
 log_session() writes correct JSON content to the returned file path.
 """
 
-import unittest
 import json
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
@@ -52,9 +52,7 @@ class TestLogSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
-            with patch(
-                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
-            ):
+            with patch("chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir):
                 result_path = log_session(
                     messages=self._sample_messages(),
                     criteria=self._sample_criteria(),
@@ -67,12 +65,8 @@ class TestLogSession(unittest.TestCase):
 
             self.assertIsInstance(result_path, Path)
             self.assertTrue(result_path.exists(), "The log file should exist on disk")
-            self.assertTrue(
-                result_path.is_file(), "The log file should be a regular file"
-            )
-            self.assertEqual(
-                result_path.parent, fake_logs_dir, "File should be in the logs dir"
-            )
+            self.assertTrue(result_path.is_file(), "The log file should be a regular file")
+            self.assertEqual(result_path.parent, fake_logs_dir, "File should be in the logs dir")
             self.assertTrue(
                 result_path.name.startswith("session_"),
                 "Filename should start with 'session_'",
@@ -91,9 +85,7 @@ class TestLogSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
-            with patch(
-                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
-            ):
+            with patch("chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir):
                 result_path = log_session(
                     messages=messages,
                     criteria=criteria,
@@ -123,9 +115,7 @@ class TestLogSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
-            with patch(
-                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
-            ):
+            with patch("chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir):
                 result_path = log_session(
                     messages=self._sample_messages(),
                     criteria=None,
@@ -152,9 +142,7 @@ class TestLogSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
-            with patch(
-                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
-            ):
+            with patch("chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir):
                 result_path = log_session(
                     messages=self._sample_messages(),
                     criteria=self._sample_criteria(),
@@ -180,9 +168,7 @@ class TestLogSession(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
-            with patch(
-                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
-            ):
+            with patch("chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir):
                 result_path = log_session(
                     messages=[],
                     criteria=None,
@@ -202,14 +188,13 @@ class TestLogSession(unittest.TestCase):
 
     def test_log_session_timestamp_format(self):
         """The timestamp field must be a valid ISO-8601 string."""
-        from chat_workflow.session_logging import log_session
         from datetime import datetime
+
+        from chat_workflow.session_logging import log_session
 
         with tempfile.TemporaryDirectory() as tmpdir:
             fake_logs_dir = Path(tmpdir)
-            with patch(
-                "chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir
-            ):
+            with patch("chat_workflow.session_logging.get_logs_dir", return_value=fake_logs_dir):
                 result_path = log_session(
                     messages=self._sample_messages(),
                     criteria=None,

@@ -1,15 +1,18 @@
-"""Presentation helpers for EvaluationCriteria conversations."""
+"""Presentation formatters for EvaluationCriteria data models."""
 
-from typing import Callable
+from __future__ import annotations
 
-from .models import EvaluationCriteria
+from collections.abc import Callable
+
+from .evaluation_criteria import EvaluationCriteria
 
 
-def print_criteria(
+def echo_criteria(
     criteria: EvaluationCriteria,
     title: str,
     echo: Callable[[str], None],
 ) -> None:
+    """Display evaluation criteria with normalized weights to the user."""
     echo(f"\n{title}")
     echo(f"✓ Generated {len(criteria.criteria)} criteria")
     echo(f"Context: {criteria.context}")
@@ -22,5 +25,5 @@ def print_criteria(
 
     echo("\nNormalized weights (sum to 1.0):")
     normalized = criteria.normalized_weights()
-    for criterion, weight in zip(criteria.criteria, normalized):
+    for criterion, weight in zip(criteria.criteria, normalized, strict=False):
         echo(f"  {criterion.name}: {weight:.3f}")

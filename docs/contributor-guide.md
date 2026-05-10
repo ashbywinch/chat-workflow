@@ -16,6 +16,8 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow/cli.py` | CLI with automatic workflow discovery |
 | `chat_workflow/session_logging.py` | Conversation session logging |
+| `chat_workflow/prompt_builder.py` | Prompt formatting: `_format_docstring()`, `_build_params_section()` |
+| `chat_workflow/metadata.py` | Type introspection: `_format_type_name()`, `_get_return_type()`, etc. |
 | `chat_workflow/__init__.py` | Public API exports |
 
 Example workflows live in the `workflows/` directory.
@@ -26,9 +28,7 @@ Example workflows live in the `workflows/` directory.
 
 - **High usability for workflow authors**: Authors must be able to easily figure out the library and create extremely readable workflows with minimal boilerplate
 - **Structured outputs via Instructor**: LLM returns Pydantic objects
-- **Validation-first**: Business rules in Pydantic models, never in prompts
 - **Multi-turn conversation**: Stateful orchestrator manages dialogue flow
-- **Configurable failure modes**: LLM can fail OR system can hit turn limits
 - **Dual configuration**: Provider/model in `config.json`, API keys in environment
 - **Configuration at the edge**: Configuration must only be set/read at the perimeter (CLI, test setup, etc.)
 - **Fail fast**: We are never backwards compatible. If something is configured incorrectly we fail fast instead of using defaults
@@ -38,7 +38,7 @@ Example workflows live in the `workflows/` directory.
 
 #### `chat_workflow/conversation_runtime.py` - Conversation Logic
 - Core class: `StructuredConversationOrchestrator`
-- Manages turn state (max_turns configurable)
+- Manages turn state (`max_turns` configurable)
 - Receives system prompt from `@chat` decorator
 - Three outcomes: continue/success/failure
 
@@ -56,7 +56,7 @@ Example workflows live in the `workflows/` directory.
 #### `config.py` - Configuration Management
 - Singleton configuration manager
 - Reads ONLY from `config.json`
-- Provides: provider, model, temperature, max_retries
+- Provides: provider, model, temperature, `max_retries`
 - Note: API keys come from environment variables, not config.json
 
 ## Development Commands
@@ -67,13 +67,28 @@ make test          # Unit tests only (no API key needed, ~0.01s)
 make test-verbose  # Same with verbose output per test
 make evals          # Real-API evals (requires config.json + API key, ~90s)
 make evals-verbose  # Same with verbose output
-make lint           # black --check + ruff check
+make lint           # ruff and basedpyright
 ```
+## Coding Standards
+
+- We use basedpyright to ensure comprehensive typing.
+- Remember that the purpose of types is to help express to the reader (human or agent) what the code does. Make sure our typing is expressive. Multiple levels of nested dicts are not expressive.
+- Always use the narrowest type that applies.
+- If tempted to use "Any" or "object", double check whether a narrower type would be appropriate.
+- If tempted to provide several types in a union, it's likely that a better approach would be to standardise on the one most appropriate type. If the current code uses a variety of types, don't automatically assume that this was a good idea.
+- If tempted to put "| None" after your type, check that this isn't a cop-out. Are you sure we should really be allowing None?
+- If we read in untyped data (for example, json as a string), coerce it to the narrow type as near to the edge as possible (i.e. in a cli or in unit tests). If we write untyped data, de-type it as close to the edge as possible.
+- If tempted to #ignore a basedpyright error, think first. Is there a code or architecture smell that we should fix?
+- Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
+- If you see a circular import, this is a code smell. Fix the smell, don't bodge the import
+- **Prefer libraries over reinvention**: Before writing non-trivial code from scratch, check whether a library already solves the problem. Adding a dev dependency has no user-facing cost. Adding a production dependency is often the right call too. The decision criterion is simplicity and readability: a library call that replaces 30 lines of custom code is worth it; a library that adds more complexity than the code it replaces is not.
+
 
 ## Git Workflow
 
 ### Quick Reference
 
+Before starting any new work:
 ```bash
 # Check outstanding work on current branch
 git status
@@ -83,9 +98,6 @@ BASE_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
 git log --oneline "origin/$BASE_BRANCH..origin/$BRANCH"
 gh pr list --head "$BRANCH" --state open --json number,url --jq '.[] | [.number, .url] | @tsv'
 
-# Before pushing: run ALL tests locally
-make test && make evals
-
 # Start new work from fresh branch off main
 git checkout main && git pull origin main && git checkout -b <new-branch>
 ```
@@ -93,30 +105,38 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 ### Rules
 - Start every new piece of work from a fresh branch off main
 - If outstanding work exists (unmerged PR, unpushed commits), finish that work first
-- Run both `make test` and `make evals` before pushing
 - origin/main is protected — all changes go through PRs
+
+### Updating a PR Description
+
+The `gh pr edit --body` flag can silently fail (e.g., when the remote URL is
+stale after a repo rename). To reliably update a PR's body, write it to a file
+and use the API directly instead:
+
+```bash
+# Write the new body to a file
+cat > /tmp/pr_body.md << 'EOF'
+## Summary
+...
+EOF
+
+# Update body
+gh api "repos/$(gh repo view --json owner,name --jq '[.owner.login,.name] | join("/")')/pulls/$PR_NUMBER" \
+  -X PATCH -F body=@/tmp/pr_body.md
+
+# Update title (works with both methods)
+gh api "repos/$(gh repo view --json owner,name --jq '[.owner.login,.name] | join("/")')/pulls/$PR_NUMBER" \
+  -X PATCH -f title="New title here"
+```
+
+The `-F body=@file` form reliably sends the file contents as a string field. The
+`-f` flag is for short string fields. Use `-F` (capital) for file references with
+`@` and `-f` for inline values.
 
 ## Conventions
 
-- **Business rules live in Pydantic models** (`model_validator`), not prompts
-- **Prompts give behavioral guidance only** — Instructor handles schema formatting
-- **Must communicate rules in the JSON schema, not just the model_validator**: A `model_validator` only fires *after* the LLM returns data — it's enforcement, not communication. The LLM reads the JSON schema (appended by Instructor to the system message) to understand what to produce. So rules must be encoded in ways that propagate to `model_json_schema()`:
-  - Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`) — these inject directly into the schema
-  - Use `Field(description=...)` with plain-English conditional rules (e.g. `'Required when action is "success". Must be null when action is "continue".'`)
-  - Use class docstrings — Pydantic v2 emits them as the model's `"description"` in JSON schema
-  - Use `model_config = dict(json_schema_extra=...)` for non-standard but model-level annotations the LLM should see
-  - Test schemas with `Model.model_json_schema()` and verify each rule is visible in the output
-- **`max_turns`** appears in both the system prompt (f-string) and the code guard
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them
-
-## Prompt Design Rules
-
-1. NEVER mention Pydantic class names, field types or validation rules in prompts
-2. DO give behavioral examples and conversation strategies
-3. ALWAYS use f-strings for turn limits (`{self.max_turns}`), never hardcode
-4. FOCUS on "what to do", not "what not to do"
-5. If the LLM repeatedly fails to satisfy a Pydantic rule, the rule is not visible enough in the JSON schema. Fix the schema (see Conventions), not the prompt
 
 ## Critical Patterns
 
@@ -124,6 +144,41 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 - `ConversationAction` is a Generic BaseModel with `action: Literal["continue", "success", "failure"]` and a `model_validator` for consistency
 - `StructuredConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
 - Turn limit raises `TurnLimitExceededError`; failure action raises `ConversationFailedError`
+
+## SOLID/DRY Principles for Code
+
+These principles guide the module structure and naming conventions in the framework.
+
+### Module Naming
+
+Avoid generic words like "utils", "manager", "tools" in module names. Use domain-driven names instead.
+
+- `prompt_builder.py` not `prompt_utils.py`
+- `metadata.py` not `utils/introspection.py`
+
+A module named "utils" is a grab bag. It has no single responsibility. It grows without bound. Name modules after what they do.
+
+### Prefer Flat Module Structure
+
+Keep modules flat in the `chat_workflow/` directory rather than nesting them in subdirectories. Deep nesting hides information and makes imports harder to follow.
+
+- `metadata.py` not `utils/introspection.py`
+- `prompt_builder.py` not `prompt/prompt_builder.py`
+
+### Single Responsibility Principle
+
+Each module should have one reason to change.
+
+- `prompt_builder.py` owns prompt formatting (docstring rendering, parameter section building)
+- `metadata.py` owns type introspection (type name formatting, return type resolution, parameter inspection)
+- `conversation_runtime.py` owns conversation orchestration (turn management, LLM calling, action handling)
+- `llm_interaction.py` owns LLM provider abstraction
+
+If you find yourself adding a function to a module that doesn't match its stated purpose, create a new module.
+
+### DRY: Extract Shared Logic
+
+When the same pattern appears in multiple places, extract it into a dedicated module. The `prompt_builder.py` and `metadata.py` modules were extracted from `conversation_runtime.py` because prompt formatting and type introspection are used by `decorators.py` and are conceptually separate concerns.
 
 ## Debugging LLM Interactions
 
@@ -179,7 +234,8 @@ tests/
 | Task | Primary File | Key Function/Method |
 |------|--------------|---------------------|
 | Add business rule | Example workflow models | `model_validator` methods |
-| Modify generic prompt | `chat_workflow/conversation_runtime.py` | `@chat` decorator system prompt |
+| Modify generic prompt | `chat_workflow/prompt_builder.py` | `_format_docstring()`, `_build_params_section()` |
+| Add/modify type introspection | `chat_workflow/metadata.py` | `_format_type_name()`, `_get_return_type()` |
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
 | Modify conversation flow | `chat_workflow/conversation_runtime.py` | `StructuredConversationOrchestrator.process_turn()` |
@@ -206,7 +262,7 @@ tests/
 
 ## Reference Docs
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — Deeper architecture and file responsibilities
+- [ARCHITECTURE.md](../ARCHITECTURE.md) — Architecture overview, core files, and critical patterns
 - [QUICKSTART.md](../QUICKSTART.md) — 5-minute contributor guide with critical code locations
 - [spec.md](../spec.md) — Product specification and philosophy
 - [TESTING.md](TESTING.md) — Full testing strategy and patterns

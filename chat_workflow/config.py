@@ -5,12 +5,16 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .llm_interaction import ProviderType
+
 
 class Config:
     """Configuration manager for LLM settings.
 
     The caller provides the path to config.json. No auto-discovery.
     """
+
+    _VALID_PROVIDERS = frozenset({"openai", "google", "anthropic", "groq", "together", "azure", "openrouter"})
 
     def __init__(self, config_path: Path):
         from .exceptions import ConfigFileError, ConfigurationError
@@ -26,22 +30,26 @@ class Config:
 
         if not config_path.exists():
             raise ConfigFileError(
-                f"Configuration file not found: {config_path}\n"
-                f"Refer to config.json.example for the required format."
+                f"Configuration file not found: {config_path}\nRefer to config.json.example for the required format."
             )
 
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 file_config = json.load(f)
                 self._merge_config(self._config_data, file_config)
         except json.JSONDecodeError as e:
-            raise ConfigFileError(f"Invalid JSON in {config_path}: {e}")
-        except IOError as e:
-            raise ConfigFileError(f"Could not read {config_path}: {e}")
+            raise ConfigFileError(f"Invalid JSON in {config_path}: {e}") from e
+        except OSError as e:
+            raise ConfigFileError(f"Could not read {config_path}: {e}") from e
 
         if not self._config_data.get("llm", {}).get("provider"):
+            raise ConfigurationError("Missing required field in config.json: llm.provider")
+
+        provider = self._config_data["llm"]["provider"]
+        if provider not in self._VALID_PROVIDERS:
             raise ConfigurationError(
-                "Missing required field in config.json: llm.provider"
+                f"Invalid provider in config.json: {provider}. "
+                f"Valid providers: {', '.join(sorted(self._VALID_PROVIDERS))}"
             )
 
         if not self._config_data.get("llm", {}).get("model"):
@@ -55,7 +63,7 @@ class Config:
                 base[key] = value
 
     @property
-    def provider(self) -> str:
+    def provider(self) -> "ProviderType":
         return self._config_data["llm"]["provider"]
 
     @property

@@ -1,0 +1,121 @@
+"""Structured conversation orchestrator for multi-turn LLM interactions."""
+
+from __future__ import annotations
+
+import copy
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+from .debug import _DebugTimer
+from .llm_interaction import ProviderType
+from .models import ConversationAction, ConversationResult
+from .protocols import ConversationDebug
+
+TResult = TypeVar("TResult")
+
+
+@dataclass
+class OrchestratorConfig(Generic[TResult]):
+    """Configuration for StructuredConversationOrchestrator."""
+
+    system_prompt: str
+    response_model: type[ConversationAction[TResult]]
+    max_turns: int
+    initial_messages: list[dict[str, str]] | None = None
+    on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] | None = None
+    on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] | None = None
+    on_failure: Callable[[ConversationAction[TResult]], Exception] | None = None
+    debug: ConversationDebug | None = None
+    model: str = "default-model"
+    provider: ProviderType = "openrouter"
+    max_retries: int = 3
+    request_timeout_seconds: int = 30
+
+
+class StructuredConversationOrchestrator(Generic[TResult]):
+    def __init__(
+        self,
+        *,
+        config: OrchestratorConfig[TResult],
+    ):
+        self.messages: list[dict[str, str]] = [{"role": "system", "content": config.system_prompt}]
+        self.turn_count = 0
+        self.max_turns = config.max_turns
+        self.model = config.model
+        self._provider: ProviderType = config.provider
+        self._max_retries = config.max_retries
+        self._request_timeout_seconds = config.request_timeout_seconds
+        self.response_model = config.response_model
+        self.on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = config.on_continue
+        self.on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = config.on_success
+        self.on_failure: Callable[[ConversationAction[TResult]], Exception] = config.on_failure
+        self.debug = config.debug
+
+        for message in config.initial_messages or []:
+            self.messages.append(message)
+
+    def process_turn(self, user_input: str) -> ConversationResult[TResult]:
+        from .exceptions import InvalidResponseError, TurnLimitExceededError
+
+        if self.turn_count >= self.max_turns:
+            raise TurnLimitExceededError(self.max_turns)
+
+        if user_input.strip():
+            self.messages.append({"role": "user", "content": user_input})
+
+        self.turn_count += 1
+        action = self._call_llm()
+
+        message = action.message
+        if message:
+            self.messages.append({"role": "assistant", "content": message})
+
+        if action.action == "continue":
+            return self.on_continue(action)
+        if action.action == "success":
+            return self.on_success(action)
+        if action.action == "failure":
+            error = self.on_failure(action)
+            error.messages = list(self.messages)  # type: ignore[attr-defined]
+            transcript = "".join(
+                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}"
+                for i, m in enumerate(self.messages)
+            )
+            error.message = f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━{transcript}"
+            if self.debug:
+                self.debug.on_error(error)
+            raise error
+
+        raise InvalidResponseError(f"Invalid action received: {action.action}")
+
+    def _call_llm(self) -> ConversationAction[TResult]:
+        from .exceptions import ProviderNotFoundError
+        from .llm_interaction import get_client
+
+        try:
+            client = get_client(provider=self._provider)
+            timer = _DebugTimer(self.debug, self.messages, self.model)
+
+            with timer:
+                # Pass a copy of messages — Instructor patches messages
+                # in-place with the JSON schema. Using a copy keeps our
+                # conversation history clean across turns.
+                response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
+                    model=self.model,
+                    messages=copy.deepcopy(self.messages),  # pyright: ignore[reportArgumentType]
+                    response_model=self.response_model,
+                    max_retries=self._max_retries,
+                    timeout=self._request_timeout_seconds,
+                )
+
+            timer.emit_response(response)
+            return response
+        except ImportError as e:
+            raise ProviderNotFoundError(
+                f"No LLM providers available. {e}\nInstall litellm for multi-provider LLM support: uv add litellm"
+            ) from e
+        except Exception as e:
+            if self.debug:
+                self.debug.on_error(e)
+            raise

@@ -12,7 +12,7 @@ from chat_workflow.config import Config
 class TestConfig(unittest.TestCase):
     """Config requires an explicit path to config.json — no auto-discovery."""
 
-    def _write_temp_config(self, content: dict) -> str:
+    def _write_temp_config(self, content: object) -> str:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
             json.dump(content, f)
             return f.name
@@ -82,9 +82,7 @@ class TestConfig(unittest.TestCase):
     def test_empty_model_raises_error(self):
         from chat_workflow.exceptions import ConfigurationError
 
-        temp_path = self._write_temp_config(
-            {"llm": {"provider": "openai", "model": ""}}
-        )
+        temp_path = self._write_temp_config({"llm": {"provider": "openai", "model": ""}})
         try:
             with self.assertRaises(ConfigurationError):
                 Config(Path(temp_path))
@@ -115,9 +113,7 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_default_values_applied(self):
-        temp_path = self._write_temp_config(
-            {"llm": {"provider": "anthropic", "model": "claude-3-opus"}}
-        )
+        temp_path = self._write_temp_config({"llm": {"provider": "anthropic", "model": "claude-3-opus"}})
         try:
             cfg = Config(Path(temp_path))
             self.assertEqual(cfg.temperature, 0.7)
@@ -148,21 +144,17 @@ class TestConfig(unittest.TestCase):
             os.unlink(temp_path)
 
     def test_str_representation(self):
-        temp_path = self._write_temp_config(
-            {"llm": {"provider": "test-p", "model": "test-m"}}
-        )
+        temp_path = self._write_temp_config({"llm": {"provider": "anthropic", "model": "test-m"}})
         try:
             cfg = Config(Path(temp_path))
             s = str(cfg)
-            self.assertIn("test-p", s)
+            self.assertIn("anthropic", s)
             self.assertIn("test-m", s)
         finally:
             os.unlink(temp_path)
 
     def test_debug_from_env(self):
-        temp_path = self._write_temp_config(
-            {"llm": {"provider": "test-p", "model": "test-m"}}
-        )
+        temp_path = self._write_temp_config({"llm": {"provider": "anthropic", "model": "test-m"}})
         try:
             cfg = Config(Path(temp_path))
             self.assertFalse(cfg.debug)

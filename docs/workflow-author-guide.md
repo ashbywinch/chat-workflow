@@ -14,21 +14,18 @@ Use `@chat` on functions that directly interact with the LLM. The function body 
 from chat_workflow import chat
 
 @chat
-def my_workflow_step(
-    context: str = "",
-    max_turns: int = 10,
-) -> MyModel:
-    """System prompt for the LLM goes here. {param} interpolation works."""
+def generate_essay_from_topic(
+    topic: Topic
+) -> Essay:
+    """You are a helpful essay writing tutor. Facilitate the user in writing a great essay on the given topic. Help them develop their essay writing skills as they go."""
     pass
 ```
 
 **How it works:**
-1. Inspects the return type (must be a Pydantic `BaseModel`)
-2. Uses the docstring as the system prompt and appends an auto-generated `## Parameters` section (all params with types, descriptions, and runtime values)
-3. Wraps the return type in `ConversationAction[ReturnType]` as the LLM response model
-4. Creates a `StructuredConversationOrchestrator` with default callbacks
-5. Runs the multi-turn conversation via `ConversationTools.chat()`
-6. Returns the inner Pydantic object
+1. Uses the docstring as a prompt 
+2. Runs a multi-turn conversation, including validating the object returned by the LLM and retrying if it's invalid
+3. Provides the parameters and details of the expected return type (including validation) to the LLM under the hood
+4. Returns the object that the LLM provides, or raises an exception if the LLM was unable to create a valid object.
 
 **Required parameters:** `io` or `tools` - these provide the I/O interface for user interaction.
 
@@ -39,41 +36,120 @@ Use `@workflow` on functions that compose multiple `@chat` steps. It injects a `
 ```python
 from chat_workflow import workflow, ConversationTools
 
+@chat
+def generate_topic(tools:ConversationTools) -> Topic:
+    """You are a helpful careers advisor. Help the user (a student) think up a good essay topic for an essay that will be part of their application for a course of some kind. You'll need to ask the user questions to determine what course they're applying for and what background they have that might feed into the essay topic"""
+
 @workflow
-def composite_step(
-    context: str = "",
-    max_turns: int = 10,
+def generate_essay(
     tools: ConversationTools,
-) -> MyModel:
-    result = my_workflow_step(context=context, max_turns=max_turns, tools=tools)
-    # ... additional logic ...
-    return result
+) -> Essay:
+    topic = generate_topic(tools)
+    return generate_essay_from_topic(topic, tools)
 ```
 
-**How it works:**
-1. If `tools` is already provided (e.g., called from another `@workflow`), passes through
-2. Otherwise, creates a `ConversationTools` from the `io` and `state` parameters
-3. Calls the function body with `tools` injected
-
-**CLI auto-discovery**: Functions decorated with `@workflow` are automatically discovered by the CLI. Their parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
+**CLI auto-discovery**: Functions decorated with `@workflow` and exported from the module are automatically discovered by the CLI. Their parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_essay` → `generate-essay`).
 
 ## Pydantic Model Patterns
 
+### Good prompts 
+
+DO give behavioral examples and conversation strategies in your prompt
+
+FOCUS on "what to do", not "what not to do"
+
 ### Business Rules in Models, Not Prompts
 
-Business rules live in Pydantic models (`model_validator`), not prompts. Prompts give behavioral guidance only, and Instructor handles schema formatting.
+Business rules live in your Pydantic models, from where they are automatically added to the system prompt when you write a @chat function that returns a model. You shouldn't need to add business rules to prompts that you write.
 
 ### Communicate Rules in JSON Schema
 
-A `model_validator` only fires *after* the LLM returns data. It's enforcement, not communication. The LLM reads the JSON schema (appended by Instructor to the system message) to understand what to produce. So rules must be encoded in ways that propagate to `model_json_schema()`:
+You can add `model_validators` to your Pydantic model. These will be used to verify what the LLM returns, but they aren't enough get the rules automatically added to your prompts. If the LLM repeatedly fails to satisfy your business rule, the rule is not visible enough in the model. Here's how to fix the model:
 
-- Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`). These inject directly into the schema.
-- Use `Field(description=...)` with plain-English conditional rules (e.g. `'Required when action is "success". Must be null when action is "continue".'`).
-- Use class docstrings. Pydantic v2 emits them as the model's `"description"` in JSON schema.
-- Use `model_config = dict(json_schema_extra=...)` for non-standard but model-level annotations the LLM should see.
-- Test schemas with `Model.model_json_schema()` and verify each rule is visible in the output.
+#### Best option if you can: Pydantic field constraints.
+
+- Use Pydantic field constraints (`min_length` → `minItems`, `ge`/`le` → `minimum`/`maximum`). These are visible in your prompt and will be verified automatically when the LLM returns an object.
+
+#### Second best option: Docstrings and descriptions
+- Use `Field(description=...)` with plain-English conditional rules (e.g. `'Required when action is "success". Must be null when action is "continue".'`). 
+- Use class docstrings for class-level validation. These will appear in the JSON schema. 
+- Write a `model_validator` that validates the same rules programmatically. Your validator will be called when the LLM returns an object.
+
+You can test schemas with `Model.model_json_schema()` to verify that your rules are all visible in the output.
+
+### SOLID/DRY Principles for Workflow Authors
+
+These principles help you design maintainable, composable workflows.
+
+#### Workflow Classes Are Rich Classes
+
+Pydantic models can carry convenience methods. This is Pythonic and idiomatic. A model that validates data can also provide methods that operate on that data.
+
+```python
+class EvaluationCriteria(BaseModel):
+    criteria: list[Criterion] = []
+
+    def add_criterion(self, name: str, description: str, weight: float = 1.0) -> None:
+        self.criteria.append(Criterion(name=name, description=description, weight=weight))
+
+    def total_weight(self) -> float:
+        return sum(c.weight for c in self.criteria)
+
+    def normalized_weights(self) -> list[float]:
+        total = self.total_weight()
+        return [c.weight / total for c in self.criteria]
+```
+
+Don't extract every method into a service class just for purity. A thin convenience method on the model itself is often clearer than a separate builder class.
+
+#### Business Rules Live in Models, Not Prompts
+
+Business rules go in Pydantic `model_validator` methods and field constraints. Prompts give behavioral guidance only. This separation means:
+
+- Rules are enforced programmatically, not by hoping the LLM follows instructions
+- Rules appear in the JSON schema that Instructor sends to the LLM
+- Rules are testable with unit tests (no API key needed)
+- Prompts stay focused on conversation strategy
+
+#### Keep Prompts Focused on Behavioral Guidance
+
+A prompt should tell the LLM how to behave, not what data format to produce. Instructor handles schema formatting. Your prompt should cover:
+
+- The role the LLM should adopt
+- Conversation strategy and approach
+- How to interact with the user
+- What to do when information is incomplete
+
+#### Compose Workflows from Small, Single-Purpose Functions
+
+Each `@chat` function should do one thing well. Compose them with `@workflow` functions.
+
+```python
+@chat
+def gather_requirements(tools: ConversationTools) -> Requirements:
+    """Help the user articulate their requirements through guided questions."""
+    pass
+
+@chat
+def generate_specification(
+    requirements: Requirements, tools: ConversationTools
+) -> Specification:
+    """Transform requirements into a structured specification."""
+    pass
+
+@workflow
+def build_specification(
+    topic: str = "", tools: ConversationTools
+) -> Specification:
+    reqs = gather_requirements(tools)
+    return generate_specification(reqs, tools)
+```
+
+This makes each step testable in isolation and reusable across workflows.
 
 ### Example Model
+
+This example is from the internals of workflow-chat - it's the model that all LLM responses get wrapped in to support multi turn chat functionality.
 
 ```python
 from pydantic import BaseModel, Field, model_validator
@@ -122,7 +198,7 @@ class ConversationAction(BaseModel, Generic[TResult]):
 
 ## Parameter Descriptions via `Annotated`
 
-Use `typing.Annotated[T, "description"]` to add descriptions that appear in the auto-generated `## Parameters` section of the system prompt:
+Use `typing.Annotated[T, "description"]` to add descriptions that appear in the auto-generated `## Parameters` section of your prompt:
 
 ```python
 from typing import Annotated
@@ -139,40 +215,9 @@ def my_workflow_step(
     ...
 ```
 
-This produces `## Parameters` entries like:
-```
-- `context` (str): The topic or domain for which to generate data
-  Value: "example topic"
-- `max_turns` (int): Maximum number of conversation turns before giving up
-  Value: 10
-```
-
-## Docstring Interpolation
-
-The docstring supports:
-- `{param_name}` - simple parameter substitution
-- `{param.method()}` - method calls on parameter values (e.g., `{initial_object.model_dump()}`)
-
-### Example
-
-```python
-@chat
-def refine(
-    initial_object: Annotated[MyModel, "The object to review"],
-    max_turns: Annotated[int, "Maximum refinement turns"] = 5,
-) -> MyModel:
-    """Review and refine the provided object.
-
-    The user has provided this initial object:
-    {initial_object.model_dump()}
-
-    Please help them improve it through conversation."""
-    pass
-```
-
 ## Generic Refinement with TypeVar
 
-Use `TypeVar` to create generic refinement functions that work with any Pydantic model:
+Use `TypeVar` to create generic chat functions that work with any Pydantic model type:
 
 ```python
 from typing import TypeVar
@@ -258,9 +303,7 @@ def refine_data(
     initial_data: Annotated[ModelType, "Data to refine"],
     max_turns: Annotated[int, "Refinement turns"] = 5,
 ) -> ModelType:
-    """Review and improve the provided data.
-    
-    Initial data: {initial_data.model_dump()}
+    """Review and improve the provided object.
     
     Ask questions to help the user enhance clarity, completeness, and quality."""
     pass
@@ -281,22 +324,7 @@ def create_and_refine_data(
     return refined_data
 ```
 
-## Debugging LLM Interactions
-
-When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
-
-```bash
-CHAT_WORKFLOW_DEBUG=1 python -m pytest tests/your_test.py
-```
-
-This streams all LLM requests/responses to stderr with timing:
-```
-[15:44:16.001] ━━━ LLM REQUEST ━━━
-[15:44:16.001] Model: openrouter/google/gemini-2.0-flash-lite-001
-[15:44:16.001] [0] system: You are a helpful assistant...
-[15:44:16.001] Waiting for response...
-[15:44:17.234] ━━━ LLM RESPONSE (1233ms) ━━━
-```
+For debugging LLM interactions, see the [Contributor Guide](contributor-guide.md#debugging-llm-interactions).
 
 ## Next Steps
 
