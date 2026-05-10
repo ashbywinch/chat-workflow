@@ -2,8 +2,7 @@
 
 import types
 import unittest
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from chat_workflow.cli import (
     _build_workflow_sub_app,
@@ -42,6 +41,7 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
 
         def wf_func():
             pass
+
         wf_func._is_workflow = True  # type: ignore[attr-defined]
 
         def plain_func():
@@ -58,6 +58,7 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
 
         def plain_func():
             pass
+
         module.plain_func = plain_func  # type: ignore[attr-defined]
 
         result = discover_workflow_functions(module)
@@ -90,6 +91,7 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
 
         def my_workflow(context: str = "", *, tools):
             pass
+
         my_workflow._is_workflow = True  # type: ignore[attr-defined]
 
         fake_module.my_workflow = my_workflow  # type: ignore[attr-defined]

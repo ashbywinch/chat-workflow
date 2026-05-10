@@ -1,6 +1,7 @@
 """Smoke tests for the CLI app — no API keys or network required."""
 
 import unittest
+
 from typer.testing import CliRunner
 
 from chat_workflow.cli import app
@@ -29,9 +30,7 @@ class TestCliSmoke(unittest.TestCase):
 
     def test_workflow_function_help(self):
         """A specific workflow function should render its own help with known options."""
-        result = self.runner.invoke(
-            app, ["evaluation-criteria", "generate-reviewed-criteria", "--help"]
-        )
+        result = self.runner.invoke(app, ["evaluation-criteria", "generate-reviewed-criteria", "--help"])
         self.assertEqual(result.exit_code, 0)
         self.assertIn("--context", result.output)
 
@@ -40,13 +39,9 @@ class TestCliSmoke(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 0)
 
     def test_invalid_command_errors(self):
-        result = self.runner.invoke(
-            app, ["evaluation-criteria", "nonexistent-command"]
-        )
+        result = self.runner.invoke(app, ["evaluation-criteria", "nonexistent-command"])
         self.assertNotEqual(result.exit_code, 0)
 
     def test_invalid_option_errors(self):
-        result = self.runner.invoke(
-            app, ["evaluation-criteria", "generate-reviewed-criteria", "--bogus"]
-        )
+        result = self.runner.invoke(app, ["evaluation-criteria", "generate-reviewed-criteria", "--bogus"])
         self.assertNotEqual(result.exit_code, 0)

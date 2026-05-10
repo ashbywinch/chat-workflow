@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
@@ -71,26 +70,6 @@ class EvaluationCriteria(BaseModel):
         if not any(c.name.lower() == "budget" for c in self.criteria):
             raise ValidationError("Must include a criterion named 'budget' (case-insensitive)")
         return self
-
-    def echo(
-        self: EvaluationCriteria,
-        title: str,
-        echo: Callable[[str], None],
-    ) -> None:
-        echo(f"\n{title}")
-        echo(f"✓ Generated {len(self.criteria)} criteria")
-        echo(f"Context: {self.context}")
-
-        for i, criterion in enumerate(self.criteria, 1):
-            echo(f"\n{i}. {criterion.name} (weight: {criterion.weight})")
-            echo(f"   Description: {criterion.description}")
-            if criterion.ideal_value:
-                echo(f"   Ideal: {criterion.ideal_value}")
-
-        echo("\nNormalized weights (sum to 1.0):")
-        normalized = self.normalized_weights()
-        for criterion, weight in zip(self.criteria, normalized, strict=False):
-            echo(f"  {criterion.name}: {weight:.3f}")
 
     def add_criterion(
         self,
