@@ -3,10 +3,10 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
-from chat_workflow import (
-    ConversationAction,
-    StructuredConversationOrchestrator,
-)
+from chat_workflow import ConversationAction
+from chat_workflow.conversation_log import ConversationLog
+from chat_workflow.conversation_orchestrator import ConversationOrchestrator
+from chat_workflow.conversation_tools import ConversationTools
 from chat_workflow.exceptions import (
     ConversationFailedError,
     InvalidResponseError,
@@ -16,9 +16,9 @@ from tests.conftest import FakeConfig, make_orchestrator_config, make_valid_crit
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
-class TestStructuredConversationOrchestrator(unittest.TestCase):
+class TestConversationOrchestrator(unittest.TestCase):
     def test_orchestrator_initialization(self):
-        orchestrator = StructuredConversationOrchestrator(
+        orchestrator = ConversationOrchestrator(
             config=make_orchestrator_config(
                 max_turns=5,
                 model="test-model",
@@ -34,11 +34,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertEqual(orchestrator.messages[1]["role"], "user")
         self.assertIn("Initial context", orchestrator.messages[1]["content"])
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_process_turn_success(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
         action = ConversationAction[EvaluationCriteria](action="success", result=make_valid_criteria())
         mock_call_llm.return_value = action
@@ -50,11 +48,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertEqual(orchestrator.turn_count, 1)
         self.assertEqual(len(orchestrator.messages), 2)
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_process_turn_continue(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
         action = ConversationAction[EvaluationCriteria](action="continue", message="What's your budget range?")
         mock_call_llm.return_value = action
@@ -68,11 +64,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertEqual(len(orchestrator.messages), 3)
         self.assertEqual(orchestrator.messages[2]["role"], "assistant")
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_process_turn_failure_raises_exception(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
         action = ConversationAction[EvaluationCriteria](
             action="failure", message="I don't have enough information to help"
@@ -88,18 +82,14 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         )
         self.assertEqual(orchestrator.turn_count, 1)
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_process_turn_failure_transcript_not_duplicated(self, mock_call_llm):
         """On failure, the conversation transcript must appear exactly once
         in the error message — not 0 (missing) and not 2+ (duplicated from
         both error.__str__ and error.message)."""
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
-        action = ConversationAction[EvaluationCriteria](
-            action="failure", message="I don't have enough information"
-        )
+        action = ConversationAction[EvaluationCriteria](action="failure", message="I don't have enough information")
         mock_call_llm.return_value = action
 
         with self.assertRaises(ConversationFailedError) as context:
@@ -108,15 +98,14 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         error_msg = str(context.exception)
         transcript_count = error_msg.count("CONVERSATION TRANSCRIPT")
         self.assertEqual(
-            transcript_count, 1,
+            transcript_count,
+            1,
             f"Expected exactly 1 CONVERSATION TRANSCRIPT, found {transcript_count}",
         )
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_process_turn_empty_input(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
         action = ConversationAction[EvaluationCriteria](action="continue", message="First question")
         mock_call_llm.return_value = action
@@ -127,11 +116,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertEqual(result.message, "First question")
         self.assertEqual(len(orchestrator.messages), 2)
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_multi_turn_conversation_sequence(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config(max_turns=5)
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config(max_turns=5))
 
         responses = [
             ConversationAction[EvaluationCriteria](action="continue", message="Question 1"),
@@ -155,11 +142,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
         self.assertEqual(result3.result, make_valid_criteria())
         self.assertEqual(orchestrator.turn_count, 3)
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_orchestrator_raises_on_max_turns(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config(max_turns=2)
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config(max_turns=2))
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="continue", message="Another question"
@@ -178,11 +163,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
 
         self.assertIn("Maximum conversation turns (2) reached", str(context.exception))
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_process_turn_propagates_llm_exceptions(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
         mock_call_llm.side_effect = ValueError("Validation failed after retries")
 
@@ -191,11 +174,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
 
         self.assertEqual(orchestrator.turn_count, 1)
 
-    @patch.object(StructuredConversationOrchestrator, "_call_llm")
+    @patch.object(ConversationOrchestrator, "_call_llm")
     def test_invalid_action_raises_exception(self, mock_call_llm):
-        orchestrator = StructuredConversationOrchestrator(
-            config=make_orchestrator_config()
-        )
+        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
 
         mock_action = Mock()
         mock_action.action = "invalid_action"
@@ -210,9 +191,9 @@ class TestStructuredConversationOrchestrator(unittest.TestCase):
 
 
 class TestWorkflowIntegration(unittest.TestCase):
-    @patch("chat_workflow.conversation_runtime.StructuredConversationOrchestrator._call_llm")
+    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
     def test_leaf_accepts_tools_parameter(self, mock_call_llm):
-        from chat_workflow import ConversationFlowState, ConversationTools
+        from chat_workflow.conversation_log import ConversationLog
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="success", result=make_valid_criteria()
@@ -222,7 +203,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="test response")
 
-        state = ConversationFlowState()
+        state = ConversationLog()
         tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
         result = EvaluationCriteria.generate_from_chat(context="test", max_turns=5, tools=tools)
@@ -230,10 +211,10 @@ class TestWorkflowIntegration(unittest.TestCase):
         self.assertIsInstance(result, EvaluationCriteria)
         self.assertEqual(len(result.criteria), 2)
 
-    @patch("chat_workflow.conversation_runtime.StructuredConversationOrchestrator._call_llm")
+    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
     def test_leaf_accepts_tools_via_io(self, mock_call_llm):
         """Caller can pass io+state+config to build tools themselves."""
-        from chat_workflow import ConversationFlowState, ConversationTools
+        from chat_workflow.conversation_log import ConversationLog
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
             action="success", result=make_valid_criteria()
@@ -245,7 +226,7 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         tools = ConversationTools(
             io=mock_io,
-            state=ConversationFlowState(),
+            state=ConversationLog(),
             config=FakeConfig(),
         )
 
@@ -253,9 +234,9 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         self.assertIsInstance(result, EvaluationCriteria)
 
-    @patch("chat_workflow.conversation_runtime.StructuredConversationOrchestrator._call_llm")
+    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
     def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
-        from chat_workflow import ConversationFlowState, ConversationTools
+        from chat_workflow.conversation_log import ConversationLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
         mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
@@ -266,7 +247,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="looks good")
 
-        state = ConversationFlowState()
+        state = ConversationLog()
         tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_reviewed_criteria(
@@ -277,10 +258,10 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         self.assertIsInstance(result, EvaluationCriteria)
 
-    @patch("chat_workflow.conversation_runtime.StructuredConversationOrchestrator._call_llm")
+    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
     def test_workflow_refinement_loop(self, mock_call_llm):
 
-        from chat_workflow import ConversationFlowState, ConversationTools
+        from chat_workflow.conversation_log import ConversationLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
         initial_criteria = EvaluationCriteria(
@@ -309,7 +290,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="change quality weight")
 
-        state = ConversationFlowState()
+        state = ConversationLog()
         tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_reviewed_criteria(
@@ -389,12 +370,8 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         """
         from unittest.mock import Mock, patch
 
-        from chat_workflow import (
-            ConversationAction,
-            ConversationFlowState,
-            ConversationTools,
-            StructuredConversationOrchestrator,
-        )
+        from chat_workflow import ConversationAction
+        from chat_workflow.conversation_orchestrator import ConversationOrchestrator
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
         from workflows.evaluation_criteria.refine import refine
 
@@ -406,10 +383,10 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             ],
         )
 
-# Capture what response_model the decorator passes to the orchestrator
+        # Capture what response_model the decorator passes to the orchestrator
         captured_response_model = []
 
-        original_init = StructuredConversationOrchestrator.__init__
+        original_init = ConversationOrchestrator.__init__
 
         def tracking_init(self, **kwargs):
             config = kwargs.get("config")
@@ -417,8 +394,8 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             return original_init(self, **kwargs)
 
         with (
-            patch.object(StructuredConversationOrchestrator, "__init__", tracking_init),
-            patch.object(StructuredConversationOrchestrator, "_call_llm") as mock_call_llm,
+            patch.object(ConversationOrchestrator, "__init__", tracking_init),
+            patch.object(ConversationOrchestrator, "_call_llm") as mock_call_llm,
         ):
             mock_call_llm.return_value = ConversationAction[EvaluationCriteria](action="success", result=criteria)
 
@@ -426,7 +403,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="looks good")
 
-            state = ConversationFlowState()
+            state = ConversationLog()
             tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
             result = refine(initial_object=criteria, max_turns=5, tools=tools)
@@ -536,15 +513,13 @@ class TestAutoParamInjection(unittest.TestCase):
         from unittest.mock import Mock, patch
 
         from chat_workflow.conversation_runtime import (
-            ConversationFlowState,
-            ConversationTools,
-            StructuredConversationOrchestrator,
+            ConversationOrchestrator,
         )
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
         captured_system_prompt = []
 
-        original_init = StructuredConversationOrchestrator.__init__
+        original_init = ConversationOrchestrator.__init__
 
         def tracking_init(self, **kwargs):
             config = kwargs.get("config")
@@ -560,8 +535,8 @@ class TestAutoParamInjection(unittest.TestCase):
         )
 
         with (
-            patch.object(StructuredConversationOrchestrator, "__init__", tracking_init),
-            patch.object(StructuredConversationOrchestrator, "_call_llm") as mock_call_llm,
+            patch.object(ConversationOrchestrator, "__init__", tracking_init),
+            patch.object(ConversationOrchestrator, "_call_llm") as mock_call_llm,
         ):
             mock_call_llm.return_value = type(
                 "MockAction",
@@ -572,7 +547,7 @@ class TestAutoParamInjection(unittest.TestCase):
             mock_io = Mock()
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="test")
-            state = ConversationFlowState()
+            state = ConversationLog()
             tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
             result = EvaluationCriteria.generate_from_chat(context="birthday ideas", max_turns=5, tools=tools)
@@ -593,15 +568,13 @@ class TestAutoParamInjection(unittest.TestCase):
         from unittest.mock import Mock, patch
 
         from chat_workflow.conversation_runtime import (
-            ConversationFlowState,
-            ConversationTools,
-            StructuredConversationOrchestrator,
+            ConversationOrchestrator,
         )
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
         captured_system_prompt = []
 
-        original_init = StructuredConversationOrchestrator.__init__
+        original_init = ConversationOrchestrator.__init__
 
         def tracking_init(self, **kwargs):
             config = kwargs.get("config")
@@ -617,8 +590,8 @@ class TestAutoParamInjection(unittest.TestCase):
         )
 
         with (
-            patch.object(StructuredConversationOrchestrator, "__init__", tracking_init),
-            patch.object(StructuredConversationOrchestrator, "_call_llm") as mock_call_llm,
+            patch.object(ConversationOrchestrator, "__init__", tracking_init),
+            patch.object(ConversationOrchestrator, "_call_llm") as mock_call_llm,
         ):
             mock_call_llm.return_value = type(
                 "MockAction",
@@ -629,7 +602,7 @@ class TestAutoParamInjection(unittest.TestCase):
             mock_io = Mock()
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="looks good")
-            state = ConversationFlowState()
+            state = ConversationLog()
             tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
 
             from workflows.evaluation_criteria.refine import refine
@@ -741,7 +714,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         LLM knows the validation rules before generating."""
         from unittest.mock import Mock
 
-        from chat_workflow import ConversationFlowState, ConversationTools
+        from chat_workflow.conversation_log import ConversationLog
         from workflows.evaluation_criteria import EvaluationCriteria
 
         mock_io = Mock()
@@ -750,7 +723,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
 
         tools = ConversationTools(
             io=mock_io,
-            state=ConversationFlowState(),
+            state=ConversationLog(),
             config=FakeConfig(),
         )
 
@@ -871,7 +844,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         with their correct runtime values."""
         from unittest.mock import Mock
 
-        from chat_workflow import ConversationFlowState, ConversationTools
+        from chat_workflow.conversation_log import ConversationLog
         from workflows.evaluation_criteria import EvaluationCriteria
 
         mock_io = Mock()
@@ -880,7 +853,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
 
         tools = ConversationTools(
             io=mock_io,
-            state=ConversationFlowState(),
+            state=ConversationLog(),
             config=FakeConfig(),
         )
 

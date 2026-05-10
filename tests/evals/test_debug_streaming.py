@@ -5,11 +5,11 @@ from pathlib import Path
 
 from chat_workflow import (
     ConversationAction,
-    ConversationFlowState,
-    ConversationTools,
     StreamingDebug,
 )
 from chat_workflow.config import Config
+from chat_workflow.conversation_log import ConversationLog
+from chat_workflow.conversation_tools import ConversationTools
 from tests.conftest import timeout
 from workflows.evaluation_criteria import EvaluationCriteria
 
@@ -93,7 +93,7 @@ class TestDebugStreaming(unittest.TestCase):
             criteria = EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop",
                 max_turns=6,
-                tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+                tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
                 debug=debug,
             )
 
@@ -124,7 +124,7 @@ class TestDebugStreaming(unittest.TestCase):
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+            tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
             debug=debug,
         )
 

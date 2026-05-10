@@ -35,10 +35,10 @@ class Criterion(BaseModel):
 class EvaluationCriteria(BaseModel):
     """A list of criteria for evaluating possible choices in a specific context.
 
-    For example, evaluating options for a planned purchase. 
+    For example, evaluating options for a planned purchase.
 
     Args:
-        criteria: List of evaluation criteria 
+        criteria: List of evaluation criteria
         context: Context for these evaluation criteria
             (e.g., 'Birthday presents for a 7-year-old child').
     """

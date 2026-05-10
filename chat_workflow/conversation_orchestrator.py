@@ -1,39 +1,16 @@
-"""Structured conversation orchestrator for multi-turn LLM interactions."""
-
-from __future__ import annotations
-
 import copy
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from .debug import _DebugTimer
-from .llm_interaction import ProviderType
-from .models import ConversationAction, ConversationResult
-from .protocols import ConversationDebug
+from chat_workflow.debug import _DebugTimer
+from chat_workflow.llm_interaction import ProviderType
+from chat_workflow.models import ConversationAction, ConversationResult
+from chat_workflow.orchestrator_config import OrchestratorConfig
 
 TResult = TypeVar("TResult")
 
 
-@dataclass
-class OrchestratorConfig(Generic[TResult]):
-    """Configuration for StructuredConversationOrchestrator."""
-
-    system_prompt: str
-    response_model: type[ConversationAction[TResult]]
-    max_turns: int
-    initial_messages: list[dict[str, str]] | None = None
-    on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] | None = None
-    on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] | None = None
-    on_failure: Callable[[ConversationAction[TResult]], Exception] | None = None
-    debug: ConversationDebug | None = None
-    model: str = "default-model"
-    provider: ProviderType = "openrouter"
-    max_retries: int = 3
-    request_timeout_seconds: int = 30
-
-
-class StructuredConversationOrchestrator(Generic[TResult]):
+class ConversationOrchestrator(Generic[TResult]):
     def __init__(
         self,
         *,
@@ -79,8 +56,7 @@ class StructuredConversationOrchestrator(Generic[TResult]):
             error = self.on_failure(action)
             error.messages = list(self.messages)  # type: ignore[attr-defined]
             transcript = "".join(
-                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}"
-                for i, m in enumerate(self.messages)
+                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}" for i, m in enumerate(self.messages)
             )
             error.message = f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━{transcript}"
             if self.debug:

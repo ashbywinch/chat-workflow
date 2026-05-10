@@ -71,6 +71,7 @@ make lint           # ruff and basedpyright
 ```
 ## Coding Standards
 
+### Types
 - We use basedpyright to ensure comprehensive typing.
 - Remember that the purpose of types is to help express to the reader (human or agent) what the code does. Make sure our typing is expressive. Multiple levels of nested dicts are not expressive.
 - Always use the narrowest type that applies.
@@ -79,9 +80,19 @@ make lint           # ruff and basedpyright
 - If tempted to put "| None" after your type, check that this isn't a cop-out. Are you sure we should really be allowing None?
 - If we read in untyped data (for example, json as a string), coerce it to the narrow type as near to the edge as possible (i.e. in a cli or in unit tests). If we write untyped data, de-type it as close to the edge as possible.
 - If tempted to #ignore a basedpyright error, think first. Is there a code or architecture smell that we should fix?
-- Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
-- If you see a circular import, this is a code smell. Fix the smell, don't bodge the import
+
+### Principles
+- Naming is very important. Each class, function and variable should be named carefully in order to help readers understand the structure of the code as a whole.
+- Each class should be on its own in a module named after that class
+- Functionality that is tightly coupled to the contents of a class should be in a member function of that class
+- Code should be written in a functional programming style wherever reasonably possible
 - **Prefer libraries over reinvention**: Before writing non-trivial code from scratch, check whether a library already solves the problem. Adding a dev dependency has no user-facing cost. Adding a production dependency is often the right call too. The decision criterion is simplicity and readability: a library call that replaces 30 lines of custom code is worth it; a library that adds more complexity than the code it replaces is not.
+- Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
+- We do not maintain backwards compatability with previous versions of anything
+
+### Smells
+- If you see a circular import, this is a code smell. Fix the smell, don't bodge the import.
+- If a file, class or function is getting long, it's probably time to split it up.
 
 
 ## Git Workflow

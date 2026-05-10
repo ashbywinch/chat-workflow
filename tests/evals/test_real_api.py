@@ -4,14 +4,14 @@ from pathlib import Path
 
 from chat_workflow import (
     ConversationAction,
-    ConversationFlowState,
     ConversationResult,
-    ConversationTools,
-    OrchestratorConfig,
-    StructuredConversationOrchestrator,
 )
 from chat_workflow.config import Config
+from chat_workflow.conversation_log import ConversationLog
+from chat_workflow.conversation_orchestrator import ConversationOrchestrator
+from chat_workflow.conversation_tools import ConversationTools
 from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
+from chat_workflow.orchestrator_config import OrchestratorConfig
 from tests.conftest import timeout
 from workflows.evaluation_criteria import EvaluationCriteria
 
@@ -35,7 +35,7 @@ class MockIO:
 class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_call_llm_returns_valid_action(self):
-        orchestrator = StructuredConversationOrchestrator(
+        orchestrator = ConversationOrchestrator(
             config=OrchestratorConfig(
                 system_prompt=(
                     "You are a helpful assistant that creates evaluation criteria. "
@@ -110,7 +110,7 @@ class TestRealAPI(unittest.TestCase):
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+            tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -123,7 +123,7 @@ class TestRealAPI(unittest.TestCase):
 
     @timeout(10)
     def test_single_turn_with_real_llm(self):
-        orchestrator = StructuredConversationOrchestrator(
+        orchestrator = ConversationOrchestrator(
             config=OrchestratorConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
@@ -179,7 +179,7 @@ class TestRealAPI(unittest.TestCase):
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift for a 7-year-old",
             max_turns=10,
-            tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+            tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -205,12 +205,12 @@ class TestRealAPI(unittest.TestCase):
             EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop for programming",
                 max_turns=3,
-                tools=ConversationTools(io=mock_io, state=ConversationFlowState(), config=_CONFIG),
+                tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
             )
 
     @timeout(10)
     def test_conversation_action_format(self):
-        orchestrator = StructuredConversationOrchestrator(
+        orchestrator = ConversationOrchestrator(
             config=OrchestratorConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "

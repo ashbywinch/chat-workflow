@@ -10,7 +10,7 @@ from typing import Any
 
 import typer
 
-from chat_workflow.runner import WorkflowRunner
+from chat_workflow.workflow_runner import WorkflowRunner
 
 # Parameters injected by the framework, not exposed as CLI options
 _INTERNAL_PARAMS = frozenset({"tools", "io", "state", "debug"})

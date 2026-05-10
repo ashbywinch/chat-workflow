@@ -1,4 +1,5 @@
 """Decorators for chat-workflow: @chat and @workflow."""
+
 from __future__ import annotations
 
 import inspect
@@ -9,10 +10,11 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+from .conversation_orchestrator import ConversationOrchestrator
 from .conversation_runtime import _get_return_type
 from .debug import StreamingDebug
 from .models import ConversationAction, ConversationResult
-from .orchestrator import OrchestratorConfig, StructuredConversationOrchestrator
+from .orchestrator_config import OrchestratorConfig
 from .prompt_builder import _build_params_section, _format_docstring
 
 
@@ -32,9 +34,7 @@ def _resolve_return_type(
         qualname = raw_func.__qualname__
         parts = qualname.rsplit(".", 1)
         if len(parts) < 2:
-            raise TypeError(
-                f"Leaf function '{func.__name__}' uses Self return type but is not a method on a class"
-            )
+            raise TypeError(f"Leaf function '{func.__name__}' uses Self return type but is not a method on a class")
         class_name = parts[0]
         cls = raw_func.__globals__.get(class_name)
         if cls is None or not (isinstance(cls, type) and issubclass(cls, BaseModel)):
@@ -103,11 +103,11 @@ def _setup_orchestrator(
     max_turns: int,
     debug: Any,
     tools: Any,
-) -> StructuredConversationOrchestrator:
+) -> ConversationOrchestrator:
     """Create and configure a StructuredConversationOrchestrator."""
     from .exceptions import ConversationFailedError
 
-    return StructuredConversationOrchestrator(
+    return ConversationOrchestrator(
         config=OrchestratorConfig(
             system_prompt=system_prompt,
             response_model=ConversationAction[actual_return_type],

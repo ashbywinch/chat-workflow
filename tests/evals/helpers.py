@@ -2,8 +2,9 @@
 
 from pathlib import Path
 
-from chat_workflow import ConversationFlowState, ConversationTools
 from chat_workflow.config import Config
+from chat_workflow.conversation_log import ConversationLog
+from chat_workflow.conversation_tools import ConversationTools
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.json"
@@ -16,6 +17,6 @@ def make_config() -> Config:
 def make_tools(io) -> ConversationTools:
     return ConversationTools(
         io=io,
-        state=ConversationFlowState(),
+        state=ConversationLog(),
         config=make_config(),
     )

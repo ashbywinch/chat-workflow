@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from chat_workflow import ConversationTools, workflow
+from chat_workflow import workflow
+from chat_workflow.conversation_tools import ConversationTools
 
 from .evaluation_criteria import EvaluationCriteria
 from .formatter import echo_criteria

@@ -11,7 +11,7 @@ from typing import Any
 
 from chat_workflow import ConversationAction, ConversationResult
 from chat_workflow.exceptions import ConversationFailedError
-from chat_workflow.orchestrator import OrchestratorConfig
+from chat_workflow.orchestrator_config import OrchestratorConfig
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 # Add the project root to Python path
