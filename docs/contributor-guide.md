@@ -16,6 +16,8 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow/cli.py` | CLI with automatic workflow discovery |
 | `chat_workflow/session_logging.py` | Conversation session logging |
+| `chat_workflow/prompt_builder.py` | Prompt formatting: `_format_docstring()`, `_build_params_section()` |
+| `chat_workflow/metadata.py` | Type introspection: `_format_type_name()`, `_get_return_type()`, etc. |
 | `chat_workflow/__init__.py` | Public API exports |
 
 Example workflows live in the `workflows/` directory.
@@ -116,6 +118,43 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 - `StructuredConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
 - Turn limit raises `TurnLimitExceededError`; failure action raises `ConversationFailedError`
 
+## SOLID/DRY Principles for Code
+
+These principles guide the module structure and naming conventions in the framework.
+
+### Avoid "utils" Modules
+
+Name modules after their domain, not their category. A module called "utils" has no single responsibility. It becomes a grab bag that grows without bound.
+
+- `prompt_builder.py` not `prompt_utils.py`
+- `metadata.py` not `utils/introspection.py`
+
+### Prefer Flat Module Structure
+
+Keep modules flat in the `chat_workflow/` directory rather than nesting them in subdirectories. Deep nesting hides information and makes imports harder to follow.
+
+- `metadata.py` not `utils/introspection.py`
+- `prompt_builder.py` not `prompt/prompt_builder.py`
+
+### Single Responsibility Principle
+
+Each module should have one reason to change.
+
+- `prompt_builder.py` owns prompt formatting (docstring rendering, parameter section building)
+- `metadata.py` owns type introspection (type name formatting, return type resolution, parameter inspection)
+- `conversation_runtime.py` owns conversation orchestration (turn management, LLM calling, action handling)
+- `llm_interaction.py` owns LLM provider abstraction
+
+If you find yourself adding a function to a module that doesn't match its stated purpose, create a new module.
+
+### DRY: Extract Shared Logic
+
+When the same pattern appears in multiple places, extract it into a dedicated module. The `prompt_builder.py` and `metadata.py` modules were extracted from `conversation_runtime.py` because prompt formatting and type introspection are used by `decorators.py` and are conceptually separate concerns.
+
+### Rich Models Are OK
+
+Pydantic models can carry convenience methods. A model that validates data can also provide methods that operate on that data. Don't extract every method into a service class just for purity. Use judgment.
+
 ## Debugging LLM Interactions
 
 When evals hang or behave unexpectedly, enable debug tracing with an environment variable:
@@ -170,7 +209,8 @@ tests/
 | Task | Primary File | Key Function/Method |
 |------|--------------|---------------------|
 | Add business rule | Example workflow models | `model_validator` methods |
-| Modify generic prompt | `chat_workflow/conversation_runtime.py` | `@chat` decorator system prompt |
+| Modify generic prompt | `chat_workflow/prompt_builder.py` | `_format_docstring()`, `_build_params_section()` |
+| Add/modify type introspection | `chat_workflow/metadata.py` | `_format_type_name()`, `_get_return_type()` |
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
 | Modify conversation flow | `chat_workflow/conversation_runtime.py` | `StructuredConversationOrchestrator.process_turn()` |

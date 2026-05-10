@@ -443,7 +443,7 @@ class TestAutoParamInjection(unittest.TestCase):
 
     def test_build_params_section_basic_params(self):
         """Params without Annotated metadata show type, name, and value."""
-        from chat_workflow.conversation_runtime import _build_params_section
+        from chat_workflow.prompt_builder import _build_params_section
 
         def sample(context: str = "", max_turns: int = 10):
             pass
@@ -460,7 +460,7 @@ class TestAutoParamInjection(unittest.TestCase):
         """Annotated[T, 'desc'] descriptions appear in the output."""
         from typing import Annotated
 
-        from chat_workflow.conversation_runtime import _build_params_section
+        from chat_workflow.prompt_builder import _build_params_section
 
         def sample(
             context: Annotated[str, "The party theme"] = "",
@@ -477,7 +477,7 @@ class TestAutoParamInjection(unittest.TestCase):
 
     def test_build_params_section_excludes_internal(self):
         """tools, io, state, debug are excluded from the section."""
-        from chat_workflow.conversation_runtime import _build_params_section
+        from chat_workflow.prompt_builder import _build_params_section
 
         def sample(
             context: str = "",
@@ -498,7 +498,7 @@ class TestAutoParamInjection(unittest.TestCase):
 
     def test_build_params_section_shows_default_when_no_runtime_value(self):
         """When a param is not in kwargs, its default is shown instead."""
-        from chat_workflow.conversation_runtime import _build_params_section
+        from chat_workflow.prompt_builder import _build_params_section
 
         def sample(max_turns: int = 10):
             pass

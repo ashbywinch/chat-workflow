@@ -9,14 +9,11 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from .conversation_runtime import (
-    _build_params_section,
-    _format_docstring,
-    _get_return_type,
-)
+from .conversation_runtime import _get_return_type
 from .debug import StreamingDebug
 from .models import ConversationAction, ConversationResult
 from .orchestrator import OrchestratorConfig, StructuredConversationOrchestrator
+from .prompt_builder import _build_params_section, _format_docstring
 
 
 def _resolve_return_type(

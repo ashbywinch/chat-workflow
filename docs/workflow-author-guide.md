@@ -77,6 +77,76 @@ You can add `model_validators` to your Pydantic model. These will be used to ver
 
 You can test schemas with `Model.model_json_schema()` to verify that your rules are all visible in the output.
 
+### SOLID/DRY Principles for Workflow Authors
+
+These principles help you design maintainable, composable workflows.
+
+#### Workflow Classes Are Rich Classes
+
+Pydantic models can carry convenience methods. This is Pythonic and idiomatic. A model that validates data can also provide methods that operate on that data.
+
+```python
+class EvaluationCriteria(BaseModel):
+    criteria: list[Criterion] = []
+
+    def add_criterion(self, name: str, description: str, weight: float = 1.0) -> None:
+        self.criteria.append(Criterion(name=name, description=description, weight=weight))
+
+    def total_weight(self) -> float:
+        return sum(c.weight for c in self.criteria)
+
+    def normalized_weights(self) -> list[float]:
+        total = self.total_weight()
+        return [c.weight / total for c in self.criteria]
+```
+
+Don't extract every method into a service class just for purity. A thin convenience method on the model itself is often clearer than a separate builder class.
+
+#### Business Rules Live in Models, Not Prompts
+
+Business rules go in Pydantic `model_validator` methods and field constraints. Prompts give behavioral guidance only. This separation means:
+
+- Rules are enforced programmatically, not by hoping the LLM follows instructions
+- Rules appear in the JSON schema that Instructor sends to the LLM
+- Rules are testable with unit tests (no API key needed)
+- Prompts stay focused on conversation strategy
+
+#### Keep Prompts Focused on Behavioral Guidance
+
+A prompt should tell the LLM how to behave, not what data format to produce. Instructor handles schema formatting. Your prompt should cover:
+
+- The role the LLM should adopt
+- Conversation strategy and approach
+- How to interact with the user
+- What to do when information is incomplete
+
+#### Compose Workflows from Small, Single-Purpose Functions
+
+Each `@chat` function should do one thing well. Compose them with `@workflow` functions.
+
+```python
+@chat
+def gather_requirements(tools: ConversationTools) -> Requirements:
+    """Help the user articulate their requirements through guided questions."""
+    pass
+
+@chat
+def generate_specification(
+    requirements: Requirements, tools: ConversationTools
+) -> Specification:
+    """Transform requirements into a structured specification."""
+    pass
+
+@workflow
+def build_specification(
+    topic: str = "", tools: ConversationTools
+) -> Specification:
+    reqs = gather_requirements(tools)
+    return generate_specification(reqs, tools)
+```
+
+This makes each step testable in isolation and reusable across workflows.
+
 ### Example Model
 
 This example is from the internals of workflow-chat - it's the model that all LLM responses get wrapped in to support multi turn chat functionality.
