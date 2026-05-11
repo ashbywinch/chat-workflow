@@ -4,12 +4,13 @@ from io import StringIO
 from pathlib import Path
 
 from chat_workflow import (
-    ConversationAction,
+    AgentIntent,
+    AgentResponse,
     StreamingDebug,
 )
 from chat_workflow.config import Config
-from chat_workflow.conversation_log import ConversationLog
-from chat_workflow.conversation_tools import ConversationTools
+from chat_workflow.session import Session
+from chat_workflow.session_log import SessionLog
 from tests.conftest import timeout
 from workflows.evaluation_criteria import EvaluationCriteria
 
@@ -55,7 +56,7 @@ class TestDebugStreaming(unittest.TestCase):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        action = ConversationAction[EvaluationCriteria](action="continue", message="What is your budget?")
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What is your budget?")
         debug.on_response(action, duration_ms=123.45)
 
         output = debug_output.getvalue()
@@ -93,7 +94,7 @@ class TestDebugStreaming(unittest.TestCase):
             criteria = EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop",
                 max_turns=6,
-                tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
+                session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
                 debug=debug,
             )
 
@@ -124,7 +125,7 @@ class TestDebugStreaming(unittest.TestCase):
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
+            session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
             debug=debug,
         )
 

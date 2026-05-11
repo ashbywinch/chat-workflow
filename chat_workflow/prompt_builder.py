@@ -4,8 +4,8 @@ This module provides utilities for introspecting decorated workflow
 functions and generating structured sections (parameters, formatted
 docstrings) for inclusion in LLM system prompts.
 
-It is consumed by the ``@chat`` / ``@workflow`` decorator machinery
-in :mod:`chat_workflow.conversation_runtime`.
+It is consumed by the ``@atomic_workflow`` / ``@composite_workflow`` decorator machinery
+    in :mod:`chat_workflow.decorators`.
 """
 
 import inspect
@@ -19,9 +19,9 @@ from chat_workflow.metadata import (
     _get_typed_hint,
 )
 
-# Internal params that the @chat decorator consumes and should NOT
+# Internal params that the @atomic_workflow decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
-_INTERNAL_PARAMS: frozenset[str] = frozenset({"tools", "debug", "io", "state", "cls"})
+_INTERNAL_PARAMS: frozenset[str] = frozenset({"session", "debug", "cls"})
 
 
 def _format_docstring(docstring: str | None, **kwargs) -> str:

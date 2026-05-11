@@ -6,21 +6,21 @@ import traceback
 
 import typer
 
-from chat_workflow import ConversationIO
 from chat_workflow.exceptions import (
     APIKeyError,
+    AtomicWorkflowFailedError,
     ChatWorkflowError,
     ConfigFileError,
     ConfigurationError,
-    ConversationFailedError,
     ProviderNotFoundError,
     ProviderNotSupportedError,
     TurnLimitExceededError,
     ValidationError,
 )
+from chat_workflow.session import UserIO
 
 
-class TyperConversationIO(ConversationIO):
+class TyperUserIO(UserIO):
     def echo(self, message: str) -> None:
         typer.echo(message)
 
@@ -46,8 +46,8 @@ def handle_error(error: Exception) -> None:
         typer.secho(f"\nProvider not found: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, TurnLimitExceededError):
         typer.secho(f"\n{error.message}", err=True, fg=typer.colors.RED)
-    elif isinstance(error, ConversationFailedError):
-        typer.secho(f"\nConversation failed: {error.message}", err=True, fg=typer.colors.RED)
+    elif isinstance(error, AtomicWorkflowFailedError):
+        typer.secho(f"\nAtomic workflow failed: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ValidationError):
         typer.secho(f"\nValidation error: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ChatWorkflowError):

@@ -5,10 +5,10 @@ from typing import Any
 import typer
 
 from chat_workflow.config import Config
-from chat_workflow.conversation_log import ConversationLog
-from chat_workflow.conversation_tools import ConversationTools
-from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
-from chat_workflow.runner import TyperConversationIO, handle_error
+from chat_workflow.exceptions import AtomicWorkflowFailedError, TurnLimitExceededError
+from chat_workflow.runner import TyperUserIO, handle_error
+from chat_workflow.session import Session
+from chat_workflow.session_log import SessionLog
 from chat_workflow.session_logging import log_session
 
 
@@ -25,10 +25,10 @@ class WorkflowRunner:
     ) -> None:
         """Run a workflow function with framework plumbing."""
         typer.echo("Starting conversation... (Ctrl+C to quit)")
-        io = TyperConversationIO()
-        flow_state = ConversationLog()
+        io = TyperUserIO()
+        session_log = SessionLog()
         config = Config(self.config_path)
-        tools = ConversationTools(io=io, state=flow_state, config=config)
+        session = Session(io=io, state=session_log, config=config)
 
         def _log_and_exit(result_dict, default_success=True, feedback=None):
             judgement = typer.confirm("\nWas this experience successful?", default=default_success)
@@ -38,12 +38,12 @@ class WorkflowRunner:
                     feedback = None
             try:
                 path = log_session(
-                    messages=flow_state.messages,
+                    messages=session_log.messages,
                     criteria=result_dict,
                     success_judgement=judgement,
                     feedback_text=feedback,
-                    model=flow_state.model,
-                    turn_count=flow_state.turn_count,
+                    model=session_log.model,
+                    turn_count=session_log.turn_count,
                     context=user_params.get("context", ""),
                 )
                 typer.echo(f"\nSession logged to: {path}")
@@ -51,14 +51,14 @@ class WorkflowRunner:
                 typer.secho(f"\nFailed to log session: {log_err}", fg=typer.colors.YELLOW)
 
         try:
-            user_params["tools"] = tools
+            user_params["session"] = session
             result = func(**user_params)
             _log_and_exit(result_dict=result.model_dump(), default_success=True)
         except KeyboardInterrupt:
             typer.echo("\n\nConversation cancelled.")
             raise typer.Exit(0) from None
-        except ConversationFailedError as e:
-            typer.secho(f"Conversation failed: {e.message}", err=True, fg=typer.colors.RED)
+        except AtomicWorkflowFailedError as e:
+            typer.secho(f"Atomic workflow failed: {e.message}", err=True, fg=typer.colors.RED)
             _log_and_exit(result_dict=None, default_success=False)
             raise typer.Exit(1) from None
         except TurnLimitExceededError as e:

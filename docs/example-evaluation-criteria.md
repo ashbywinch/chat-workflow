@@ -88,16 +88,16 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --help
 
 ```python
 from workflows.evaluation_criteria.flows import generate_reviewed_criteria
-from chat_workflow import ConversationTools, ConversationFlowState, ConversationIO
+from chat_workflow import Session, SessionLog, UserIO
 
-class MyIO(ConversationIO):
+class MyIO(UserIO):
     def echo(self, message: str) -> None: print(message)
     def prompt(self, label: str) -> str: return input(label + ": ")
 
 criteria = generate_reviewed_criteria(
     context="evaluating coffee makers",
     max_turns=10,
-    tools=ConversationTools(io=MyIO(), state=ConversationFlowState()),
+    session=Session(io=MyIO(), state=SessionLog()),
 )
 ```
 
@@ -107,7 +107,7 @@ The workflow consists of three main functions:
 
 ### 1. `generate_criteria()` - Initial generation
 ```python
-@chat
+@atomic_workflow
 def generate_criteria(
     context: Annotated[
         str, "The topic or domain for which to generate evaluation criteria"
@@ -131,7 +131,7 @@ def generate_criteria(
 
 ### 2. `refine()` - Generic refinement
 ```python
-@chat
+@atomic_workflow
 def refine(
     initial_object: Annotated[
         ModelType, "The object to review and potentially modify based on user feedback"
@@ -152,27 +152,27 @@ def refine(
 
 ### 3. `generate_reviewed_criteria()` - Composite workflow
 ```python
-@workflow
+@composite_workflow
 def generate_reviewed_criteria(
     context: str = "",
     max_turns: int = 10,
     max_refinements: int = 3,
     *,
-    tools: ConversationTools,
+    session: Session,
 ) -> EvaluationCriteria:
-    criteria = generate_criteria(context=context, max_turns=max_turns, tools=tools)
+    criteria = generate_criteria(context=context, max_turns=max_turns, session=session)
 
     for _ in range(max_refinements):
         print_criteria(
             criteria=criteria,
             title="Current criteria:",
-            echo=tools.io.echo,
+            echo=session.io.echo,
         )
 
         refined = refine(
             initial_object=criteria,
             max_turns=max_turns,
-            tools=tools,
+            session=session,
         )
 
         if refined.model_dump() == criteria.model_dump():
@@ -183,7 +183,7 @@ def generate_reviewed_criteria(
     return criteria
 ```
 
-**Note**: Functions decorated with `@workflow` are automatically discovered by the CLI. Their parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
+**Note**: Functions decorated with `@composite_workflow` are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
 
 ## Critical Code Locations
 
@@ -192,8 +192,8 @@ def generate_reviewed_criteria(
 workflows/evaluation_criteria/models.py:44  # validate_business_rules() model_validator
 
 # Conversation flow:
-chat_workflow/conversation_runtime.py:174  # StructuredConversationOrchestrator
-chat_workflow/conversation_runtime.py:204  # process_turn() - main logic
+chat_workflow/atomic_workflow.py:174  # AtomicWorkflow
+chat_workflow/atomic_workflow.py:204  # process_turn() - main logic
 
 # LLM integration:
 chat_workflow/llm_interaction.py:44  # get_client() - provider setup
@@ -268,7 +268,7 @@ Normalized weights (sum to 1.0):
 The workflow handles several error cases:
 
 - **Turn limit exceeded**: Conversation reaches `max_turns` without success
-- **Conversation failed**: User is uncooperative or LLM returns `action="failure"`
+- **Conversation failed**: User is uncooperative or LLM returns `intent=AgentIntent.FAILURE`
 - **Validation error**: Generated criteria don't satisfy business rules
 - **Configuration error**: Missing API key or invalid provider settings
 
@@ -293,6 +293,6 @@ This workflow demonstrates several key patterns you can reuse:
 2. **Multi-turn conversation**: Guide users through complex data collection
 3. **Refinement loop**: Allow users to review and adjust generated content
 4. **Generic refinement**: Use `TypeVar` for reusable refinement conversations
-5. **Composite workflows**: Chain multiple `@chat` functions with `@workflow`
+5. **Composite workflows**: Chain multiple `@atomic_workflow` functions with `@composite_workflow`
 
 To create your own workflow, copy the `evaluation_criteria` directory structure and adapt the models and prompts for your use case.

@@ -3,15 +3,16 @@ import unittest
 from pathlib import Path
 
 from chat_workflow import (
-    ConversationAction,
-    ConversationResult,
+    AgentIntent,
+    AgentResponse,
+    TurnResult,
 )
+from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.config import Config
-from chat_workflow.conversation_log import ConversationLog
-from chat_workflow.conversation_orchestrator import ConversationOrchestrator
-from chat_workflow.conversation_tools import ConversationTools
-from chat_workflow.exceptions import ConversationFailedError, TurnLimitExceededError
+from chat_workflow.exceptions import AtomicWorkflowFailedError, TurnLimitExceededError
 from chat_workflow.orchestrator_config import OrchestratorConfig
+from chat_workflow.session import Session
+from chat_workflow.session_log import SessionLog
 from tests.conftest import timeout
 from workflows.evaluation_criteria import EvaluationCriteria
 
@@ -35,16 +36,16 @@ class MockIO:
 class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_call_llm_returns_valid_action(self):
-        orchestrator = ConversationOrchestrator(
+        orchestrator = AtomicWorkflow(
             config=OrchestratorConfig(
                 system_prompt=(
                     "You are a helpful assistant that creates evaluation criteria. "
-                    "When returning action='success' with criteria, you MUST include "
+                    "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
-                    "Use action='continue' to ask questions, action='success' to return criteria, "
-                    "action='failure' if unable to help."
+                    "Use intent='continue' to ask questions, intent='success' to return criteria, "
+                    "intent='failure' if unable to help."
                 ),
-                response_model=ConversationAction[EvaluationCriteria],
+                response_model=AgentResponse[EvaluationCriteria],
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -56,21 +57,21 @@ class TestRealAPI(unittest.TestCase):
                         "content": "Create criteria for choosing a birthday gift. My budget is $50.",
                     }
                 ],
-                on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
-                on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: ConversationFailedError(action.message),
+                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
+                on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
+                on_failure=lambda action: AtomicWorkflowFailedError(action.message),
             )
         )
 
         action = orchestrator._call_llm()
 
-        self.assertIn(action.action, ["continue", "success", "failure"])
+        self.assertIn(action.intent, [AgentIntent.CONTINUE, AgentIntent.SUCCESS, AgentIntent.FAILURE])
 
-        if action.action in ["continue", "failure"]:
+        if action.intent in [AgentIntent.CONTINUE, AgentIntent.FAILURE]:
             self.assertIsNotNone(action.message)
             self.assertTrue(len(action.message) > 0)
 
-        if action.action == "success":
+        if action.intent == AgentIntent.SUCCESS:
             self.assertIsNotNone(action.result)
             self.assertGreaterEqual(len(action.result.criteria), 2)
             has_budget = any(c.name.lower() == "budget" for c in action.result.criteria)
@@ -81,13 +82,13 @@ class TestRealAPI(unittest.TestCase):
 
         action = orchestrator._call_llm()
 
-        self.assertIn(action.action, ["continue", "success", "failure"])
+        self.assertIn(action.intent, [AgentIntent.CONTINUE, AgentIntent.SUCCESS, AgentIntent.FAILURE])
 
-        if action.action in ["continue", "failure"]:
+        if action.intent in [AgentIntent.CONTINUE, AgentIntent.FAILURE]:
             self.assertIsNotNone(action.message)
             self.assertTrue(len(action.message) > 0)
 
-        if action.action == "success":
+        if action.intent == AgentIntent.SUCCESS:
             self.assertIsNotNone(action.result)
             self.assertGreaterEqual(len(action.result.criteria), 2)
             has_budget = any(c.name.lower() == "budget" for c in action.result.criteria)
@@ -110,7 +111,7 @@ class TestRealAPI(unittest.TestCase):
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
             max_turns=6,
-            tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
+            session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -123,16 +124,16 @@ class TestRealAPI(unittest.TestCase):
 
     @timeout(10)
     def test_single_turn_with_real_llm(self):
-        orchestrator = ConversationOrchestrator(
+        orchestrator = AtomicWorkflow(
             config=OrchestratorConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
-                    "When returning action='success' with criteria, you MUST include "
+                    "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
-                    "Use action='continue' to ask questions, action='success' to return criteria, "
-                    "action='failure' if unable to help."
+                    "Use intent='continue' to ask questions, intent='success' to return criteria, "
+                    "intent='failure' if unable to help."
                 ),
-                response_model=ConversationAction[EvaluationCriteria],
+                response_model=AgentResponse[EvaluationCriteria],
                 max_turns=3,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -144,15 +145,15 @@ class TestRealAPI(unittest.TestCase):
                         "content": "I want to evaluate coffee makers. Budget is $200.",
                     }
                 ],
-                on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
-                on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: ConversationFailedError(action.message),
+                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
+                on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
+                on_failure=lambda action: AtomicWorkflowFailedError(action.message),
             )
         )
 
         result = orchestrator.process_turn("")
 
-        self.assertIsInstance(result, ConversationResult)
+        self.assertIsInstance(result, TurnResult)
         self.assertIsNotNone(result.message)
         self.assertTrue(len(result.message) > 0)
 
@@ -179,7 +180,7 @@ class TestRealAPI(unittest.TestCase):
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift for a 7-year-old",
             max_turns=10,
-            tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
+            session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
         )
 
         self.assertIsInstance(criteria, EvaluationCriteria)
@@ -201,25 +202,25 @@ class TestRealAPI(unittest.TestCase):
             ]
         )
 
-        with self.assertRaises((TurnLimitExceededError, ConversationFailedError)):
+        with self.assertRaises((TurnLimitExceededError, AtomicWorkflowFailedError)):
             EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop for programming",
                 max_turns=3,
-                tools=ConversationTools(io=mock_io, state=ConversationLog(), config=_CONFIG),
+                session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
             )
 
     @timeout(10)
     def test_conversation_action_format(self):
-        orchestrator = ConversationOrchestrator(
+        orchestrator = AtomicWorkflow(
             config=OrchestratorConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
-                    "When returning action='success' with criteria, you MUST include "
+                    "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
-                    "Use action='continue' to ask questions, action='success' to return criteria, "
-                    "action='failure' if unable to help."
+                    "Use intent='continue' to ask questions, intent='success' to return criteria, "
+                    "intent='failure' if unable to help."
                 ),
-                response_model=ConversationAction[EvaluationCriteria],
+                response_model=AgentResponse[EvaluationCriteria],
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -231,14 +232,14 @@ class TestRealAPI(unittest.TestCase):
                         "content": "I want to create criteria for choosing a laptop. My budget is $1000.",
                     }
                 ],
-                on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message),
-                on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: ConversationFailedError(action.message),
+                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
+                on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
+                on_failure=lambda action: AtomicWorkflowFailedError(action.message),
             )
         )
 
         result = orchestrator.process_turn("Please include budget as a criterion")
-        self.assertIsInstance(result, ConversationResult)
+        self.assertIsInstance(result, TurnResult)
         self.assertIsNotNone(result.message)
 
 

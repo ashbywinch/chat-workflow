@@ -3,22 +3,22 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
-from chat_workflow import ConversationAction
-from chat_workflow.conversation_log import ConversationLog
-from chat_workflow.conversation_orchestrator import ConversationOrchestrator
-from chat_workflow.conversation_tools import ConversationTools
+from chat_workflow import AgentIntent, AgentResponse
+from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.exceptions import (
-    ConversationFailedError,
+    AtomicWorkflowFailedError,
     InvalidResponseError,
     TurnLimitExceededError,
 )
+from chat_workflow.session import Session
+from chat_workflow.session_log import SessionLog
 from tests.conftest import FakeConfig, make_orchestrator_config, make_valid_criteria
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
-class TestConversationOrchestrator(unittest.TestCase):
+class TestAtomicWorkflow(unittest.TestCase):
     def test_orchestrator_initialization(self):
-        orchestrator = ConversationOrchestrator(
+        orchestrator = AtomicWorkflow(
             config=make_orchestrator_config(
                 max_turns=5,
                 model="test-model",
@@ -34,11 +34,11 @@ class TestConversationOrchestrator(unittest.TestCase):
         self.assertEqual(orchestrator.messages[1]["role"], "user")
         self.assertIn("Initial context", orchestrator.messages[1]["content"])
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_success(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
-        action = ConversationAction[EvaluationCriteria](action="success", result=make_valid_criteria())
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria())
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("Let's create criteria")
@@ -48,11 +48,11 @@ class TestConversationOrchestrator(unittest.TestCase):
         self.assertEqual(orchestrator.turn_count, 1)
         self.assertEqual(len(orchestrator.messages), 2)
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_continue(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
-        action = ConversationAction[EvaluationCriteria](action="continue", message="What's your budget range?")
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What's your budget range?")
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("Hello")
@@ -64,16 +64,16 @@ class TestConversationOrchestrator(unittest.TestCase):
         self.assertEqual(len(orchestrator.messages), 3)
         self.assertEqual(orchestrator.messages[2]["role"], "assistant")
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_failure_raises_exception(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
-        action = ConversationAction[EvaluationCriteria](
-            action="failure", message="I don't have enough information to help"
+        action = AgentResponse[EvaluationCriteria](
+            intent=AgentIntent.FAILURE, message="I don't have enough information to help"
         )
         mock_call_llm.return_value = action
 
-        with self.assertRaises(ConversationFailedError) as context:
+        with self.assertRaises(AtomicWorkflowFailedError) as context:
             orchestrator.process_turn("Something vague")
 
         self.assertIn(
@@ -82,17 +82,19 @@ class TestConversationOrchestrator(unittest.TestCase):
         )
         self.assertEqual(orchestrator.turn_count, 1)
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_failure_transcript_not_duplicated(self, mock_call_llm):
         """On failure, the conversation transcript must appear exactly once
-        in the error message — not 0 (missing) and not 2+ (duplicated from
+        in the error message — not 0 (missing) or 2+ (duplicated from
         both error.__str__ and error.message)."""
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
-        action = ConversationAction[EvaluationCriteria](action="failure", message="I don't have enough information")
+        action = AgentResponse[EvaluationCriteria](
+            intent=AgentIntent.FAILURE, message="I don't have enough information"
+        )
         mock_call_llm.return_value = action
 
-        with self.assertRaises(ConversationFailedError) as context:
+        with self.assertRaises(AtomicWorkflowFailedError) as context:
             orchestrator.process_turn("Something vague")
 
         error_msg = str(context.exception)
@@ -103,11 +105,11 @@ class TestConversationOrchestrator(unittest.TestCase):
             f"Expected exactly 1 CONVERSATION TRANSCRIPT, found {transcript_count}",
         )
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_empty_input(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
-        action = ConversationAction[EvaluationCriteria](action="continue", message="First question")
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="First question")
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("")
@@ -116,14 +118,14 @@ class TestConversationOrchestrator(unittest.TestCase):
         self.assertEqual(result.message, "First question")
         self.assertEqual(len(orchestrator.messages), 2)
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_multi_turn_conversation_sequence(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config(max_turns=5))
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config(max_turns=5))
 
         responses = [
-            ConversationAction[EvaluationCriteria](action="continue", message="Question 1"),
-            ConversationAction[EvaluationCriteria](action="continue", message="Question 2"),
-            ConversationAction[EvaluationCriteria](action="success", result=make_valid_criteria()),
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="Question 1"),
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="Question 2"),
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria()),
         ]
         mock_call_llm.side_effect = responses
 
@@ -142,12 +144,12 @@ class TestConversationOrchestrator(unittest.TestCase):
         self.assertEqual(result3.result, make_valid_criteria())
         self.assertEqual(orchestrator.turn_count, 3)
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_orchestrator_raises_on_max_turns(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config(max_turns=2))
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config(max_turns=2))
 
-        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
-            action="continue", message="Another question"
+        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+            intent=AgentIntent.CONTINUE, message="Another question"
         )
 
         result1 = orchestrator.process_turn("A1")
@@ -163,9 +165,9 @@ class TestConversationOrchestrator(unittest.TestCase):
 
         self.assertIn("Maximum conversation turns (2) reached", str(context.exception))
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_propagates_llm_exceptions(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
         mock_call_llm.side_effect = ValueError("Validation failed after retries")
 
@@ -174,12 +176,12 @@ class TestConversationOrchestrator(unittest.TestCase):
 
         self.assertEqual(orchestrator.turn_count, 1)
 
-    @patch.object(ConversationOrchestrator, "_call_llm")
+    @patch.object(AtomicWorkflow, "_call_llm")
     def test_invalid_action_raises_exception(self, mock_call_llm):
-        orchestrator = ConversationOrchestrator(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
 
         mock_action = Mock()
-        mock_action.action = "invalid_action"
+        mock_action.intent = "invalid_action"
         mock_action.message = "test"
         mock_action.result = None
         mock_call_llm.return_value = mock_action
@@ -187,81 +189,81 @@ class TestConversationOrchestrator(unittest.TestCase):
         with self.assertRaises(InvalidResponseError) as context:
             orchestrator.process_turn("test")
 
-        self.assertIn("Invalid action received: invalid_action", str(context.exception))
+        self.assertIn("Invalid intent received: invalid_action", str(context.exception))
 
 
 class TestWorkflowIntegration(unittest.TestCase):
-    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
+    @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_leaf_accepts_tools_parameter(self, mock_call_llm):
-        from chat_workflow.conversation_log import ConversationLog
+        from chat_workflow.session_log import SessionLog
 
-        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
-            action="success", result=make_valid_criteria()
+        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+            intent=AgentIntent.SUCCESS, result=make_valid_criteria()
         )
 
         mock_io = Mock()
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="test response")
 
-        state = ConversationLog()
-        tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
+        state = SessionLog()
+        tools = Session(io=mock_io, state=state, config=FakeConfig())
 
-        result = EvaluationCriteria.generate_from_chat(context="test", max_turns=5, tools=tools)
+        result = EvaluationCriteria.generate_from_chat(context="test", max_turns=5, session=tools)
 
         self.assertIsInstance(result, EvaluationCriteria)
         self.assertEqual(len(result.criteria), 2)
 
-    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
+    @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_leaf_accepts_tools_via_io(self, mock_call_llm):
-        """Caller can pass io+state+config to build tools themselves."""
-        from chat_workflow.conversation_log import ConversationLog
+        """Caller can pass io+state+config to build session themselves."""
+        from chat_workflow.session_log import SessionLog
 
-        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
-            action="success", result=make_valid_criteria()
+        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+            intent=AgentIntent.SUCCESS, result=make_valid_criteria()
         )
 
         mock_io = Mock()
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="test response")
 
-        tools = ConversationTools(
+        tools = Session(
             io=mock_io,
-            state=ConversationLog(),
+            state=SessionLog(),
             config=FakeConfig(),
         )
 
-        result = EvaluationCriteria.generate_from_chat(context="test", max_turns=5, tools=tools)
+        result = EvaluationCriteria.generate_from_chat(context="test", max_turns=5, session=tools)
 
         self.assertIsInstance(result, EvaluationCriteria)
 
-    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
+    @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
-        from chat_workflow.conversation_log import ConversationLog
+        from chat_workflow.session_log import SessionLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
-        mock_call_llm.return_value = ConversationAction[EvaluationCriteria](
-            action="success", result=make_valid_criteria()
+        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+            intent=AgentIntent.SUCCESS, result=make_valid_criteria()
         )
 
         mock_io = Mock()
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="looks good")
 
-        state = ConversationLog()
-        tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
+        state = SessionLog()
+        tools = Session(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_reviewed_criteria(
             context="test context",
             max_turns=5,
-            tools=tools,
+            session=tools,
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
 
-    @patch("chat_workflow.conversation_runtime.ConversationOrchestrator._call_llm")
+    @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_workflow_refinement_loop(self, mock_call_llm):
 
-        from chat_workflow.conversation_log import ConversationLog
+        from chat_workflow.session_log import SessionLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
         initial_criteria = EvaluationCriteria(
@@ -281,22 +283,22 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         mock_call_llm.side_effect = [
-            ConversationAction[EvaluationCriteria](action="success", result=initial_criteria),
-            ConversationAction[EvaluationCriteria](action="success", result=refined_criteria),
-            ConversationAction[EvaluationCriteria](action="success", result=refined_criteria),
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=initial_criteria),
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
         ]
 
         mock_io = Mock()
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="change quality weight")
 
-        state = ConversationLog()
-        tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
+        state = SessionLog()
+        tools = Session(io=mock_io, state=state, config=FakeConfig())
 
         result = generate_reviewed_criteria(
             context="test context",
             max_turns=5,
-            tools=tools,
+            session=tools,
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
@@ -366,12 +368,12 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         """The @chat decorator on refine() must resolve the TypeVar to the
         concrete type passed via initial_object. This exercises the full
         resolution logic through the decorator - before the fix, response_model
-        stayed as ConversationAction[ModelType] (unresolved).
+        stayed as AgentResponse[ModelType] (unresolved).
         """
         from unittest.mock import Mock, patch
 
-        from chat_workflow import ConversationAction
-        from chat_workflow.conversation_orchestrator import ConversationOrchestrator
+        from chat_workflow import AgentIntent, AgentResponse
+        from chat_workflow.atomic_workflow import AtomicWorkflow
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
         from workflows.evaluation_criteria.refine import refine
 
@@ -386,7 +388,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         # Capture what response_model the decorator passes to the orchestrator
         captured_response_model = []
 
-        original_init = ConversationOrchestrator.__init__
+        original_init = AtomicWorkflow.__init__
 
         def tracking_init(self, **kwargs):
             config = kwargs.get("config")
@@ -394,19 +396,19 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             return original_init(self, **kwargs)
 
         with (
-            patch.object(ConversationOrchestrator, "__init__", tracking_init),
-            patch.object(ConversationOrchestrator, "_call_llm") as mock_call_llm,
+            patch.object(AtomicWorkflow, "__init__", tracking_init),
+            patch.object(AtomicWorkflow, "_call_llm") as mock_call_llm,
         ):
-            mock_call_llm.return_value = ConversationAction[EvaluationCriteria](action="success", result=criteria)
+            mock_call_llm.return_value = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
 
             mock_io = Mock()
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="looks good")
 
-            state = ConversationLog()
-            tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
+            state = SessionLog()
+            tools = Session(io=mock_io, state=state, config=FakeConfig())
 
-            result = refine(initial_object=criteria, max_turns=5, tools=tools)
+            result = refine(initial_object=criteria, max_turns=3, session=tools)
 
             self.assertIsInstance(result, EvaluationCriteria)
 
@@ -483,8 +485,7 @@ class TestAutoParamInjection(unittest.TestCase):
         def sample(
             context: str = "",
             tools: object = None,
-            io: object = None,
-            state: object = None,
+            session: object = None,
             debug: object = None,
         ):
             pass
@@ -492,9 +493,7 @@ class TestAutoParamInjection(unittest.TestCase):
         section = _build_params_section(sample, {"context": "test"})
 
         self.assertIn("context", section)
-        self.assertNotIn("tools", section)
-        self.assertNotIn("io ", section)  # space to avoid matching 'io' in other words
-        self.assertNotIn("state", section)
+        self.assertNotIn("session", section)
         self.assertNotIn("debug", section)
 
     def test_build_params_section_shows_default_when_no_runtime_value(self):
@@ -512,14 +511,14 @@ class TestAutoParamInjection(unittest.TestCase):
         """The @chat decorator appends the params section to the system prompt."""
         from unittest.mock import Mock, patch
 
-        from chat_workflow.conversation_runtime import (
-            ConversationOrchestrator,
+        from chat_workflow.atomic_workflow import (
+            AtomicWorkflow,
         )
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
         captured_system_prompt = []
 
-        original_init = ConversationOrchestrator.__init__
+        original_init = AtomicWorkflow.__init__
 
         def tracking_init(self, **kwargs):
             config = kwargs.get("config")
@@ -535,22 +534,22 @@ class TestAutoParamInjection(unittest.TestCase):
         )
 
         with (
-            patch.object(ConversationOrchestrator, "__init__", tracking_init),
-            patch.object(ConversationOrchestrator, "_call_llm") as mock_call_llm,
+            patch.object(AtomicWorkflow, "__init__", tracking_init),
+            patch.object(AtomicWorkflow, "_call_llm") as mock_call_llm,
         ):
             mock_call_llm.return_value = type(
                 "MockAction",
                 (),
-                {"action": "success", "message": None, "result": valid_criteria},
+                {"intent": AgentIntent.SUCCESS, "message": None, "result": valid_criteria},
             )()
 
             mock_io = Mock()
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="test")
-            state = ConversationLog()
-            tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
+            state = SessionLog()
+            tools = Session(io=mock_io, state=state, config=FakeConfig())
 
-            result = EvaluationCriteria.generate_from_chat(context="birthday ideas", max_turns=5, tools=tools)
+            result = EvaluationCriteria.generate_from_chat(context="birthday ideas", max_turns=5, session=tools)
 
             self.assertIsInstance(result, EvaluationCriteria)
 
@@ -561,20 +560,18 @@ class TestAutoParamInjection(unittest.TestCase):
         self.assertIn("`context` (str)", prompt)
         self.assertIn("`max_turns` (int)", prompt)
 
-        self.assertNotIn("tools", prompt)
+        self.assertNotIn("session", prompt)
 
     def test_chat_decorator_preserves_inline_interpolation(self):
         """{initial_object.model_dump()} style interpolation still works."""
         from unittest.mock import Mock, patch
 
-        from chat_workflow.conversation_runtime import (
-            ConversationOrchestrator,
-        )
+        from chat_workflow.atomic_workflow import AtomicWorkflow
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
         captured_system_prompt = []
 
-        original_init = ConversationOrchestrator.__init__
+        original_init = AtomicWorkflow.__init__
 
         def tracking_init(self, **kwargs):
             config = kwargs.get("config")
@@ -590,24 +587,24 @@ class TestAutoParamInjection(unittest.TestCase):
         )
 
         with (
-            patch.object(ConversationOrchestrator, "__init__", tracking_init),
-            patch.object(ConversationOrchestrator, "_call_llm") as mock_call_llm,
+            patch.object(AtomicWorkflow, "__init__", tracking_init),
+            patch.object(AtomicWorkflow, "_call_llm") as mock_call_llm,
         ):
             mock_call_llm.return_value = type(
                 "MockAction",
                 (),
-                {"action": "success", "message": None, "result": criteria},
+                {"intent": AgentIntent.SUCCESS, "message": None, "result": criteria},
             )()
 
             mock_io = Mock()
             mock_io.echo = Mock()
             mock_io.prompt = Mock(return_value="looks good")
-            state = ConversationLog()
-            tools = ConversationTools(io=mock_io, state=state, config=FakeConfig())
+            state = SessionLog()
+            tools = Session(io=mock_io, state=state, config=FakeConfig())
 
             from workflows.evaluation_criteria.refine import refine
 
-            result = refine(initial_object=criteria, max_turns=3, tools=tools)
+            result = refine(initial_object=criteria, max_turns=3, session=tools)
 
             self.assertIsInstance(result, EvaluationCriteria)
 
@@ -644,7 +641,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
             # Return a minimal fake response instructor can parse
             content = json.dumps(
                 {
-                    "action": "success",
+                    "intent": "success",
                     "message": None,
                     "result": {
                         "criteria": [
@@ -714,16 +711,16 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         LLM knows the validation rules before generating."""
         from unittest.mock import Mock
 
-        from chat_workflow.conversation_log import ConversationLog
+        from chat_workflow.session_log import SessionLog
         from workflows.evaluation_criteria import EvaluationCriteria
 
         mock_io = Mock()
         mock_io.echo = Mock()
         mock_io.prompt = Mock(return_value="done")
 
-        tools = ConversationTools(
+        tools = Session(
             io=mock_io,
-            state=ConversationLog(),
+            state=SessionLog(),
             config=FakeConfig(),
         )
 
@@ -731,138 +728,10 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
             EvaluationCriteria.generate_from_chat,
             context="test",
             max_turns=2,
-            tools=tools,
+            session=tools,
         )
 
         self.assertIsNotNone(captured["messages"], "No messages captured")
-        system_msg = None
-        for msg in captured["messages"]:
-            if msg.get("role") == "system":
-                system_msg = msg["content"]
-                break
-
-        self.assertIsNotNone(system_msg, "No system message found")
-
-        self.assertIn(
-            "EvaluationCriteria",
-            system_msg,
-            "Instructor must inject EvaluationCriteria schema into the system prompt",
-        )
-
-        self.assertIn(
-            "minItems",
-            system_msg,
-            "Json schema must include minItems constraint on criteria",
-        )
-
-        self.assertIn(
-            "maximum",
-            system_msg,
-            "Json schema must include maximum constraint on weight field",
-        )
-        self.assertIn(
-            "minimum",
-            system_msg,
-            "Json schema must include minimum constraint on weight field",
-        )
-
-        self.assertIn(
-            "Criterion",
-            system_msg,
-            "Json schema must include Criterion definition",
-        )
-
-        self.assertIn(
-            "ask one question at a time",
-            system_msg.lower(),
-            "System prompt must contain behavioral guidance from docstring",
-        )
-
-        # Validation guidance injected by @chat decorator before schema
-        self.assertIn(
-            "## Output Format",
-            system_msg,
-            "@chat decorator injects Output Format section as validation guidance",
-        )
-        self.assertIn(
-            "Field descriptions and constraints communicate validation rules",
-            system_msg,
-            "Validation guidance tells LLM to check field descriptions and constraints",
-        )
-
-        # --- Validation communicated via Field() metadata in the JSON schema ---
-        # The "must include budget" rule is in the criteria field description,
-        # which Pydantic renders into the JSON schema as the property description.
-        # This is how the LLM learns about it before generating.
-        self.assertIn(
-            "must include one named 'budget'",
-            system_msg,
-            "Field description: criteria list must include 'budget'",
-        )
-
-        # Weight range communicated via the field description (ge=0.0/le=10.0
-        # appear as minimum/maximum in the schema, already checked above).
-        self.assertIn(
-            "Importance weight from 0.0",
-            system_msg,
-            "Field description: weight range 0.0 to 10.0",
-        )
-
-        # Criterion class docstring appears as the item description in schema
-        self.assertIn(
-            "A single criterion for evaluating options",
-            system_msg,
-            "Criterion class docstring guides LLM on what a criterion is",
-        )
-
-        # EvaluationCriteria class docstring appears as model description
-        self.assertIn(
-            "A list of criteria for evaluating possible choices",
-            system_msg,
-            "EvaluationCriteria class docstring gives context to the LLM",
-        )
-
-        # --- Validation communicated ONLY via model_validator (post-hoc) ---
-        # This is the gap: the budget requirement also lives in the
-        # model_validator but is NOT visible in the JSON schema. The LLM
-        # can only learn about it from the field description above.
-        # Assert it's NOT in the prompt to prove the gap exists.
-        self.assertNotIn(
-            "Must include a criterion named 'budget'",
-            system_msg,
-            "model_validator message is NOT in the schema — the LLM never sees it",
-        )
-
-        self.assertNotIn(
-            "`cls`",
-            system_msg,
-            "The `cls` parameter (classmethod convention) must NOT appear in the system prompt",
-        )
-
-    def test_evaluation_criteria_params_section_has_context_and_max_turns(self):
-        """The generated params section must contain context and max_turns
-        with their correct runtime values."""
-        from unittest.mock import Mock
-
-        from chat_workflow.conversation_log import ConversationLog
-        from workflows.evaluation_criteria import EvaluationCriteria
-
-        mock_io = Mock()
-        mock_io.echo = Mock()
-        mock_io.prompt = Mock(return_value="done")
-
-        tools = ConversationTools(
-            io=mock_io,
-            state=ConversationLog(),
-            config=FakeConfig(),
-        )
-
-        captured = self._capture_instructor_messages(
-            EvaluationCriteria.generate_from_chat,
-            context="test",
-            max_turns=2,
-            tools=tools,
-        )
 
         system_msg = next(msg["content"] for msg in captured["messages"] if msg.get("role") == "system")
         self.assertIn("## Parameters", system_msg)

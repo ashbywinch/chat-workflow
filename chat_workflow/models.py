@@ -1,62 +1,82 @@
-"""Pydantic models for conversation actions and results."""
+"""Pydantic models for agent responses and workflow turn results."""
 
 from __future__ import annotations
 
-from typing import Generic, Literal, TypeVar
+from enum import StrEnum
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
 TResult = TypeVar("TResult")
 
 
-class ConversationAction(BaseModel, Generic[TResult]):
-    action: Literal["continue", "success", "failure"]
+class AgentIntent(StrEnum):
+    """What the agent wants the framework to do next."""
+
+    CONTINUE = "continue"
+    SUCCESS = "success"
+    FAILURE = "failure"
+
+
+class AgentResponse(BaseModel, Generic[TResult]):
+    """The structured response from an LLM agent after one turn.
+
+    The agent tells the framework what to do next via ``intent``:
+    - ``CONTINUE``: ask the user another question
+    - ``SUCCESS``: return the completed result
+    - ``FAILURE``: abort with an error message
+    """
+
+    intent: AgentIntent
     message: str | None = Field(
         default=None,
         description=(
-            'Message for the user. Required when action is "continue" or "failure". '
-            'Must be null when action is "success".'
+            'Message for the user. Required when intent is "continue" or "failure". '
+            'Must be null when intent is "success".'
         ),
     )
     result: TResult | None = Field(
         default=None,
         description=(
-            'The criteria object. Required when action is "success". '
-            'Must be null when action is "continue" or "failure".'
+            'The final object. Required when intent is "success". '
+            'Must be null when intent is "continue" or "failure".'
         ),
     )
 
     @model_validator(mode="after")
-    def validate_action_consistency(self):
-        if self.action == "continue":
+    def validate_intent_consistency(self):
+        if self.intent == AgentIntent.CONTINUE:
             if not self.message:
                 raise ValueError(
-                    "continue action requires a message field with your question for the user. "
+                    "CONTINUE intent requires a message field with your question for the user. "
                     "Do not include a result field."
                 )
             if self.result is not None:
                 raise ValueError(
-                    "continue action cannot include result. "
-                    "Use action='success' if you have complete criteria to return."
+                    "CONTINUE intent cannot include result. "
+                    "Use SUCCESS intent if you have a complete result to return."
                 )
-        elif self.action == "failure":
+        elif self.intent == AgentIntent.FAILURE:
             if not self.message:
-                raise ValueError("failure action requires a message field explaining why.")
+                raise ValueError("FAILURE intent requires a message field explaining why.")
             if self.result is not None:
-                raise ValueError("failure action cannot include result.")
-        elif self.action == "success":
+                raise ValueError("FAILURE intent cannot include result.")
+        elif self.intent == AgentIntent.SUCCESS:
             if self.result is None:
-                raise ValueError("success action requires a result field with the complete criteria.")
+                raise ValueError("SUCCESS intent requires a result field with the complete object.")
         return self
 
 
-class ConversationResult(BaseModel, Generic[TResult]):
+class TurnResult(BaseModel, Generic[TResult]):
+    """The outcome of processing a single turn in an atomic workflow."""
+
     result: TResult | None = None
     message: str
     is_complete: bool
 
     @classmethod
-    def continuing(cls, message: str) -> ConversationResult[TResult]:
+    def continuing(cls, message: str) -> TurnResult[TResult]:
+        """The workflow should continue with another turn."""
         return cls(result=None, message=message, is_complete=False)
 
     @classmethod
@@ -64,9 +84,11 @@ class ConversationResult(BaseModel, Generic[TResult]):
         cls,
         result: TResult,
         message: str = "Completed successfully!",
-    ) -> ConversationResult[TResult]:
+    ) -> TurnResult[TResult]:
+        """The workflow completed with a valid result."""
         return cls(result=result, message=message, is_complete=True)
 
     @classmethod
-    def failure(cls, message: str) -> ConversationResult[TResult]:
+    def failure(cls, message: str) -> TurnResult[TResult]:
+        """The workflow failed with an error message."""
         return cls(result=None, message=message, is_complete=True)

@@ -25,17 +25,17 @@ tests/
 
 ### 1. Orchestrator Logic (mock `_call_llm`)
 ```python
-@patch.object(StructuredConversationOrchestrator, '_call_llm')
+@patch.object(AtomicWorkflow, '_call_llm')
 def test_multi_turn_conversation(self, mock_call_llm):
-    orchestrator = StructuredConversationOrchestrator(
-        system_prompt="Test", response_model=ConversationAction[EvaluationCriteria],
+    orchestrator = AtomicWorkflow(
+        system_prompt="Test", response_model=AgentResponse[EvaluationCriteria],
         max_turns=5, initial_messages=None,
         on_continue=..., on_success=..., on_failure=...,
     )
     responses = [
-        ConversationAction(action="continue", message="Question 1"),
-        ConversationAction(action="continue", message="Question 2"),
-        ConversationAction(action="success", result=valid_criteria),
+        AgentResponse(intent=AgentIntent.CONTINUE, message="Question 1"),
+        AgentResponse(intent=AgentIntent.CONTINUE, message="Question 2"),
+        AgentResponse(intent=AgentIntent.SUCCESS, result=valid_criteria),
     ]
     mock_call_llm.side_effect = responses
     result1 = orchestrator.process_turn("Hello")
@@ -47,8 +47,8 @@ def test_multi_turn_conversation(self, mock_call_llm):
 @patch('chat_workflow.llm_interaction.get_client')
 def test_call_llm_success(self, mock_get_client):
     mock_client = Mock()
-    mock_client.chat.completions.create.return_value = ConversationAction[...](
-        action="continue", message="Test"
+    mock_client.chat.completions.create.return_value = AgentResponse[...](
+        intent=AgentIntent.CONTINUE, message="Test"
     )
     mock_get_client.return_value = mock_client
     action = self.orchestrator._call_llm()

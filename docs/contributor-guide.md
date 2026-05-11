@@ -10,12 +10,16 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 
 | File | What |
 |------|------|
-| `chat_workflow/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
+| `chat_workflow/decorators.py` | `@atomic_workflow`/`@composite_workflow` decorators |
+| `chat_workflow/atomic_workflow.py` | `AtomicWorkflow` — drives a single atomic workflow turn loop |
+| `chat_workflow/session.py` | `Session` — runtime context (IO, state, config) |
+| `chat_workflow/session_log.py` | `SessionLog` — accumulated session state |
+| `chat_workflow/debug.py` | `StreamingDebug` — real-time LLM tracing |
 | `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow/cli.py` | CLI with automatic workflow discovery |
-| `chat_workflow/session_logging.py` | Conversation session logging |
+| `chat_workflow/session_logging.py` | Session logging to disk |
 | `chat_workflow/prompt_builder.py` | Prompt formatting: `_format_docstring()`, `_build_params_section()` |
 | `chat_workflow/metadata.py` | Type introspection: `_format_type_name()`, `_get_return_type()`, etc. |
 | `chat_workflow/__init__.py` | Public API exports |
@@ -36,10 +40,10 @@ Example workflows live in the `workflows/` directory.
 
 ### File Responsibilities
 
-#### `chat_workflow/conversation_runtime.py` - Conversation Logic
-- Core class: `StructuredConversationOrchestrator`
+#### `chat_workflow/atomic_workflow.py` - Conversation Logic
+- Core class: `AtomicWorkflow`
 - Manages turn state (`max_turns` configurable)
-- Receives system prompt from `@chat` decorator
+- Receives system prompt from `@atomic_workflow` decorator
 - Three outcomes: continue/success/failure
 
 #### `llm_interaction.py` - LLM Abstraction
@@ -48,8 +52,8 @@ Example workflows live in the `workflows/` directory.
 - Uses instructor for structured output
 
 #### `chat_workflow/cli.py` - CLI with Auto-Discovery
-- Discovers `@workflow` functions in `workflows/` directory
-- Converts function parameters to CLI options (excluding `tools`, `io`, `state`, `debug`)
+- Discovers `@composite_workflow` functions in `workflows/` directory
+- Converts function parameters to CLI options (excluding `session`, `io`, `state`, `debug`)
 - Uses `__signature__` override with `typing.get_type_hints()` for type resolution
 - Handles `from __future__ import annotations` string annotations
 
@@ -90,7 +94,7 @@ make lint           # ruff and basedpyright
 - Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
 - We do not maintain backwards compatability with previous versions of anything
 - Module and package exports should be organised so that the public API surface is importable from the package root. If code is moved to a different submodule, only ``__init__.py`` should need to change. External consumers must import from the package root (``from mypackage import Thing``), not from submodules (``from mypackage.submodule import Thing``). Internal code within the package should use relative submodule imports as normal.
-- If a class or function name uses vague terms like "Manager", "Enhanced" or "Configured", reconsider whether the base concept is well-defined. ``ConversationOrchestrator`` without "Structured" says everything ``StructuredConversationOrchestrator`` said. When two concepts genuinely need disambiguation, the names should complement each other (e.g., ``AtomicWorkflow`` and ``CompositeWorkflow`` — each clarifies the other).
+- If a class or function name uses vague terms like "Manager", "Enhanced" or "Configured", reconsider whether the base concept is well-defined. ``AtomicWorkflow`` without "Structured" says everything ``StructuredConversationOrchestrator`` said. When two concepts genuinely need disambiguation, the names should complement each other (e.g., ``AtomicWorkflow`` and ``CompositeWorkflow`` — each clarifies the other).
 - If the best docstring you can write just rephrases the name (``"""ConversationOrchestrator orchestrates conversations."""``), that is a smell. Either the name is too vague or the concept boundaries are unclear. 
 
 ### Smells
@@ -156,9 +160,9 @@ The `-F body=@file` form reliably sends the file contents as a string field. The
 ## Critical Patterns
 
 - All development must be done on a branch. origin/main is protected
-- `ConversationAction` is a Generic BaseModel with `action: Literal["continue", "success", "failure"]` and a `model_validator` for consistency
-- `StructuredConversationOrchestrator.process_turn()` checks turn limit, calls LLM, handles action
-- Turn limit raises `TurnLimitExceededError`; failure action raises `ConversationFailedError`
+- `AgentResponse` is a Generic BaseModel with `intent: AgentIntent` and a `model_validator` for consistency
+- `AtomicWorkflow.process_turn()` checks turn limit, calls LLM, handles intent
+- Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowFailedError`
 
 ## SOLID/DRY Principles for Code
 
@@ -186,14 +190,14 @@ Each module should have one reason to change.
 
 - `prompt_builder.py` owns prompt formatting (docstring rendering, parameter section building)
 - `metadata.py` owns type introspection (type name formatting, return type resolution, parameter inspection)
-- `conversation_runtime.py` owns conversation orchestration (turn management, LLM calling, action handling)
+- `atomic_workflow.py` owns conversation orchestration (turn management, LLM calling, intent handling)
 - `llm_interaction.py` owns LLM provider abstraction
 
 If you find yourself adding a function to a module that doesn't match its stated purpose, create a new module.
 
 ### DRY: Extract Shared Logic
 
-When the same pattern appears in multiple places, extract it into a dedicated module. The `prompt_builder.py` and `metadata.py` modules were extracted from `conversation_runtime.py` because prompt formatting and type introspection are used by `decorators.py` and are conceptually separate concerns.
+When the same pattern appears in multiple places, extract it into a dedicated module. The `prompt_builder.py` and `metadata.py` modules were extracted from `atomic_workflow.py` because prompt formatting and type introspection are used by `decorators.py` and are conceptually separate concerns.
 
 ## Debugging LLM Interactions
 
@@ -253,15 +257,15 @@ tests/
 | Add/modify type introspection | `chat_workflow/metadata.py` | `_format_type_name()`, `_get_return_type()` |
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
-| Modify conversation flow | `chat_workflow/conversation_runtime.py` | `StructuredConversationOrchestrator.process_turn()` |
+| Modify conversation flow | `chat_workflow/atomic_workflow.py` | `AtomicWorkflow.process_turn()` |
 | Add LLM provider | `chat_workflow/llm_interaction.py` | `get_client()` |
 | Modify CLI auto-discovery | `chat_workflow/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
 
 ## Quick Start for Common Changes
 
 ### Modify Conversation Flow
-1. Edit `@chat`-decorated function docstrings in example workflow files
-2. Check `StructuredConversationOrchestrator.process_turn()` logic in `conversation_runtime.py`
+1. Edit `@atomic_workflow`-decorated function docstrings in example workflow files
+2. Check `AtomicWorkflow.process_turn()` logic in `atomic_workflow.py`
 3. Update `tests/unit/test_orchestrator_logic.py`
 
 ### Add LLM Provider
@@ -270,9 +274,9 @@ tests/
 
 ### Modify CLI Auto-Discovery
 1. Check `chat_workflow/cli.py` `build_cli_app()` function
-2. The `@workflow` decorator sets `_is_workflow = True` on functions
+2. The `@composite_workflow` decorator sets `_is_workflow = True` on functions
 3. CLI discovers these functions via `discover_workflow_functions()` 
-4. Function parameters (excluding `tools`, `io`, `state`, `debug`) become CLI options
+4. Function parameters (excluding `session`, `io`, `state`, `debug`) become CLI options
 5. Function names are converted to kebab-case for command names
 
 ## Reference Docs

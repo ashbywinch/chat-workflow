@@ -9,8 +9,8 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from chat_workflow import ConversationAction, ConversationResult
-from chat_workflow.exceptions import ConversationFailedError
+from chat_workflow import AgentResponse, TurnResult
+from chat_workflow.exceptions import AtomicWorkflowFailedError
 from chat_workflow.orchestrator_config import OrchestratorConfig
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
@@ -86,11 +86,11 @@ def make_orchestrator_config(
     """Create a standard OrchestratorConfig for testing."""
     kwargs = dict(
         system_prompt="Test prompt",
-        response_model=response_model_override or ConversationAction[EvaluationCriteria],
+        response_model=response_model_override or AgentResponse[EvaluationCriteria],
         max_turns=max_turns,
-        on_continue=lambda action: ConversationResult[EvaluationCriteria].continuing(action.message or ""),
-        on_success=lambda action: ConversationResult[EvaluationCriteria].success(action.result),
-        on_failure=lambda action: ConversationFailedError(action.message or "No reason given"),
+        on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
+        on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
+        on_failure=lambda action: AtomicWorkflowFailedError(action.message or "No reason given"),
     )
     kwargs.update(overrides)
     return OrchestratorConfig(**kwargs)
@@ -120,7 +120,7 @@ class MockInstructorClient:
                 if isinstance(response, Exception):
                     raise response
                 return response
-            return ConversationAction[EvaluationCriteria](action="continue", message="Test question")
+            return AgentResponse[EvaluationCriteria](intent="continue", message="Test question")
 
     def get_client(self, provider=None):
         return self

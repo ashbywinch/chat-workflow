@@ -4,7 +4,7 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 
 class Criterion(BaseModel):
@@ -53,7 +53,7 @@ class EvaluationCriteria(BaseModel):
         description="Context for these evaluation criteria (e.g., 'Birthday presents for a 7-year-old child')",
     )
 
-    @chat
+    @atomic_workflow
     @classmethod
     def generate_from_chat(
         cls,

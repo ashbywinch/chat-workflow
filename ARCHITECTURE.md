@@ -4,7 +4,7 @@ This document is for developers contributing to the chat-workflow library. It de
 
 ### **Core Files (Read These First)**
 1. `workflows/evaluation_criteria/models.py` - Data models & business rule validation
-2. `chat_workflow/conversation_runtime.py` - Conversation orchestration & decorators  
+2. `chat_workflow/atomic_workflow.py` - Conversation orchestration & decorators  
 3. `chat_workflow/llm_interaction.py` - LLM provider abstraction
 4. `chat_workflow/exceptions.py` - Custom exception hierarchy
 
@@ -24,7 +24,7 @@ User Input → LLM Response → Instructor → Pydantic Validation
 ```
 
 ### 3. Failure Modes
-- **LLM-initiated**: Returns `action: "failure"` for unconstructive users
+- **LLM-initiated**: Returns `intent: AgentIntent.FAILURE` for unconstructive users
 - **System-initiated**: `TurnLimitExceededError` when `max_turns` exceeded
 - **Validation failure**: Custom exceptions for business rule violations
 
