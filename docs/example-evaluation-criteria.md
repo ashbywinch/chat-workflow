@@ -20,7 +20,7 @@ The `EvaluationCriteria` workflow helps users create structured evaluation crite
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
 | `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
 | `workflows/evaluation_criteria/presentation.py` | Display helpers for conversation output |
-| `chat_workflow/cli.py` | Main CLI with automatic workflow discovery |
+| `chat_workflow_cli/cli.py` | Main CLI with automatic workflow discovery |
 
 ## Business Rules
 

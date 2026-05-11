@@ -67,7 +67,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 | `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
-| `chat_workflow/cli.py` | Typer CLI (`converse` command) |
+| `chat_workflow_cli/cli.py` | Typer CLI entrypoint with automatic workflow discovery |
 | `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
 
 ### Development Commands

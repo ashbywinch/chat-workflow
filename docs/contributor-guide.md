@@ -25,7 +25,7 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
-| `chat_workflow/cli.py` | CLI with automatic workflow discovery |
+| `chat_workflow_cli/cli.py` | CLI with automatic workflow discovery |
 | `chat_workflow/session_logging.py` | Session logging to disk |
 | `chat_workflow/prompt_builder.py` | Prompt formatting: `_format_docstring()`, `_build_params_section()` |
 | `chat_workflow/metadata.py` | Type introspection: `_format_type_name()`, `_get_return_type()`, etc. |
@@ -58,7 +58,7 @@ Example workflows live in the `workflows/` directory.
 - Supports: OpenAI, Google, OpenRouter, etc.
 - Uses instructor for structured output
 
-#### `chat_workflow/cli.py` — CLI with Auto-Discovery
+#### `chat_workflow_cli/cli.py` — CLI with Auto-Discovery
 - Discovers `@composite_workflow` functions in `workflows/` directory
 - Converts function parameters to CLI options (excluding `session`, `io`, `state`, `debug`)
 - Uses `__signature__` override with `typing.get_type_hints()` for type resolution
@@ -149,7 +149,7 @@ This streams all LLM requests/responses to stderr with timing:
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
 | Modify conversation flow | `chat_workflow/atomic_workflow.py` | `AtomicWorkflow.process_turn()` |
 | Add LLM provider | `chat_workflow/llm_interaction.py` | `get_client()` |
-| Modify CLI auto-discovery | `chat_workflow/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
+| Modify CLI auto-discovery | `chat_workflow_cli/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
 
 ### Quick Start for Common Changes
 
@@ -163,7 +163,7 @@ This streams all LLM requests/responses to stderr with timing:
 2. Add provider configuration handling
 
 **Modify CLI auto-discovery:**
-1. Check `chat_workflow/cli.py` `build_cli_app()` function
+1. Check `chat_workflow_cli/cli.py` `build_cli_app()` function
 2. The `@composite_workflow` decorator sets `_is_workflow = True` on functions
 3. CLI discovers these functions via `discover_workflow_functions()`
 4. Function parameters (excluding `session`, `io`, `state`, `debug`) become CLI options
