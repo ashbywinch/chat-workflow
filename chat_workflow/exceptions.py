@@ -56,13 +56,13 @@ class ValidationError(ChatWorkflowError):
     pass
 
 
-class ConversationError(ChatWorkflowError):
-    """Conversation flow errors."""
+class AtomicWorkflowError(ChatWorkflowError):
+    """Atomic workflow errors."""
 
     pass
 
 
-class TurnLimitExceededError(ConversationError):
+class TurnLimitExceededError(AtomicWorkflowError):
     """Maximum conversation turns exceeded."""
 
     def __init__(self, max_turns: int):
@@ -70,8 +70,8 @@ class TurnLimitExceededError(ConversationError):
         super().__init__(message)
 
 
-class ConversationFailedError(ConversationError):
-    """LLM indicated conversation should fail."""
+class AtomicWorkflowFailedError(AtomicWorkflowError):
+    """LLM indicated the atomic workflow should fail."""
 
     def __init__(self, reason: str):
         message = f"LLM indicated failure: {reason}"

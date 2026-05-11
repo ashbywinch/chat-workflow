@@ -23,7 +23,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 **Goal**: Create a new conversation flow for a specific domain.
 
 **Read**: [Workflow Author Guide](docs/workflow-author-guide.md)
-- Understanding the `@chat` and `@workflow` decorators
+- Understanding the `@atomic_workflow` and `@composite_workflow` decorators
 - Defining Pydantic models with business rules
 - Writing conversation prompts
 - Composing multiple steps into complex workflows
@@ -63,11 +63,11 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 | File | What |
 |------|------|
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
-| `chat_workflow/conversation_runtime.py` | `@chat`/`@workflow` decorators, `StructuredConversationOrchestrator`, `StreamingDebug` |
+| `chat_workflow/atomic_workflow.py` | `@atomic_workflow`/`@composite_workflow` decorators, `AtomicWorkflow`, `StreamingDebug` |
 | `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
-| `chat_workflow/cli.py` | Typer CLI (`converse` command) |
+| `chat_workflow_cli/cli.py` | Typer CLI entrypoint with automatic workflow discovery |
 | `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
 
 ### Development Commands

@@ -4,7 +4,7 @@ import types
 import unittest
 from unittest.mock import patch
 
-from chat_workflow.cli import (
+from chat_workflow_cli.cli import (
     _build_workflow_sub_app,
     _snake_to_kebab,
     discover_workflow_functions,
@@ -74,14 +74,14 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
     """_build_workflow_sub_app wraps a module's @workflow functions into a Typer sub-app."""
 
     def test_import_error_returns_none(self):
-        with patch("chat_workflow.cli.importlib.import_module", side_effect=ImportError("no such module")):
+        with patch("chat_workflow_cli.cli.importlib.import_module", side_effect=ImportError("no such module")):
             result = _build_workflow_sub_app("nonexistent")
             self.assertIsNone(result)
 
     def test_no_workflow_functions_returns_none(self):
         fake_module = types.ModuleType("fake_workflow")
         with (
-            patch("chat_workflow.cli.importlib.import_module", return_value=fake_module),
+            patch("chat_workflow_cli.cli.importlib.import_module", return_value=fake_module),
         ):
             result = _build_workflow_sub_app("empty_workflow")
             self.assertIsNone(result)
@@ -96,7 +96,7 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
 
         fake_module.my_workflow = my_workflow  # type: ignore[attr-defined]
 
-        with patch("chat_workflow.cli.importlib.import_module", return_value=fake_module):
+        with patch("chat_workflow_cli.cli.importlib.import_module", return_value=fake_module):
             sub_app = _build_workflow_sub_app("test_workflow")
 
         self.assertIsNotNone(sub_app)
@@ -110,7 +110,7 @@ class TestDiscoverWorkflows(unittest.TestCase):
 
     def test_returns_workflow_dirs(self):
         """When run from the actual project root, the evaluation_criteria workflow should be found."""
-        from chat_workflow.cli import discover_workflows
+        from chat_workflow_cli.cli import discover_workflows
 
         result = discover_workflows()
         self.assertIn("evaluation_criteria", result)
@@ -120,7 +120,7 @@ class TestDiscoverWorkflows(unittest.TestCase):
 
     def test_skips_non_package_dirs(self):
         """Subdirectories without __init__.py are not workflows."""
-        from chat_workflow.cli import discover_workflows
+        from chat_workflow_cli.cli import discover_workflows
 
         result = discover_workflows()
         self.assertNotIn("__pycache__", result)

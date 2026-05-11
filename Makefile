@@ -65,12 +65,12 @@ coverage: setup
 # Linting with ruff
 # TODO put back	uvx basedpyright
 lint: setup
-	.venv/bin/ruff check chat_workflow/ workflows/ tests/
+	.venv/bin/ruff check chat_workflow/ workflows/ tests/ chat_workflow_cli/
 
 # Auto-fix linting issues
 format: setup
-	.venv/bin/ruff check --fix chat_workflow/ workflows/ tests/
-	.venv/bin/ruff format chat_workflow/ workflows/ tests/
+	.venv/bin/ruff check --fix chat_workflow/ workflows/ tests/ chat_workflow_cli/
+	.venv/bin/ruff format chat_workflow/ workflows/ tests/ chat_workflow_cli/
 
 # Clean up generated files (removes .venv to catch build errors like CI)
 clean:

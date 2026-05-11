@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Test that @chat with Self return type raises TypeError.
+"""Test that @atomic_workflow with Self return type raises TypeError.
 
-This test proves that using typing.Self as a return type in a @chat-decorated
+This test proves that using typing.Self as a return type in a @atomic_workflow-decorated
 classmethod causes a TypeError: issubclass() arg 1 must be a class.
 
-The bug is at chat_workflow/conversation_runtime.py:511 where issubclass()
+The bug is at chat_workflow/atomic_workflow.py:511 where issubclass()
 is called on the return type annotation without checking if it's a special
 form like typing.Self.
 
@@ -23,14 +23,14 @@ from pydantic import BaseModel
 
 
 class TestChatDecoratorSelfTypeError(unittest.TestCase):
-    """Prove that Self return type in @chat decorator no longer raises at import time."""
+    """Prove that Self return type in @atomic_workflow decorator no longer raises at import time."""
 
     def test_self_return_type_imports_successfully(self):
-        """Importing a module with @chat + Self return type should succeed (no TypeError)."""
+        """Importing a module with @atomic_workflow + Self return type should succeed (no TypeError)."""
         module_code = """
 from typing import Self
 from pydantic import BaseModel, Field
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 
 class DummyModel(BaseModel):
@@ -38,7 +38,7 @@ class DummyModel(BaseModel):
 
 
 class TestWorkflow:
-    @chat
+    @atomic_workflow
     @classmethod
     def generate(
         cls,
@@ -83,14 +83,14 @@ class TestWorkflow:
 
 
 class TestChatDecoratorTypeVar(unittest.TestCase):
-    """Test that @chat with TypeVar return type works correctly."""
+    """Test that @atomic_workflow with TypeVar return type works correctly."""
 
     def test_typevar_decoration_succeeds(self):
         """TypeVar bound to BaseModel should decorate without error."""
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -99,7 +99,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@chat
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
@@ -132,7 +132,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -141,7 +141,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@chat
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
@@ -172,12 +172,12 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
             finally:
                 sys.path[:] = old_path
 
-    def test_typevar_no_params_requires_tools(self):
-        """Calling without tools raises TypeError."""
+    def test_typevar_no_params_requires_session(self):
+        """Calling without session raises TypeError."""
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -186,7 +186,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@chat
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
@@ -214,9 +214,9 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
                     mod.generate(context="test")
                 error_msg = str(ctx.exception)
                 self.assertIn(
-                    "requires 'tools' parameter",
+                    "requires 'session' parameter",
                     error_msg,
-                    f"Expected 'requires tools parameter' in error, got: {error_msg}",
+                    f"Expected 'requires session parameter' in error, got: {error_msg}",
                 )
             finally:
                 sys.path[:] = old_path
@@ -226,7 +226,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -235,7 +235,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@chat
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass

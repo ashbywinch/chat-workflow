@@ -13,14 +13,14 @@ dependencies = [
 ]
 
 [project.scripts]
-chat-workflow = "chat_workflow.cli:app"
+chat-workflow = "chat_workflow_cli.cli:app"
 
 [build-system]
 requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["chat_workflow*", "workflows*"]
+include = ["chat_workflow*", "workflows*", "chat_workflow_cli*"]
 
 [tool.ruff]
 # Target version for modern syntax (e.g., f-strings, type unions)

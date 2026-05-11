@@ -4,7 +4,7 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from chat_workflow import chat
+from chat_workflow import atomic_workflow
 
 
 class Criterion(BaseModel):
@@ -35,10 +35,10 @@ class Criterion(BaseModel):
 class EvaluationCriteria(BaseModel):
     """A list of criteria for evaluating possible choices in a specific context.
 
-    For example, evaluating options for a planned purchase. 
+    For example, evaluating options for a planned purchase.
 
     Args:
-        criteria: List of evaluation criteria 
+        criteria: List of evaluation criteria
         context: Context for these evaluation criteria
             (e.g., 'Birthday presents for a 7-year-old child').
     """
@@ -53,7 +53,7 @@ class EvaluationCriteria(BaseModel):
         description="Context for these evaluation criteria (e.g., 'Birthday presents for a 7-year-old child')",
     )
 
-    @chat
+    @atomic_workflow
     @classmethod
     def generate_from_chat(
         cls,
@@ -81,7 +81,7 @@ class EvaluationCriteria(BaseModel):
         Raises:
             ValidationError: If no criterion is named 'budget'.
         """
-        from chat_workflow.exceptions import ValidationError
+        from chat_workflow import ValidationError
 
         if not any(c.name.lower() == "budget" for c in self.criteria):
             raise ValidationError("Must include a criterion named 'budget' (case-insensitive)")

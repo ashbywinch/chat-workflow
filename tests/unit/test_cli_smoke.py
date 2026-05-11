@@ -5,7 +5,7 @@ import unittest
 
 from typer.testing import CliRunner
 
-from chat_workflow.cli import app
+from chat_workflow_cli.cli import app
 
 
 def _strip_ansi(text: str) -> str:

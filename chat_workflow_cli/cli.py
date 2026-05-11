@@ -10,10 +10,10 @@ from typing import Any
 
 import typer
 
-from chat_workflow.runner import WorkflowRunner
+from .workflow_runner import WorkflowRunner
 
 # Parameters injected by the framework, not exposed as CLI options
-_INTERNAL_PARAMS = frozenset({"tools", "io", "state", "debug"})
+_INTERNAL_PARAMS = frozenset({"session", "debug"})
 
 
 def discover_workflows() -> dict[str, Path]:
@@ -43,7 +43,7 @@ def _build_workflow_sub_app(workflow_name: str) -> typer.Typer | None:
     """Build a Typer sub-app for a single workflow module.
 
     Imports the module via ``workflows.{workflow_name}``, discovers
-    ``@workflow``-decorated functions, and registers each as a subcommand.
+    ``@composite_workflow``-decorated functions, and registers each as a subcommand.
 
     Returns *None* when the module cannot be imported or contains no
     workflow functions — the caller should skip it silently.

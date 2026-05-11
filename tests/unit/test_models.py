@@ -3,7 +3,7 @@ import unittest
 
 from pydantic import ValidationError
 
-from chat_workflow import ConversationAction, ConversationResult
+from chat_workflow import AgentIntent, AgentResponse, TurnResult
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
@@ -87,7 +87,7 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=budget_allcaps)
 
-        from chat_workflow.exceptions import ValidationError
+        from chat_workflow import ValidationError
 
         no_budget = [
             Criterion(name="cost", description="Cost constraint", weight=8.0),
@@ -155,11 +155,11 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         self.assertEqual(normalized[1], 0.0)
 
 
-class TestConversationActionModel(unittest.TestCase):
+class TestAgentResponseModel(unittest.TestCase):
     def test_conversation_action_continue(self):
-        action = ConversationAction[EvaluationCriteria](action="continue", message="What's your budget?")
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What's your budget?")
 
-        self.assertEqual(action.action, "continue")
+        self.assertEqual(action.intent, AgentIntent.CONTINUE)
         self.assertEqual(action.message, "What's your budget?")
         self.assertIsNone(action.result)
 
@@ -172,39 +172,39 @@ class TestConversationActionModel(unittest.TestCase):
             ],
         )
 
-        action = ConversationAction[EvaluationCriteria](action="success", result=criteria)
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
 
-        self.assertEqual(action.action, "success")
+        self.assertEqual(action.intent, AgentIntent.SUCCESS)
         self.assertIsNone(action.message)
         self.assertEqual(action.result, criteria)
 
     def test_conversation_action_failure(self):
-        action = ConversationAction[EvaluationCriteria](action="failure", message="Can't help with that")
+        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.FAILURE, message="Can't help with that")
 
-        self.assertEqual(action.action, "failure")
+        self.assertEqual(action.intent, AgentIntent.FAILURE)
         self.assertEqual(action.message, "Can't help with that")
         self.assertIsNone(action.result)
 
     def test_action_validation_continue_without_message(self):
         with self.assertRaises(ValueError) as context:
-            ConversationAction[EvaluationCriteria](action="continue", message=None)
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message=None)
 
-        self.assertIn("continue action requires a message", str(context.exception))
+        self.assertIn("CONTINUE intent requires a message", str(context.exception))
 
     def test_action_validation_success_without_result(self):
         with self.assertRaises(ValueError) as context:
-            ConversationAction[EvaluationCriteria](action="success", result=None)
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=None)
 
-        self.assertIn("success action requires a result", str(context.exception))
+        self.assertIn("SUCCESS intent requires a result", str(context.exception))
 
     def test_action_validation_failure_without_message(self):
         with self.assertRaises(ValueError) as context:
-            ConversationAction[EvaluationCriteria](action="failure", message=None)
+            AgentResponse[EvaluationCriteria](intent=AgentIntent.FAILURE, message=None)
 
-        self.assertIn("failure action requires a message", str(context.exception))
+        self.assertIn("FAILURE intent requires a message", str(context.exception))
 
 
-class TestConversationResultModel(unittest.TestCase):
+class TestTurnResultModel(unittest.TestCase):
     def setUp(self):
         self.valid_criteria = EvaluationCriteria(
             context="test",
@@ -215,28 +215,28 @@ class TestConversationResultModel(unittest.TestCase):
         )
 
     def test_continuing_factory_method(self):
-        result = ConversationResult[EvaluationCriteria].continuing("Please tell me more")
+        result = TurnResult[EvaluationCriteria].continuing("Please tell me more")
 
         self.assertEqual(result.message, "Please tell me more")
         self.assertIsNone(result.result)
         self.assertFalse(result.is_complete)
 
     def test_success_factory_method(self):
-        result = ConversationResult[EvaluationCriteria].success(self.valid_criteria)
+        result = TurnResult[EvaluationCriteria].success(self.valid_criteria)
 
         self.assertEqual(result.message, "Completed successfully!")
         self.assertEqual(result.result, self.valid_criteria)
         self.assertTrue(result.is_complete)
 
     def test_failure_factory_method(self):
-        result = ConversationResult[EvaluationCriteria].failure("Maximum turns reached")
+        result = TurnResult[EvaluationCriteria].failure("Maximum turns reached")
 
         self.assertEqual(result.message, "Maximum turns reached")
         self.assertIsNone(result.result)
         self.assertTrue(result.is_complete)
 
     def test_direct_creation(self):
-        result = ConversationResult[EvaluationCriteria](
+        result = TurnResult[EvaluationCriteria](
             result=self.valid_criteria, message="Custom message", is_complete=True
         )
 

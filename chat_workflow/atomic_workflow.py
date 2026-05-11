@@ -1,43 +1,27 @@
-"""Structured conversation orchestrator for multi-turn LLM interactions."""
-
-from __future__ import annotations
-
 import copy
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from .atomic_workflow_config import AtomicWorkflowConfig
 from .debug import _DebugTimer
 from .llm_interaction import ProviderType
-from .models import ConversationAction, ConversationResult
-from .protocols import ConversationDebug
+from .models import AgentIntent, AgentResponse, TurnResult
 
 TResult = TypeVar("TResult")
 
 
-@dataclass
-class OrchestratorConfig(Generic[TResult]):
-    """Configuration for StructuredConversationOrchestrator."""
+class AtomicWorkflow(Generic[TResult]):
+    """Drives a single atomic workflow: one LLM conversation that produces a typed result.
 
-    system_prompt: str
-    response_model: type[ConversationAction[TResult]]
-    max_turns: int
-    initial_messages: list[dict[str, str]] | None = None
-    on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] | None = None
-    on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] | None = None
-    on_failure: Callable[[ConversationAction[TResult]], Exception] | None = None
-    debug: ConversationDebug | None = None
-    model: str = "default-model"
-    provider: ProviderType = "openrouter"
-    max_retries: int = 3
-    request_timeout_seconds: int = 30
+    Takes an :class:`AtomicWorkflowConfig`, then :meth:`process_turn` steps
+    through the conversation loop. The LLM returns an :class:`AgentResponse`
+    whose ``intent`` determines what happens next (continue / success / failure).
+    """
 
-
-class StructuredConversationOrchestrator(Generic[TResult]):
     def __init__(
         self,
         *,
-        config: OrchestratorConfig[TResult],
+        config: AtomicWorkflowConfig[TResult],
     ):
         self.messages: list[dict[str, str]] = [{"role": "system", "content": config.system_prompt}]
         self.turn_count = 0
@@ -47,15 +31,15 @@ class StructuredConversationOrchestrator(Generic[TResult]):
         self._max_retries = config.max_retries
         self._request_timeout_seconds = config.request_timeout_seconds
         self.response_model = config.response_model
-        self.on_continue: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = config.on_continue
-        self.on_success: Callable[[ConversationAction[TResult]], ConversationResult[TResult]] = config.on_success
-        self.on_failure: Callable[[ConversationAction[TResult]], Exception] = config.on_failure
+        self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_continue
+        self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_success
+        self.on_failure: Callable[[AgentResponse[TResult]], Exception] = config.on_failure
         self.debug = config.debug
 
         for message in config.initial_messages or []:
             self.messages.append(message)
 
-    def process_turn(self, user_input: str) -> ConversationResult[TResult]:
+    def process_turn(self, user_input: str) -> TurnResult[TResult]:
         from .exceptions import InvalidResponseError, TurnLimitExceededError
 
         if self.turn_count >= self.max_turns:
@@ -65,31 +49,30 @@ class StructuredConversationOrchestrator(Generic[TResult]):
             self.messages.append({"role": "user", "content": user_input})
 
         self.turn_count += 1
-        action = self._call_llm()
+        response = self._call_llm()
 
-        message = action.message
+        message = response.message
         if message:
             self.messages.append({"role": "assistant", "content": message})
 
-        if action.action == "continue":
-            return self.on_continue(action)
-        if action.action == "success":
-            return self.on_success(action)
-        if action.action == "failure":
-            error = self.on_failure(action)
+        if response.intent == AgentIntent.CONTINUE:
+            return self.on_continue(response)
+        if response.intent == AgentIntent.SUCCESS:
+            return self.on_success(response)
+        if response.intent == AgentIntent.FAILURE:
+            error = self.on_failure(response)
             error.messages = list(self.messages)  # type: ignore[attr-defined]
             transcript = "".join(
-                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}"
-                for i, m in enumerate(self.messages)
+                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}" for i, m in enumerate(self.messages)
             )
             error.message = f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━{transcript}"
             if self.debug:
                 self.debug.on_error(error)
             raise error
 
-        raise InvalidResponseError(f"Invalid action received: {action.action}")
+        raise InvalidResponseError(f"Invalid intent received: {response.intent}")
 
-    def _call_llm(self) -> ConversationAction[TResult]:
+    def _call_llm(self) -> AgentResponse[TResult]:
         from .exceptions import ProviderNotFoundError
         from .llm_interaction import get_client
 

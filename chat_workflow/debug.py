@@ -7,8 +7,7 @@ import sys
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from .models import ConversationAction
-from .protocols import ConversationDebug
+from .models import AgentResponse
 
 TResult = TypeVar("TResult")
 
@@ -25,7 +24,7 @@ class _DebugTimer(Generic[TResult]):
 
     def __init__(
         self,
-        debug: ConversationDebug | None,
+        debug: Any | None,
         messages: list[dict[str, str]],
         model: str,
     ):
@@ -43,7 +42,7 @@ class _DebugTimer(Generic[TResult]):
     def __exit__(self, *exc_info: object) -> None:
         pass
 
-    def emit_response(self, response: ConversationAction[TResult]) -> None:
+    def emit_response(self, response: AgentResponse[TResult]) -> None:
         if self._debug and self._start is not None:
             delta = datetime.now() - self._start
             duration_ms = delta.seconds * 1000 + delta.microseconds // 1000
@@ -55,7 +54,7 @@ class StreamingDebug:
 
     Usage:
         debug = StreamingDebug()
-        orchestrator = StructuredConversationOrchestrator(..., debug=debug)
+        workflow = AtomicWorkflow(..., debug=debug)
     """
 
     def __init__(self, file: Any = None, include_timestamps: bool = True):

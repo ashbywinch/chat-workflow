@@ -8,21 +8,19 @@ class TestGetClient(unittest.TestCase):
     """get_client validates provider and reads API key from env."""
 
     def test_unsupported_provider_raises_error(self):
-        from chat_workflow.exceptions import ProviderNotSupportedError
-        from chat_workflow.llm_interaction import get_client
+        from chat_workflow import ProviderNotSupportedError, get_client
 
         with self.assertRaises(ProviderNotSupportedError):
             get_client("nonexistent")
 
     def test_missing_api_key_raises_error(self):
-        from chat_workflow.exceptions import APIKeyError
-        from chat_workflow.llm_interaction import get_client
+        from chat_workflow import APIKeyError, get_client
 
         with patch.dict("os.environ", {}, clear=True), self.assertRaises(APIKeyError):
             get_client("openai")
 
     def test_provider_case_insensitive(self):
-        from chat_workflow.llm_interaction import get_client
+        from chat_workflow import get_client
 
         with (
             patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=True),
@@ -33,7 +31,7 @@ class TestGetClient(unittest.TestCase):
             self.assertEqual(result, "client")
 
     def test_multiple_providers(self):
-        from chat_workflow.llm_interaction import get_client
+        from chat_workflow import get_client
 
         providers = {
             "openai": "OPENAI_API_KEY",
@@ -57,14 +55,14 @@ class TestGetClient(unittest.TestCase):
 
 class TestListAvailableProviders(unittest.TestCase):
     def test_all_unset(self):
-        from chat_workflow.llm_interaction import list_available_providers
+        from chat_workflow import list_available_providers
 
         with patch.dict("os.environ", {}, clear=True):
             result = list_available_providers()
             self.assertFalse(any(result.values()))
 
     def test_one_set(self):
-        from chat_workflow.llm_interaction import list_available_providers
+        from chat_workflow import list_available_providers
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=True):
             result = list_available_providers()
