@@ -28,10 +28,4 @@ def _get_return_type(func: Callable[..., Any]) -> type[BaseModel] | None:
         The resolved return type, or ``None`` if no return annotation
         is present.
     """
-    hints = typing.get_type_hints(func)
-    return_type = hints.get("return")
-
-    if return_type is None:
-        return None
-
-    return return_type
+    return typing.get_type_hints(func).get("return")

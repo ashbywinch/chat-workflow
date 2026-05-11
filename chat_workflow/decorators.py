@@ -2,78 +2,19 @@
 
 from __future__ import annotations
 
-import inspect
-import typing
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import BaseModel
 
+from chat_workflow.types_meta import resolve_return_type
+
 from .conversation_orchestrator import ConversationOrchestrator
-from .conversation_runtime import _get_return_type
 from .debug import StreamingDebug
 from .models import ConversationAction, ConversationResult
 from .orchestrator_config import OrchestratorConfig
 from .prompt_builder import _build_params_section, _format_docstring
-
-
-def _resolve_return_type(
-    raw_func: Callable[..., Any],
-    func: Callable[..., Any],
-    args: tuple[Any, ...],
-    kwargs: dict[str, Any],
-) -> type[BaseModel]:
-    """Resolve the actual return type from the function's type annotation.
-
-    Handles Self, TypeVar, and concrete BaseModel return types.
-    """
-    return_type = _get_return_type(raw_func)
-
-    if return_type is typing.Self:
-        qualname = raw_func.__qualname__
-        parts = qualname.rsplit(".", 1)
-        if len(parts) < 2:
-            raise TypeError(f"Leaf function '{func.__name__}' uses Self return type but is not a method on a class")
-        class_name = parts[0]
-        cls = raw_func.__globals__.get(class_name)
-        if cls is None or not (isinstance(cls, type) and issubclass(cls, BaseModel)):
-            raise TypeError(
-                f"Leaf function '{func.__name__}' Self return type resolves "
-                f"to '{class_name}' which is not a Pydantic model subclass"
-            )
-        return cls
-
-    elif isinstance(return_type, TypeVar):
-        bound_type = return_type.__bound__
-        if bound_type is None or not issubclass(bound_type, BaseModel):
-            raise TypeError(
-                f"Leaf function '{func.__name__}' TypeVar bound must be a Pydantic model, bound is {bound_type}"
-            )
-        actual_return_type: type[BaseModel] = return_type
-        param_hints = typing.get_type_hints(raw_func)
-        typevar_params = [
-            name for name, annotation in param_hints.items() if name != "return" and annotation == return_type
-        ]
-        for param_name in typevar_params:
-            if param_name in kwargs:
-                actual_return_type = type(kwargs[param_name])
-                break
-            sig = inspect.signature(raw_func)
-            param_names = list(sig.parameters.keys())
-            if param_name in param_names:
-                idx = param_names.index(param_name)
-                if idx < len(args):
-                    actual_return_type = type(args[idx])
-                    break
-        return actual_return_type
-
-    elif return_type is None or not issubclass(return_type, BaseModel):
-        raise TypeError(
-            f"Leaf function '{func.__name__}' must have a Pydantic model return type, type is {return_type}"
-        )
-    else:
-        return return_type
 
 
 def _build_system_prompt(
@@ -104,7 +45,7 @@ def _setup_orchestrator(
     debug: Any,
     tools: Any,
 ) -> ConversationOrchestrator:
-    """Create and configure a StructuredConversationOrchestrator."""
+    """Create and configure a ConversationOrchestrator."""
     from .exceptions import ConversationFailedError
 
     return ConversationOrchestrator(
@@ -147,7 +88,16 @@ def chat(func: Callable[..., Any]) -> Callable[..., Any]:
             raise TypeError(f"Chat function '{func.__name__}' requires 'tools' parameter")
 
         state = tools.state
-        actual_return_type = _resolve_return_type(raw_func, func, args, kwargs)
+        actual_return_type = resolve_return_type(raw_func, func, args, kwargs)
+
+        if actual_return_type is None or not (
+            isinstance(actual_return_type, type) and issubclass(actual_return_type, BaseModel)
+        ):
+            raise TypeError(
+                f"@chat function '{func.__name__}' return type resolves "
+                f"to '{actual_return_type}' which is not a Pydantic model subclass"
+            )
+
         system_prompt = _build_system_prompt(raw_func, kwargs)
         max_turns = kwargs.pop("max_turns", 10)
 
