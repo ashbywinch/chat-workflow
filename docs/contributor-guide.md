@@ -89,10 +89,14 @@ make lint           # ruff and basedpyright
 - **Prefer libraries over reinvention**: Before writing non-trivial code from scratch, check whether a library already solves the problem. Adding a dev dependency has no user-facing cost. Adding a production dependency is often the right call too. The decision criterion is simplicity and readability: a library call that replaces 30 lines of custom code is worth it; a library that adds more complexity than the code it replaces is not.
 - Prefer to fail fast if something is wrong. Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
 - We do not maintain backwards compatability with previous versions of anything
+- Module and package exports should be organised so that the public API surface is importable from the package root. If code is moved to a different submodule, only ``__init__.py`` should need to change. External consumers must import from the package root (``from mypackage import Thing``), not from submodules (``from mypackage.submodule import Thing``). Internal code within the package should use relative submodule imports as normal.
+- If a class or function name uses vague terms like "Manager", "Enhanced" or "Configured", reconsider whether the base concept is well-defined. ``ConversationOrchestrator`` without "Structured" says everything ``StructuredConversationOrchestrator`` said. When two concepts genuinely need disambiguation, the names should complement each other (e.g., ``AtomicWorkflow`` and ``CompositeWorkflow`` — each clarifies the other).
+- If the best docstring you can write just rephrases the name (``"""ConversationOrchestrator orchestrates conversations."""``), that is a smell. Either the name is too vague or the concept boundaries are unclear. 
 
 ### Smells
 - If you see a circular import, this is a code smell. Fix the smell, don't bodge the import.
-- If a file, class or function is getting long, it's probably time to split it up.
+- A long file is a strong signal that multiple concerns have become mixed together. Identify subsets of the code that will change for different reasons and move each axis of change into its own module. Type-resolution logic changes when you add new type patterns; decorator logic changes when you alter the flow. Those belong in different files regardless of line count.
+- A docstring that adds no information beyond the name is a smell. The class may need a better name, clearer boundaries, or both. (Sometimes the class is really self describing with no need for a docstring, and that's great!)
 
 
 ## Git Workflow
