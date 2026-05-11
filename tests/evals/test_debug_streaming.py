@@ -6,11 +6,11 @@ from pathlib import Path
 from chat_workflow import (
     AgentIntent,
     AgentResponse,
+    Config,
+    Session,
+    SessionLog,
     StreamingDebug,
 )
-from chat_workflow.config import Config
-from chat_workflow.session import Session
-from chat_workflow.session_log import SessionLog
 from tests.conftest import timeout
 from workflows.evaluation_criteria import EvaluationCriteria
 

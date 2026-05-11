@@ -12,7 +12,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-from chat_workflow.metadata import (
+from .metadata import (
     _format_param_value,
     _format_type_name,
     _get_param_description,

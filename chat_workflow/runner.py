@@ -6,7 +6,7 @@ import traceback
 
 import typer
 
-from chat_workflow.exceptions import (
+from .exceptions import (
     APIKeyError,
     AtomicWorkflowFailedError,
     ChatWorkflowError,
@@ -17,7 +17,7 @@ from chat_workflow.exceptions import (
     TurnLimitExceededError,
     ValidationError,
 )
-from chat_workflow.session import UserIO
+from .session import UserIO
 
 
 class TyperUserIO(UserIO):

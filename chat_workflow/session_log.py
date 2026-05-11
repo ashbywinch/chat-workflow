@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from chat_workflow.atomic_workflow import AtomicWorkflow
+    from .atomic_workflow import AtomicWorkflow
 
 
 @dataclass

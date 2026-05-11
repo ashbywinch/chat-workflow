@@ -81,7 +81,7 @@ class EvaluationCriteria(BaseModel):
         Raises:
             ValidationError: If no criterion is named 'budget'.
         """
-        from chat_workflow.exceptions import ValidationError
+        from chat_workflow import ValidationError
 
         if not any(c.name.lower() == "budget" for c in self.criteria):
             raise ValidationError("Must include a criterion named 'budget' (case-insensitive)")

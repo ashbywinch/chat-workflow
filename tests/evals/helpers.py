@@ -2,9 +2,7 @@
 
 from pathlib import Path
 
-from chat_workflow.config import Config
-from chat_workflow.session import Session
-from chat_workflow.session_log import SessionLog
+from chat_workflow import Config, Session, SessionLog
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.json"

@@ -3,15 +3,16 @@ import json
 import unittest
 from unittest.mock import Mock, patch
 
-from chat_workflow import AgentIntent, AgentResponse
-from chat_workflow.atomic_workflow import AtomicWorkflow
-from chat_workflow.exceptions import (
+from chat_workflow import (
+    AgentIntent,
+    AgentResponse,
+    AtomicWorkflow,
     AtomicWorkflowFailedError,
     InvalidResponseError,
+    Session,
+    SessionLog,
     TurnLimitExceededError,
 )
-from chat_workflow.session import Session
-from chat_workflow.session_log import SessionLog
 from tests.conftest import FakeConfig, make_atomic_workflow_config, make_valid_criteria
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
@@ -195,7 +196,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 class TestWorkflowIntegration(unittest.TestCase):
     @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_leaf_accepts_tools_parameter(self, mock_call_llm):
-        from chat_workflow.session_log import SessionLog
+        from chat_workflow import SessionLog
 
         mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
             intent=AgentIntent.SUCCESS, result=make_valid_criteria()
@@ -216,7 +217,7 @@ class TestWorkflowIntegration(unittest.TestCase):
     @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_leaf_accepts_tools_via_io(self, mock_call_llm):
         """Caller can pass io+state+config to build session themselves."""
-        from chat_workflow.session_log import SessionLog
+        from chat_workflow import SessionLog
 
         mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
             intent=AgentIntent.SUCCESS, result=make_valid_criteria()
@@ -238,7 +239,7 @@ class TestWorkflowIntegration(unittest.TestCase):
 
     @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_workflow_passes_tools_to_leaf(self, mock_call_llm):
-        from chat_workflow.session_log import SessionLog
+        from chat_workflow import SessionLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
         mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
@@ -263,7 +264,7 @@ class TestWorkflowIntegration(unittest.TestCase):
     @patch("chat_workflow.atomic_workflow.AtomicWorkflow._call_llm")
     def test_workflow_refinement_loop(self, mock_call_llm):
 
-        from chat_workflow.session_log import SessionLog
+        from chat_workflow import SessionLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
         initial_criteria = EvaluationCriteria(
@@ -372,8 +373,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         """
         from unittest.mock import Mock, patch
 
-        from chat_workflow import AgentIntent, AgentResponse
-        from chat_workflow.atomic_workflow import AtomicWorkflow
+        from chat_workflow import AgentIntent, AgentResponse, AtomicWorkflow
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
         from workflows.evaluation_criteria.refine import refine
 
@@ -566,7 +566,7 @@ class TestAutoParamInjection(unittest.TestCase):
         """{initial_object.model_dump()} style interpolation still works."""
         from unittest.mock import Mock, patch
 
-        from chat_workflow.atomic_workflow import AtomicWorkflow
+        from chat_workflow import AtomicWorkflow
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
         captured_system_prompt = []
@@ -711,7 +711,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         LLM knows the validation rules before generating."""
         from unittest.mock import Mock
 
-        from chat_workflow.session_log import SessionLog
+        from chat_workflow import SessionLog
         from workflows.evaluation_criteria import EvaluationCriteria
 
         mock_io = Mock()

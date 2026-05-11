@@ -8,13 +8,12 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from chat_workflow.types_meta import resolve_return_type
-
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .debug import StreamingDebug
 from .models import AgentResponse, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
+from .types_meta import resolve_return_type
 
 
 def _build_system_prompt(

@@ -2,10 +2,10 @@ import copy
 from collections.abc import Callable
 from typing import Generic, TypeVar
 
-from chat_workflow.atomic_workflow_config import AtomicWorkflowConfig
-from chat_workflow.debug import _DebugTimer
-from chat_workflow.llm_interaction import ProviderType
-from chat_workflow.models import AgentIntent, AgentResponse, TurnResult
+from .atomic_workflow_config import AtomicWorkflowConfig
+from .debug import _DebugTimer
+from .llm_interaction import ProviderType
+from .models import AgentIntent, AgentResponse, TurnResult
 
 TResult = TypeVar("TResult")
 

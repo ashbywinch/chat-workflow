@@ -87,7 +87,7 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=budget_allcaps)
 
-        from chat_workflow.exceptions import ValidationError
+        from chat_workflow import ValidationError
 
         no_budget = [
             Criterion(name="cost", description="Cost constraint", weight=8.0),

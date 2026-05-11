@@ -3,9 +3,9 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
-from chat_workflow.atomic_workflow import AtomicWorkflow
-from chat_workflow.models import TurnResult
-from chat_workflow.session_log import SessionLog, _record_atomic_workflow
+from .atomic_workflow import AtomicWorkflow
+from .models import TurnResult
+from .session_log import SessionLog, _record_atomic_workflow
 
 
 class UserIO:

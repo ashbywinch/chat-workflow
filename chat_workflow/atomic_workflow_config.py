@@ -2,9 +2,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from chat_workflow.debug import StreamingDebug
-from chat_workflow.llm_interaction import ProviderType
-from chat_workflow.models import AgentResponse, TurnResult
+from .debug import StreamingDebug
+from .llm_interaction import ProviderType
+from .models import AgentResponse, TurnResult
 
 TResult = TypeVar("TResult")
 
