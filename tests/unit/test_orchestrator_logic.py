@@ -12,14 +12,14 @@ from chat_workflow.exceptions import (
 )
 from chat_workflow.session import Session
 from chat_workflow.session_log import SessionLog
-from tests.conftest import FakeConfig, make_orchestrator_config, make_valid_criteria
+from tests.conftest import FakeConfig, make_atomic_workflow_config, make_valid_criteria
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
 class TestAtomicWorkflow(unittest.TestCase):
     def test_orchestrator_initialization(self):
         orchestrator = AtomicWorkflow(
-            config=make_orchestrator_config(
+            config=make_atomic_workflow_config(
                 max_turns=5,
                 model="test-model",
                 initial_messages=[{"role": "user", "content": "Initial context: test"}],
@@ -36,7 +36,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_success(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         action = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria())
         mock_call_llm.return_value = action
@@ -50,7 +50,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_continue(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What's your budget range?")
         mock_call_llm.return_value = action
@@ -66,7 +66,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_failure_raises_exception(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         action = AgentResponse[EvaluationCriteria](
             intent=AgentIntent.FAILURE, message="I don't have enough information to help"
@@ -87,7 +87,7 @@ class TestAtomicWorkflow(unittest.TestCase):
         """On failure, the conversation transcript must appear exactly once
         in the error message — not 0 (missing) or 2+ (duplicated from
         both error.__str__ and error.message)."""
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         action = AgentResponse[EvaluationCriteria](
             intent=AgentIntent.FAILURE, message="I don't have enough information"
@@ -107,7 +107,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_empty_input(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="First question")
         mock_call_llm.return_value = action
@@ -120,7 +120,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_multi_turn_conversation_sequence(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config(max_turns=5))
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(max_turns=5))
 
         responses = [
             AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="Question 1"),
@@ -146,7 +146,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_orchestrator_raises_on_max_turns(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config(max_turns=2))
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(max_turns=2))
 
         mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
             intent=AgentIntent.CONTINUE, message="Another question"
@@ -167,7 +167,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_propagates_llm_exceptions(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         mock_call_llm.side_effect = ValueError("Validation failed after retries")
 
@@ -178,7 +178,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_invalid_action_raises_exception(self, mock_call_llm):
-        orchestrator = AtomicWorkflow(config=make_orchestrator_config())
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         mock_action = Mock()
         mock_action.intent = "invalid_action"

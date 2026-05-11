@@ -10,8 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from chat_workflow import AgentResponse, TurnResult
+from chat_workflow.atomic_workflow_config import AtomicWorkflowConfig
 from chat_workflow.exceptions import AtomicWorkflowFailedError
-from chat_workflow.orchestrator_config import OrchestratorConfig
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 # Add the project root to Python path
@@ -78,12 +78,12 @@ def make_valid_criteria() -> EvaluationCriteria:
     )
 
 
-def make_orchestrator_config(
+def make_atomic_workflow_config(
     response_model_override: type | None = None,
     max_turns: int = 10,
     **overrides: Any,
-) -> OrchestratorConfig:
-    """Create a standard OrchestratorConfig for testing."""
+) -> AtomicWorkflowConfig:
+    """Create a standard AtomicWorkflowConfig for testing."""
     kwargs = dict(
         system_prompt="Test prompt",
         response_model=response_model_override or AgentResponse[EvaluationCriteria],
@@ -93,7 +93,7 @@ def make_orchestrator_config(
         on_failure=lambda action: AtomicWorkflowFailedError(action.message or "No reason given"),
     )
     kwargs.update(overrides)
-    return OrchestratorConfig(**kwargs)
+    return AtomicWorkflowConfig(**kwargs)
 
 
 class MockInstructorClient:

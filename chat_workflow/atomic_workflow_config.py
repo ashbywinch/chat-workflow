@@ -10,7 +10,7 @@ TResult = TypeVar("TResult")
 
 
 @dataclass
-class OrchestratorConfig(Generic[TResult]):
+class AtomicWorkflowConfig(Generic[TResult]):
     """Configuration for an :class:`AtomicWorkflow`."""
 
     system_prompt: str

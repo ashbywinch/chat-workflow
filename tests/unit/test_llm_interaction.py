@@ -12,7 +12,7 @@ from workflows.evaluation_criteria.evaluation_criteria import EvaluationCriteria
 class TestLLMInteraction(unittest.TestCase):
     def _create_orchestrator(self, max_turns=10):
         return AtomicWorkflow(
-            config=tests.conftest.make_orchestrator_config(max_turns=max_turns)
+            config=tests.conftest.make_atomic_workflow_config(max_turns=max_turns)
         )
 
     @patch("chat_workflow.llm_interaction.get_client")

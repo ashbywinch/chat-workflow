@@ -11,9 +11,9 @@ from pydantic import BaseModel
 from chat_workflow.types_meta import resolve_return_type
 
 from .atomic_workflow import AtomicWorkflow
+from .atomic_workflow_config import AtomicWorkflowConfig
 from .debug import StreamingDebug
 from .models import AgentResponse, TurnResult
-from .orchestrator_config import OrchestratorConfig
 from .prompt_builder import _build_params_section, _format_docstring
 
 
@@ -49,7 +49,7 @@ def _setup_atomic_workflow(
     from .exceptions import AtomicWorkflowFailedError
 
     return AtomicWorkflow(
-        config=OrchestratorConfig(
+        config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
             response_model=AgentResponse[actual_return_type],
             max_turns=max_turns,

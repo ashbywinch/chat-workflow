@@ -2,10 +2,10 @@ import copy
 from collections.abc import Callable
 from typing import Generic, TypeVar
 
+from chat_workflow.atomic_workflow_config import AtomicWorkflowConfig
 from chat_workflow.debug import _DebugTimer
 from chat_workflow.llm_interaction import ProviderType
 from chat_workflow.models import AgentIntent, AgentResponse, TurnResult
-from chat_workflow.orchestrator_config import OrchestratorConfig
 
 TResult = TypeVar("TResult")
 
@@ -13,7 +13,7 @@ TResult = TypeVar("TResult")
 class AtomicWorkflow(Generic[TResult]):
     """Drives a single atomic workflow: one LLM conversation that produces a typed result.
 
-    Takes an :class:`OrchestratorConfig`, then :meth:`process_turn` steps
+    Takes an :class:`AtomicWorkflowConfig`, then :meth:`process_turn` steps
     through the conversation loop. The LLM returns an :class:`AgentResponse`
     whose ``intent`` determines what happens next (continue / success / failure).
     """
@@ -21,7 +21,7 @@ class AtomicWorkflow(Generic[TResult]):
     def __init__(
         self,
         *,
-        config: OrchestratorConfig[TResult],
+        config: AtomicWorkflowConfig[TResult],
     ):
         self.messages: list[dict[str, str]] = [{"role": "system", "content": config.system_prompt}]
         self.turn_count = 0

@@ -8,9 +8,9 @@ from chat_workflow import (
     TurnResult,
 )
 from chat_workflow.atomic_workflow import AtomicWorkflow
+from chat_workflow.atomic_workflow_config import AtomicWorkflowConfig
 from chat_workflow.config import Config
 from chat_workflow.exceptions import AtomicWorkflowFailedError, TurnLimitExceededError
-from chat_workflow.orchestrator_config import OrchestratorConfig
 from chat_workflow.session import Session
 from chat_workflow.session_log import SessionLog
 from tests.conftest import timeout
@@ -37,7 +37,7 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_call_llm_returns_valid_action(self):
         orchestrator = AtomicWorkflow(
-            config=OrchestratorConfig(
+            config=AtomicWorkflowConfig(
                 system_prompt=(
                     "You are a helpful assistant that creates evaluation criteria. "
                     "When returning intent='success' with criteria, you MUST include "
@@ -125,7 +125,7 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_single_turn_with_real_llm(self):
         orchestrator = AtomicWorkflow(
-            config=OrchestratorConfig(
+            config=AtomicWorkflowConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
                     "When returning intent='success' with criteria, you MUST include "
@@ -212,7 +212,7 @@ class TestRealAPI(unittest.TestCase):
     @timeout(10)
     def test_conversation_action_format(self):
         orchestrator = AtomicWorkflow(
-            config=OrchestratorConfig(
+            config=AtomicWorkflowConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
                     "When returning intent='success' with criteria, you MUST include "
