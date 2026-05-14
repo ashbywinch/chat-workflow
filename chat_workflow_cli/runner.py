@@ -24,8 +24,8 @@ class TyperUserIO(UserIO):
     def echo(self, message: str) -> None:
         typer.echo(message)
 
-    def prompt(self, label: str) -> str:
-        return typer.prompt(label)
+    def prompt(self, label: str, **kwargs: object) -> str:
+        return typer.prompt(label, **kwargs)
 
 
 def handle_error(error: Exception) -> None:

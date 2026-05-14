@@ -5,7 +5,9 @@ description = "Framework for building structured LLM conversation workflows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "codegen>=0.57.0",
     "instructor>=1.15.1",
+    "libcst>=1.8.6",
     "litellm>=1.58.15",
     "pydantic>=2.13.3",
     "python-dotenv>=1.2.2",
@@ -41,6 +43,11 @@ ignore = ["UP046", "UP047"]
 
 # "Fixable" allows Ruff to automatically rewrite the code for you
 fixable = ["ALL"]
+
+[dependency-groups]
+dev = [
+    "code-review-graph>=2.3.3",
+]
 
 [project.optional-dependencies]
 dev = [

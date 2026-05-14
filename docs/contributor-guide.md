@@ -174,7 +174,5 @@ This streams all LLM requests/responses to stderr with timing:
 - [Domain Concepts](domain-concepts.md) — Vocabulary defined and mapped to the broader LLM ecosystem
 - [Coding Standards](coding-standards.md) — Types, principles, naming, smells
 - [Git Workflow](git-workflow.md) — Branching, commits, PR descriptions
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — Architecture overview, core files, and critical patterns
-- [QUICKSTART.md](../QUICKSTART.md) — 5-minute contributor guide with critical code locations
 - [spec.md](../spec.md) — Product specification and philosophy
 - [TESTING.md](TESTING.md) — Full testing strategy and patterns

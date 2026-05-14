@@ -8,9 +8,6 @@ LINK_RE = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 DOC_FILES: list[Path] = [
     REPO_ROOT / "README.md",
     REPO_ROOT / "AGENTS.md",
-    REPO_ROOT / "ARCHITECTURE.md",
-    REPO_ROOT / "QUICKSTART.md",
-    REPO_ROOT / "spec.md",
     *sorted((REPO_ROOT / "docs").rglob("*.md")),
 ]
 

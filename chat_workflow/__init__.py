@@ -15,6 +15,7 @@ from .exceptions import (
     TurnLimitExceededError,
     ValidationError,
 )
+from .interactive_entity import InteractiveEntity
 from .llm_interaction import get_client, list_available_providers
 from .models import AgentIntent, AgentResponse, TurnResult
 from .session import Session
@@ -31,6 +32,7 @@ __all__ = [
     "Config",
     "ConfigFileError",
     "ConfigurationError",
+    "InteractiveEntity",
     "InvalidResponseError",
     "ProviderNotFoundError",
     "ProviderNotSupportedError",

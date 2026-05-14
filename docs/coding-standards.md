@@ -23,6 +23,7 @@ These standards apply to all code in the chat-workflow library. They are designe
 - **Prefer to fail fast.** Don't silence errors, only use defaults where there is actually a good default option, don't have backstops, don't have three places that you look for something "just in case". Decide what should happen and then fail fast if it doesn't happen.
 - **We do not maintain backwards compatibility** with previous versions of anything.
 - **Import discipline**: Module and package exports should be organised so that the public API surface is importable from the package root. If code is moved to a different submodule, only ``__init__.py`` should need to change. External consumers must import from the package root (``from mypackage import Thing``), not from submodules (``from mypackage.submodule import Thing``). Internal code within the package should use relative submodule imports as normal.
+- **Code generation safety**: Having code in strings within other code should be an absolute last resort when generating code.
 
 ### Class and Module Decomposition
 
