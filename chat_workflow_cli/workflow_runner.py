@@ -52,12 +52,10 @@ class WorkflowRunner:
                 typer.secho(f"\nFailed to log session: {log_err}", fg=typer.colors.YELLOW)
 
         try:
-user_params["session"] = session
+            user_params["session"] = session
             result = func(**user_params)
             if result is not None:
                 _log_and_exit(result_dict=result.model_dump(), default_success=True)
-            else:
-                typer.echo("\nDone.")
             else:
                 typer.echo("\nDone.")
         except KeyboardInterrupt:

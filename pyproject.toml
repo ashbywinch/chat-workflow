@@ -41,6 +41,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "N"]
 # runtime reflection that inspects Generic[TResult] / TypeVar patterns.
 ignore = ["UP046", "UP047"]
 
+
+
 # "Fixable" allows Ruff to automatically rewrite the code for you
 fixable = ["ALL"]
 

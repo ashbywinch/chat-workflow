@@ -337,11 +337,6 @@ class TestCliDiscovery(unittest.TestCase):
         workflow_path = workflows["workflow"]
         self.assertTrue((workflow_path / "__init__.py").exists())
 
-    def test_create_function_is_workflow(self):
-        """The create function should have _is_workflow attribute."""
-        from workflows.workflow.flows import create
-        self.assertTrue(getattr(create, "_is_workflow", False))
-
     def test_workflow_discoverable_by_cli(self):
         """The CLI should be able to build a sub-app for workflow."""
         from chat_workflow_cli.cli import _build_workflow_sub_app

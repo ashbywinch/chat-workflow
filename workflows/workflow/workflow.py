@@ -1,0 +1,284 @@
+from __future__ import annotations
+
+from typing import Annotated, ClassVar
+
+from pydantic import Field
+
+from chat_workflow import Session, atomic_workflow, composite_workflow
+from chat_workflow.annotations import Blob, Validation
+from chat_workflow.mixins import BlobSyncMixin, LLMValidated
+
+from .models import (
+    ComponentRequirement,
+    GapAnalysis,
+    Input,
+    Output,
+    ProcessAnalysis,
+)
+from .models.component_requirement import ComponentRequirement as _ComponentRequirement
+from .models.gap_analysis import GapAnalysis as _GapAnalysis
+
+
+class Workflow(BlobSyncMixin, LLMValidated):
+    """A complete workflow specification.
+
+    Combines process analysis, input/output specs, component requirements,
+    gap analysis, and a Mermaid sequence diagram into a single validated artifact.
+    """
+
+    name: str = Field(
+        ...,
+        description="Workflow name ending in 'Workflow'",
+    )
+
+    diagram: Annotated[
+        str,
+        Blob(".mmd"),
+        Validation("Must use sequenceDiagram format with proper participant declarations"),
+        Validation("Participants must use 'Component Path: Playbook Name' naming format"),
+        Validation("Must not include classDef or styling directives"),
+        Validation("Must use <br/> tags for splitting long text across lines"),
+    ] = Field(
+        ...,
+        description="Mermaid sequence diagram as text (sequenceDiagram format)",
+    )
+
+    inputs: list[Input] = Field(
+        ...,
+        description="All workflow inputs with source, format, trigger, and validation analysis",
+    )
+
+    outputs: list[Output] = Field(
+        ...,
+        description="All workflow outputs with consumer, format, success criteria, and integration analysis",
+    )
+
+    components: list[ComponentRequirement] = Field(
+        ...,
+        description="Identified components required by this workflow",
+    )
+
+    gap_analysis: GapAnalysis | None = Field(
+        None,
+        description="Analysis of missing elements, integration gaps, and organizational gaps",
+    )
+
+    architectural_validation: str = Field(
+        ...,
+        description="Validation of ownership, alignment, separation of concerns, and dependency management",
+    )
+
+    _validation_rules: ClassVar[list[str]] = [
+        "All component names must follow artifact-based naming (nouns, not processes)",
+        "Every input must have a matching output consumer",
+        "No activities lack proper component ownership",
+    ]
+
+    @atomic_workflow
+    @classmethod
+    def generate_diagram(
+        cls,
+        analysis: Annotated[ProcessAnalysis, "The process analysis"],
+        components: Annotated[list[ComponentRequirement], "The identified components"],
+        inputs: Annotated[list[Input], "The workflow inputs"],
+        outputs: Annotated[list[Output], "The workflow outputs"],
+        gap_analysis: Annotated[GapAnalysis | None, "Optional gap analysis to incorporate"] = None,
+        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+    ) -> Workflow:
+        """You are creating a complete workflow artifact with a Mermaid sequence diagram.
+
+        Create a Mermaid sequenceDiagram with:
+        - Participants in 'Component Path: Playbook Name' format
+        - Split long text across lines using <br/> tags
+        - No classDef or styling directives
+        - Entry point, all interactions through orchestrator, decision points, return flows, clear outcomes
+
+        Also populate all fields:
+        - name: Workflow name ending in 'Workflow'
+        - inputs: from the provided input analysis
+        - outputs: from the provided output analysis
+        - components: from the identified components
+        - gap_analysis: from the provided gap analysis
+        - architectural_validation: validate ownership, alignment, and dependencies
+
+        {analysis}
+
+        Guidelines:
+        - The diagram must tell a complete story of the business process
+        - Every activity should be represented in the sequence flow
+        - Participants should be meaningful business roles
+        - Ask one question at a time
+        """
+        ...  # type: ignore[reportReturnType]
+
+    @classmethod
+    def _create_diagram(
+        cls,
+        analysis: ProcessAnalysis,
+        components: list[ComponentRequirement],
+        inputs: list[Input],
+        outputs: list[Output],
+        gap_analysis: GapAnalysis | None = None,
+        *,
+        session: Session,
+        max_refinements: int = 3,
+    ) -> Workflow:
+        import tempfile
+        from pathlib import Path
+
+        from workflows.evaluation_criteria.refine import refine
+
+        tmp_dir = tempfile.mkdtemp(prefix="workflow_diagram_")
+
+        workflow = cls.generate_diagram(
+            analysis=analysis,
+            components=components,
+            inputs=inputs,
+            outputs=outputs,
+            gap_analysis=gap_analysis,
+            session=session,
+        )
+
+        workflow.materialize_blobs(Path(tmp_dir))
+        diagram_path = workflow.get_blob_path("diagram")
+        if diagram_path:
+            session.io.echo(f"Diagram saved to: {diagram_path}")
+
+        for _ in range(max_refinements):
+            refined = refine(
+                initial_object=workflow,
+                max_turns=5,
+                session=session,
+            )
+
+            # User satisfied when object returned unchanged
+            if refined.model_dump() == workflow.model_dump():
+                return refined
+
+            workflow = refined
+            workflow.materialize_blobs(Path(tmp_dir))
+            if diagram_path:
+                session.io.echo(f"Updated diagram saved to: {diagram_path}")
+
+        return workflow
+
+
+def _resolve_gaps(
+    analysis: ProcessAnalysis,
+    inputs: list[Input],
+    outputs: list[Output],
+    existing_components: list[str] | None = None,
+    *,
+    session: Session,
+) -> tuple[list[ComponentRequirement], GapAnalysis]:
+    """Loop: identify components -> analyze gaps -> refine until clean."""
+    existing = existing_components or []
+    max_iterations = 5
+
+    for _ in range(max_iterations):
+        components = _ComponentRequirement.identify_from_chat(
+            analysis=analysis,
+            inputs=inputs,
+            outputs=outputs,
+            session=session,
+        )
+        gaps = _GapAnalysis.analyze_from_chat(
+            components=components,
+            analysis=analysis,
+            existing_components=existing,
+            session=session,
+        )
+
+        # Check if gaps are resolved
+        if (
+            not gaps.missing_components
+            and not gaps.integration_gaps
+            and not gaps.organizational_gaps
+        ):
+            return components, gaps
+
+        # Pass gap info back — the LLM sub-workflows will see it and adjust
+        # by including gap context in the next iteration
+        existing.extend(gaps.missing_components)
+
+    # After max iterations, return best effort
+    return _ComponentRequirement.identify_from_chat(
+        analysis=analysis,
+        inputs=inputs,
+        outputs=outputs,
+        session=session,
+    ), _GapAnalysis.analyze_from_chat(
+        components=_ComponentRequirement.identify_from_chat(
+            analysis=analysis,
+            inputs=inputs,
+            outputs=outputs,
+            session=session,
+        ),
+        analysis=analysis,
+        existing_components=existing,
+        session=session,
+    )
+
+
+@composite_workflow
+def create(
+    process_description: str = "",
+    *,
+    session: Session,
+    max_refinements: int = 3,
+    existing_components: list[str] | None = None,
+) -> Workflow:
+    """Create a complete workflow artifact through conversation.
+
+    Orchestrates: process analysis → component identification →
+    gap resolution loop → diagram generation → user refinement →
+    component creation.
+
+    Args:
+        process_description: Initial description of the business process
+        session: The chat-workflow session
+        max_refinements: Maximum diagram refinement iterations
+        existing_components: List of existing component names to check against
+    """
+    analysis = ProcessAnalysis.generate_from_chat(
+        process_description=process_description,
+        session=session,
+    )
+
+    session.io.echo("\nLet's analyze the inputs and outputs for this workflow.")
+    inputs = Input.generate_from_chat(analysis=analysis, session=session)
+    outputs = Output.generate_from_chat(analysis=analysis, session=session)
+
+    components, gap_analysis = _resolve_gaps(
+        analysis=analysis,
+        inputs=inputs,
+        outputs=outputs,
+        existing_components=existing_components or [],
+        session=session,
+    )
+
+    workflow = Workflow._create_diagram(
+        analysis=analysis,
+        components=components,
+        inputs=inputs,
+        outputs=outputs,
+        gap_analysis=gap_analysis,
+        session=session,
+        max_refinements=max_refinements,
+    )
+
+    session.io.echo(f"\nCreating {len(components)} component(s)...")
+    for req in components:
+        session.io.echo(f"  Creating component: {req.name}")
+        try:
+            from .component import Component as ComponentModel
+
+            component = ComponentModel.create(
+                requirements=req,  # type: ignore[arg-type]
+                session=session,
+            )
+            session.io.echo(f"  ✓ {req.name} created at {component.code_path}")
+        except Exception as e:
+            session.io.echo(f"  ✗ Failed to create {req.name}: {e}")
+
+    return workflow
