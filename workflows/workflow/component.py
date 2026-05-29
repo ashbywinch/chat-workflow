@@ -1,23 +1,30 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from chat_workflow import atomic_workflow, composite_workflow
 from chat_workflow.code_generator import verify_code
+from chat_workflow.mixins import LLMValidated
 from chat_workflow.session import Session
 
 from .models import ComponentRequirement, GeneratedComponent
 
 
-class Component(BaseModel):
+class Component(LLMValidated):
     """A created business component.
 
     Represents a single business component that has been designed and
     written to disk by the component workflow.
     """
+
+    _validation_rules: ClassVar[list[str]] = [
+        "Generated class must inherit from BaseModel",
+        "Generated class must have a generate_from_chat classmethod",
+        "All field types must be valid Python types",
+    ]
 
     name: str = Field(
         ...,
@@ -68,7 +75,7 @@ class Component(BaseModel):
         1. design_component(requirements) -> GeneratedComponent with code
         2. verify_code(code) -> clean, formatted code
         3. Write to file at output_dir / {name}.py
-        4. Build and return Component object with code_path set
+        4. Build, validate, and return Component object with code_path set
         
         Args:
             requirements: The component requirements
@@ -101,15 +108,21 @@ class Component(BaseModel):
         code_path.write_text(clean_code)
         session.io.echo(f"Component written to: {code_path}")
 
-        # Step 5: Create and return Component object
-        return cls(
-            name=requirements.name,
-            purpose=requirements.purpose,
-            code_path=code_path,
-            model_class=requirements.name,
-            expert_role=f"{requirements.name} Expert",
-            component_type=requirements.component_type,
-        )
+        # Step 5: Validate the Component object (triggers LLMValidated @model_validator)
+        try:
+            result = cls(
+                name=requirements.name,
+                purpose=requirements.purpose,
+                code_path=code_path,
+                model_class=requirements.name,
+                expert_role=f"{requirements.name} Expert",
+                component_type=requirements.component_type,
+            )
+            result.validate_llm_rules()
+            return result
+        except Exception as e:
+            session.io.echo(f"Validation failed: {e}")
+            raise
 
     @atomic_workflow
     @classmethod
