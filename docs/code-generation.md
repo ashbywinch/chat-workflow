@@ -183,7 +183,7 @@ It also keeps each file small and focused. A model file typically contains:
 ```python
 # workflows/workflow/Workflow.py
 from __future__ import annotations
-from typing import Annotated
+from typing import Annotated, ClassVar
 from pydantic import BaseModel, Field, model_validator
 from chat_workflow.annotations import Blob, Validation
 from chat_workflow.mixins import BlobSyncMixin, LLMValidated

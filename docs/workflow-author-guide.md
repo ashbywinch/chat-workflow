@@ -549,6 +549,7 @@ from pathlib import Path
 from typing import Annotated
 from pydantic import BaseModel, Field
 from chat_workflow import Session, atomic_workflow, composite_workflow
+from chat_workflow.code_generator import verify_code
 
 class GeneratedComponent(BaseModel):
     """Holds the raw code output from the LLM before verification."""
