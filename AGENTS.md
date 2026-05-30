@@ -101,7 +101,6 @@ make lint           # black --check + ruff check
 | [Contributor Guide](docs/contributors/contributor-guide.md) | Developing the framework itself | Library contributors |
 | [Writing Documentation Guide](docs/contributors/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
 | [Testing Guide](docs/contributors/testing.md) | Testing strategy and patterns | Quality assurance |
-| [Product Spec](spec.md) | Product requirements and philosophy | Understanding vision |
 | [Couch2food Migration Guide](docs/workflow-authors/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
 | [Code Generation](docs/workflow-authors/code-generation.md) | Generating workflow code via LLM + verify_code() | Developers creating new workflows |
 

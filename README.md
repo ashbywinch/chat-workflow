@@ -75,7 +75,6 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ide
 | **Building New Workflows** | [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md) |
 | **Contributing to the Framework** | [Contributor Guide](docs/contributors/contributor-guide.md) |
 | **Testing Strategy** | [Testing Guide](docs/contributors/testing.md) |
-| **Product Specification** | [Product Spec](spec.md) |
 
 **AI Agents**: Read [AGENTS.md](AGENTS.md) for agent-specific onboarding and routing.
 
