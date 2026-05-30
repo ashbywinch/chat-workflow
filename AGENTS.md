@@ -13,7 +13,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 1. Run an Existing Workflow
 **Goal**: Execute a pre-built workflow to generate structured data.
 
-**Read**: [User Guide](docs/user-guide.md)
+**Read**: [User Guide](docs/users/user-guide.md)
 - How to install and configure the library
 - Using the command-line interface
 - Running the example evaluation criteria workflow
@@ -22,7 +22,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 2. Build a New Workflow
 **Goal**: Create a new conversation flow for a specific domain.
 
-**Read**: [Workflow Author Guide](docs/workflow-author-guide.md)
+**Read**: [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md)
 - Understanding the `@atomic_workflow` and `@composite_workflow` decorators
 - Defining Pydantic models with business rules
 - Writing conversation prompts
@@ -32,7 +32,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 3. Hack on the Framework
 **Goal**: Contribute to the core library or modify its internals.
 
-**Read**: [Contributor Guide](docs/contributor-guide.md)
+**Read**: [Contributor Guide](docs/contributors/contributor-guide.md)
 - Project architecture and key patterns
 - Git workflow and development practices
 - Running tests (unit tests and real API evals)
@@ -42,7 +42,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 4. See the Example Workflow
 **Goal**: Understand the evaluation criteria example that ships with the library.
 
-**Read**: [Example: Evaluation Criteria](docs/example-evaluation-criteria.md)
+**Read**: [Example: Evaluation Criteria](docs/users/example-evaluation-criteria.md)
 - Complete walkthrough of the sample workflow
 - Business rules and validation logic
 - Conversation flow design
@@ -51,7 +51,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 5. Write Documentation
 **Goal**: Create or update project documentation.
 
-**Read**: [Writing Documentation Guide](docs/writing-documentation.md)
+**Read**: [Writing Documentation Guide](docs/contributors/writing-documentation.md)
 - Context Efficiency principle
 - SOLID/DRY principles for documentation
 - Documentation structure and conventions
@@ -59,7 +59,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 6. Migrate from Couch2food
 **Goal**: Update existing workflows from earlier patterns to the new chat-workflow-prototype implementation.
 
-**Read**: [couch2food-migration-guide.md](docs/couch2food-migration-guide.md), [code-generation.md](docs/code-generation.md)
+**Read**: [couch2food-migration-guide.md](docs/workflow-authors/couch2food-migration-guide.md), [code-generation.md](docs/workflow-authors/code-generation.md)
 - Understanding the changes from the old architecture to the new
 - Using the Blob and Validation annotation system
 - Working with BlobSyncMixin and LLMValidated mixins
@@ -95,15 +95,15 @@ make lint           # black --check + ruff check
 | Document | Purpose | Best For |
 |----------|---------|----------|
 | [README.md](README.md) | Project overview and general introduction | All audiences, GitHub front page |
-| [User Guide](docs/user-guide.md) | 5-minute setup and first run | New users getting started |
-| [Example: Evaluation Criteria](docs/example-evaluation-criteria.md) | Complete sample workflow walkthrough | Learning by example |
-| [Workflow Author Guide](docs/workflow-author-guide.md) | Building new conversation flows | Developers creating workflows |
-| [Contributor Guide](docs/contributor-guide.md) | Developing the framework itself | Library contributors |
-| [Writing Documentation Guide](docs/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
-| [Testing Guide](docs/TESTING.md) | Testing strategy and patterns | Quality assurance |
+| [User Guide](docs/users/user-guide.md) | 5-minute setup and first run | New users getting started |
+| [Example: Evaluation Criteria](docs/users/example-evaluation-criteria.md) | Complete sample workflow walkthrough | Learning by example |
+| [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md) | Building new conversation flows | Developers creating workflows |
+| [Contributor Guide](docs/contributors/contributor-guide.md) | Developing the framework itself | Library contributors |
+| [Writing Documentation Guide](docs/contributors/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
+| [Testing Guide](docs/contributors/testing.md) | Testing strategy and patterns | Quality assurance |
 | [Product Spec](spec.md) | Product requirements and philosophy | Understanding vision |
-| [Couch2food Migration Guide](docs/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
-| [Code Generation](docs/code-generation.md) | Generating workflow code via LLM + verify_code() | Developers creating new workflows |
+| [Couch2food Migration Guide](docs/workflow-authors/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
+| [Code Generation](docs/workflow-authors/code-generation.md) | Generating workflow code via LLM + verify_code() | Developers creating new workflows |
 
 ## Git Workflow (For Contributors)
 
@@ -130,4 +130,4 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 - Run both `make test` and `make evals` before pushing.
 - origin/main is protected — all changes go through PRs.
 
-For debugging LLM interactions, see the [Contributor Guide](docs/contributor-guide.md#debugging-llm-interactions).
+For debugging LLM interactions, see the [Contributor Guide](docs/contributors/contributor-guide.md#debugging-llm-interactions).

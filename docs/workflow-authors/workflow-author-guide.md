@@ -347,11 +347,11 @@ def generate_reviewed_data(
     return refined_data
 ```
 
-For debugging LLM interactions, see the [Contributor Guide](contributor-guide.md#debugging-llm-interactions).
+For debugging LLM interactions, see the [Contributor Guide](../contributors/contributor-guide.md#debugging-llm-interactions).
 
 ## Next Steps
 
-- See [example-evaluation-criteria.md](example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
+- See [../users/example-evaluation-criteria.md](../users/example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
 - See [code-generation.md](code-generation.md) for LLM-based workflow code generation and the verify_code() pipeline.
 
 ## Annotations & Mixins

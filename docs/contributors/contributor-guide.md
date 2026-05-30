@@ -1,8 +1,8 @@
 # Contributor Guide
 
-This guide is for developers working **on** the chat-workflow library itself. If you're looking to build workflows using the library, see the [workflow author guide](workflow-author-guide.md).
+This guide is for developers working **on** the chat-workflow library itself. If you're looking to build workflows using the library, see the [workflow author guide](../workflow-authors/workflow-author-guide.md).
 
-If you are new to the codebase, start with [domain-concepts.md](domain-concepts.md) — it defines the core vocabulary (atomic workflow, turn, session, etc.) and maps each term to equivalent concepts in the broader LLM ecosystem.
+If you are new to the codebase, start with [../reference/domain-concepts.md](../reference/domain-concepts.md) — it defines the core vocabulary (atomic workflow, turn, session, etc.) and maps each term to equivalent concepts in the broader LLM ecosystem.
 
 For coding standards, see [coding-standards.md](coding-standards.md).
 For git workflow and PR guidance, see [git-workflow.md](git-workflow.md).
@@ -93,7 +93,7 @@ make lint           # ruff and basedpyright
 
 ## Testing Strategy
 
-See the full [testing documentation](TESTING.md) for details.
+See the full [testing documentation](testing.md) for details.
 
 ### Philosophy
 1. **Fail fast with exceptions** — code raises, doesn't return failure objects
@@ -173,8 +173,8 @@ This streams all LLM requests/responses to stderr with timing:
 
 ## Reference Docs
 
-- [Domain Concepts](domain-concepts.md) — Vocabulary defined and mapped to the broader LLM ecosystem
+- [Domain Concepts](../reference/domain-concepts.md) — Vocabulary defined and mapped to the broader LLM ecosystem
 - [Coding Standards](coding-standards.md) — Types, principles, naming, smells
 - [Git Workflow](git-workflow.md) — Branching, commits, PR descriptions
-- [spec.md](../spec.md) — Product specification and philosophy
-- [TESTING.md](TESTING.md) — Full testing strategy and patterns
+- [spec.md](../../spec.md) — Product specification and philosophy
+- [testing.md](testing.md) — Full testing strategy and patterns
