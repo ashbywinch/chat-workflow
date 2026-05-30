@@ -1,4 +1,4 @@
-"""Tests for Component.design_component atomic workflow."""
+"""Tests for Component._design_component atomic workflow."""
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -27,12 +27,12 @@ class TestDesignComponent(unittest.TestCase):
 
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(Component.design_component, "_is_workflow", False),
+            getattr(Component._design_component, "_is_workflow", False),
         )
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            Component.design_component(
+            Component._design_component(
                 requirements=ComponentRequirement(
                     name="Test",
                     purpose="Test component",
@@ -58,7 +58,7 @@ class TestDesignComponent(unittest.TestCase):
         )
 
         session = self._make_session()
-        result = Component.design_component(
+        result = Component._design_component(
             requirements=ComponentRequirement(
                 name="Order",
                 purpose="Manage orders",
@@ -87,7 +87,7 @@ class TestDesignComponent(unittest.TestCase):
         )
 
         session = self._make_session()
-        result = Component.design_component(
+        result = Component._design_component(
             requirements=ComponentRequirement(
                 name="TestComponent",
                 purpose="Test",

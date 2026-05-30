@@ -31,8 +31,6 @@ class ProcessAnalysis(BaseModel):
         Your goal is to analyze a business process description and create a
         structured process analysis.
 
-        {process_description}
-
         Behavior:
         - Collaborate with the user to understand their business objective
         - Identify logical process phases in order

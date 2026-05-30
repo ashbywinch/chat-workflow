@@ -76,7 +76,7 @@ class Workflow(BlobSyncMixin, LLMValidated):
 
     @atomic_workflow
     @classmethod
-    def generate_diagram(
+    def _generate_diagram(
         cls,
         analysis: Annotated[ProcessAnalysis, "The process analysis"],
         components: Annotated[list[ComponentRequirement], "The identified components"],
@@ -100,8 +100,6 @@ class Workflow(BlobSyncMixin, LLMValidated):
         - components: from the identified components
         - gap_analysis: from the provided gap analysis
         - architectural_validation: validate ownership, alignment, and dependencies
-
-        {analysis}
 
         Guidelines:
         - The diagram must tell a complete story of the business process
@@ -130,7 +128,7 @@ class Workflow(BlobSyncMixin, LLMValidated):
 
         tmp_dir = tempfile.mkdtemp(prefix="workflow_diagram_")
 
-        workflow = cls.generate_diagram(
+        workflow = cls._generate_diagram(
             analysis=analysis,
             components=components,
             inputs=inputs,
@@ -159,6 +157,65 @@ class Workflow(BlobSyncMixin, LLMValidated):
             workflow.materialize_blobs(Path(tmp_dir))
             if diagram_path:
                 session.io.echo(f"Updated diagram saved to: {diagram_path}")
+
+        return workflow
+
+    @composite_workflow
+    @classmethod
+    def create(
+        cls,
+        process_description: str = "",
+        *,
+        session: Session,
+        max_refinements: int = 3,
+        existing_components: list[str] | None = None,
+    ) -> Workflow:
+        """Create a complete workflow artifact through conversation.
+
+        Orchestrates: process analysis, component identification,
+        gap resolution, diagram generation, user refinement, and
+        component creation.
+        """
+        analysis = ProcessAnalysis.generate_from_chat(
+            process_description=process_description,
+            session=session,
+        )
+
+        session.io.echo("\nLet's analyze the inputs and outputs for this workflow.")
+        inputs = Input.generate_from_chat(analysis=analysis, session=session)
+        outputs = Output.generate_from_chat(analysis=analysis, session=session)
+
+        components, gap_analysis = _resolve_gaps(
+            analysis=analysis,
+            inputs=inputs,
+            outputs=outputs,
+            existing_components=existing_components or [],
+            session=session,
+        )
+
+        workflow = cls._create_diagram(
+            analysis=analysis,
+            components=components,
+            inputs=inputs,
+            outputs=outputs,
+            gap_analysis=gap_analysis,
+            session=session,
+            max_refinements=max_refinements,
+        )
+
+        session.io.echo(f"\nCreating {len(components)} component(s)...")
+        for req in components:
+            session.io.echo(f"  Creating component: {req.name}")
+            try:
+                from .component import Component as ComponentModel
+
+                component = ComponentModel.create(
+                    requirements=req,
+                    session=session,
+                )
+                session.io.echo(f"  ✓ {req.name} created at {component.code_path}")
+            except Exception as e:
+                session.io.echo(f"  ✗ Failed to create {req.name}: {e}")
 
         return workflow
 
@@ -218,67 +275,3 @@ def _resolve_gaps(
         existing_components=existing,
         session=session,
     )
-
-
-@composite_workflow
-def create(
-    process_description: str = "",
-    *,
-    session: Session,
-    max_refinements: int = 3,
-    existing_components: list[str] | None = None,
-) -> Workflow:
-    """Create a complete workflow artifact through conversation.
-
-    Orchestrates: process analysis → component identification →
-    gap resolution loop → diagram generation → user refinement →
-    component creation.
-
-    Args:
-        process_description: Initial description of the business process
-        session: The chat-workflow session
-        max_refinements: Maximum diagram refinement iterations
-        existing_components: List of existing component names to check against
-    """
-    analysis = ProcessAnalysis.generate_from_chat(
-        process_description=process_description,
-        session=session,
-    )
-
-    session.io.echo("\nLet's analyze the inputs and outputs for this workflow.")
-    inputs = Input.generate_from_chat(analysis=analysis, session=session)
-    outputs = Output.generate_from_chat(analysis=analysis, session=session)
-
-    components, gap_analysis = _resolve_gaps(
-        analysis=analysis,
-        inputs=inputs,
-        outputs=outputs,
-        existing_components=existing_components or [],
-        session=session,
-    )
-
-    workflow = Workflow._create_diagram(
-        analysis=analysis,
-        components=components,
-        inputs=inputs,
-        outputs=outputs,
-        gap_analysis=gap_analysis,
-        session=session,
-        max_refinements=max_refinements,
-    )
-
-    session.io.echo(f"\nCreating {len(components)} component(s)...")
-    for req in components:
-        session.io.echo(f"  Creating component: {req.name}")
-        try:
-            from .component import Component as ComponentModel
-
-            component = ComponentModel.create(
-                requirements=req,  # type: ignore[arg-type]
-                session=session,
-            )
-            session.io.echo(f"  ✓ {req.name} created at {component.code_path}")
-        except Exception as e:
-            session.io.echo(f"  ✗ Failed to create {req.name}: {e}")
-
-    return workflow

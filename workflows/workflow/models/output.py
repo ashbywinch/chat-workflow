@@ -38,8 +38,6 @@ class Output(BaseModel):
         Based on this process analysis, help the user identify what outputs
         this workflow produces.
 
-        {analysis}
-
         For each output, identify:
         - consumer: Which components use this output
         - format: Exact format/structure

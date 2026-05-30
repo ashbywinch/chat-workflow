@@ -72,7 +72,7 @@ class Component(LLMValidated):
     ) -> Component:
         """Create ONE business component.
         
-        1. design_component(requirements) -> GeneratedComponent with code
+        1. _design_component(requirements) -> GeneratedComponent with code
         2. verify_code(code) -> clean, formatted code
         3. Write to file at output_dir / {name}.py
         4. Build, validate, and return Component object with code_path set
@@ -85,7 +85,7 @@ class Component(LLMValidated):
         """
         # Step 1: Design the component (LLM generates code)
         session.io.echo(f"Designing component: {requirements.name}...")
-        generated = cls.design_component(
+        generated = cls._design_component(
             requirements=requirements,
             session=session,
         )
@@ -126,7 +126,7 @@ class Component(LLMValidated):
 
     @atomic_workflow
     @classmethod
-    def design_component(
+    def _design_component(
         cls,
         requirements: Annotated[
             ComponentRequirement,
@@ -137,8 +137,6 @@ class Component(LLMValidated):
         """You are a software architect designing a Python business component.
 
         Generate a complete Python file for this business component.
-
-        {requirements}
 
         Rules:
         - Import from __future__ import annotations

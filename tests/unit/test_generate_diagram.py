@@ -1,4 +1,4 @@
-"""Tests for Workflow.generate_diagram and _create_diagram."""
+"""Tests for Workflow._generate_diagram and _create_diagram."""
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -77,12 +77,12 @@ def _make_outputs() -> list[Output]:
 class TestGenerateDiagram(unittest.TestCase):
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(Workflow.generate_diagram, "_is_workflow", False)
+            getattr(Workflow._generate_diagram, "_is_workflow", False)
         )
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            Workflow.generate_diagram(
+            Workflow._generate_diagram(
                 analysis=_make_analysis(),
                 components=_make_components(),
                 inputs=_make_inputs(),
@@ -106,7 +106,7 @@ class TestGenerateDiagram(unittest.TestCase):
             result=expected,
         )
         session = _make_session()
-        result = Workflow.generate_diagram(
+        result = Workflow._generate_diagram(
             analysis=_make_analysis(),
             components=_make_components(),
             inputs=_make_inputs(),
@@ -120,7 +120,7 @@ class TestGenerateDiagram(unittest.TestCase):
 
 class TestCreateDiagram(unittest.TestCase):
     @patch("workflows.evaluation_criteria.refine.refine")
-    @patch.object(Workflow, "generate_diagram")
+    @patch.object(Workflow, "_generate_diagram")
     def test_materializes_blobs(self, mock_generate, mock_refine):
         workflow = Workflow(
             name="Test Workflow",
@@ -148,7 +148,7 @@ class TestCreateDiagram(unittest.TestCase):
         mock_refine.assert_called_once()
 
     @patch("workflows.evaluation_criteria.refine.refine")
-    @patch.object(Workflow, "generate_diagram")
+    @patch.object(Workflow, "_generate_diagram")
     def test_refine_loop_reruns_on_changes(self, mock_generate, mock_refine):
         original = Workflow(
             name="Test Workflow",

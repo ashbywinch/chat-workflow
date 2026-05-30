@@ -38,8 +38,6 @@ class ComponentRequirement(BaseModel):
     ) -> list[ComponentRequirement]:
         """You are a Business Architect identifying components needed for this process.
 
-        {analysis}
-
         Rules:
         - Each component is named after a business artifact (noun), not a process (verb)
         - Each component has a single, clear responsibility

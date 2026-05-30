@@ -37,8 +37,6 @@ class Input(BaseModel):
         Based on this process analysis, help the user identify what inputs
         are needed to execute the workflow.
 
-        {analysis}
-
         For each input, identify:
         - source: Where this input originates (user, system, component)
         - format: Exact format/structure

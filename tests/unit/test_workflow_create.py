@@ -10,7 +10,7 @@ from workflows.workflow.models import (
     Output,
     ProcessAnalysis,
 )
-from workflows.workflow.workflow import Workflow, create
+from workflows.workflow.workflow import Workflow
 
 
 class FakeConfig:
@@ -31,12 +31,12 @@ class TestWorkflowCreate(unittest.TestCase):
 
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(create, "_is_workflow", False)
+            getattr(Workflow.create, "_is_workflow", False)
         )
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            create(process_description="test")
+            Workflow.create(process_description="test")
         self.assertIn("session", str(ctx.exception))
 
     @patch("workflows.workflow.models.process_analysis.ProcessAnalysis.generate_from_chat")
@@ -112,7 +112,7 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_component_class.create.return_value = mock_component_instance
 
         session = self._make_session()
-        result = create(
+        result = Workflow.create(
             process_description="test process",
             session=session,
         )
@@ -208,7 +208,7 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_component_class.create.return_value = mock_component_instance
 
         session = self._make_session()
-        result = create(
+        result = Workflow.create(
             process_description="multi-component process",
             session=session,
         )
@@ -307,7 +307,7 @@ class TestWorkflowCreate(unittest.TestCase):
         ]
 
         session = self._make_session()
-        result = create(
+        result = Workflow.create(
             process_description="mixed component process",
             session=session,
         )
