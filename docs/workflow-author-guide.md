@@ -333,7 +333,7 @@ def refine_data(
 
 # Composite workflow
 @composite_workflow
-def create_and_refine_data(
+def generate_reviewed_data(
     topic: str = "",
     max_turns: int = 10,
     session: Session,
