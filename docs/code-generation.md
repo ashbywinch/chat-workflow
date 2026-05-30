@@ -47,6 +47,8 @@ The LLM might emit something like this:
 from __future__ import annotations
 from pydantic import BaseModel, Field
 
+from chat_workflow import atomic_workflow
+
 
 class Criterion(BaseModel):
     name: str = Field(..., description="Name of this criterion")
@@ -351,6 +353,8 @@ validator = generate_model_validator(
 ### Complete Example: LLM + Helpers Pipeline
 
 ```python
+from pathlib import Path
+
 from chat_workflow.code_generator import verify_code
 
 # Step 1: LLM emits raw Python code (simulated here)
@@ -386,48 +390,6 @@ output_path.write_text(cleaned_code)
 
 ---
 
-## Backward Compatibility
-
-### generate_class() (InteractiveEntity Subclasses)
-
-The `generate_class()` function in `chat_workflow/code_generator.py` generates `InteractiveEntity` subclasses. This was the original code generation approach from the couch2food era:
-
-```python
-from chat_workflow.code_generator import generate_class
-
-code = generate_class(
-    name="Task",
-    fields=[
-        {"name": "title", "type": "str", "desc": "Task title"},
-        {"name": "done", "type": "bool", "desc": "Completion status"},
-    ],
-    validation_rules="title must be non-empty",
-)
-```
-
-This function is kept in the codebase for backward compatibility with previously generated workflows. It is not used for new components.
-
-### What Changed
-
-| Then | Now |
-|------|-----|
-| `InteractiveEntity` base class | Pydantic `BaseModel` directly |
-| `generate_class()` emits full class code | LLM emits code, `verify_code()` cleans |
-| Regex-based validation (`_enforce_single_rule`) | `Validation` annotations + `LLMValidated` mixin |
-| Code-driven conversation flow | LLM-orchestrated conversation |
-| Template-based generation | LLM designs and emits from full context |
-
-### Migration Path
-
-Existing workflows that were generated with `generate_class()` still work. The `InteractiveEntity` base class and the old validation machinery remain in the codebase. New workflow components should:
-
-1. Inherit from `BaseModel` directly (optionally with `BlobSyncMixin` and `LLMValidated`).
-2. Be generated through the LLM + `verify_code()` pipeline.
-3. Follow the one-class-per-file convention.
-4. Use `generate_field()` and `generate_workflow_method()` as optional helpers, not as the primary generation mechanism.
-
----
-
 ## Reference
 
 | Function | File | Purpose |
@@ -438,8 +400,7 @@ Existing workflows that were generated with `generate_class()` still work. The `
 | `generate_field(name, type_, description)` | `chat_workflow/code_generator.py` | Generate Pydantic field definition string |
 | `generate_workflow_method(class_name)` | `chat_workflow/code_generator.py` | Generate `@atomic_workflow` / `@classmethod` boilerplate |
 | `generate_model_validator(rule, field_name)` | `chat_workflow/code_generator.py` | Generate `@model_validator` with truthiness check |
-| `generate_class(name, fields, validation_rules)` | `chat_workflow/code_generator.py` | Generate `InteractiveEntity` subclass (backward compat) |
 | `import_module(path)` | `chat_workflow/code_generator.py` | Dynamic module import |
 | `reload_module(path)` | `chat_workflow/code_generator.py` | Reload already-imported module |
 
-For the full migration story from couch2food patterns, see the [couch2food-migration-guide.md](couch2food-migration-guide.md). For the design decisions behind LLM-generated code, see the [Workflow Author Guide](workflow-author-guide.md).
+For the design decisions behind LLM-generated code, see the [Workflow Author Guide](workflow-author-guide.md).

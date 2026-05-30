@@ -34,7 +34,7 @@ def generate_essay_from_topic(
 Use `@composite_workflow` on functions that compose multiple `@atomic_workflow` steps. It injects a `Session` object so the function can pass `session=session` to child functions.
 
 ```python
-from chat_workflow import composite_workflow, Session
+from chat_workflow import atomic_workflow, composite_workflow, Session
 
 @atomic_workflow
 def generate_topic(session: Session) -> Topic:
@@ -86,7 +86,20 @@ These principles help you design maintainable, composable workflows.
 Pydantic models can carry convenience methods. This is Pythonic and idiomatic. A model that validates data can also provide methods that operate on that data.
 
 ```python
+from pydantic import BaseModel
+
+
+class Criterion(BaseModel):
+    """A single evaluation criterion with weight."""
+
+    name: str
+    description: str
+    weight: float = 1.0
+
+
 class EvaluationCriteria(BaseModel):
+    """Collection of evaluation criteria."""
+
     criteria: list[Criterion] = []
 
     def add_criterion(self, name: str, description: str, weight: float = 1.0) -> None:
@@ -125,6 +138,9 @@ A prompt should tell the LLM how to behave, not what data format to produce. Ins
 Each `@atomic_workflow` function should do one thing well. Compose them with `@composite_workflow` functions.
 
 ```python
+from chat_workflow import atomic_workflow, composite_workflow, Session
+
+
 @atomic_workflow
 def gather_requirements(session: Session) -> Requirements:
     """Help the user articulate their requirements through guided questions."""
@@ -204,6 +220,9 @@ Use `typing.Annotated[T, "description"]` to add descriptions that appear in the 
 ```python
 from typing import Annotated
 
+from chat_workflow import atomic_workflow
+
+
 @atomic_workflow
 def my_workflow_step(
     context: Annotated[
@@ -221,8 +240,11 @@ def my_workflow_step(
 Use `TypeVar` to create generic chat functions that work with any Pydantic model type:
 
 ```python
-from typing import TypeVar
+from typing import Annotated, TypeVar
+
 from pydantic import BaseModel
+
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -676,6 +698,8 @@ def generate_reviewed_criteria(
 The same pattern appears in `Workflow._create_diagram()` in `workflows/workflow/workflow.py`, where the loop also materializes blobs after each refinement to keep files on disk in sync:
 
 ```python
+from pathlib import Path
+
 for _ in range(max_refinements):
     refined = refine(initial_object=workflow, max_turns=5, session=session)
 
@@ -706,4 +730,4 @@ return components, gaps
 
 ## Code Generation
 
-See [code-generation.md](code-generation.md) for comprehensive documentation of code generation patterns, including template-based workflow generation and the InteractiveEntity system.
+See [code-generation.md](code-generation.md) for documentation of code generation patterns and LLM-based workflow generation.
