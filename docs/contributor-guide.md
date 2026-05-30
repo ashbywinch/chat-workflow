@@ -30,6 +30,8 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/prompt_builder.py` | Prompt formatting: `_format_docstring()`, `_build_params_section()` |
 | `chat_workflow/metadata.py` | Type introspection: `_format_type_name()`, `_get_return_type()`, etc. |
 | `chat_workflow/__init__.py` | Public API exports |
+| `chat_workflow/annotations.py` | Blob and Validation annotations |
+| `chat_workflow/mixins.py` | BlobSyncMixin and LLMValidated mixins |
 
 Example workflows live in the `workflows/` directory.
 

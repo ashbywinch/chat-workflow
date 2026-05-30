@@ -56,6 +56,15 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 - SOLID/DRY principles for documentation
 - Documentation structure and conventions
 
+### 6. Migrate from Couch2food
+**Goal**: Update existing workflows from earlier patterns to the new chat-workflow-prototype implementation.
+
+**Read**: [couch2food-migration-guide.md](docs/couch2food-migration-guide.md), [code-generation.md](docs/code-generation.md)
+- Understanding the changes from the old architecture to the new
+- Using the Blob and Validation annotation system
+- Working with BlobSyncMixin and LLMValidated mixins
+- Regenerating workflow code from the new templates
+
 ## Critical Agent Information
 
 ### Key Files for Quick Understanding
@@ -93,6 +102,8 @@ make lint           # black --check + ruff check
 | [Writing Documentation Guide](docs/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
 | [Testing Guide](docs/TESTING.md) | Testing strategy and patterns | Quality assurance |
 | [Product Spec](spec.md) | Product requirements and philosophy | Understanding vision |
+| [Couch2food Migration Guide](docs/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
+| [Code Generation](docs/code-generation.md) | Generating workflow code from templates | Developers creating new workflows |
 
 ## Git Workflow (For Contributors)
 
