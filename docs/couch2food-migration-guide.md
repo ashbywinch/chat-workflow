@@ -194,7 +194,8 @@ Fields that need to exist both as model content (for LLM read/write) and as file
 ```python
 from typing import Annotated
 from pathlib import Path
-from chat_workflow import Blob, BlobSyncMixin
+from chat_workflow.annotations import Blob
+from chat_workflow.mixins import BlobSyncMixin
 
 class Workflow(BlobSyncMixin):
     diagram: Annotated[str, Blob(".mmd")] = Field(
@@ -216,7 +217,8 @@ Replace `_enforce_single_rule()` calls and regex-based validation with `Validati
 
 ```python
 from typing import Annotated, ClassVar
-from chat_workflow import Validation, LLMValidated
+from chat_workflow.annotations import Validation
+from chat_workflow.mixins import LLMValidated
 
 class Workflow(LLMValidated):
     name: str = Field(..., min_length=1, description="Workflow name")

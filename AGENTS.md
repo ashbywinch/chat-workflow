@@ -63,7 +63,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 - Understanding the changes from the old architecture to the new
 - Using the Blob and Validation annotation system
 - Working with BlobSyncMixin and LLMValidated mixins
-- Regenerating workflow code from the new templates
+- Regenerating workflow code via LLM generation and verify_code()
 
 ## Critical Agent Information
 
@@ -103,7 +103,7 @@ make lint           # black --check + ruff check
 | [Testing Guide](docs/TESTING.md) | Testing strategy and patterns | Quality assurance |
 | [Product Spec](spec.md) | Product requirements and philosophy | Understanding vision |
 | [Couch2food Migration Guide](docs/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
-| [Code Generation](docs/code-generation.md) | Generating workflow code from templates | Developers creating new workflows |
+| [Code Generation](docs/code-generation.md) | Generating workflow code via LLM + verify_code() | Developers creating new workflows |
 
 ## Git Workflow (For Contributors)
 

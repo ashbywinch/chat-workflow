@@ -330,7 +330,7 @@ For debugging LLM interactions, see the [Contributor Guide](contributor-guide.md
 ## Next Steps
 
 - See [example-evaluation-criteria.md](example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
-- See [code-generation.md](code-generation.md) for automated workflow code generation from templates.
+- See [code-generation.md](code-generation.md) for LLM-based workflow code generation and the verify_code() pipeline.
 
 ## Annotations & Mixins
 

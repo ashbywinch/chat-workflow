@@ -185,7 +185,9 @@ It also keeps each file small and focused. A model file typically contains:
 from __future__ import annotations
 from typing import Annotated
 from pydantic import BaseModel, Field, model_validator
-from chat_workflow import Blob, BlobSyncMixin, Validation, LLMValidated, atomic_workflow
+from chat_workflow.annotations import Blob, Validation
+from chat_workflow.mixins import BlobSyncMixin, LLMValidated
+from chat_workflow import atomic_workflow
 
 
 class Workflow(BlobSyncMixin, LLMValidated):
