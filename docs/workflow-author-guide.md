@@ -329,7 +329,8 @@ For debugging LLM interactions, see the [Contributor Guide](contributor-guide.md
 
 ## Next Steps
 
-See [example-evaluation-criteria.md](example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
+- See [example-evaluation-criteria.md](example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
+- See [code-generation.md](code-generation.md) for automated workflow code generation from templates.
 
 ## Annotations & Mixins
 
@@ -704,4 +705,4 @@ return components, gaps
 
 ## Code Generation
 
-TODO: Content to be added in Wave 2
+See [code-generation.md](code-generation.md) for comprehensive documentation of code generation patterns, including template-based workflow generation and the InteractiveEntity system.
