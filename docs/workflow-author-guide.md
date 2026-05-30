@@ -333,7 +333,133 @@ See [example-evaluation-criteria.md](example-evaluation-criteria.md) for a compl
 
 ## Annotations & Mixins
 
-TODO: Content to be added in Wave 2
+The library provides two annotations (`Blob`, `Validation`) for tagging model fields with metadata, and two mixins (`BlobSyncMixin`, `LLMValidated`) that act on those annotations to provide file materialization and natural-language validation.
+
+Both mixins are independent: you can use one, both, or neither in any model.
+
+### Blob Annotation
+
+The `Blob` annotation marks a field's content for materialization to a file on disk. Use it with `typing.Annotated` on string fields.
+
+```python
+from typing import Annotated
+from pydantic import BaseModel
+from chat_workflow.annotations import Blob
+
+class DiagramModel(BaseModel):
+    title: str
+    diagram_code: Annotated[str, Blob(".mmd")] = ""
+```
+
+When combined with `BlobSyncMixin`, the field value is written to `{output_dir}/{field_name}{extension}`.
+
+The `Blob` annotation constructor accepts a single `extension` parameter (default `".txt"`) that controls the file suffix.
+
+### Validation Annotation
+
+The `Validation` annotation attaches a natural-language validation rule to a field. The rule is expressed as a plain string.
+
+```python
+from typing import Annotated
+from pydantic import BaseModel
+from chat_workflow.annotations import Validation
+
+class TeamPlan(BaseModel):
+    members: Annotated[str, Validation("Must list at least 3 members")]
+    timeline: Annotated[str, Validation("Must include specific dates or milestones")]
+```
+
+When combined with `LLMValidated`, all rules are verified by an LLM call during model validation. Rules are also automatically injected into the field's JSON schema description.
+
+### BlobSyncMixin
+
+`BlobSyncMixin` automatically materializes `Blob`-annotated fields to files on disk. Add it to your Pydantic model alongside `Blob` annotations.
+
+```python
+from pathlib import Path
+from typing import Annotated
+from pydantic import BaseModel
+from chat_workflow.annotations import Blob
+from chat_workflow.mixins import BlobSyncMixin
+
+class ArchitectureModel(BlobSyncMixin):
+    title: str
+    diagram: Annotated[str, Blob(".mmd")] = ""
+    config: Annotated[str, Blob(".yaml")] = ""
+
+# Usage
+model = ArchitectureModel(title="My App", diagram="graph TD...", config="key: value")
+model.materialize_blobs(Path("/tmp/output"))
+
+# Get paths for individual fields
+diagram_path = model.get_blob_path("diagram")
+config_path = model.get_blob_path("config")
+```
+
+The mixin provides:
+
+- `materialize_blobs(output_dir: Path) -> BlobSyncMixin` -- writes all `Blob` fields to `{output_dir}/{field_name}{extension}`. Creates `output_dir` if needed. Returns `self` for chaining.
+- `get_blob_path(field: str) -> Path | None` -- returns the filesystem path where a field was materialized, or `None` if not yet materialized.
+
+Under the hood, `get_blob_fields()` inspects `model_fields` metadata for `Blob` instances.
+
+### LLMValidated
+
+`LLMValidated` validates natural-language rules against model data using an LLM call. Add it to your model alongside `Validation` annotations.
+
+```python
+from typing import Annotated, ClassVar
+from pydantic import BaseModel
+from chat_workflow.annotations import Validation
+from chat_workflow.mixins import LLMValidated
+
+class ProjectPlan(LLMValidated):
+    _validation_rules: ClassVar[list[str]] = [
+        "The overall plan must be achievable within the stated timeline",
+    ]
+
+    goals: Annotated[str, Validation("Must have at least 2 specific goals")]
+    timeline: Annotated[str, Validation("Timeline must be realistic and include milestones")]
+
+plan = ProjectPlan(
+    goals="Launch MVP, Acquire 100 users",
+    timeline="Q1 2026: MVP launch, Q2 2026: 100 users",
+)
+# validate_llm_rules runs automatically via @model_validator(mode="after")
+```
+
+How it works:
+
+1. **Per-field rules**: `Validation("...")` annotations on individual fields are collected by `collect_per_field_rules()`.
+2. **Model-level rules**: Add model-wide rules via the `_validation_rules: ClassVar[list[str]]` class variable.
+3. **Schema injection**: `__pydantic_init_subclass__` automatically appends each field's `Validation` rules as bullet points in the field's `description`, making them visible in JSON schemas and LLM prompts.
+4. **LLM verification**: `validate_llm_rules` (a `@model_validator(mode="after")`) collects all rules, builds a prompt with the current instance data, and calls the LLM. If any rule is violated, a `ValidationError` is raised.
+5. **Graceful failure**: If no API key is configured, validation is silently skipped. This allows model construction in tests and development without an API connection.
+
+### Using Both Mixins Together
+
+The mixins work independently and can be combined in the same model:
+
+```python
+from pathlib import Path
+from typing import Annotated, ClassVar
+from pydantic import BaseModel
+from chat_workflow.annotations import Blob, Validation
+from chat_workflow.mixins import BlobSyncMixin, LLMValidated
+
+class Specification(BlobSyncMixin, LLMValidated):
+    _validation_rules: ClassVar[list[str]] = [
+        "The specification must be internally consistent",
+    ]
+
+    title: str
+    content: Annotated[str, Blob(".md"), Validation("Must be at least 100 words")]
+
+spec = Specification(title="API Design", content="...")
+spec.materialize_blobs(Path("./docs"))
+```
+
+`BlobSyncMixin` handles file materialization; `LLMValidated` handles rule enforcement. Each operates on its own annotation type without interference.
 
 ## Workflow Patterns
 
