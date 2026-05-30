@@ -330,3 +330,15 @@ For debugging LLM interactions, see the [Contributor Guide](contributor-guide.md
 ## Next Steps
 
 See [example-evaluation-criteria.md](example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
+
+## Annotations & Mixins
+
+TODO: Content to be added in Wave 2
+
+## Workflow Patterns
+
+TODO: Content to be added in Wave 2
+
+## Code Generation
+
+TODO: Content to be added in Wave 2
