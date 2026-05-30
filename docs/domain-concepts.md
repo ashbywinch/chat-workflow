@@ -65,3 +65,27 @@ Session (one CLI invocation)
 ```
 
 The outer container is a **Session** (one user session). Inside it, a **Composite Workflow** coordinates one or more **Atomic Workflows**. Each atomic workflow runs a **turn** loop until the LLM returns an **Agent Response** with `intent=SUCCESS` or `intent=FAILURE`. That response is wrapped in a **Turn Result** and recorded in the session's log.
+
+## Blob Field
+
+**What it is:** A Pydantic field annotated with `Blob(extension)` whose content is automatically materialized to a file on disk after a workflow produces a result. The blob's serialized value is the file path rather than the content itself, enabling clean handling of large text outputs (markdown, code, structured data).
+
+**Broadly known as:** *File attachment* or *sidecar file* in other frameworks. Similar to how Gale-Shapley `Blob`s work in semantic-kernel or how an MCP server returns `BlobResource` contents. The core idea is an in-memory value that maps to a real file.
+
+**In the code:** `Blob` (annotation, in `chat_workflow/annotations.py`), `BlobSyncMixin` (mixin, in `chat_workflow/mixins.py`).
+
+## Validation Rule
+
+**What it is:** A natural-language business rule attached to a field via `Annotated[str, Validation("rule text")]`. The rule is enforced by the LLM during validation — rather than a hard-coded constraint in Python, the validator checks whether the field's value satisfies the described rule. Multiple validation rules can be stacked on a single field.
+
+**Broadly known as:** *Semantic validation* or *LLM-as-judge*. Unlike traditional schema validation (regex, min/max, type checks), a validation rule captures subjective or qualitative constraints that are better evaluated through language understanding than arithmetic.
+
+**In the code:** `Validation` (annotation, in `chat_workflow/annotations.py`), `LLMValidated` (mixin, in `chat_workflow/mixins.py`).
+
+## Gap Resolution Loop
+
+**What it is:** A looping pattern inside a `@composite_workflow` function where an atomic workflow identifies gaps or issues in a result, a follow-up refinement step addresses them, and the cycle repeats until all gaps are resolved. Each iteration narrows the delta between the current state and the desired outcome.
+
+**Broadly known as:** *Iterative refinement*, *critique-revise loop*, *reflection agent pattern*. LangGraph implements this as a *feedback loop* between nodes. Vercel's AI SDK supports it through chained generations. The key idea is that a second pass (often a different prompt or model) finds flaws the first pass missed.
+
+**In the code:** The pattern is visible in `generate_reviewed_criteria` (in `workflows/evaluation_criteria/flows.py`), where a refinement step loops over gap analysis results until the reviewer is satisfied.
