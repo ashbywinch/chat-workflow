@@ -463,7 +463,244 @@ spec.materialize_blobs(Path("./docs"))
 
 ## Workflow Patterns
 
-TODO: Content to be added in Wave 2
+Real workflows combine the decorators, models, and refinement patterns into reusable structures. This section documents the three most common patterns found in the codebase.
+
+### Workflow.create()
+
+A `@composite_workflow` classmethod that orchestrates multiple `@atomic_workflow` steps end to end. This is the top-level entry point users call from the CLI.
+
+The canonical example is `Workflow.create()` in `workflows/workflow/workflow.py`. It chains several steps together:
+
+1. Generate a process analysis from a user's plain-English description
+2. Analyze inputs and outputs
+3. Identify components and resolve gaps
+4. Generate a Mermaid sequence diagram
+5. Refine the diagram through user feedback
+6. Materialize each component to disk
+
+```python
+from chat_workflow import Session, atomic_workflow, composite_workflow
+
+@composite_workflow
+@classmethod
+def create(
+    cls,
+    process_description: str = "",
+    *,
+    session: Session,
+    max_refinements: int = 3,
+    existing_components: list[str] | None = None,
+) -> Workflow:
+    """Create a complete workflow artifact through conversation."""
+
+    # Step 1: Analyze the process
+    analysis = ProcessAnalysis.generate_from_chat(
+        process_description=process_description,
+        session=session,
+    )
+
+    # Step 2: Analyze inputs and outputs
+    session.io.echo("Let's analyze the inputs and outputs for this workflow.")
+    inputs = Input.generate_from_chat(analysis=analysis, session=session)
+    outputs = Output.generate_from_chat(analysis=analysis, session=session)
+
+    # Step 3: Identify components, resolve gaps in a loop
+    components, gap_analysis = _resolve_gaps(
+        analysis=analysis,
+        inputs=inputs,
+        outputs=outputs,
+        existing_components=existing_components or [],
+        session=session,
+    )
+
+    # Step 4: Generate the diagram with refinement loop
+    workflow = cls._create_diagram(
+        analysis=analysis,
+        components=components,
+        inputs=inputs,
+        outputs=outputs,
+        gap_analysis=gap_analysis,
+        session=session,
+        max_refinements=max_refinements,
+    )
+
+    # Step 5: Create each identified component
+    for req in components:
+        session.io.echo(f"Creating component: {req.name}")
+        component = ComponentModel.create(
+            requirements=req,
+            session=session,
+        )
+
+    return workflow
+```
+
+**When to use this pattern:** When you have a multi-step process where each step is a separate `@atomic_workflow` call and the steps must run in sequence. The `@composite_workflow` decorator injects a shared `Session` so each step gets the same I/O and state. The result is a single CLI command that hides all internal orchestration.
+
+### Component.create()
+
+A `@composite_workflow` classmethod that creates a single self-contained artifact. It wraps one or more `@atomic_workflow` calls with code verification and disk I/O.
+
+The canonical example is `Component.create()` in `workflows/workflow/component.py`. It takes a `ComponentRequirement` and produces a `Component` with a `code_path` pointing to a written file:
+
+```python
+from pathlib import Path
+from typing import Annotated
+from pydantic import BaseModel, Field
+from chat_workflow import Session, atomic_workflow, composite_workflow
+
+class GeneratedComponent(BaseModel):
+    """Holds the raw code output from the LLM before verification."""
+    code: str = Field(..., description="Generated Python source code")
+    model_class: str = Field(..., description="Name of the Pydantic model class")
+
+class Component(BaseModel):
+    """A single created business component on disk."""
+    name: str
+    purpose: str
+    code_path: Path
+    model_class: str
+
+    @composite_workflow
+    @classmethod
+    def create(
+        cls,
+        requirements: ComponentRequirement,
+        *,
+        session: Session,
+        output_dir: Path | None = None,
+    ) -> Component:
+        """Create and materialize one component from requirements."""
+
+        # Step 1: LLM designs the component
+        generated = cls._design_component(
+            requirements=requirements,
+            session=session,
+        )
+
+        # Step 2: Verify code quality (syntax, linting)
+        clean_code = verify_code(generated.code)
+
+        # Step 3: Determine the output path
+        if output_dir is None:
+            output_dir = Path.cwd() / "workflows" / requirements.name.lower()
+        output_dir.mkdir(parents=True, exist_ok=True)
+        code_path = output_dir / f"{requirements.name.lower()}.py"
+
+        # Step 4: Write to disk
+        code_path.write_text(clean_code)
+
+        # Step 5: Return the component object
+        return cls(
+            name=requirements.name,
+            purpose=requirements.purpose,
+            code_path=code_path,
+            model_class=requirements.name,
+        )
+
+    @atomic_workflow
+    @classmethod
+    def _design_component(
+        cls,
+        requirements: Annotated[
+            ComponentRequirement,
+            "The component requirements",
+        ],
+        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+    ) -> GeneratedComponent:
+        """You are a software architect designing a Python business component.
+        Generate a complete Python file with a Pydantic model and an
+        @atomic_workflow generate_from_chat classmethod."""
+        ...
+```
+
+The pattern separates the LLM conversation (`_design_component`, an `@atomic_workflow`) from the procedural work (verification, file writing, object construction) that happens in the `@composite_workflow` wrapper.
+
+**When to use this pattern:** When each unit of work produces a file or other side effect on disk. The `@atomic_workflow` leaf handles the generative part; the `@composite_workflow` parent handles I/O, validation, and error recovery. This keeps the LLM conversation focused on content, not infrastructure.
+
+### Gap Resolution Loop
+
+A refinement loop that checks whether the user is satisfied by comparing the returned object to the previous one. If they are equal (no changes requested), the loop terminates.
+
+The canonical example is `generate_reviewed_criteria()` in `workflows/evaluation_criteria/generate_reviewed_criteria.py`:
+
+```python
+from chat_workflow import Session, atomic_workflow, composite_workflow
+
+@atomic_workflow
+def refine(
+    initial_object: Annotated[EvaluationCriteria, "Object to review"],
+    max_turns: Annotated[int, "Maximum refinement turns"] = 5,
+) -> EvaluationCriteria:
+    """Review this object with the user. Ask if they want to change anything.
+    Return the object with any requested updates. If they are happy,
+    return the object unchanged."""
+    ...
+
+@composite_workflow
+def generate_reviewed_criteria(
+    context: str = "",
+    max_turns: int = 10,
+    max_refinements: int = 3,
+    *,
+    session: Session,
+) -> EvaluationCriteria:
+    # Step 1: Generate the initial object
+    criteria = EvaluationCriteria.generate_from_chat(
+        context=context, max_turns=max_turns, session=session,
+    )
+
+    # Step 2: Refinement loop
+    for _ in range(max_refinements):
+        session.io.echo("Current criteria:")
+        echo_criteria(criteria, echo=session.io.echo)
+
+        refined = refine(
+            initial_object=criteria,
+            max_turns=max_turns,
+            session=session,
+        )
+
+        # Termination: user made no changes
+        if refined.model_dump() == criteria.model_dump():
+            return refined
+
+        criteria = refined
+
+    # Fallback: return best effort after max iterations
+    return criteria
+```
+
+The same pattern appears in `Workflow._create_diagram()` in `workflows/workflow/workflow.py`, where the loop also materializes blobs after each refinement to keep files on disk in sync:
+
+```python
+for _ in range(max_refinements):
+    refined = refine(initial_object=workflow, max_turns=5, session=session)
+
+    if refined.model_dump() == workflow.model_dump():
+        return refined
+
+    workflow = refined
+    workflow.materialize_blobs(Path(tmp_dir))
+```
+
+A variant of this pattern resolves structural gaps rather than user satisfaction. The `_resolve_gaps()` function in `workflows/workflow/workflow.py` loops until all missing components, integration gaps, and organizational gaps are empty:
+
+```python
+for _ in range(max_iterations):
+    components = ComponentRequirement.identify_from_chat(...)
+    gaps = GapAnalysis.analyze_from_chat(...)
+
+    if not gaps.missing_components and not gaps.integration_gaps:
+        return components, gaps
+
+    existing.extend(gaps.missing_components)
+
+# Best effort after max iterations
+return components, gaps
+```
+
+**When to use this pattern:** Any time a user needs to review and refine generated content. The equality check (`model_dump() == model_dump()`) is the key insight: it avoids asking "are you done?" and instead relies on the LLM returning the object unchanged when the user is satisfied. Use the structural variant when the loop should terminate based on data quality criteria rather than user preference.
 
 ## Code Generation
 
