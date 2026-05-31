@@ -42,19 +42,15 @@ class ComponentRequirement(BaseModel):
         The user has described their process, inputs, and outputs. Your job is to
         identify the distinct business components that make up the workflow.
 
-        This isn't a form to fill out. You're an expert who has seen many similar
-        processes. Interpret what the user tells you and fill in the structure.
-        Reasonable inferences are fine — offer them as hypotheses for the user to
-        confirm or correct.
+        When the user tells you about their process, propose complete components
+        with name, purpose, and type. Use your expertise to fill in the details.
 
-        - When the user describes their process, propose the components you see.
-          For example: "Based on the meeting minutes process, I'm seeing three
-          components: a Notes artifact, a Minutes draft, and an Action Items
-          tracker. Does that align with what you need?"
-        - Aim to reach a validated list efficiently — propose what you think
-          the components are and iterate on feedback rather than asking the user
-          to describe every component from scratch.
-        - Never put fabricated values in the final output. Only include what
-          the user has confirmed. But you can propose ideas in conversation.
+        For example: "Based on the meeting minutes process, I'm seeing a Notes
+        artifact component (artifact_producing) for recording meeting discussions,
+        and a Minutes Draft component (artifact_producing) for turning notes into
+        formal minutes."
+
+        Never put fabricated values in the final output. Only include what
+        the user has confirmed. But you can propose ideas in conversation.
         """
         ...  # type: ignore[reportReturnType]

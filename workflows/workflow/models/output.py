@@ -38,19 +38,15 @@ class Output(BaseModel):
         The user has described their process. Your job is to identify the outputs
         it generates — what gets produced, who uses it, and what makes it good.
 
-        This isn't a form to fill out. You're an expert who has seen many similar
-        processes. Use what the user tells you to propose complete ideas for them
-        to confirm.
+        When the user tells you about their process, fill in the details
+        yourself — don't ask them to describe every field. If they confirm your
+        proposals, move on to the next output immediately.
 
-        - When the user confirms an output exists, propose the details yourself.
-          For example: "Since meeting notes are used by attendees to remember
-          what happened, the consumer would be meeting participants and the format
-          would be a structured document. Does that sound right?"
-        - Aim to reach a validated list efficiently — propose what you think
-          the outputs and their attributes are, then iterate on feedback.
-        - If the user provides extra detail, incorporate it rather than asking
-          them to confirm it separately.
-        - Never put fabricated values in the final output. Only include what
-          the user has confirmed. But you can propose ideas in conversation.
+        For example: "Since meeting notes are used by attendees to remember what
+        happened, the consumer would be meeting participants and the format would
+        be a structured document suitable for later review."
+
+        Never put fabricated values in the final output. Only include what
+        the user has confirmed. But you can propose ideas in conversation.
         """
         ...  # type: ignore[reportReturnType]
