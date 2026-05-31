@@ -1,8 +1,13 @@
 """Shared helpers for eval tests that call real LLMs."""
 
+import sys
+from collections.abc import Callable
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import litellm
+from pydantic import BaseModel
 
 from chat_workflow import Config, Session, SessionLog
 
@@ -112,3 +117,156 @@ def llm_judge(question: str, content: str, config: Config, max_tokens: int = 200
     reasoning = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
     passed = verdict.startswith("YES")
     return passed, reasoning
+
+
+def format_transcript(session: Session) -> str:
+    """Build a formatted conversation transcript from session state (both sides)."""
+    parts = []
+    for msg in session.state.messages:
+        role = msg.get("role", "?")
+        content = msg.get("content", "")
+        if role == "system":
+            continue
+        parts.append(f"[{role}]\n{content}")
+    return "\n---\n".join(parts)
+
+
+@contextmanager
+def capture_on_failure(session: Session):
+    """If the enclosed block fails, dump the full conversation transcript to stderr."""
+    try:
+        yield
+    except Exception:
+        transcript = format_transcript(session)
+        print(
+            "\n=== CONVERSATION TRANSCRIPT (before failure) ===\n"
+            + transcript
+            + "\n=== END TRANSCRIPT ===\n",
+            file=sys.stderr,
+        )
+        raise
+
+
+DEFAULT_JUDGE_PROMPT = (
+    "Did the analyst propose a structure and then ask to fill in details? "
+    "Avoid repeating questions? Use plain language "
+    "(explaining jargon when asked is fine)? "
+    "Answer YES for productive conversation, "
+    "NO only if stuck in a pure questioning loop."
+)
+
+
+def run_multi_turn_eval(
+    model_method: Callable[..., Any],
+    method_kwargs: dict[str, Any],
+    user_persona: str,
+    judge_prompt: str | None = None,
+    judge: Callable = llm_judge,
+    config: Config | None = None,
+) -> Any:
+    """Run a multi-turn workflow eval with an LLM user bot and optional LLM judge.
+
+    Hands off to the model method (which is an @atomic_workflow-decorated
+    classmethod), then verifies turn efficiency, runs the judge on the
+    conversation transcript, and dumps the transcript on failure.
+
+    Args:
+        model_method: The @atomic_workflow or @composite_workflow classmethod to test
+        method_kwargs: Keyword args to pass to model_method (must include session)
+        user_persona: Persona prompt for the AgentIO user bot
+        judge_prompt: Prompt for the LLM judge. Defaults to DEFAULT_JUDGE_PROMPT.
+        judge: The judge function (defaults to llm_judge). Pass None to skip judging.
+        config: Config instance. Defaults to make_config().
+    """
+    config = config or make_config()
+    judge_prompt = judge_prompt or DEFAULT_JUDGE_PROMPT
+
+    user_bot = AgentIO(persona_prompt=user_persona, config=config)
+
+    # Create session — state.messages records the conversation
+    session = make_tools(user_bot)
+
+    # Inject session into method_kwargs if not present
+    kwargs = dict(method_kwargs)
+    kwargs.setdefault("session", session)
+
+    with capture_on_failure(session):
+        result = model_method(**kwargs)
+
+        # Turn efficiency assertion
+        max_turns = kwargs.get("max_turns", 10)
+        assert session.state.turn_count < max_turns, (
+            f"Workflow burned all {session.state.turn_count} turns — likely stuck in questioning loop. "
+            f"User bot had to provide {len(user_bot.outputs)} responses."
+        )
+
+        # LLM judge on the full conversation
+        if judge is not None:
+            transcript = format_transcript(session)
+            ok, reason = judge(judge_prompt, transcript, config)
+            assert ok, (
+                f"Conversation quality issue detected.\n"
+                f"Judge's reasoning: {reason}\n"
+                f"Transcript:\n{transcript}"
+            )
+
+    return result
+
+
+def run_one_shot_eval(
+    response_model: type[BaseModel],
+    system_prompt: str,
+    initial_message: str,
+    user_turn: str,
+    config: Config | None = None,
+) -> Any:
+    """Run a one-shot workflow eval — single LLM call with fixed prompts.
+
+    Constructs an AtomicWorkflow with standard boilerplate, processes one
+    turn, and returns the result for structural assertions.
+    """
+    from chat_workflow import (
+        AgentResponse,
+        AtomicWorkflow,
+        AtomicWorkflowConfig,
+        AtomicWorkflowFailedError,
+        TurnResult,
+    )
+
+    config = config or make_config()
+
+    orchestrator = AtomicWorkflow(
+        config=AtomicWorkflowConfig(
+            system_prompt=system_prompt,
+            response_model=AgentResponse[response_model],
+            max_turns=3,
+            model=config.model,
+            provider=config.provider,
+            max_retries=config.max_retries,
+            request_timeout_seconds=config.request_timeout_seconds,
+            initial_messages=[{"role": "user", "content": initial_message}],
+            on_continue=lambda action: TurnResult[response_model].continuing(action.message or ""),
+            on_success=lambda action: TurnResult[response_model].success(action.result),
+            on_failure=lambda action: AtomicWorkflowFailedError(action.message or "No reason given"),
+        )
+    )
+
+    result = orchestrator.process_turn(user_turn)
+    return result.result if result else None
+
+
+def make_meeting_analysis():
+    """Create a standard meeting-minutes ProcessAnalysis for eval tests."""
+    from workflows.workflow.models import ProcessAnalysis
+
+    return ProcessAnalysis(
+        phases=["Note-taking", "Review & Clarify", "Draft Minutes", "Review & Approve"],
+        activities=[
+            "Take meeting notes", "Review notes for clarity",
+            "Identify action items", "Write minutes draft",
+            "Circulate for review", "Incorporate feedback",
+            "Distribute final minutes",
+        ],
+        orchestrating_component="Meeting Organizer",
+        participants=["Meeting Attendees", "Note Taker", "Reviewers"],
+    )
