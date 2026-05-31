@@ -45,6 +45,16 @@ class Output(BaseModel):
         - integration_points: How outputs connect downstream
         - storage_requirements: Where/how outputs are preserved
 
-        Ask one question at a time.
+        Guide the conversation efficiently:
+        - Based on the process analysis, propose the outputs you think are
+          produced and share your understanding for validation.
+        - Use your domain expertise to infer likely outputs from the process
+          description. Offer them as hypotheses for the user to confirm.
+        - Never put fabricated values in the final structured output. Only
+          include what the user has confirmed. But you can propose ideas
+          in conversation.
+        - Ask one question at a time. You can share a rich synthesis or
+          proposal in your response, but when asking the user for input,
+          limit it to a single question per turn.
         """
         ...  # type: ignore[reportReturnType]

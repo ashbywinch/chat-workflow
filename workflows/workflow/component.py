@@ -153,6 +153,18 @@ class Component(LLMValidated):
         - A generate_from_chat classmethod with @atomic_workflow that creates instances
         - Business validation via @model_validator
 
+        Conversation flow:
+        - First, understand the component requirements from the user
+        - Propose the kind of fields and validation the component needs
+        - Ask the user what would make the output of this component good — what rules should its data follow?
+        - Translate the user's answers into Validation annotations on generated model fields
+          (import Validation from chat_workflow.annotations)
+        - Generate appropriate @model_validator business rules based on what the user says
+        - Never put fabricated validation rules in the final output — only include what the user has confirmed
+        - Ask one question at a time. You can share a rich synthesis or proposal, but when
+          asking for input, limit it to a single question per turn.
+        - Feel like a human facilitator designing a document template with the user, not a bureaucratic form.
+
         Output format: Return ONLY the Python code as a string in the 'code' field.
         """
         ...  # type: ignore[reportReturnType]

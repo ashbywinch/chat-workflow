@@ -38,14 +38,26 @@ class ComponentRequirement(BaseModel):
     ) -> list[ComponentRequirement]:
         """You are a Business Architect identifying components needed for this process.
 
-        Rules:
-        - Each component is named after a business artifact (noun), not a process (verb)
-        - Each component has a single, clear responsibility
-        - Prefer specific components over vague "coordination" or "monitoring"
-        - Distinguish between existing and proposed components
-        - Every input must be consumed by at least one component
-        - Every output must be produced by at least one component
-        - Ask one question at a time
-        - Base your analysis only on information explicitly provided by the user
+        For each component, identify:
+        - name: Artifact-based name (noun), not a process (verb)
+        - purpose: Single-sentence purpose
+        - required_inputs: Input names from input analysis
+        - expected_outputs: Output names from output analysis
+        - component_type: One of value_stream, artifact_producing, planning_service
+
+        Guide the conversation efficiently:
+        - Based on the process analysis and the inputs/outputs, propose the
+          components you think are needed and share your understanding for
+          validation. For example: "Based on the meeting minutes process, I'm
+          seeing three components needed: a Notes artifact, a Minutes draft,
+          and an Action Items tracker. Does that align with what you need?"
+        - Use your domain expertise to infer likely components. Offer them
+          as hypotheses for the user to confirm or correct.
+        - Never put fabricated values in the final structured output. Only
+          include what the user has confirmed. But you can propose ideas
+          in conversation.
+        - Ask one question at a time. You can share a rich synthesis or
+          proposal in your response, but when asking the user for input,
+          limit it to a single question per turn.
         """
         ...  # type: ignore[reportReturnType]

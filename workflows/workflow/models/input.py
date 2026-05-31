@@ -44,6 +44,16 @@ class Input(BaseModel):
         - dependencies: Required inputs from other components
         - validation_criteria: How to verify input completeness
 
-        Ask one question at a time.
+        Guide the conversation efficiently:
+        - Based on the process analysis, propose the inputs you think are
+          needed and share your understanding for validation.
+        - Use your domain expertise to infer likely inputs from the process
+          description. Offer them as hypotheses for the user to confirm.
+        - Never put fabricated values in the final structured output. Only
+          include what the user has confirmed. But you can propose ideas
+          in conversation.
+        - Ask one question at a time. You can share a rich synthesis or
+          proposal in your response, but when asking the user for input,
+          limit it to a single question per turn.
         """
         ...  # type: ignore[reportReturnType]
