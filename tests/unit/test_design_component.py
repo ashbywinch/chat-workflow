@@ -1,11 +1,10 @@
-"""Tests for Component._design_component atomic workflow."""
+"""Tests for GeneratedComponent.generate atomic workflow."""
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
 from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.models import AgentIntent, AgentResponse
-from workflows.workflow.component import Component
 from workflows.workflow.models import ComponentRequirement, GeneratedComponent
 
 
@@ -27,12 +26,12 @@ class TestDesignComponent(unittest.TestCase):
 
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(Component._design_component, "_is_workflow", False),
+            getattr(GeneratedComponent.generate, "_is_workflow", False),
         )
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            Component._design_component(
+            GeneratedComponent.generate(
                 requirements=ComponentRequirement(
                     name="Test",
                     purpose="Test component",
@@ -58,7 +57,7 @@ class TestDesignComponent(unittest.TestCase):
         )
 
         session = self._make_session()
-        result = Component._design_component(
+        result = GeneratedComponent.generate(
             requirements=ComponentRequirement(
                 name="Order",
                 purpose="Manage orders",
@@ -87,7 +86,7 @@ class TestDesignComponent(unittest.TestCase):
         )
 
         session = self._make_session()
-        result = Component._design_component(
+        result = GeneratedComponent.generate(
             requirements=ComponentRequirement(
                 name="TestComponent",
                 purpose="Test",

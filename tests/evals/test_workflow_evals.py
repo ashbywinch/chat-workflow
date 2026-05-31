@@ -161,9 +161,8 @@ class TestGeneratedComponentEval(unittest.TestCase):
 
     @timeout(120)
     def test_multi_turn_component_design(self):
-        """Component._design_component should complete efficiently with a user bot."""
+        """GeneratedComponent.generate should complete efficiently with a user bot."""
         from tests.evals.helpers import run_multi_turn_eval
-        from workflows.workflow.component import Component
         from workflows.workflow.models import ComponentRequirement, GeneratedComponent
 
         req = ComponentRequirement(
@@ -185,7 +184,7 @@ class TestGeneratedComponentEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=Component._design_component,
+            model_method=GeneratedComponent.generate,
             method_kwargs=dict(
                 requirements=req, max_turns=10,
             ),

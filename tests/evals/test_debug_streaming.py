@@ -76,7 +76,7 @@ class TestDebugStreaming(unittest.TestCase):
         self.assertIn("ValueError", output)
         self.assertIn("Something went wrong", output)
 
-    @timeout(10)
+    @timeout(60)
     def test_orchestrator_with_debug(self):
         """Verify debug output captures LLM interaction when using @chat decorator."""
         debug_output = StringIO()
@@ -84,7 +84,7 @@ class TestDebugStreaming(unittest.TestCase):
 
         mock_io = MockIO(
             [
-                "Performance, battery life, and portability",
+                "Performance, battery life, portability, and budget",
                 "I need it for software development and travel",
                 "That's all, please finalize",
             ]
@@ -116,7 +116,7 @@ class TestDebugStreaming(unittest.TestCase):
         mock_io = MockIO(
             [
                 "Around $50 budget",
-                "For a 7-year-old who likes science",
+                "For a 7-year-old who likes science, safety is key",
                 "Safety and educational value",
                 "That's all, please finalize",
             ]

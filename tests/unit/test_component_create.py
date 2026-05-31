@@ -43,7 +43,7 @@ class TestComponentCreate(unittest.TestCase):
             )
         self.assertIn("session", str(ctx.exception))
 
-    @patch.object(Component, "_design_component")
+    @patch.object(GeneratedComponent, "generate")
     @patch("workflows.workflow.component.verify_code")
     def test_writes_file_and_returns_component(
         self, mock_verify, mock_design
@@ -77,7 +77,7 @@ class TestComponentCreate(unittest.TestCase):
             self.assertTrue(result.code_path.exists())
             self.assertIn("order", result.code_path.name)
 
-    @patch.object(Component, "_design_component")
+    @patch.object(GeneratedComponent, "generate")
     @patch("workflows.workflow.component.verify_code")
     def test_verify_code_failure_raises_error(
         self, mock_verify, mock_design
@@ -100,7 +100,7 @@ class TestComponentCreate(unittest.TestCase):
                 output_dir=Path("/tmp"),
             )
 
-    @patch.object(Component, "_design_component")
+    @patch.object(GeneratedComponent, "generate")
     @patch("workflows.workflow.component.verify_code")
     def test_default_output_dir(
         self, mock_verify, mock_design

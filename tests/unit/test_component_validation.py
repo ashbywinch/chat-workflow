@@ -8,11 +8,13 @@ from workflows.workflow.component import Component
 
 class TestComponentValidation(unittest.TestCase):
     def test_collects_validation_rules(self):
-        """Component should have _validation_rules with code quality checks."""
+        """Component should have _validation_rules for its own metadata quality."""
         rules = Component.collect_all_rules()
-        self.assertTrue(len(rules) >= 3)
-        self.assertTrue(any("BaseModel" in r for r in rules))
-        self.assertTrue(any("generate_from_chat" in r for r in rules))
+        self.assertTrue(len(rules) >= 2)
+        self.assertTrue(any("name" in r for r in rules),
+                        "Should have a rule about the name field")
+        self.assertTrue(any("purpose" in r or "expert_role" in r for r in rules),
+                        "Should have rules about purpose or expert_role")
 
     def test_valid_component_passes_validation(self):
         """A properly constructed Component should not raise."""

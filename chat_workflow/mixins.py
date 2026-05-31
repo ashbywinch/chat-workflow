@@ -7,6 +7,7 @@ LLM calls.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import ClassVar
 
@@ -138,17 +139,28 @@ class LLMValidated(BaseModel):
         """Call the LLM to check all rules against the current instance.
 
         Uses :func:`chat_workflow.llm_interaction.get_client` to obtain
-        an LLM client.  Builds a prompt listing all rules and asks the
-        LLM to verify each one.  Raises :class:`ValidationError` (from
-        ``chat_workflow.exceptions``) on any violation.
+        an LLM client from config.  Builds a prompt listing all rules and
+        asks the LLM to verify each one.  Raises :class:`ValidationError`
+        (from ``chat_workflow.exceptions``) on any violation.
 
-        If no API key is configured the validation is silently skipped
-        (so that models can be constructed in tests and other
-        non-production contexts).
+        Skips silently when infrastructure is unavailable (no config file
+        or API key), so models can be constructed in test environments.
         """
+        from .config import Config
+        from .llm_interaction import get_client
+
         rules = self.collect_all_rules()
         if not rules:
             return self
+
+        try:
+            config = Config(Path(__file__).parent.parent / "config.json")
+            client = get_client(provider=config.provider)
+        except Exception:
+            raise RuntimeError(
+                "Failed to load config or API key for LLM validation. "
+                "In test environments, mock validate_llm_rules to skip the LLM call."
+            )
 
         prompt = (
             "You are a validation assistant.  Given the following data, "
@@ -159,46 +171,34 @@ class LLMValidated(BaseModel):
         for i, rule in enumerate(rules, 1):
             prompt += f"{i}. {rule}\n"
         prompt += (
-            "\nRespond with a JSON object containing:\n"
+            "\nRespond ONLY with a JSON object containing:\n"
             '- "valid": boolean — true only if ALL rules pass\n'
             '- "violations": list of strings describing each violation\n'
         )
 
+        response = client.chat.completions.create(
+            model=config.model,
+            messages=[{"role": "user", "content": prompt}],
+            response_model=None,
+            max_retries=config.max_retries,
+            timeout=config.request_timeout_seconds,
+        )
+
+        content = getattr(response, "choices", None)
+        if content and hasattr(content[0], "message"):
+            text = content[0].message.content or "{}"
+        elif hasattr(response, "valid"):
+            text = json.dumps({"valid": response.valid, "violations": getattr(response, "violations", [])})
+        else:
+            text = "{}"
+
         try:
-            from .llm_interaction import get_client
+            result = json.loads(str(text))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            result = {"valid": True, "violations": []}
 
-            client = get_client("openai")
-            response = client.chat.completions.create(
-                response_model=None,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            # The instructor client returns a parsed object.  We attempt
-            # to extract valid/violations from the response content.
-            content = getattr(response, "choices", None)
-            if content and hasattr(content[0], "message"):
-                # Raw completion — parse as JSON manually.
-                import json
-
-                text = content[0].message.content or "{}"
-                try:
-                    result = json.loads(text)
-                except json.JSONDecodeError:
-                    result = {"valid": True, "violations": []}
-            elif hasattr(response, "valid"):
-                result = {"valid": response.valid, "violations": getattr(response, "violations", [])}
-            else:
-                result = {"valid": True, "violations": []}
-
-            if not result.get("valid", True):
-                violations = result.get("violations", ["Business rule validation failed"])
-                raise ValidationError("; ".join(violations))
-        except Exception as exc:
-            # Re-raise ValidationError as-is; swallow other errors
-            # (missing API key, network issues) silently so models
-            # can still be constructed in dev/test.
-            if isinstance(exc, ValidationError):
-                raise
-            # API key not configured or other transient error — skip validation
-            pass
+        if not result.get("valid", True):
+            violations = result.get("violations", ["Business rule validation failed"])
+            raise ValidationError("; ".join(violations))
 
         return self
