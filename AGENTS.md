@@ -90,6 +90,27 @@ make evals-verbose  # Same with verbose output
 make lint           # black --check + ruff check
 ```
 
+### Evals Cost Rule
+
+Evals call real LLM APIs — each run costs money and takes 90+ seconds. **Never re-run evals just to read output you already captured.** Instead:
+
+```bash
+# Always tee eval output to a file on the first run:
+make evals 2>&1 | tee .sisyphus/evidence/run-$(date +%s).txt
+
+# When a test fails, read the tee'd file — do not re-run:
+grep -A 50 "FAIL\|ERROR" .sisyphus/evidence/run-*.txt
+```
+
+The same applies to any command producing output: if it's tee'd, read the file. If it's not tee'd, tee it the first time. One run per problem.
+
+### Debugging Eval Failures
+
+When an eval fails, the test output shows the judge's verdict per rule. If you need the full conversation transcript, read the file at `test-results/transcripts/` (or the path shown in the error). Full exception traces (including Instructor retry chains) are at a companion `*-exception.txt` file.
+
+Do not re-run the eval suite just to see something you already captured. Before blaming the model, read the [Prompt Improvement Mindset](docs/contributors/testing.md#prompt-improvement-mindset) section — eval failures nearly always point to prompt improvements, not model deficiencies.
+```
+
 ## Reference Documentation Table
 
 | Document | Purpose | Best For |

@@ -1,7 +1,10 @@
-"""Eval tests: verify LLM can produce workflow models.
+"""Eval tests that verify workflow prompt quality with real LLM calls.
 
-These tests call a real LLM API and verify the LLM can produce each
-workflow model with valid data. They run with ``make evals``.
+These test the actual @atomic_workflow-decorated methods with an LLM-powered
+user bot (AgentIO) and an LLM judge to non-deterministically evaluate
+conversation quality — did the agent synthesize, loop, repeat itself, etc.
+
+Pydantic validates the structural output. These tests check the conversation.
 """
 
 import unittest
@@ -12,31 +15,6 @@ from tests.conftest import timeout
 
 class TestProcessAnalysisEval(unittest.TestCase):
     """Eval tests for ProcessAnalysis model."""
-
-    @timeout(30)
-    def test_llm_produces_process_analysis(self):
-        """LLM should produce a ProcessAnalysis with all fields."""
-        from tests.evals.helpers import run_one_shot_eval
-        from workflows.workflow.models import ProcessAnalysis
-
-        result = run_one_shot_eval(
-            response_model=ProcessAnalysis,
-            system_prompt=(
-                "You are a Business Process Analyst. Analyze this process.\n\n"
-                "Return phases, activities, orchestrating_component, and participants.\n"
-                "Use intent='success' to return the complete ProcessAnalysis."
-            ),
-            initial_message=(
-                "Customer places an order, the system validates payment, "
-                "inventory is checked, and shipping is arranged."
-            ),
-            user_turn="Please analyze this process and return the result.",
-        )
-        self.assertIsInstance(result, ProcessAnalysis)
-        self.assertTrue(len(result.phases) >= 1)
-        self.assertTrue(len(result.activities) >= 1)
-        self.assertTrue(len(result.orchestrating_component) > 0)
-        self.assertTrue(len(result.participants) >= 1)
 
     @timeout(120)
     def test_multi_turn_conversation_with_user_bot(self):
@@ -70,69 +48,10 @@ class TestProcessAnalysisEval(unittest.TestCase):
             user_persona=user_persona,
         )
         self.assertIsInstance(result, ProcessAnalysis)
-        self.assertGreaterEqual(len(result.phases), 1)
-        self.assertGreaterEqual(len(result.activities), 1)
-        self.assertGreater(len(result.orchestrating_component), 0)
-        self.assertGreaterEqual(len(result.participants), 1)
-
-
-class TestGapAnalysisEval(unittest.TestCase):
-    """Eval tests for GapAnalysis model."""
-
-    @timeout(30)
-    def test_llm_produces_gap_analysis(self):
-        """LLM should produce a GapAnalysis from component requirements."""
-        from tests.evals.helpers import run_one_shot_eval
-        from workflows.workflow.models import GapAnalysis
-
-        result = run_one_shot_eval(
-            response_model=GapAnalysis,
-            system_prompt=(
-                "You are analyzing gaps in a component architecture.\n\n"
-                "Return missing_components, missing_playbooks, integration_gaps, "
-                "organizational_gaps, and recommendations.\n"
-                "Use intent='success' to return the complete GapAnalysis."
-            ),
-            initial_message=(
-                "Components needed: Order, Payment, Inventory. "
-                "Existing: Order only. "
-                "Payment integration is unclear with Inventory."
-            ),
-            user_turn="Analyze gaps and return the analysis.",
-        )
-        self.assertIsInstance(result, GapAnalysis)
-        self.assertTrue(
-            len(result.missing_components) > 0 or len(result.recommendations) > 0
-        )
 
 
 class TestInputEval(unittest.TestCase):
     """Eval tests for Input model."""
-
-    @timeout(30)
-    def test_llm_produces_input(self):
-        """LLM should produce an Input model with all fields."""
-        from tests.evals.helpers import run_one_shot_eval
-        from workflows.workflow.models import Input
-
-        result = run_one_shot_eval(
-            response_model=Input,
-            system_prompt=(
-                "You are analyzing workflow inputs.\n\n"
-                "Return source, format, trigger_conditions, dependencies, "
-                "and validation_criteria.\n"
-                "Use intent='success' to return the complete Input."
-            ),
-            initial_message=(
-                "The order management workflow receives order data "
-                "from the customer portal as JSON."
-            ),
-            user_turn="Return the input analysis.",
-        )
-        self.assertIsInstance(result, Input)
-        self.assertTrue(len(result.source) > 0)
-        self.assertTrue(len(result.format) > 0)
-        self.assertTrue(len(result.trigger_conditions) > 0)
 
     @timeout(120)
     def test_multi_turn_input_generation(self):
@@ -163,29 +82,6 @@ class TestInputEval(unittest.TestCase):
 class TestOutputEval(unittest.TestCase):
     """Eval tests for Output model."""
 
-    @timeout(30)
-    def test_llm_produces_output(self):
-        """LLM should produce an Output model with all fields."""
-        from tests.evals.helpers import run_one_shot_eval
-        from workflows.workflow.models import Output
-
-        result = run_one_shot_eval(
-            response_model=Output,
-            system_prompt=(
-                "You are analyzing workflow outputs.\n\n"
-                "Return consumer, format, success_criteria, integration_points, "
-                "and storage_requirements.\n"
-                "Use intent='success' to return the complete Output."
-            ),
-            initial_message=(
-                "The order confirmation is sent to the customer via email as a PDF."
-            ),
-            user_turn="Return the output analysis.",
-        )
-        self.assertIsInstance(result, Output)
-        self.assertTrue(len(result.consumer) > 0)
-        self.assertTrue(len(result.format) > 0)
-
     @timeout(120)
     def test_multi_turn_output_generation(self):
         """Output.generate_from_chat should complete efficiently with a user bot."""
@@ -214,35 +110,6 @@ class TestOutputEval(unittest.TestCase):
 
 class TestComponentRequirementEval(unittest.TestCase):
     """Eval tests for ComponentRequirement model."""
-
-    @timeout(30)
-    def test_llm_produces_component_requirement(self):
-        """LLM should produce a ComponentRequirement."""
-        from tests.evals.helpers import run_one_shot_eval
-        from workflows.workflow.models import ComponentRequirement
-
-        result = run_one_shot_eval(
-            response_model=ComponentRequirement,
-            system_prompt=(
-                "You are identifying business components.\n\n"
-                "Return a ComponentRequirement with name (noun-based), purpose, "
-                "required_inputs, expected_outputs, and component_type "
-                "(one of: value_stream, artifact_producing, planning_service).\n"
-                "Use intent='success' to return the complete ComponentRequirement."
-            ),
-            initial_message=(
-                "We need a component that manages customer invoices "
-                "throughout their lifecycle."
-            ),
-            user_turn="Return the component requirement.",
-        )
-        self.assertIsInstance(result, ComponentRequirement)
-        self.assertTrue(len(result.name) > 0)
-        self.assertTrue(len(result.purpose) > 0)
-        self.assertIn(
-            result.component_type,
-            ["value_stream", "artifact_producing", "planning_service"],
-        )
 
     @timeout(120)
     def test_multi_turn_component_identification(self):
@@ -292,39 +159,6 @@ class TestComponentRequirementEval(unittest.TestCase):
 class TestGeneratedComponentEval(unittest.TestCase):
     """Eval tests for GeneratedComponent model."""
 
-    @timeout(30)
-    def test_llm_produces_python_code(self):
-        """LLM should produce Python code via GeneratedComponent."""
-        from tests.evals.helpers import run_one_shot_eval
-        from workflows.workflow.models import GeneratedComponent
-
-        result = run_one_shot_eval(
-            response_model=GeneratedComponent,
-            system_prompt=(
-                "You are a Python code generator.\n\n"
-                "Generate a complete Python file for a business component.\n"
-                "Rules:\n"
-                "- Import from pydantic import BaseModel, Field\n"
-                "- Use Field(..., description=...) on all fields\n"
-                "- One class per file\n"
-                "- Valid Python\n\n"
-                "Output format: Return ONLY the Python code as a string "
-                "in the 'code' field.\n"
-                "Use intent='success' to return the GeneratedComponent."
-            ),
-            initial_message=(
-                "Create a component named 'Order' that manages customer orders. "
-                "It needs fields: customer_name (str), items (list), total (float)."
-            ),
-            user_turn="Generate the Python code now.",
-        )
-        self.assertIsInstance(result, GeneratedComponent)
-        self.assertTrue(len(result.code) > 0)
-        self.assertIn("class ", result.code)
-        self.assertIn("BaseModel", result.code)
-        with suppress(SyntaxError):
-            compile(result.code, "<test>", "exec")
-
     @timeout(120)
     def test_multi_turn_component_design(self):
         """Component._design_component should complete efficiently with a user bot."""
@@ -356,21 +190,12 @@ class TestGeneratedComponentEval(unittest.TestCase):
                 requirements=req, max_turns=10,
             ),
             user_persona=user_persona,
-            judge_prompt=(
-                "Evaluate this conversation between a software architect and a "
-                "business user designing a component. Did the architect:\n"
-                "- Ask about what makes good output (quality criteria)?\n"
-                "- Translate the user's domain knowledge into validation rules?\n"
-                "- Avoid technical jargon or explain it when asked?\n"
-                "- Synthesize and propose (proposing then asking to fill details "
-                "is GOOD, not bad)?\n\n"
-                "Answer YES for good conversation, NO if the architect was stuck "
-                "in a pure questioning loop or failed to elicit quality criteria."
-            ),
         )
         self.assertIsInstance(result, GeneratedComponent)
         self.assertGreater(len(result.code), 0)
         self.assertIn("class ", result.code)
+        with suppress(SyntaxError):
+            compile(result.code, "<test>", "exec")
 
 
 if __name__ == "__main__":

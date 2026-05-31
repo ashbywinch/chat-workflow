@@ -24,4 +24,12 @@ jobs:
       - name: Evaluation tests
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CHAT_WORKFLOW_TRANSCRIPT_DIR: test-results/transcripts
         run: make evals
+
+      - name: Upload eval transcripts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-transcripts
+          path: test-results/transcripts/

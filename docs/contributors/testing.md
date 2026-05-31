@@ -195,3 +195,32 @@ make lint               # ruff check
 - **Integration / Evals**: Critical paths only (real API interaction)
   - Every workflow's `generate_from_chat` prompt should have at least one multi-turn eval
   - Write evals that reproduce known failure modes and verify they're fixed
+
+## Prompt Improvement Mindset
+
+When an eval fails, it's tempting to blame the cheap model. **Resist that instinct.** A core purpose of this library is to build agents that work well even with small, fast, cheap models. An eval failure is almost always a signal that the prompt can be improved.
+
+### What good prompts look like
+
+The best prompts for multi-turn conversation workflows share a few patterns:
+
+1. **They tell the agent *how* to think, not just *what* to produce.**
+   A prompt that lists fields like "produce: consumer, format, success_criteria..." trains the agent to follow a checklist. A prompt that says "you're an expert — use what the user tells you to fill in the details yourself" trains the agent to listen and propose.
+
+2. **They describe the conversational rhythm with concrete examples.**
+   "Synthesize what they've said and share your understanding" is abstract. "For example: 'From what you've described, I'm seeing three phases... Does that match your understanding?'" gives the model a concrete pattern to follow.
+
+3. **They tell the agent what to do when the user gives a detailed answer.**
+   Without this guidance, agents tend to ignore verbose user responses and continue their pre-planned script. Telling them to "acknowledge and build on what the user just said, rather than asking for it again" prevents repetition loops.
+
+4. **They frame the task around the user's domain, not the data model.**
+   "Identify consumer, format, and success criteria" makes the agent think about fields. "Help the user understand who uses each output and what makes it good" makes the agent think about the user's problem. The data model is the same; the conversation quality is very different.
+
+### When debugging a failing eval
+
+1. Read the judge's verdict — it tells you *which* rule was violated and *why*.
+2. If "No repetition" failed: did the agent ignore or re-ask for information the user already gave? If yes, add guidance to listen and build on answers. If the follow-up was genuinely needed (e.g., user gave a vague answer), the judge prompt may need refining instead.
+3. If "Uses expertise" failed: the agent is asking the user to fill out a form. Add language that tells it to propose, infer, and suggest — "propose the details yourself" — and give a concrete example.
+4. If "Honest about provenance" failed: the agent is hallucinating. Add language that clearly separates proposals from confirmed facts.
+5. Rerun the failing test only — never the full suite until you're ready to verify.
+6. Transcripts are saved to `test-results/transcripts/` for debugging.

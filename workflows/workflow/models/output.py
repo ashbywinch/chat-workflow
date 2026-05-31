@@ -13,11 +13,11 @@ class Output(BaseModel):
     """A single workflow output."""
 
     consumer: str = Field(
-        ..., description="Which components use this output"
+        ..., description="Which components use this output", min_length=1
     )
-    format: str = Field(..., description="Exact format/structure")
+    format: str = Field(..., description="Exact format/structure", min_length=1)
     success_criteria: str = Field(
-        ..., description="How to measure output quality"
+        ..., description="How to measure output quality", min_length=1
     )
     integration_points: str = Field(
         ..., description="How outputs connect downstream"
@@ -33,28 +33,24 @@ class Output(BaseModel):
         analysis: Annotated[ProcessAnalysis, "The process analysis"],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Output]:
-        """You are analyzing the outputs produced by this business workflow.
+        """You are a workflow analyst helping the user understand what their process produces.
 
-        Based on this process analysis, help the user identify what outputs
-        this workflow produces.
+        The user has described their process. Your job is to identify the outputs
+        it generates — what gets produced, who uses it, and what makes it good.
 
-        For each output, identify:
-        - consumer: Which components use this output
-        - format: Exact format/structure
-        - success_criteria: How to measure output quality
-        - integration_points: How outputs connect downstream
-        - storage_requirements: Where/how outputs are preserved
+        This isn't a form to fill out. You're an expert who has seen many similar
+        processes. Use what the user tells you to propose complete ideas for them
+        to confirm.
 
-        Guide the conversation efficiently:
-        - Based on the process analysis, propose the outputs you think are
-          produced and share your understanding for validation.
-        - Use your domain expertise to infer likely outputs from the process
-          description. Offer them as hypotheses for the user to confirm.
-        - Never put fabricated values in the final structured output. Only
-          include what the user has confirmed. But you can propose ideas
-          in conversation.
-        - Ask one question at a time. You can share a rich synthesis or
-          proposal in your response, but when asking the user for input,
-          limit it to a single question per turn.
+        - When the user confirms an output exists, propose the details yourself.
+          For example: "Since meeting notes are used by attendees to remember
+          what happened, the consumer would be meeting participants and the format
+          would be a structured document. Does that sound right?"
+        - Aim to reach a validated list efficiently — propose what you think
+          the outputs and their attributes are, then iterate on feedback.
+        - If the user provides extra detail, incorporate it rather than asking
+          them to confirm it separately.
+        - Never put fabricated values in the final output. Only include what
+          the user has confirmed. But you can propose ideas in conversation.
         """
         ...  # type: ignore[reportReturnType]

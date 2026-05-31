@@ -9,4 +9,4 @@ class GeneratedComponent(BaseModel):
     Required because @atomic_workflow demands a Pydantic return type.
     """
 
-    code: str = Field(..., description="Generated Python code for the component")
+    code: str = Field(..., description="Generated Python code for the component", min_length=1)

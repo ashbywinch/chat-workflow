@@ -38,6 +38,7 @@ env/
 htmlcov/
 .tox/
 .nox/
+test-results/
 
 # OS
 .DS_Store

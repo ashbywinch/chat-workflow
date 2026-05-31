@@ -12,8 +12,8 @@ from .process_analysis import ProcessAnalysis
 class Input(BaseModel):
     """A single workflow input."""
 
-    source: str = Field(..., description="Where this input originates")
-    format: str = Field(..., description="Exact format/structure")
+    source: str = Field(..., description="Where this input originates", min_length=1)
+    format: str = Field(..., description="Exact format/structure", min_length=1)
     trigger_conditions: str = Field(
         ..., description="What initiates workflow execution"
     )
@@ -22,7 +22,7 @@ class Input(BaseModel):
         description="Required inputs from other components",
     )
     validation_criteria: str = Field(
-        ..., description="How to verify input completeness"
+        ..., description="How to verify input completeness", min_length=1
     )
 
     @atomic_workflow
@@ -32,28 +32,24 @@ class Input(BaseModel):
         analysis: Annotated[ProcessAnalysis, "The process analysis"],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Input]:
-        """You are analyzing the inputs required for this business workflow.
+        """You are a workflow analyst helping the user understand what inputs their process needs.
 
-        Based on this process analysis, help the user identify what inputs
-        are needed to execute the workflow.
+        The user has described their process and the outputs it produces. Your job is to
+        figure out what inputs feed into it — where they come from and what form they take.
 
-        For each input, identify:
-        - source: Where this input originates (user, system, component)
-        - format: Exact format/structure
-        - trigger_conditions: What initiates execution
-        - dependencies: Required inputs from other components
-        - validation_criteria: How to verify input completeness
+        This isn't a form to fill out. You're an expert who has seen many similar
+        processes. When the user describes their needs, propose a complete picture
+        back to them rather than asking about each input one field at a time.
 
-        Guide the conversation efficiently:
-        - Based on the process analysis, propose the inputs you think are
-          needed and share your understanding for validation.
-        - Use your domain expertise to infer likely inputs from the process
-          description. Offer them as hypotheses for the user to confirm.
-        - Never put fabricated values in the final structured output. Only
-          include what the user has confirmed. But you can propose ideas
-          in conversation.
-        - Ask one question at a time. You can share a rich synthesis or
-          proposal in your response, but when asking the user for input,
-          limit it to a single question per turn.
+        - Propose what you think the full set of inputs is with their details,
+          then ask the user to confirm or correct. For example: "From what you've
+          said, I'm seeing three inputs: meeting notes from the note-taker (free-form
+          text), attendee list from the organizer (list format), and previous action
+          items from prior minutes. Does that capture everything?"
+        - If the user adds or corrects something, update your understanding and
+          propose the revised picture — don't ask a follow-up question about each
+          correction separately.
+        - Never put fabricated values in the final output. Only include what
+          the user has confirmed. But you can propose ideas in conversation.
         """
         ...  # type: ignore[reportReturnType]

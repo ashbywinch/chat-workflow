@@ -10,13 +10,17 @@ from chat_workflow import atomic_workflow
 class ProcessAnalysis(BaseModel):
     """Output of analyze_process()."""
 
-    phases: list[str] = Field(..., description="Logical process phases in order")
-    activities: list[str] = Field(..., description="Specific business activities")
+    phases: list[str] = Field(
+        ..., description="Logical process phases in order", min_length=1
+    )
+    activities: list[str] = Field(
+        ..., description="Specific business activities", min_length=1
+    )
     orchestrating_component: str = Field(
-        ..., description="Which domain coordinates this workflow"
+        ..., description="Which domain coordinates this workflow", min_length=1
     )
     participants: list[str] = Field(
-        ..., description="All roles/systems involved"
+        ..., description="All roles/systems involved", min_length=1
     )
 
     @atomic_workflow
@@ -29,30 +33,21 @@ class ProcessAnalysis(BaseModel):
         """You are a Business Process Analyst & Workflow Architect.
 
         Your goal is to analyze a business process description and create a
-        structured process analysis covering:
-        - Logical process phases in order
-        - Specific business activities within each phase
-        - The orchestrating component (which domain coordinates this)
-        - All participants (roles, systems, components)
+        structured process analysis covering phases, activities, orchestrating
+        component, and participants.
 
-        Guide the conversation efficiently:
-        - When the user describes their process, synthesize what they've said
-          into the analysis fields and share your understanding for validation.
-          For example: "From what you've described, I'm seeing three phases:
-          note-taking, review, and drafting — with activities like identifying
-          action items and assigning owners. Does that match your understanding?"
-        - Use your domain expertise to interpret what the user tells you and fill
-          in the structure. Reasonable inferences are fine — offer them as
-          hypotheses for the user to confirm or correct.
-        - Never put fabricated values in the final structured output. Only include
-          what the user has confirmed. But you can propose ideas in conversation.
+        This isn't a form to fill out. Use what the user tells you to propose
+        the analysis for them to confirm.
+
+        - When the user describes their process, synthesize and fill in the
+          structure yourself. For example: "From what you've described, I'm
+          seeing three phases: note-taking, review, and drafting — with
+          activities like identifying action items and assigning owners.
+          Does that match your understanding?"
+        - Never put fabricated values in the final output. Only include what
+          the user has confirmed. But you can propose ideas in conversation.
         - If the user's description is genuinely missing critical information,
-          ask for it. But if you can make a reasonable inference, offer it first
-          and let the user correct you.
-        - Aim to reach a validated analysis efficiently — share your understanding
-          early and iterate on feedback.
-        - Ask one question at a time. You can share a rich synthesis or proposal
-          in your response, but when asking the user for input, limit it to a
-          single question per turn.
+          ask for it. But if you can make a reasonable inference, offer it
+          first and let the user correct you.
         """
         ...  # type: ignore[reportReturnType]
