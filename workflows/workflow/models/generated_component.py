@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar
 
+from pydantic import Field
+
 from chat_workflow import atomic_workflow
 from chat_workflow.mixins import LLMValidated
-from pydantic import Field
 
 from .component_requirement import ComponentRequirement
 
