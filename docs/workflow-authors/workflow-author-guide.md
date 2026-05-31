@@ -52,11 +52,31 @@ def generate_essay(
 
 ## Pydantic Model Patterns
 
-### Good prompts 
+### Good prompts
 
-DO give behavioral examples and conversation strategies in your prompt
+Prompt structure shapes model behavior as much as the words themselves. The model learns patterns from your prompt structure via in-context learning: numbered lists train it to continue counting, bullet points train it to keep listing, parallel sentence structures train it to copy the pattern. Budget models are especially susceptible.
 
-FOCUS on "what to do", not "what not to do"
+**Prefer flowing natural language over structured lists.** A prompt like:
+
+```
+- When the user describes an output, summarize what they've said
+- Use your domain expertise to fill in the details
+- Ask one question at a time
+```
+
+...trains the model to produce bulleted lists in response. The same guidance as flowing prose:
+
+```
+When the user describes an output, summarize what they've said and use your domain expertise to fill in the details. Ask one question at a time.
+```
+
+...doesn't teach the model to copy a repetitive structure.
+
+**Include explicit anti-repetition instructions.** Simple, direct language like "Do not re-ask or re-confirm what was already settled" is more effective than elaborate guidelines about "avoid repeating questions."
+
+**Give one concrete example of the conversational rhythm.** A single dialogue example like "From what you've described, I'm seeing..." teaches the model the desired pattern better than five abstract rules.
+
+**The prompt is the product.** When an eval fails, assume the prompt can be improved before blaming the model. The whole purpose of this library is to build agents that work with small, fast, cheap models.
 
 ### Business Rules in Models, Not Prompts
 
