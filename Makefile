@@ -1,5 +1,5 @@
 # Makefile for chat-workflow test automation
-.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all evals-smoke coverage lint format clean
+.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all evals-smoke evals-incremental coverage lint format clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -24,6 +24,7 @@ help:
 	@echo "  ${GREEN}make evals-debug${NC}   Run evals with LLM tracing (streams requests/responses)"
 	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
 	@echo "  ${GREEN}make evals-smoke${NC}  Quick framework check (test_real_api + test_debug_streaming_api, ~80s)"
+	@echo "  ${GREEN}make evals-incremental${NC} Change-aware eval subset (auto-detects affected evals via code-review-graph)"
 	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
 	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
 	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
@@ -58,6 +59,17 @@ test-all: test evals
 
 evals-smoke: setup lint
 	@${PYTHON} scripts/run_with_timeout.py --timeout 120 -- ${UNITTEST} tests.evals.test_real_api tests.evals.test_debug_streaming_api -v
+
+evals-incremental: setup lint
+	@echo "${YELLOW}Updating dependency graph...${NC}"
+	@${PYTHON} -m code_review_graph update 2>&1 | grep -v "^$" || true
+	@FILES=$$(${PYTHON} scripts/affected_evals.py --git-base origin/main); \
+	if [ -z "$$FILES" ]; then \
+		echo "${GREEN}No evals affected by current changes.${NC}"; \
+	else \
+		echo "${YELLOW}Running affected evals:${NC} $$FILES"; \
+		${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} $$FILES -v; \
+	fi
 
 # Test with coverage (requires coverage package)
 coverage: setup
