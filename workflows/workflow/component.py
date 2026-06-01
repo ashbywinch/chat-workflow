@@ -12,8 +12,11 @@ from chat_workflow.session import Session
 
 from . import GeneratedComponent
 from .component_responsibilities import ComponentResponsibilities
+from .design_spec import ComponentDesignSpec
 from .domain_spec import ComponentDomainSpec
+from .interaction_context import ComponentInteractionContext
 from .models import ComponentRequirement
+from .structure import ComponentStructure
 
 
 class Component(LLMValidated):
@@ -83,9 +86,9 @@ class Component(LLMValidated):
         """Create ONE business component.
 
         Two code paths:
-        - ComponentResponsibilities (new): Phase 1 skeleton — calls
-          ComponentDomainSpec.explore() to produce a domain spec, then
-          builds and returns a Component record from it.
+        - ComponentResponsibilities (new): Phase 1 (DomainSpec.explore)
+          + Phase 2 (Structure.design) — produces a domain spec, designs
+          the structure, then builds and returns a Component record.
         - ComponentRequirement (legacy): Full pipeline — generates code,
           verifies, writes to disk, and returns Component.
 
@@ -95,11 +98,17 @@ class Component(LLMValidated):
             output_dir: Directory to write the component file. Defaults to
                 current working directory / "workflows" / {name} /
         """
-        # --- New path: ComponentResponsibilities (Phase 1 skeleton) ---
+        # --- New path: ComponentResponsibilities (Phase 1 + Phase 2) ---
         if isinstance(requirements, ComponentResponsibilities):
             session.io.echo(f"Exploring domain: {requirements.name}...")
             domain_spec = ComponentDomainSpec.explore(
                 responsibilities=requirements,
+                session=session,
+            )
+
+            session.io.echo(f"Designing structure: {domain_spec.name}...")
+            structure = ComponentStructure.design(
+                domain_spec=domain_spec,
                 session=session,
             )
 
@@ -110,7 +119,7 @@ class Component(LLMValidated):
 
             result = cls(
                 name=domain_spec.name,
-                purpose=domain_spec.description,
+                purpose=structure.description,
                 code_path=code_path,
                 model_class=domain_spec.name,
                 expert_role=domain_spec.expert_role,
@@ -119,10 +128,27 @@ class Component(LLMValidated):
             return result
 
         # --- Legacy path: ComponentRequirement ---
-        # Step 1: Design the component (LLM generates code)
+        # Step 1: Construct a ComponentDesignSpec from the requirement
         session.io.echo(f"Designing component: {requirements.name}...")
+        design_spec = ComponentDesignSpec(
+            domain_spec=ComponentDomainSpec(
+                name=requirements.name,
+                description=requirements.purpose,
+                fields=[],
+                what_good_looks_like=[],
+                expert_role=f"{requirements.name} Expert",
+            ),
+            structure=ComponentStructure(
+                description=requirements.purpose,
+            ),
+            interaction_context=ComponentInteractionContext(
+                must_prioritize=[],
+                auto_suggest=[],
+                user_pain_points=[],
+            ),
+        )
         generated = GeneratedComponent.generate(
-            requirements=requirements,
+            design_spec=design_spec,
             session=session,
         )
 

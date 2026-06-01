@@ -7,7 +7,7 @@ from pydantic import Field
 from chat_workflow import atomic_workflow
 from chat_workflow.mixins import LLMValidated
 
-from .models.component_requirement import ComponentRequirement
+from .design_spec import ComponentDesignSpec
 
 
 class GeneratedComponent(LLMValidated):
@@ -51,40 +51,49 @@ class GeneratedComponent(LLMValidated):
     @classmethod
     def generate(
         cls,
-        requirements: Annotated[
-            ComponentRequirement,
-            "The component requirements specifying name, purpose, inputs, outputs, and type",
+        design_spec: Annotated[
+            ComponentDesignSpec,
+            "Complete component design specification — domain understanding, "
+            "Pydantic structure, and interaction context. The design is fully "
+            "assembled; no further user input is needed.",
         ],
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+        max_turns: Annotated[int, "Maximum conversation turns"] = 3,
     ) -> GeneratedComponent:
-        """You are a software architect designing a Python business component.
+        """You are a Python code generator. You have been given a complete
+        component design specification. Your job is to generate valid Python
+        source code that implements this design.
 
-        The user has described what they need. Your job is to generate Python code
-        that defines a Pydantic BaseModel class — a business component — with:
-        - A class docstring that explains the domain concept the model represents,
-          in terms an LLM with no context could understand
-        - An @atomic_workflow classmethod whose docstring is a good system prompt:
-          it frames the task around the user's domain, tells the agent to propose
-          and synthesize, and includes a concrete example of the conversational
-          rhythm (e.g., "From what you've described, I'm seeing...")
-        - Field definitions using Field(..., description=...) with plain-English
-          business descriptions and min_length=1 where empty values are meaningless
-        - Validation rules (Field constraints or @model_validator) that encode
-          real business semantics, not just type checks
+        The design spec contains everything you need:
+        - Domain specification: what the artifact represents in the user's world,
+          its fields (names, descriptions, type hints), and holistic quality criteria
+        - Structure: the Pydantic model fields with Python types, Field() kwargs,
+          validation rules, and any extra imports needed
+        - Interaction context: how the assistant should interact with users when
+          creating instances of this artifact
 
-        Design the component conversationally:
-        - Propose concrete fields, data types, and validation rules based on what
-          the user has told you. Use your expertise to fill in the gaps.
-        - When the user describes a rule or constraint, summarize and build on it.
-          For example: "So every action item needs an owner and due date — I'll make
-          those required fields with validation. What about the description length?"
-        - Never put fabricated validation rules in the final output. Only include
-          what the user has confirmed. But you can propose ideas in conversation.
+        Generate a complete Python module that defines:
+        1. A Pydantic BaseModel class (or LLMValidated subclass) named after the
+           component, with a class docstring explaining the domain concept
+        2. A classmethod decorated with @atomic_workflow (imported from
+           chat_workflow) whose docstring is a good system prompt — it frames the
+           task around the user's domain, tells the agent to propose and synthesize,
+           and includes a concrete dialogue example.
+        3. Field definitions using Field(..., description=...) with plain-English
+           business descriptions and appropriate constraints (min_length, etc.)
+        4. Validation rules (@model_validator or Field constraints) that encode
+           real business semantics from the quality criteria
 
         Code generation rules:
+        - Import atomic_workflow from chat_workflow (just the name, no alias)
+        - Use @atomic_workflow on its own line WITHOUT parentheses or arguments
+          (correct: "@atomic_workflow" then "@classmethod" then "def method_name")
         - Import from __future__ import annotations, pydantic BaseModel and Field
         - One class per file named after the component
         - Valid Python that passes ruff linting
+
+        The design is complete. Do NOT ask questions, propose alternatives, or
+        request confirmation. Just generate the code and return it immediately
+        with intent "success".
 
         Output format: Return ONLY the Python code as a string in the 'code' field.
         """
