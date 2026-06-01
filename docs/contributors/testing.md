@@ -14,6 +14,25 @@ strategy and patterns to answer the question: "How should I test changes to this
    belongs in assertions, but conversation quality (did the agent loop? repeat itself? use jargon?)
    is best assessed by an LLM judge reading the transcript.
 
+## Test Strategy Rules
+
+These rules govern when and how tests must be written for any change:
+
+| Type of Change | Required Test |
+|---|---|
+| Code changes only | Failing unit test first (TDD: red → green → refactor) |
+| Prompt text changes only | Failing eval first (eval-first: write the eval, watch it fail, fix the prompt) |
+| Both code and prompt changes | Both — failing unit test AND failing eval first |
+| Any of the above | Agent-executed QA scenarios are mandatory for EVERY task, regardless |
+
+### Why This Matters
+
+- **Code without a unit test is untested logic** — the code path may never be exercised.
+- **Prompt text without an eval is a guess** — you won't know if the change improves or degrades conversation quality until you run a real LLM against it.
+- **QA scenarios catch integration issues** — unit tests and evals test in isolation; QA scenarios verify the system works end-to-end (e.g., simulate an InstructorRetryException → verify companion file created + no traceback visible).
+
+> One rule of thumb: if you changed only prompt text, write an eval. If you changed only code, write a unit test. If you changed both, write both.
+
 ## Test Structure
 
 ```

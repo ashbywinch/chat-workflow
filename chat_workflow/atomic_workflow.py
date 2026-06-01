@@ -73,7 +73,9 @@ class AtomicWorkflow(Generic[TResult]):
         raise InvalidResponseError(f"Invalid intent received: {response.intent}")
 
     def _call_llm(self) -> AgentResponse[TResult]:
-        from .exceptions import ProviderNotFoundError
+        from instructor.core.exceptions import InstructorRetryException
+
+        from .exceptions import MaxRetriesExceededError, ProviderNotFoundError
         from .llm_interaction import get_client
 
         try:
@@ -98,6 +100,8 @@ class AtomicWorkflow(Generic[TResult]):
             raise ProviderNotFoundError(
                 f"No LLM providers available. {e}\nInstall litellm for multi-provider LLM support: uv add litellm"
             ) from e
+        except InstructorRetryException as e:
+            raise MaxRetriesExceededError(self._max_retries) from e
         except Exception as e:
             if self.debug:
                 self.debug.on_error(e)

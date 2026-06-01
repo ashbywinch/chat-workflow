@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -41,6 +41,45 @@ class AgentResponse(BaseModel, Generic[TResult]):
             'The final object. Required when intent is "success". Must be null when intent is "continue" or "failure".'
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _give_llm_actionable_feedback(cls, data: Any) -> Any:
+        """Catch common LLM output mistakes and give actionable error messages.
+
+        - Bare list: LLM returned an array without AgentResponse wrapper.
+        - Inner fields directly: LLM returned domain fields without intent/result.
+        """
+        if isinstance(data, list):
+            raise ValueError(
+                "Received a bare list/array instead of an AgentResponse object. "
+                "You must wrap your data with intent and result fields, for example:\n"
+                '  AgentResponse(intent="success", result=<your_data>)'
+            )
+        if isinstance(data, dict):
+            known_inner_fields = {
+                "consumer",
+                "format",
+                "success_criteria",
+                "integration_points",
+                "storage_requirements",
+                "source",
+                "trigger_conditions",
+                "dependencies",
+                "validation_criteria",
+                "phases",
+                "activities",
+            }
+            if known_inner_fields & data.keys() and "intent" not in data and "result" not in data:
+                raise ValueError(
+                    "Received only inner/domain fields without an AgentResponse wrapper. "
+                    "Your data includes fields like '{}' but is missing the required "
+                    "'intent' and 'result' keys. Wrap your response, for example:\n"
+                    '  AgentResponse(intent="success", result=<your_domain_data>)'.format(
+                        "', '".join(sorted(known_inner_fields & data.keys()))
+                    )
+                )
+        return data
 
     @model_validator(mode="after")
     def validate_intent_consistency(self):

@@ -175,14 +175,18 @@ class Workflow(BlobSyncMixin, LLMValidated):
         gap resolution, diagram generation, user refinement, and
         component creation.
         """
+        outputs = Output.generate_from_chat(session=session)
+
+        session.io.echo("\nNow let's figure out what you have to work with.")
+        inputs = Input.generate_from_chat(outputs=outputs, session=session)
+
+        session.io.echo("\nLet me understand how it all fits together.")
         analysis = ProcessAnalysis.generate_from_chat(
             process_description=process_description,
+            outputs=outputs,
+            inputs=inputs,
             session=session,
         )
-
-        session.io.echo("\nLet's analyze the inputs and outputs for this workflow.")
-        inputs = Input.generate_from_chat(analysis=analysis, session=session)
-        outputs = Output.generate_from_chat(analysis=analysis, session=session)
 
         components, gap_analysis = _resolve_gaps(
             analysis=analysis,

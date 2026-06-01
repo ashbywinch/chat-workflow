@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import traceback
-
 import typer
 
 from chat_workflow.exceptions import (
@@ -54,6 +52,6 @@ def handle_error(error: Exception) -> None:
         typer.secho(f"\nError: {error.message}", err=True, fg=typer.colors.RED)
     else:
         typer.secho(f"\nUnexpected error: {str(error)[:200]}", err=True, fg=typer.colors.RED)
-        message = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-        typer.secho(f"\n{message}")
+        # Full traceback is saved to companion -exception.txt file by the caller.
+        # Never print tracebacks to end users.
     raise typer.Exit(1)

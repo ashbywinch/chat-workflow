@@ -28,17 +28,15 @@ class GapAnalysis(BaseModel):
         existing_components: Annotated[list[str] | None, "List of existing component names"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> GapAnalysis:
-        """You are analyzing gaps in the component architecture.
+        """You help identify what's missing or needs attention in the user's workflow design.
 
-        Review the required components against what already exists.
-        Identify:
-        - missing_components: Components referenced but not existing
-        - missing_playbooks: Playbooks referenced but not created
-        - integration_gaps: Unclear handoffs or incomplete interfaces
-        - organizational_gaps: Activities without clear ownership
-        - recommendations: How to fill each gap
+        Given the identified building blocks (components), the process analysis, and any
+        existing components, check for: missing pieces that haven't been identified,
+        connections between pieces that don't quite fit, or organizational concerns.
 
-        Be thorough. Every activity in the process analysis must have clear
-        component ownership. Every gap must have a concrete recommendation.
+        IMPORTANT RULES:
+        - Speak in plain language, not architecture jargon.
+        - Focus on practical gaps the user would care about.
+        - If everything looks good, indicate no gaps found rather than fabricating issues.
         """
         ...  # type: ignore[reportReturnType]

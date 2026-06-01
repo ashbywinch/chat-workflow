@@ -1,3 +1,4 @@
+# ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
 from typing import Annotated
@@ -6,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from chat_workflow import atomic_workflow
 
+from .output import Output
 from .process_analysis import ProcessAnalysis
 
 
@@ -25,27 +27,22 @@ class Input(BaseModel):
     @classmethod
     def generate_from_chat(
         cls,
-        analysis: Annotated[ProcessAnalysis, "The process analysis"],
+        analysis: Annotated[ProcessAnalysis | None, "The process analysis, if already available"] = None,
+        outputs: Annotated[list[Output] | None, "The outputs the process should produce, if already known"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Input]:
-        """You are a workflow analyst helping the user understand what inputs their process needs.
+        """You are helping the user figure out what ingredients or raw materials their process needs.
 
-        The user has described their process and the outputs it produces. Your job is to
-        figure out what inputs feed into it — where they come from and what form they take.
+        The user has described what they want to produce (their outputs). Your job is to figure
+        out what inputs or starting materials they need to make those outputs happen.
 
-        This isn't a form to fill out. You're an expert who has seen many similar
-        processes. When the user describes their needs, propose a complete picture
-        back to them rather than asking about each input one field at a time.
-
-        - Propose what you think the full set of inputs is with their details,
-          then ask the user to confirm or correct. For example: "From what you've
-          said, I'm seeing three inputs: meeting notes from the note-taker (free-form
-          text), attendee list from the organizer (list format), and previous action
-          items from prior minutes. Does that capture everything?"
-        - If the user adds or corrects something, update your understanding and
-          propose the revised picture — don't ask a follow-up question about each
-          correction separately.
-        - Never put fabricated values in the final output. Only include what
-          the user has confirmed. But you can propose ideas in conversation.
+        IMPORTANT RULES:
+        - Speak in the user's language. If they're cooking, talk about ingredients, kitchen equipment, and recipes.
+        - NEVER use model field names with the user. Instead of "source" ask "where does this come from?" Instead of "format" ask "what form is it in?" Instead of "trigger_conditions" ask "what kicks things off?" Instead of "validation_criteria" ask "how do you know you have everything you need?"
+        - Never adopt an analytical or consulting tone. Talk like a helpful person helping out, not an analyst documenting a process.
+        - Propose what you can based on what you know. If the user gave enough detail, summarize it back: "So from what you've said, you'd need a list of meals you fancy, a note of how many days you're cooking for, and a record of what kitchen equipment you have — does that capture everything?" If you're suggesting something new, make that clear: "How about we start with a list of meals you fancy, and then figure out what ingredients you'd need for each — does that sound like it would work?"
+        - If the user is confused, simplify your language. Don't re-explain — just use simpler words.
+        - When the user confirms, move on. Don't re-ask.
+        - Never put fabricated values in the final output. Propose ideas and let the user confirm/correct.
         """
         ...  # type: ignore[reportReturnType]

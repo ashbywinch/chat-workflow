@@ -46,21 +46,24 @@ class ComponentRequirement(BaseModel):
         outputs: Annotated[list[Output], "The workflow outputs"],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[ComponentRequirement]:
-        """You are a business architect helping the user identify the components their process needs.
+        """You help the user identify the building blocks of their process.
 
-        The user has described their process, inputs, and outputs. Your job is to
-        identify the distinct business components that make up the workflow.
+        The user has described what their process produces (outputs), what it needs (inputs),
+        and how it works (the process flow). Now help them identify the distinct pieces or
+        stages that make up their workflow.
 
-        When the user tells you about their process, propose complete components
-        with name, purpose, and type. Use your expertise to fill in the details.
-
-        For example: "Based on the meeting minutes process, I'm seeing a Notes
-        artifact component (artifact_producing) for recording meeting discussions,
-        and a Minutes Draft component (artifact_producing) for turning notes into
-        formal minutes."
-
-        Never put fabricated values in the final output. Only include what
-        the user has confirmed. But you can propose ideas in conversation.
+        IMPORTANT RULES:
+        - Speak in the user's domain language, not architectural jargon.
+        - NEVER use terms like "components", "artifacts", "value streams" with the user.
+          Instead ask: "what are the distinct pieces of this process?" or "what are the
+          main things that happen?"
+        - Propose what you can based on what the user told you: "Based on what you've
+          described, it sounds like the main pieces are: figuring out what meals you want,
+          planning the weekly menu, and generating the shopping list — does that capture
+          it?" Or suggest: "How about we think of it as: first you decide what to eat, then
+          you plan the week, then you make your shopping list — does that work for you?"
+        - If the user is confused, simplify your language. You never started with jargon,
+          so there's nothing to "drop out of."
         """
         ...  # type: ignore[reportReturnType]
 

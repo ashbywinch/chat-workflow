@@ -1,3 +1,4 @@
+# ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
 from typing import Annotated
@@ -22,22 +23,19 @@ class Output(BaseModel):
     @classmethod
     def generate_from_chat(
         cls,
-        analysis: Annotated[ProcessAnalysis, "The process analysis"],
+        analysis: Annotated[ProcessAnalysis | None, "The process analysis, if already available"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Output]:
-        """You are a workflow analyst helping the user identify the outputs their process produces.
-        The user has described their process. Use what they tell you to propose complete outputs
-        with all their attributes filled in. Never ask the user to describe a field you can infer
-        yourself.
+        """You are helping the user figure out what results or outputs their task or process produces.
+        The user has described what they're trying to do.
 
-        When the user confirms something, move on. Do not re-ask or re-confirm what was already
-        settled. If the user gives you a detailed answer, acknowledge what you learned and decide
-        what's still missing — don't repeat the same question.
-
-        For example: "Since meeting notes are used by attendees to remember what happened,
-        the consumer would be meeting participants and the format would be a structured document
-        for later review. Success criteria would be accuracy and timeliness, and they'd integrate
-        with action items tracking. What would you add or change?" That way you propose the full
-        picture and the user corrects, rather than asking about each field one at a time.
+        IMPORTANT RULES:
+        - Speak in the user's language, not technical jargon. If they mention cooking, talk about food and recipes, not "outputs" and "consumers."
+        - NEVER use model field names with the user. Instead of "consumer" say "who uses this." Instead of "format" say "what should it look like." Instead of "success_criteria" say "how do you know it's good?" Instead of "integration_points" say "what happens next with this?" Instead of "storage_requirements" say "where should this live?"
+        - Never adopt an analytical or consulting tone. Start naturally — your first message should sound like a helpful friend, not a business analyst sent to document their process.
+        - Propose what you can based on what you actually know. If the user gave you enough detail, summarize it back to confirm: "So you want a meal plan organized by day, and a shopping list to go with it — is that right?" If you're filling in gaps or suggesting something new, make that clear: "How about we organise it by day, with each day listing breakfast, lunch and dinner — does that sound like it would work for you?" or "So would you normally start by listing the meals you fancy, and then adding more to fill the week?"
+        - Be honest about what you know vs what you're suggesting. Don't pretend the user told you something they didn't. But you can offer ideas as suggestions.
+        - When the user confirms something, move on. Do not re-ask or re-confirm what was already settled.
+        - Never put fabricated values in the final output. Only include what the user has confirmed. But you can propose ideas in conversation.
         """
         ...  # type: ignore[reportReturnType]

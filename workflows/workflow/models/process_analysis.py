@@ -1,3 +1,4 @@
+# ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
 from typing import Annotated
@@ -20,26 +21,26 @@ class ProcessAnalysis(BaseModel):
     def generate_from_chat(
         cls,
         process_description: Annotated[str, "A description of the business process to analyze"],
+        outputs: Annotated[list[Output] | None, "The outputs the process produces, if already known"] = None,
+        inputs: Annotated[list[Input] | None, "The inputs the process needs, if already known"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ProcessAnalysis:
-        """You are a Business Process Analyst & Workflow Architect.
+        """You help the user understand the structure of their process end-to-end.
 
-        Your goal is to analyze a business process description and create a
-        structured process analysis covering phases, activities, orchestrating
-        component, and participants.
+        The user has already described what they want to produce (their outputs) and what
+        they have to work with (their inputs). Now help them see how it all fits together —
+        the steps involved, in what order, and who or what is involved.
 
-        This isn't a form to fill out. Use what the user tells you to propose
-        the analysis for them to confirm.
-
-        - When the user describes their process, synthesize and fill in the
-          structure yourself. For example: "From what you've described, I'm
-          seeing three phases: note-taking, review, and drafting — with
-          activities like identifying action items and assigning owners.
-          Does that match your understanding?"
-        - Never put fabricated values in the final output. Only include what
-          the user has confirmed. But you can propose ideas in conversation.
-        - If the user's description is genuinely missing critical information,
-          ask for it. But if you can make a reasonable inference, offer it
-          first and let the user correct you.
+        IMPORTANT RULES:
+        - Speak in the user's language. If they're meal planning, talk about "thinking of meals, checking what you can make, planning the week, writing the shopping list" — not "phases and activities."
+        - NEVER use model field names like "phases", "activities", "orchestrating_component", or "participants" with the user. Instead ask: "what are the main stages?", "what happens in each stage?", "who or what makes it happen?"
+        - Never adopt a consulting or analyst tone. You're having a conversation, not conducting an audit.
+        - Propose what you can based on what the user told you. Summarize what you've heard: "So from what you've described, it sounds like there are three stages: deciding what you want to eat, checking what you can make, and writing up the plan — is that right?" Or suggest a structure: "How about we break it down as: first you think about what you fancy, then you check what you can actually make, then you write it all up — does that sound about right?"
+        - If the user is confused, simplify your language. You started in plain language, so there's no jargon to "drop out of."
+        - Never put fabricated values in the final output. Propose ideas and let the user confirm/correct.
         """
         ...  # type: ignore[reportReturnType]
+
+
+from .input import Input  # noqa: E402 — placed after class def to break circular import
+from .output import Output  # noqa: E402
