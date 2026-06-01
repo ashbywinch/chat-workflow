@@ -44,7 +44,7 @@ class AgentResponse(BaseModel, Generic[TResult]):
 
     @model_validator(mode="before")
     @classmethod
-    def _give_llm_actionable_feedback(cls, data: Any) -> Any:
+    def _validate_response_envelope(cls, data: Any) -> Any:
         """Catch common LLM output mistakes and give actionable error messages.
 
         - Bare list: LLM returned an array without AgentResponse wrapper.
@@ -69,6 +69,8 @@ class AgentResponse(BaseModel, Generic[TResult]):
                 "validation_criteria",
                 "phases",
                 "activities",
+                "outputs",
+                "inputs",
             }
             if known_inner_fields & data.keys() and "intent" not in data and "result" not in data:
                 raise ValueError(
@@ -98,7 +100,10 @@ class AgentResponse(BaseModel, Generic[TResult]):
             if self.result is not None:
                 raise ValueError("FAILURE intent cannot include result.")
         elif self.intent == AgentIntent.SUCCESS and self.result is None:
-            raise ValueError("SUCCESS intent requires a result field with the complete object.")
+            raise ValueError(
+                "SUCCESS intent requires a field named 'result' containing the complete object. "
+                "Your data must use 'result' as the key name, not 'outputs', 'inputs', or any other name."
+            )
         return self
 
 

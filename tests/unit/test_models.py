@@ -195,7 +195,7 @@ class TestAgentResponseModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=None)
 
-        self.assertIn("SUCCESS intent requires a result", str(context.exception))
+        self.assertIn("field named 'result'", str(context.exception))
 
     def test_action_validation_failure_without_message(self):
         with self.assertRaises(ValueError) as context:

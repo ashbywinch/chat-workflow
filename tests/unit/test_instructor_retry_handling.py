@@ -47,7 +47,7 @@ class TestAgentResponseModelValidator(unittest.TestCase):
             AgentResponse[EvaluationCriteria].model_validate(
                 {"intent": "success", "result": None}
             )
-        self.assertIn("SUCCESS intent requires a result", str(ctx.exception))
+        self.assertIn("field named 'result'", str(ctx.exception))
 
 
 class TestCallLlmInstructorRetryHandling(unittest.TestCase):
