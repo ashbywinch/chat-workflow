@@ -1,5 +1,6 @@
 """Tests for workflow sub-models."""
 import unittest
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
@@ -105,7 +106,8 @@ class TestComponentRequirement(unittest.TestCase):
 
 
 class TestGeneratedComponent(unittest.TestCase):
-    def test_valid_instance(self):
+    @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
+    def test_valid_instance(self, mock_validate):
         model = GeneratedComponent(code="class MyModel(BaseModel): pass")
         self.assertEqual(model.code, "class MyModel(BaseModel): pass")
 

@@ -174,7 +174,8 @@ class TestLLMValidated(unittest.TestCase):
         self.assertIn("Must be non-empty", desc)
         self.assertIn("Must be unique", desc)
 
-    def test_model_construct_without_api_key(self):
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    def test_model_construct_without_api_key(self, mock_collect):
         """Should not raise when no API key is configured (silently skips LLM validation)."""
 
         class TestModel(LLMValidated):

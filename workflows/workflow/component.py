@@ -11,6 +11,8 @@ from chat_workflow.mixins import LLMValidated
 from chat_workflow.session import Session
 
 from . import GeneratedComponent
+from .component_responsibilities import ComponentResponsibilities
+from .domain_spec import ComponentDomainSpec
 from .models import ComponentRequirement
 
 
@@ -73,24 +75,50 @@ class Component(LLMValidated):
     @classmethod
     def create(
         cls,
-        requirements: ComponentRequirement,
+        requirements: ComponentRequirement | ComponentResponsibilities,
         *,
         session: Session,
         output_dir: Path | None = None,
     ) -> Component:
         """Create ONE business component.
 
-        1. GeneratedComponent.generate(requirements) -> code
-        2. verify_code(code) -> clean, formatted code
-        3. Write to file at output_dir / {name}.py
-        4. Build, validate, and return Component object with code_path set
+        Two code paths:
+        - ComponentResponsibilities (new): Phase 1 skeleton — calls
+          ComponentDomainSpec.explore() to produce a domain spec, then
+          builds and returns a Component record from it.
+        - ComponentRequirement (legacy): Full pipeline — generates code,
+          verifies, writes to disk, and returns Component.
 
         Args:
-            requirements: The component requirements
+            requirements: The component requirements or responsibilities
             session: The chat-workflow session
             output_dir: Directory to write the component file. Defaults to
                 current working directory / "workflows" / {name} /
         """
+        # --- New path: ComponentResponsibilities (Phase 1 skeleton) ---
+        if isinstance(requirements, ComponentResponsibilities):
+            session.io.echo(f"Exploring domain: {requirements.name}...")
+            domain_spec = ComponentDomainSpec.explore(
+                responsibilities=requirements,
+                session=session,
+            )
+
+            if output_dir is None:
+                output_dir = Path.cwd() / "workflows" / domain_spec.name.lower()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            code_path = output_dir / f"{domain_spec.name.lower()}.py"
+
+            result = cls(
+                name=domain_spec.name,
+                purpose=domain_spec.description,
+                code_path=code_path,
+                model_class=domain_spec.name,
+                expert_role=domain_spec.expert_role,
+                component_type=requirements.component_type,
+            )
+            return result
+
+        # --- Legacy path: ComponentRequirement ---
         # Step 1: Design the component (LLM generates code)
         session.io.echo(f"Designing component: {requirements.name}...")
         generated = GeneratedComponent.generate(
