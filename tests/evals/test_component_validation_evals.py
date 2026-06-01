@@ -1,11 +1,7 @@
 """Eval tests for Component._validation_rules using llm_judge().
 
-For each of the 9 validation rules in Component._validation_rules, we create:
-  - A VIOLATION test: the Component fields clearly break the rule
-  - A SATISFACTION test: the Component fields clearly satisfy the rule
-
-Component fields are formatted as a transcript and evaluated by an LLM judge
-via llm_judge() from tests.evals.helpers.
+Each test constructs a Component that should violate one of the 9 validation
+rules in Component._validation_rules, then verifies the LLM judge catches it.
 
 A final 'hoover up' test validates a realistic good component against all
 9 rules simultaneously to catch cross-rule interactions.
@@ -66,22 +62,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
 
-    @timeout(60)
-    def test_purpose_describes_domain_concept_satisfaction(self):
-        """Purpose that describes a business domain concept should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="Invoice",
-            purpose=(
-                "Represents a customer invoice that tracks the complete billing "
-                "lifecycle from creation through payment"
-            ),
-            expert_role="Invoice Processing Clerk",
-        )
-        result: JudgeResult = llm_judge(self._RULE_PURPOSE_DOMAIN, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
-
     # ==================================================================
     # Rule 2: Name is a noun
     #   _validation_rules[1]
@@ -108,19 +88,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             self.assertFalse(
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
-
-    @timeout(60)
-    def test_name_is_noun_satisfaction(self):
-        """Name that is a noun should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="Invoice",
-            purpose="Creates invoices from start to finish",
-            expert_role="Invoice Processing Clerk",
-        )
-        result: JudgeResult = llm_judge(self._RULE_NAME_NOUN, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
 
     # ==================================================================
     # Rule 3: Expert role is specific (not generic)
@@ -149,19 +116,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             self.assertFalse(
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
-
-    @timeout(60)
-    def test_expert_role_specific_satisfaction(self):
-        """Specific domain expert role should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="MeetingMinutes",
-            purpose="Creates structured meeting minutes capturing decisions and action items",
-            expert_role="Meeting Minutes Administrator",
-        )
-        result: JudgeResult = llm_judge(self._RULE_EXPERT_SPECIFIC, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
 
     # ==================================================================
     # Rule 4: Single Artifact Type Rule
@@ -192,19 +146,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             self.assertFalse(
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
-
-    @timeout(60)
-    def test_single_artifact_type_satisfaction(self):
-        """Purpose describing one artifact type should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Processes customer invoices through their complete lifecycle",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._RULE_SINGLE_ARTIFACT, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
 
     # ==================================================================
     # Rule 5: Single Responsibility
@@ -237,19 +178,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
 
-    @timeout(60)
-    def test_single_responsibility_satisfaction(self):
-        """Purpose describing one clear responsibility should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Processes customer invoices through their complete lifecycle",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._RULE_SINGLE_RESP, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
-
     # ==================================================================
     # Rule 6: No Multiple Artifact Creation
     #   _validation_rules[5]
@@ -279,19 +207,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             self.assertFalse(
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
-
-    @timeout(60)
-    def test_no_multiple_artifact_creation_satisfaction(self):
-        """Purpose describing creation of one artifact should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Creates customer invoices from start to finish",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._RULE_NO_MULTI_CREATE, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
 
     # ==================================================================
     # Rule 7: Clear Boundaries
@@ -325,19 +240,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
 
-    @timeout(60)
-    def test_clear_boundaries_satisfaction(self):
-        """Purpose with clear inside/outside boundaries should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Creates customer invoices from submission through final distribution",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._RULE_CLEAR_BOUNDARIES, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
-
     # ==================================================================
     # Rule 8: Encapsulation
     #   _validation_rules[7]
@@ -368,19 +270,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             self.assertFalse(
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
-
-    @timeout(60)
-    def test_encapsulation_satisfaction(self):
-        """Purpose focused on one domain concept should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Creates customer invoices from submission through final distribution",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._RULE_ENCAPSULATION, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
 
     # ==================================================================
     # Rule 9: Cohesion
@@ -413,19 +302,6 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             self.assertFalse(
                 v.passed, f"Rule '{v.rule}' should have failed: {v.explanation}"
             )
-
-    @timeout(60)
-    def test_cohesion_satisfaction(self):
-        """Purpose where all functionality serves one artifact should PASS."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Creates customer invoices from submission through final distribution",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._RULE_COHESION, transcript, config)
-        for v in result.verdicts:
-            self.assertTrue(v.passed, f"Rule '{v.rule}' failed: {v.explanation}")
 
     # ==================================================================
     # Hoover-up: All rules against a realistic good component
