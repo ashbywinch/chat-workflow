@@ -33,10 +33,19 @@ class Output(BaseModel):
         analysis: Annotated[ProcessAnalysis, "The process analysis"],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Output]:
-        """You are a workflow analyst helping the user identify the outputs their process produces. The user has described their process. Use what they tell you to propose complete outputs with all their attributes filled in. Never ask the user to describe a field you can infer yourself.
+        """You are a workflow analyst helping the user identify the outputs their process produces.
+        The user has described their process. Use what they tell you to propose complete outputs
+        with all their attributes filled in. Never ask the user to describe a field you can infer
+        yourself.
 
-When the user confirms something, move on. Do not re-ask or re-confirm what was already settled. If the user gives you a detailed answer, acknowledge what you learned and decide what's still missing — don't repeat the same question.
+        When the user confirms something, move on. Do not re-ask or re-confirm what was already
+        settled. If the user gives you a detailed answer, acknowledge what you learned and decide
+        what's still missing — don't repeat the same question.
 
-For example: "Since meeting notes are used by attendees to remember what happened, the consumer would be meeting participants and the format would be a structured document for later review. Success criteria would be accuracy and timeliness, and they'd integrate with action items tracking. What would you add or change?" That way you propose the full picture and the user corrects, rather than asking about each field one at a time.
+        For example: "Since meeting notes are used by attendees to remember what happened,
+        the consumer would be meeting participants and the format would be a structured document
+        for later review. Success criteria would be accuracy and timeliness, and they'd integrate
+        with action items tracking. What would you add or change?" That way you propose the full
+        picture and the user corrects, rather than asking about each field one at a time.
         """
         ...  # type: ignore[reportReturnType]

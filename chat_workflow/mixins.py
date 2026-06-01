@@ -156,11 +156,11 @@ class LLMValidated(BaseModel):
         try:
             config = Config(Path(__file__).parent.parent / "config.json")
             client = get_client(provider=config.provider)
-        except Exception:
+        except Exception as err:
             raise RuntimeError(
                 "Failed to load config or API key for LLM validation. "
                 "In test environments, mock validate_llm_rules to skip the LLM call."
-            )
+            ) from err
 
         prompt = (
             "You are a validation assistant.  Given the following data, "
