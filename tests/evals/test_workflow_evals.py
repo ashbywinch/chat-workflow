@@ -11,6 +11,34 @@ import unittest
 from contextlib import suppress
 
 from tests.conftest import timeout
+from tests.evals.helpers import DEFAULT_JUDGE_RULES
+
+META_LEVEL_JUDGE_RULES: dict[str, str] = {
+    **DEFAULT_JUDGE_RULES,
+    "Stays at meta-level": (
+        "The assistant is helping the user define the SHAPE and STRUCTURE of their "
+        "outputs/inputs/process as design artifacts. This is a meta-level conversation "
+        "\u2014 the assistant defines what things look like, not their content. "
+        "The assistant does NOT drop into the object-level and start helping the user "
+        "achieve their real-world goal (e.g., generating business ideas, planning menus, "
+        "writing posts). When the user describes a goal, the assistant asks about structure "
+        "('what fields should each output have?') rather than trying to help achieve the "
+        "goal ('what skills do you have?')."
+    ),
+}
+
+REDIRECT_JUDGE_RULES: dict[str, str] = {
+    **META_LEVEL_JUDGE_RULES,
+    "Redirects without joining": (
+        "When the user goes off-topic and describes their actual domain content "
+        "(business ideas, specific ventures, etc.), the assistant acknowledges briefly "
+        "then redirects back to the meta-level conversation. It does NOT join the user "
+        "in discussing the domain content. A brief 'That sounds interesting \u2014 let's "
+        "come back to that. What would a good business idea output look like?' is "
+        "acceptable. A response like 'Oh, that's a great idea! Have you thought about "
+        "the target market?' is NOT \u2014 that's joining in."
+    ),
+}
 
 
 class TestProcessAnalysisEval(unittest.TestCase):
@@ -49,6 +77,34 @@ class TestProcessAnalysisEval(unittest.TestCase):
         )
         self.assertIsInstance(result, ProcessAnalysis)
 
+    @timeout(120)
+    def test_process_analysis_with_adhd_writer(self):
+        """ProcessAnalysis should stay at meta-level with an ADHD writer who keeps describing content."""
+        from tests.evals.helpers import run_multi_turn_eval
+        from workflows.workflow.models import ProcessAnalysis
+
+        user_persona = (
+            "You are a content writer who creates long-form blog posts. You want to "
+            "document your writing process so new writers on your team can follow it. "
+            "But whenever you start describing the stages, you get excited about the "
+            "actual content \u2014 the post you're working on, the research you've done, "
+            "the expert you interviewed yesterday. You have ADHD and don't naturally "
+            "stay on topic. When the assistant tries to redirect you to talk about "
+            "process structure, you follow for a bit, then dive back into describing "
+            "your latest article."
+        )
+
+        result = run_multi_turn_eval(
+            model_method=ProcessAnalysis.generate_from_chat,
+            method_kwargs=dict(
+                process_description="Writing long-form blog posts for a tech company",
+                max_turns=10,
+            ),
+            user_persona=user_persona,
+            judge_rules=META_LEVEL_JUDGE_RULES,
+        )
+        self.assertIsInstance(result, ProcessAnalysis)
+
 
 class TestInputEval(unittest.TestCase):
     """Eval tests for Input model."""
@@ -74,6 +130,36 @@ class TestInputEval(unittest.TestCase):
                 max_turns=10,
             ),
             user_persona=user_persona,
+        )
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 1)
+
+    @timeout(120)
+    def test_input_with_adhd_chef(self):
+        """Input should stay at meta-level with an ADHD chef who keeps describing dishes."""
+        from tests.evals.helpers import run_multi_turn_eval
+        from workflows.workflow.models import Input
+
+        user_persona = (
+            "You are a professional chef planning weekly menus for a restaurant. You want "
+            "to document your menu planning process so junior chefs can follow it. But "
+            "whenever you start describing what goes into your planning, you get excited "
+            "and start talking about the actual dishes \u2014 the seasonal ingredients you've "
+            "spotted, the new supplier you found, the head chef's feedback on last week's "
+            "menu. You have ADHD and don't naturally stay on topic. When the assistant "
+            "tries to redirect you to talk about the structure of your process inputs, you "
+            "follow for a bit, then get carried away describing your latest menu idea."
+        )
+
+        result = run_multi_turn_eval(
+            model_method=Input.generate_from_chat,
+            method_kwargs=dict(
+                analysis=None,
+                outputs=None,
+                max_turns=10,
+            ),
+            user_persona=user_persona,
+            judge_rules=META_LEVEL_JUDGE_RULES,
         )
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)
@@ -106,6 +192,59 @@ class TestOutputEval(unittest.TestCase):
         )
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)
+
+    @timeout(120)
+    def test_output_with_adhd_ideas_person(self):
+        """Output should stay at meta-level with an ADHD user who keeps describing business ideas."""
+        from chat_workflow.exceptions import TurnLimitExceededError
+        from tests.evals.helpers import (
+            AgentIO,
+            capture_on_failure,
+            format_transcript,
+            llm_judge,
+            make_config,
+            make_tools,
+        )
+        from workflows.workflow.models import Output
+
+        user_persona = (
+            "You have tons of business ideas \u2014 you're always thinking of new ones \u2014 "
+            "and you're excited about them. You want to use this tool to help you capture "
+            "and organize them. But every time you start describing your process, you get "
+            "carried away talking about your actual ideas \u2014 you find them fascinating. "
+            "You have ADHD and don't naturally stay on topic. When the assistant tries to "
+            "redirect you to talk about your process, you follow for a bit, but then you "
+            "remember another brilliant idea and start describing that. You're not trying "
+            "to be difficult \u2014 your brain just works this way."
+        )
+
+        config = make_config()
+        user_bot = AgentIO(persona_prompt=user_persona, config=config)
+        session = make_tools(user_bot)
+
+        with capture_on_failure(session):
+            try:
+                result = Output.generate_from_chat(
+                    analysis=None,
+                    max_turns=10,
+                    session=session,
+                )
+                # If we get here without hitting the limit, validate output
+                self.assertIsInstance(result, list)
+                self.assertGreaterEqual(len(result), 1)
+            except TurnLimitExceededError:
+                # Hitting the turn limit is OK — the ADHD user is chatty
+                # Still validate via judge rules on whatever conversation happened
+                pass
+
+            # Always run the judge on the conversation transcript
+            transcript = format_transcript(session)
+            judge_result = llm_judge(REDIRECT_JUDGE_RULES, transcript, config)
+            failures = [v for v in judge_result.verdicts if not v.passed]
+            assert not failures, (
+                f"Conversation quality: {len(failures)}/{len(REDIRECT_JUDGE_RULES)} rules failed:\n"
+                + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures)
+            )
 
 
 class TestComponentRequirementEval(unittest.TestCase):
