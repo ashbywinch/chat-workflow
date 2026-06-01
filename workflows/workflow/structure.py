@@ -113,6 +113,14 @@ class ComponentStructure(BaseModel):
         holds, what constraints it should follow, and what overall rules the artifact
         must satisfy.
 
+        CRITICAL — Response format rules:
+        - When you need to ask the user a question or propose ideas for discussion,
+          use "continue" intent with a message only — do NOT include a result field.
+        - Only use "success" intent when the user has confirmed the complete structure
+          and you are ready to return the final result.
+        - Never include a result with "continue" intent. Never include a message with
+          "success" intent.
+
         This is not a technical conversation. The user understands their business but
         not data structures or programming. When you propose a constraint, frame it
         in terms they care about. For example, instead of asking "should I add
@@ -161,11 +169,5 @@ class ComponentStructure(BaseModel):
         Never put fabricated values in the final output. Only include what the user
         has confirmed. But you can propose ideas in conversation — that's how you
         help them think through what they need.
-
-        When you need to ask the user a question or propose ideas for discussion,
-        use "continue" intent with a message only — do not include a result. Only
-        use "success" intent when the user has confirmed the complete structure and
-        you are ready to return the final result. Never include a result with
-        "continue" intent.
         """
         ...  # type: ignore[reportReturnType]

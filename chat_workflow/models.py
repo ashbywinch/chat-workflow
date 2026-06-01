@@ -50,18 +50,16 @@ class AgentResponse(BaseModel, Generic[TResult]):
                     "CONTINUE intent requires a message field with your question for the user. "
                     "Do not include a result field."
                 )
-            if self.result is not None:
-                raise ValueError(
-                    "CONTINUE intent cannot include result. Use SUCCESS intent if you have a complete result to return."
-                )
+            # Tolerate result with CONTINUE — some LLMs (e.g. Gemini Flash Lite)
+            # persistently include a partial result. The on_continue callback
+            # only uses message, so the result is safely ignored.
         elif self.intent == AgentIntent.FAILURE:
             if not self.message:
                 raise ValueError("FAILURE intent requires a message field explaining why.")
             if self.result is not None:
                 raise ValueError("FAILURE intent cannot include result.")
-        elif self.intent == AgentIntent.SUCCESS:
-            if self.result is None:
-                raise ValueError("SUCCESS intent requires a result field with the complete object.")
+        elif self.intent == AgentIntent.SUCCESS and self.result is None:
+            raise ValueError("SUCCESS intent requires a result field with the complete object.")
         return self
 
 

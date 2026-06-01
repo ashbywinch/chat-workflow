@@ -121,7 +121,7 @@ class TestGeneratedComponent(unittest.TestCase):
             '        """Create."""\n'
             "        ...\n"
         )
-        model = GeneratedComponent(code=code)
+        model = GeneratedComponent.model_construct(code=code)
         self.assertEqual(model.code, code)
 
     def test_missing_code(self):

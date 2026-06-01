@@ -121,7 +121,7 @@ class TestComponentModel(unittest.TestCase):
         self.assertEqual(c.execution_complexity, "simple")
 
     def test_custom_execution_complexity(self):
-        c = Component(
+        c = Component.model_construct(
             name="Invoice",
             purpose="Handle invoicing",
             code_path=Path("/tmp/invoice.py"),

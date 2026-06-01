@@ -60,7 +60,7 @@ class TestComponentCreate(unittest.TestCase):
             '        """Create order."""\n'
             "        ...\n"
         )
-        mock_design.return_value = GeneratedComponent(code=valid_code)
+        mock_design.return_value = GeneratedComponent.model_construct(code=valid_code)
         mock_verify.return_value = valid_code
 
         with TemporaryDirectory() as tmpdir:
@@ -133,7 +133,7 @@ class TestComponentCreate(unittest.TestCase):
             '        """Create."""\n'
             "        ...\n"
         )
-        mock_design.return_value = GeneratedComponent(code=valid_code)
+        mock_design.return_value = GeneratedComponent.model_construct(code=valid_code)
         mock_verify.return_value = valid_code
 
         session = self._make_session()

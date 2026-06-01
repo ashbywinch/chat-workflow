@@ -59,7 +59,7 @@ class TestDesignComponent(unittest.TestCase):
             '        """Create order."""\n'
             "        ...\n"
         )
-        expected = GeneratedComponent(code=expected_code)
+        expected = GeneratedComponent.model_construct(code=expected_code)
         mock_call_llm.return_value = AgentResponse[GeneratedComponent](
             intent=AgentIntent.SUCCESS,
             result=expected,

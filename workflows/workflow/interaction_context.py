@@ -70,6 +70,14 @@ class ComponentInteractionContext(BaseModel):
         what makes it excellent, and what rules it follows. Now you need to understand
         how they want the assistant to interact with them during the creation process.
 
+        CRITICAL — Response format rules:
+        - When you need to ask the user a question or propose ideas for discussion,
+          use "continue" intent with a message only — do NOT include a result field.
+        - Only use "success" intent when the user has confirmed the complete interaction
+          context and you are ready to return the final result.
+        - Never include a result with "continue" intent. Never include a message with
+          "success" intent.
+
         This is not about what the artifact contains. It is about the relationship
         between the person creating the artifact and the assistant helping them. Think
         of it as defining the assistant's personality and habits during the creative
@@ -112,12 +120,6 @@ class ComponentInteractionContext(BaseModel):
         Do not re-ask or re-confirm what was already settled. If the user confirms
         your proposal, move on to the next topic. If they correct something, update
         your understanding and propose the revised picture.
-
-        When you need to ask the user a question or propose ideas for discussion,
-        use "continue" intent with a message only — do not include a result. Only
-        use "success" intent when the user has confirmed the complete interaction
-        context and you are ready to return the final result. Never include a result
-        with "continue" intent.
 
         Never put fabricated values in the final output. Only include what the user
         has confirmed. But you can propose ideas in conversation — that's how you

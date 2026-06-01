@@ -208,7 +208,8 @@ def verify_code(code: str, max_attempts: int = 3) -> str:
                 )
                 continue
 
-            # Check linting
+            # Check linting — no rules ignored. If the generated code violates
+            # ruff rules, the prompt must be improved to generate cleaner code.
             lint_result = subprocess.run(
                 [ruff_path, "check", tmp_path],
                 capture_output=True,

@@ -168,14 +168,72 @@ class TestGeneratedComponentEval(unittest.TestCase):
         """GeneratedComponent.generate should complete efficiently with a user bot."""
         from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow import GeneratedComponent
-        from workflows.workflow.models import ComponentRequirement
+        from workflows.workflow.design_spec import ComponentDesignSpec
+        from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
+        from workflows.workflow.interaction_context import ComponentInteractionContext
+        from workflows.workflow.structure import ComponentStructure
 
-        req = ComponentRequirement(
-            name="MinutesDraft",
-            purpose="Transform raw meeting notes into structured minutes with action items",
-            required_inputs=["Meeting notes"],
-            expected_outputs=["Approved minutes", "Action items"],
-            component_type="artifact_producing",
+        design_spec = ComponentDesignSpec(
+            domain_spec=ComponentDomainSpec(
+                name="MinutesDraft",
+                description=(
+                    "Structured meeting minutes that capture what happened, "
+                    "decisions made, and action items assigned"
+                ),
+                fields=[
+                    ComponentDomainField(
+                        name="meeting_date",
+                        domain_description="When the meeting took place",
+                        field_type_hint="date",
+                    ),
+                    ComponentDomainField(
+                        name="attendees",
+                        domain_description="People who attended the meeting",
+                        field_type_hint="list of person names",
+                    ),
+                    ComponentDomainField(
+                        name="key_decisions",
+                        domain_description="Important decisions made during the meeting",
+                        field_type_hint="list of decision descriptions",
+                    ),
+                    ComponentDomainField(
+                        name="action_items",
+                        domain_description="Action items with owners and due dates",
+                        field_type_hint="list of action items",
+                    ),
+                    ComponentDomainField(
+                        name="next_meeting_date",
+                        domain_description="Date of the next meeting, if scheduled",
+                        field_type_hint="optional date",
+                    ),
+                ],
+                what_good_looks_like=[
+                    "Attendees can immediately understand decisions made",
+                    "Someone who missed the meeting can catch up in two minutes",
+                    "Every action item has a clear owner and due date",
+                    "The minutes are concise but complete",
+                ],
+                expert_role="Meeting Minutes Administrator",
+            ),
+            structure=ComponentStructure(
+                description=(
+                    "Structured meeting minutes that capture what happened, "
+                    "decisions made, and action items assigned"
+                ),
+            ),
+            interaction_context=ComponentInteractionContext(
+                must_prioritize=[
+                    "Always ask about decisions and action items early in the conversation"
+                ],
+                auto_suggest=[
+                    "Suggest action item owners based on the topic discussed",
+                    "Propose a due date for each action item",
+                ],
+                user_pain_points=[
+                    "Users often forget to list all attendees",
+                    "Users sometimes omit decisions that were made implicitly",
+                ],
+            ),
         )
         user_persona = (
             "You are a busy professional who writes up meeting minutes. "
@@ -191,7 +249,7 @@ class TestGeneratedComponentEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=GeneratedComponent.generate,
             method_kwargs=dict(
-                requirements=req,
+                design_spec=design_spec,
                 max_turns=10,
             ),
             user_persona=user_persona,

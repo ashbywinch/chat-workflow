@@ -11,7 +11,12 @@ from chat_workflow.mixins import LLMValidated
 
 from .design_spec import ComponentDesignSpec
 
-_CONSTRAINT_NAMES = frozenset({"min_length", "ge", "le", "gt", "lt", "pattern", "max_length", "multiple_of"})
+_CONSTRAINT_NAMES = frozenset({
+    "min_length", "max_length",
+    "min_items", "max_items",
+    "ge", "le", "gt", "lt",
+    "pattern", "multiple_of",
+})
 
 
 def _has_field_constraint(node: ast.AST) -> bool:
@@ -31,8 +36,17 @@ def _is_model_validator(node: ast.AST) -> bool:
     if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return False
     for decorator in node.decorator_list:
+        # Bare @model_validator
         if isinstance(decorator, ast.Name) and decorator.id == "model_validator":
             return True
+        # @model_validator(mode="after") — call form
+        if isinstance(decorator, ast.Call):
+            func = decorator.func
+            if isinstance(func, ast.Name) and func.id == "model_validator":
+                return True
+            if isinstance(func, ast.Attribute) and func.attr == "model_validator":
+                return True
+        # Qualified name like chat_workflow.model_validator
         if isinstance(decorator, ast.Attribute) and decorator.attr == "model_validator":
             return True
     return False
@@ -52,9 +66,9 @@ class GeneratedComponent(LLMValidated):
         "The generated BaseModel uses Field(..., description=...) on each field "
         "with a plain-English description of what the field means in the "
         "business domain.",
-        "Field definitions on the generated class use min_length=1 on string "
-        "or collection fields where an empty value would be semantically "
-        "meaningless for that business concept.",
+        "Field definitions on the generated class use min_length=1 or "
+        "min_items=1 on string or collection fields where an empty value "
+        "would be semantically meaningless for that business concept.",
         "Validation in the generated code (Field constraints or "
         "@model_validator) encodes business rules a domain expert would care "
         "about — not just type checks.",
@@ -185,6 +199,14 @@ class GeneratedComponent(LLMValidated):
         - Import atomic_workflow from chat_workflow (just the name, no alias)
         - Use @atomic_workflow on its own line WITHOUT parentheses or arguments
           (correct: "@atomic_workflow" then "@classmethod" then "def method_name")
+        - The @atomic_workflow method MUST have a return type annotation:
+          ``-> ClassName`` (e.g., ``def create_minutes_draft(...) -> MinutesDraft:``)
+        - The @atomic_workflow method body MUST be just ``...`` (Ellipsis / pass) —
+          do NOT add a return statement or any other code. The decorator handles
+          the LLM conversation and return value automatically.
+        - Define EXACTLY ONE primary BaseModel subclass — the component class
+          itself. You may define additional Pydantic models for structured
+          sub-fields (e.g. an ActionItem model used in list[ActionItem]).
         - Import from __future__ import annotations, pydantic BaseModel and Field
         - One class per file named after the component
         - Valid Python that passes ruff linting

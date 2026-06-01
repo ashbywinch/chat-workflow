@@ -90,6 +90,14 @@ class ComponentDomainSpec(BaseModel):
         details: what information it should capture, what makes it excellent, and
         who owns it.
 
+        CRITICAL — Response format rules:
+        - When you need to ask the user a question or propose ideas for discussion,
+          use "continue" intent with a message only — do NOT include a result field.
+        - Only use "success" intent when the user has confirmed the complete domain
+          spec and you are ready to return the final result.
+        - Never include a result with "continue" intent. Never include a message with
+          "success" intent.
+
         This isn't a form to fill out. You're an expert who has seen many similar
         artifacts in different organizations. When the user describes their needs,
         propose a complete picture back to them rather than asking about each piece

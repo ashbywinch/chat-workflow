@@ -115,16 +115,17 @@ class Component(LLMValidated):
 
     @model_validator(mode="after")
     def _check_single_responsibility(self) -> Component:
-        """Enforce single responsibility: purpose must not contain 'and' or 'also'.
+        """Enforce single responsibility: purpose must not contain 'also'.
 
         This is a fast programmatic heuristic that catches obvious violations.
         Deeper semantic checks are handled by _validation_rules (LLM-judged).
+
+        Note: We do NOT check for 'and' here because it's commonly used in
+        natural language descriptions of a single responsibility (e.g.,
+        'including discussions, decisions, and action items'). The LLM-judged
+        _validation_rules handle the semantic check for multiple responsibilities.
         """
         purpose_lower = self.purpose.lower()
-        if re.search(r"\band\b", purpose_lower):
-            raise ValueError(
-                f"Purpose must describe a single responsibility — remove conjunctions like 'and': '{self.purpose}'"
-            )
         if re.search(r"\balso\b", purpose_lower):
             raise ValueError(
                 f"Purpose must describe a single responsibility — remove conjunctions like 'also': '{self.purpose}'"
