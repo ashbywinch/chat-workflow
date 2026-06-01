@@ -508,6 +508,27 @@ spec.materialize_blobs(Path("./docs"))
 
 Real workflows combine the decorators, models, and refinement patterns into reusable structures. This section documents the three most common patterns found in the codebase.
 
+### Three-Layer Architecture
+
+The framework uses a three-layer architecture for building components, each with distinct responsibilities:
+
+1. **Workflow** (architect) — `Workflow.create()` defines component boundaries and interfaces. It captures what components exist and how they connect, producing `ComponentResponsibilities` for each one. The architecture is considered final before Component starts.
+
+2. **Component** (designer) — `Component.create()` takes the architecture from Workflow and designs component internals through a multi-phase conversation with the user. It produces a complete design spec.
+
+3. **GeneratedComponent** (executor) — `GeneratedComponent.generate()` takes a complete design spec and translates it into Python code statelessly. No design decisions remain at this layer. No user conversation about code.
+
+The design flows through four phases inside `Component.create()`:
+
+- **Phase 1: Domain Exploration** (`ComponentDomainSpec.explore()`) — Understands what the artifact IS and what makes it good in the user's domain. Returns a `ComponentDomainSpec`.
+- **Phase 2: Structural Design** (`ComponentStructure.design()`) — Translates domain concepts into Pydantic field definitions and `@model_validator` rules. Stays in domain language, never mentions Python types.
+- **Phase 3: Interaction Preferences** (`ComponentInteractionContext.gather()`) — Explores how the user wants the assistant to behave during creation. Returns a `ComponentInteractionContext`.
+- **Phase 4: Code Generation** (`GeneratedComponent.generate()`) — Statelessly translates the complete design spec into Python code. No user conversation about code.
+
+Each phase has its own return type with its own validation rules. This keeps the cognitive load on the LLM manageable per step and makes each phase independently testable.
+
+For the full architecture document, see the [canonical architecture reference](../../.sisyphus/notepads/refactor-evals/component-architecture.md). For the architecture principles, see [architecture principles](../../.sisyphus/evidence/architecture-principles.md).
+
 ### Workflow.create()
 
 A `@composite_workflow` classmethod that orchestrates multiple `@atomic_workflow` steps end to end. This is the top-level entry point users call from the CLI.
@@ -582,21 +603,14 @@ def create(
 
 ### Component.create()
 
-A `@composite_workflow` classmethod that creates a single self-contained artifact. It wraps one or more `@atomic_workflow` calls with code verification and disk I/O.
+A `@composite_workflow` classmethod that creates a single self-contained artifact through a multi-phase design conversation. It orchestrates four phases: domain exploration, structural design, interaction preferences, and code generation.
 
-The canonical example is `Component.create()` in `workflows/workflow/component.py`. It takes a `ComponentRequirement` and produces a `Component` with a `code_path` pointing to a written file:
+The canonical example is `Component.create()` in `workflows/workflow/component.py`. It takes a `ComponentResponsibilities` and produces a `Component` with a `code_path` pointing to a written file:
 
 ```python
 from pathlib import Path
-from typing import Annotated
-from pydantic import BaseModel, Field
-from chat_workflow import Session, atomic_workflow, composite_workflow
-from chat_workflow.code_generator import verify_code
-
-class GeneratedComponent(BaseModel):
-    """Holds the raw code output from the LLM before verification."""
-    code: str = Field(..., description="Generated Python source code")
-    model_class: str = Field(..., description="Name of the Pydantic model class")
+from pydantic import BaseModel
+from chat_workflow import Session, composite_workflow
 
 class Component(BaseModel):
     """A single created business component on disk."""
@@ -609,58 +623,69 @@ class Component(BaseModel):
     @classmethod
     def create(
         cls,
-        requirements: ComponentRequirement,
+        requirements: ComponentResponsibilities,
         *,
         session: Session,
         output_dir: Path | None = None,
     ) -> Component:
         """Create and materialize one component from requirements."""
 
-        # Step 1: LLM designs the component
-        generated = cls._design_component(
+        # Phase 1: Understand the domain concept
+        domain_spec = ComponentDomainSpec.explore(
             requirements=requirements,
             session=session,
         )
 
-        # Step 2: Verify code quality (syntax, linting)
-        clean_code = verify_code(generated.code)
+        # Phase 2: Design the Pydantic structure
+        structure = ComponentStructure.design(
+            domain_spec=domain_spec,
+            session=session,
+        )
 
-        # Step 3: Determine the output path
+        # Phase 3: Gather interaction preferences
+        interaction_context = ComponentInteractionContext.gather(
+            domain_spec=domain_spec,
+            structure=structure,
+            session=session,
+        )
+
+        # Phase 4: Generate the code (stateless, no user chat)
+        design_spec = ComponentDesignSpec(
+            domain_spec=domain_spec,
+            structure=structure,
+            interaction_context=interaction_context,
+        )
+        generated = GeneratedComponent.generate(
+            design_spec=design_spec,
+            session=session,
+        )
+
+        # Verify and write to disk
+        clean_code = verify_code(generated.code)
         if output_dir is None:
             output_dir = Path.cwd() / "workflows" / requirements.name.lower()
         output_dir.mkdir(parents=True, exist_ok=True)
         code_path = output_dir / f"{requirements.name.lower()}.py"
-
-        # Step 4: Write to disk
         code_path.write_text(clean_code)
 
-        # Step 5: Return the component object
         return cls(
             name=requirements.name,
-            purpose=requirements.purpose,
+            purpose=structure.description,
             code_path=code_path,
             model_class=requirements.name,
         )
-
-    @atomic_workflow
-    @classmethod
-    def _design_component(
-        cls,
-        requirements: Annotated[
-            ComponentRequirement,
-            "The component requirements",
-        ],
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-    ) -> GeneratedComponent:
-        """You are a software architect designing a Python business component.
-        Generate a complete Python file with a Pydantic model and an
-        @atomic_workflow generate_from_chat classmethod."""
-        ...
 ```
 
-The pattern separates the LLM conversation (`_design_component`, an `@atomic_workflow`) from the procedural work (verification, file writing, object construction) that happens in the `@composite_workflow` wrapper.
+Each phase is a separate `@atomic_workflow` with its own return type and validation rules:
 
-**When to use this pattern:** When each unit of work produces a file or other side effect on disk. The `@atomic_workflow` leaf handles the generative part; the `@composite_workflow` parent handles I/O, validation, and error recovery. This keeps the LLM conversation focused on content, not infrastructure.
+- **Phase 1** (`ComponentDomainSpec.explore()`) — Conversational. Probes what the artifact is, what makes it good, and what quality criteria matter. Returns a `ComponentDomainSpec` with the domain understanding.
+- **Phase 2** (`ComponentStructure.design()`) — Conversational. Translates domain concepts into Pydantic field definitions and `@model_validator` rules. Stays in domain language, never mentions Python types.
+- **Phase 3** (`ComponentInteractionContext.gather()`) — Conversational. Explores how the user wants the assistant to behave: priorities, proactive suggestions, tone, common pitfalls. Returns a `ComponentInteractionContext`.
+- **Phase 4** (`GeneratedComponent.generate()`) — Stateless. Takes the complete design spec and produces Python code. No user conversation about code.
+
+The pattern separates the LLM conversations (Phases 1-3, each an `@atomic_workflow`) from the procedural work (verification, file writing, object construction) that happens in the `@composite_workflow` wrapper. Each phase has its own return type with its own validation rules, keeping the cognitive load on the LLM manageable per step.
+
+**When to use this pattern:** When each unit of work produces a file or other side effect on disk. The `@atomic_workflow` leaves handle the generative parts; the `@composite_workflow` parent handles orchestration, I/O, validation, and error recovery. This keeps each LLM conversation focused on one aspect of the design.
 
 ### Gap Resolution Loop
 

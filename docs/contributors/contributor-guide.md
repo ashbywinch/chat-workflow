@@ -32,6 +32,13 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/__init__.py` | Public API exports |
 | `chat_workflow/annotations.py` | Blob and Validation annotations |
 | `chat_workflow/mixins.py` | BlobSyncMixin and LLMValidated mixins |
+| `workflows/workflow/component.py` | `Component` — orchestrator with 4-phase `create()` |
+| `workflows/workflow/component_responsibilities.py` | `ComponentResponsibilities` — interface from Workflow to Component |
+| `workflows/workflow/models/generated_component.py` | `GeneratedComponent` — stateless code executor |
+| `workflows/workflow/models/component_domain_spec.py` | `ComponentDomainSpec` — Phase 1 output (domain understanding) |
+| `workflows/workflow/models/component_structure.py` | `ComponentStructure` — Phase 2 output (Pydantic structure) |
+| `workflows/workflow/models/component_interaction_context.py` | `ComponentInteractionContext` — Phase 3 output (interaction preferences) |
+| `workflows/workflow/models/component_design_spec.py` | `ComponentDesignSpec` — composite of all 3 phases, input to Phase 4 |
 
 Example workflows live in the `workflows/` directory.
 
@@ -46,6 +53,39 @@ Example workflows live in the `workflows/` directory.
 - **Configuration at the edge**: Configuration must only be set/read at the perimeter (CLI, test setup, etc.)
 - **Fail fast**: We are never backwards compatible. If something is configured incorrectly we fail fast instead of using defaults
 - **User-friendly error messages**: All error messages shown to users or workflow authors should be clear and helpful
+
+### Three-Layer Architecture
+
+The framework uses a three-layer architecture for building components, each with distinct responsibilities:
+
+1. **Workflow** (architect) — `Workflow.create()` defines component boundaries and interfaces. It captures what components exist and how they connect, producing `ComponentResponsibilities` for each one. The architecture is considered final before Component starts.
+
+2. **Component** (designer) — `Component.create()` takes the architecture from Workflow and designs component internals through a multi-phase conversation with the user. It produces a complete design spec.
+
+3. **GeneratedComponent** (executor) — `GeneratedComponent.generate()` takes a complete design spec and translates it into Python code statelessly. No design decisions remain. No user conversation about code.
+
+#### Multi-Phase Design
+
+`Component.create()` orchestrates four phases, each a separate `@atomic_workflow` with its own return type and validation rules:
+
+- **Phase 1: Domain Exploration** (`ComponentDomainSpec.explore()`) — Understands what the artifact IS and what makes it good in the user's domain. Returns a `ComponentDomainSpec`.
+- **Phase 2: Structural Design** (`ComponentStructure.design()`) — Translates domain concepts into Pydantic field definitions and `@model_validator` rules. Returns a `ComponentStructure`.
+- **Phase 3: Interaction Preferences** (`ComponentInteractionContext.gather()`) — Explores how the user wants the assistant to behave during creation. Returns a `ComponentInteractionContext`.
+- **Phase 4: Code Generation** (`GeneratedComponent.generate()`) — Statelessly translates the complete design spec into Python code. Returns a `GeneratedComponent`.
+
+Each phase has its own return type with its own validation rules. This keeps the cognitive load on the LLM manageable per step and makes each phase independently testable.
+
+#### Architecture Principles
+
+The architecture follows five key principles:
+
+1. **Every component has a clear domain purpose and boundary** — Named after an artifact (noun), not a process (verb). Boundary is explicit.
+2. **A good workflow has loosely coupled components with clear interfaces** — Minimize dependencies. Each component's interface is explicit and stable.
+3. **All conversations with the user stay in the user's domain** — Never about Python, Pydantic, or code structure.
+4. **"What Good Looks Like" becomes validation rules** — Encode quality criteria as `Field(constraints=...)` and `@model_validator` rules, never as prompt text.
+5. **Validation rules never go in prompts** — Business rules go in Pydantic constraints and validators.
+
+For the full architecture document, see the [canonical architecture reference](../../.sisyphus/notepads/refactor-evals/component-architecture.md). For the complete principles, see [architecture principles](../../.sisyphus/evidence/architecture-principles.md).
 
 ### File Responsibilities
 
