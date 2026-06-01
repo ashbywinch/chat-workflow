@@ -101,7 +101,7 @@ class TestProcessAnalysisEval(unittest.TestCase):
                 max_turns=10,
             ),
             user_persona=user_persona,
-            judge_rules=META_LEVEL_JUDGE_RULES,
+            judge_rules=REDIRECT_JUDGE_RULES,
         )
         self.assertIsInstance(result, ProcessAnalysis)
 
@@ -159,7 +159,7 @@ class TestInputEval(unittest.TestCase):
                 max_turns=10,
             ),
             user_persona=user_persona,
-            judge_rules=META_LEVEL_JUDGE_RULES,
+            judge_rules=REDIRECT_JUDGE_RULES,
         )
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)
@@ -189,6 +189,7 @@ class TestOutputEval(unittest.TestCase):
                 max_turns=10,
             ),
             user_persona=user_persona,
+            judge_rules=META_LEVEL_JUDGE_RULES,
         )
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)
