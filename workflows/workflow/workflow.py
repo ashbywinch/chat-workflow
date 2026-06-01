@@ -8,14 +8,13 @@ from chat_workflow import Session, atomic_workflow, composite_workflow
 from chat_workflow.annotations import Blob, Validation
 from chat_workflow.mixins import BlobSyncMixin, LLMValidated
 
+from .component_responsibilities import ComponentRequirement
 from .models import (
-    ComponentRequirement,
     GapAnalysis,
     Input,
     Output,
     ProcessAnalysis,
 )
-from .models.component_requirement import ComponentRequirement as _ComponentRequirement
 from .models.gap_analysis import GapAnalysis as _GapAnalysis
 
 
@@ -233,7 +232,7 @@ def _resolve_gaps(
     max_iterations = 5
 
     for _ in range(max_iterations):
-        components = _ComponentRequirement.identify_from_chat(
+        components = ComponentRequirement.identify_from_chat(
             analysis=analysis,
             inputs=inputs,
             outputs=outputs,
@@ -259,13 +258,13 @@ def _resolve_gaps(
         existing.extend(gaps.missing_components)
 
     # After max iterations, return best effort
-    return _ComponentRequirement.identify_from_chat(
+    return ComponentRequirement.identify_from_chat(
         analysis=analysis,
         inputs=inputs,
         outputs=outputs,
         session=session,
     ), _GapAnalysis.analyze_from_chat(
-        components=_ComponentRequirement.identify_from_chat(
+        components=ComponentRequirement.identify_from_chat(
             analysis=analysis,
             inputs=inputs,
             outputs=outputs,

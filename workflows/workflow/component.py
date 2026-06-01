@@ -98,7 +98,7 @@ class Component(LLMValidated):
             output_dir: Directory to write the component file. Defaults to
                 current working directory / "workflows" / {name} /
         """
-        # --- New path: ComponentResponsibilities (Phase 1 + Phase 2) ---
+        # --- New path: ComponentResponsibilities (Phase 1-4) ---
         if isinstance(requirements, ComponentResponsibilities):
             session.io.echo(f"Exploring domain: {requirements.name}...")
             domain_spec = ComponentDomainSpec.explore(
@@ -112,10 +112,43 @@ class Component(LLMValidated):
                 session=session,
             )
 
+            session.io.echo(
+                f"Gathering interaction context: {domain_spec.name}..."
+            )
+            interaction_context = ComponentInteractionContext.gather(
+                domain_spec=domain_spec,
+                structure=structure,
+                session=session,
+            )
+
+            design_spec = ComponentDesignSpec(
+                domain_spec=domain_spec,
+                structure=structure,
+                interaction_context=interaction_context,
+            )
+
+            session.io.echo(
+                f"Generating component code: {domain_spec.name}..."
+            )
+            generated = GeneratedComponent.generate(
+                design_spec=design_spec,
+                session=session,
+            )
+
+            session.io.echo("Verifying generated code...")
+            try:
+                clean_code = verify_code(generated.code)
+            except RuntimeError as e:
+                session.io.echo(f"Code verification failed: {e}")
+                raise
+
             if output_dir is None:
                 output_dir = Path.cwd() / "workflows" / domain_spec.name.lower()
             output_dir.mkdir(parents=True, exist_ok=True)
             code_path = output_dir / f"{domain_spec.name.lower()}.py"
+
+            code_path.write_text(clean_code)
+            session.io.echo(f"Component written to: {code_path}")
 
             result = cls(
                 name=domain_spec.name,

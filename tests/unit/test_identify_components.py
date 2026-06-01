@@ -144,7 +144,7 @@ class TestAnalyzeGaps(unittest.TestCase):
 
 class TestResolveGaps(unittest.TestCase):
     @patch("workflows.workflow.workflow._GapAnalysis.analyze_from_chat")
-    @patch("workflows.workflow.workflow._ComponentRequirement.identify_from_chat")
+    @patch("workflows.workflow.workflow.ComponentRequirement.identify_from_chat")
     def test_loop_terminates_when_clean(
         self, mock_identify, mock_analyze
     ):
@@ -179,7 +179,7 @@ class TestResolveGaps(unittest.TestCase):
         mock_analyze.assert_called_once()
 
     @patch("workflows.workflow.workflow._GapAnalysis.analyze_from_chat")
-    @patch("workflows.workflow.workflow._ComponentRequirement.identify_from_chat")
+    @patch("workflows.workflow.workflow.ComponentRequirement.identify_from_chat")
     def test_loop_retries_on_gaps(
         self, mock_identify, mock_analyze
     ):

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from chat_workflow import atomic_workflow
 
-from .component_requirement import ComponentRequirement
+from ..component_responsibilities import ComponentRequirement
 from .process_analysis import ProcessAnalysis
 
 

@@ -13,6 +13,10 @@ from workflows.workflow.domain_spec import (
     ComponentDomainField,
     ComponentDomainSpec,
 )
+from workflows.workflow.generated_component import GeneratedComponent
+from workflows.workflow.interaction_context import (
+    ComponentInteractionContext,
+)
 from workflows.workflow.structure import (
     ComponentStructure,
     StructField,
@@ -108,16 +112,44 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             ],
         )
 
+    def _make_interaction_context(self) -> ComponentInteractionContext:
+        return ComponentInteractionContext(
+            must_prioritize=["Always ask about decisions early"],
+            auto_suggest=["Suggest action item owners based on topic"],
+            tone_preference="Professional but friendly",
+            user_pain_points=["Users often forget to list attendees"],
+        )
+
+    def _make_generated_component(self) -> GeneratedComponent:
+        return GeneratedComponent(
+            code=(
+                "from __future__ import annotations\n"
+                "from pydantic import BaseModel\n"
+                "\n"
+                "class MeetingMinutes(BaseModel):\n"
+                "    meeting_date: str\n"
+                "    attendees: list[str]\n"
+            ),
+        )
+
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
     def test_create_returns_component_with_domain_spec_fields(
-        self, mock_explore, mock_design
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
     ):
         """Component.create should return a Component with fields from domain spec."""
         domain_spec = self._make_domain_spec()
         mock_explore.return_value = domain_spec
         structure = self._make_structure()
         mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
 
         responsibilities = self._make_responsibilities()
 
@@ -142,14 +174,24 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             self.assertIsInstance(result.code_path, Path)
             self.assertIn("meetingminutes", str(result.code_path).lower())
 
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
-    def test_explore_called_with_responsibilities(self, mock_explore, mock_design):
+    def test_explore_called_with_responsibilities(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
         """Component.create should pass responsibilities to explore()."""
         domain_spec = self._make_domain_spec()
         mock_explore.return_value = domain_spec
         structure = self._make_structure()
         mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
 
         responsibilities = self._make_responsibilities()
 
@@ -166,14 +208,24 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 session=session,
             )
 
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
-    def test_default_output_dir(self, mock_explore, mock_design):
+    def test_default_output_dir(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
         """When no output_dir given, defaults to cwd/workflows/{name}/."""
         domain_spec = self._make_domain_spec()
         mock_explore.return_value = domain_spec
         structure = self._make_structure()
         mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
 
         responsibilities = self._make_responsibilities()
         session = self._make_session()
@@ -187,14 +239,24 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             self.assertIsInstance(result, Component)
             self.assertIn("meetingminutes", str(result.code_path).lower())
 
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
-    def test_explore_echoes_message(self, mock_explore, mock_design):
+    def test_explore_echoes_message(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
         """Component.create should echo an exploring message."""
         domain_spec = self._make_domain_spec()
         mock_explore.return_value = domain_spec
         structure = self._make_structure()
         mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
 
         responsibilities = self._make_responsibilities()
 
@@ -210,14 +272,24 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 "Exploring domain: MeetingMinutes..."
             )
 
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
-    def test_design_called_with_domain_spec(self, mock_explore, mock_design):
+    def test_design_called_with_domain_spec(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
         """Component.create should pass domain_spec from Phase 1 to Phase 2."""
         domain_spec = self._make_domain_spec()
         mock_explore.return_value = domain_spec
         structure = self._make_structure()
         mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
 
         responsibilities = self._make_responsibilities()
 
@@ -234,14 +306,24 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 session=session,
             )
 
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
-    def test_design_echoes_message(self, mock_explore, mock_design):
+    def test_design_echoes_message(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
         """Component.create should echo a designing message."""
         domain_spec = self._make_domain_spec()
         mock_explore.return_value = domain_spec
         structure = self._make_structure()
         mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
 
         responsibilities = self._make_responsibilities()
 
@@ -256,6 +338,186 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             session.io.echo.assert_any_call(
                 "Designing structure: MeetingMinutes..."
             )
+
+
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
+    @patch.object(ComponentStructure, "design")
+    @patch.object(ComponentDomainSpec, "explore")
+    def test_gather_called_with_domain_spec_and_structure(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
+        """Phase 3: gather() should receive domain_spec and structure."""
+        domain_spec = self._make_domain_spec()
+        mock_explore.return_value = domain_spec
+        structure = self._make_structure()
+        mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
+
+        responsibilities = self._make_responsibilities()
+
+        with TemporaryDirectory() as tmpdir:
+            session = self._make_session()
+            Component.create(
+                requirements=responsibilities,
+                session=session,
+                output_dir=Path(tmpdir),
+            )
+
+            mock_gather.assert_called_once_with(
+                domain_spec=domain_spec,
+                structure=structure,
+                session=session,
+            )
+
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
+    @patch.object(ComponentStructure, "design")
+    @patch.object(ComponentDomainSpec, "explore")
+    def test_gather_echoes_message(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
+        """Phase 3: Component.create should echo a gathering message."""
+        domain_spec = self._make_domain_spec()
+        mock_explore.return_value = domain_spec
+        structure = self._make_structure()
+        mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
+
+        responsibilities = self._make_responsibilities()
+
+        with TemporaryDirectory() as tmpdir:
+            session = self._make_session()
+            Component.create(
+                requirements=responsibilities,
+                session=session,
+                output_dir=Path(tmpdir),
+            )
+
+            session.io.echo.assert_any_call(
+                "Gathering interaction context: MeetingMinutes..."
+            )
+
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
+    @patch.object(ComponentStructure, "design")
+    @patch.object(ComponentDomainSpec, "explore")
+    def test_generate_called_with_design_spec(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
+        """Phase 4: generate() should receive a ComponentDesignSpec."""
+        domain_spec = self._make_domain_spec()
+        mock_explore.return_value = domain_spec
+        structure = self._make_structure()
+        mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
+
+        responsibilities = self._make_responsibilities()
+
+        with TemporaryDirectory() as tmpdir:
+            session = self._make_session()
+            Component.create(
+                requirements=responsibilities,
+                session=session,
+                output_dir=Path(tmpdir),
+            )
+
+            mock_generate.assert_called_once()
+            call_kwargs = mock_generate.call_args.kwargs
+            self.assertIn("design_spec", call_kwargs)
+            self.assertEqual(
+                call_kwargs["design_spec"].domain_spec, domain_spec
+            )
+            self.assertEqual(
+                call_kwargs["design_spec"].structure, structure
+            )
+            self.assertEqual(
+                call_kwargs["design_spec"].interaction_context,
+                interaction_context,
+            )
+            self.assertEqual(call_kwargs["session"], session)
+
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
+    @patch.object(ComponentStructure, "design")
+    @patch.object(ComponentDomainSpec, "explore")
+    def test_generate_echoes_message(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
+        """Phase 4: Component.create should echo a generating message."""
+        domain_spec = self._make_domain_spec()
+        mock_explore.return_value = domain_spec
+        structure = self._make_structure()
+        mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
+
+        responsibilities = self._make_responsibilities()
+
+        with TemporaryDirectory() as tmpdir:
+            session = self._make_session()
+            Component.create(
+                requirements=responsibilities,
+                session=session,
+                output_dir=Path(tmpdir),
+            )
+
+            session.io.echo.assert_any_call(
+                "Generating component code: MeetingMinutes..."
+            )
+
+    @patch("workflows.workflow.component.verify_code")
+    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentInteractionContext, "gather")
+    @patch.object(ComponentStructure, "design")
+    @patch.object(ComponentDomainSpec, "explore")
+    def test_code_verified_and_written(
+        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
+    ):
+        """Code should be verified and written to disk."""
+        domain_spec = self._make_domain_spec()
+        mock_explore.return_value = domain_spec
+        structure = self._make_structure()
+        mock_design.return_value = structure
+        interaction_context = self._make_interaction_context()
+        mock_gather.return_value = interaction_context
+        generated = self._make_generated_component()
+        mock_generate.return_value = generated
+        mock_verify_code.side_effect = lambda code: code
+
+        responsibilities = self._make_responsibilities()
+
+        with TemporaryDirectory() as tmpdir:
+            session = self._make_session()
+            Component.create(
+                requirements=responsibilities,
+                session=session,
+                output_dir=Path(tmpdir),
+            )
+
+            mock_verify_code.assert_called_once_with(generated.code)
+            expected_path = Path(tmpdir) / "meetingminutes.py"
+            self.assertTrue(expected_path.exists())
+            self.assertEqual(expected_path.read_text(), generated.code)
 
 
 if __name__ == "__main__":

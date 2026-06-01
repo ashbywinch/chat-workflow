@@ -7,7 +7,7 @@ from pydantic import Field
 from chat_workflow import atomic_workflow
 from chat_workflow.mixins import LLMValidated
 
-from .component_requirement import ComponentRequirement
+from ..component_responsibilities import ComponentRequirement
 
 
 class GeneratedComponent(LLMValidated):
