@@ -1,5 +1,5 @@
 # Makefile for chat-workflow test automation
-.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint format clean
+.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all evals-smoke coverage lint format clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -23,6 +23,7 @@ help:
 	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output"
 	@echo "  ${GREEN}make evals-debug${NC}   Run evals with LLM tracing (streams requests/responses)"
 	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
+	@echo "  ${GREEN}make evals-smoke${NC}  Quick framework check (test_real_api + test_debug_streaming_api, ~80s)"
 	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
 	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
 	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
@@ -54,6 +55,9 @@ evals-debug: setup lint
 	@CHAT_WORKFLOW_DEBUG=1 ${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
 
 test-all: test evals
+
+evals-smoke: setup lint
+	@${PYTHON} scripts/run_with_timeout.py --timeout 120 -- ${UNITTEST} tests.evals.test_real_api tests.evals.test_debug_streaming_api -v
 
 # Test with coverage (requires coverage package)
 coverage: setup
