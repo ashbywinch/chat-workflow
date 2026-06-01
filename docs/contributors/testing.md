@@ -199,7 +199,9 @@ self.assertTrue(is_good, f"Conversation quality issue:\n{reason}")
 ```bash
 make test              # Unit tests (no API key, ~0.01s)
 make test-verbose      # Same with verbose output
-make evals              # Real-API evals (~90s, requires API key)
+make evals              # Full suite (real API, ~90-300s)
+make evals-smoke        # Quick framework-level check (test_real_api + debug_streaming, ~80s)
+make evals-incremental  # Change-aware subset (auto-detects affected evals via code-review-graph)
 make evals-verbose      # Same with verbose output
 make evals-debug        # Evals with LLM request/response tracing
 make test-all           # Unit tests + evals

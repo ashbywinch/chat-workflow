@@ -67,6 +67,40 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 
 ## Critical Agent Information
 
+### Before Starting Work
+
+The decision tree above routes by your primary goal. But subtasks within a
+larger plan (testing, documentation, migration, etc.) may have their own
+guides under `docs/`. Check `docs/` for relevant conventions before doing
+work in an area you haven't worked with in this project.
+
+Examples: modifying tests → check testing.md. Writing documentation → check
+writing-documentation.md. Migrating workflows → check couch2food-migration-guide.md.
+
+### Testing Rules
+
+- ALWAYS use `make` targets for testing. NEVER construct ad-hoc `python -m unittest`, `pytest`, or other commands.
+- When running evals, ALWAYS capture output with `tee`: `make evals 2>&1 | tee .sisyphus/evidence/run-$(date +%s).txt`
+- NEVER pipe eval output through `grep`, `head`, or filters that truncate it — you'll lose the error message you needed.
+
+| Situation | Target | What it does |
+|-----------|--------|-------------|
+| Any unit test | `make test` | Runs lint + unit tests |
+| Quick framework check | `make evals-smoke` | test_real_api + debug_streaming (~80s) |
+| Changed code or prompts | `make evals-incremental` | Auto-detects affected evals via graph |
+| Full verification | `make evals` | Runs all evals |
+| Unsure | `make evals-incremental` | Safe default, auto-detects |
+
+### Tool Selection
+
+| Tool | When to Use | Why |
+|------|-------------|-----|
+| LSP (`lsp_find_references`, etc.) | Local Qs: definitions, usages, renames | Instant, zero precomputation |
+| code-review-graph (`get_impact_radius`, etc.) | Architectural Qs: blast radius, flow analysis, change impact | Precomputed dependency graph |
+| Explore agent | Broad pattern searches LSP can't handle | LLM-powered, flexible |
+
+**Guardrail**: code-review-graph shows blast radius to inform where you test, not whether to make the change. Don't use architecture analysis as a reason to be timid.
+
 ### Key Files for Quick Understanding
 
 | File | What |
