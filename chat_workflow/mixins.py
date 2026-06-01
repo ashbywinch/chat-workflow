@@ -192,8 +192,18 @@ class LLMValidated(BaseModel):
         else:
             text = "{}"
 
+        cleaned = str(text).strip()
+        if cleaned.startswith("```"):
+            first_newline = cleaned.find("\n")
+            if first_newline != -1:
+                cleaned = cleaned[first_newline + 1 :]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3].strip()
+            elif "\n```" in cleaned:
+                cleaned = cleaned.rsplit("\n```", 1)[0].strip()
+
         try:
-            result = json.loads(str(text))
+            result = json.loads(cleaned)
         except (json.JSONDecodeError, TypeError, ValueError):
             result = {"valid": True, "violations": []}
 

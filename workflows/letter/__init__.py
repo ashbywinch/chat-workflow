@@ -1,3 +1,3 @@
 from .models import Letter
 
-__all__ = ['Letter']
+__all__ = ["Letter"]

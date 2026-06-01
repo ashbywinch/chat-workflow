@@ -43,10 +43,7 @@ class ComponentInteractionContext(BaseModel):
     )
     user_pain_points: list[str] = Field(
         ...,
-        description=(
-            "Common pitfalls the assistant should watch for, "
-            "e.g. 'Users often forget to list attendees'"
-        ),
+        description=("Common pitfalls the assistant should watch for, e.g. 'Users often forget to list attendees'"),
     )
 
     @atomic_workflow
@@ -62,9 +59,7 @@ class ComponentInteractionContext(BaseModel):
         ],
         structure: Annotated[
             ComponentStructure,
-            (
-                "The structural design — what fields and rules the artifact follows"
-            ),
+            ("The structural design — what fields and rules the artifact follows"),
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentInteractionContext:

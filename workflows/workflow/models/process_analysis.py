@@ -10,18 +10,10 @@ from chat_workflow import atomic_workflow
 class ProcessAnalysis(BaseModel):
     """Output of analyze_process()."""
 
-    phases: list[str] = Field(
-        ..., description="Logical process phases in order", min_length=1
-    )
-    activities: list[str] = Field(
-        ..., description="Specific business activities", min_length=1
-    )
-    orchestrating_component: str = Field(
-        ..., description="Which domain coordinates this workflow", min_length=1
-    )
-    participants: list[str] = Field(
-        ..., description="All roles/systems involved", min_length=1
-    )
+    phases: list[str] = Field(..., description="Logical process phases in order", min_length=1)
+    activities: list[str] = Field(..., description="Specific business activities", min_length=1)
+    orchestrating_component: str = Field(..., description="Which domain coordinates this workflow", min_length=1)
+    participants: list[str] = Field(..., description="All roles/systems involved", min_length=1)
 
     @atomic_workflow
     @classmethod

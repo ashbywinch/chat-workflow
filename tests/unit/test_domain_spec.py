@@ -1,4 +1,5 @@
 """Tests for ComponentDomainSpec and ComponentDomainField models."""
+
 import unittest
 
 from pydantic import ValidationError

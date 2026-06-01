@@ -141,9 +141,7 @@ class TestLLMValidated(unittest.TestCase):
 
     def test_description_injection(self):
         class TestModel(LLMValidated):
-            diagram: Annotated[str, Validation("Must have participants")] = Field(
-                ..., description="A diagram"
-            )
+            diagram: Annotated[str, Validation("Must have participants")] = Field(..., description="A diagram")
 
         desc = TestModel.model_fields["diagram"].description
         self.assertIsNotNone(desc)

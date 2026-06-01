@@ -1,4 +1,5 @@
 """Tests for ComponentDesignSpec composite model."""
+
 import unittest
 
 from pydantic import ValidationError
@@ -66,9 +67,7 @@ class TestComponentDesignSpec(unittest.TestCase):
 
     def test_structure_is_accessible(self):
         spec = self.make_valid()
-        self.assertEqual(
-            spec.structure.description, "Structured meeting minutes"
-        )
+        self.assertEqual(spec.structure.description, "Structured meeting minutes")
 
     def test_interaction_context_is_accessible(self):
         spec = self.make_valid()

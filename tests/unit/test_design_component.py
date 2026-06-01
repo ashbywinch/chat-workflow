@@ -1,4 +1,5 @@
 """Tests for GeneratedComponent.generate atomic workflow."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -47,9 +48,16 @@ class TestDesignComponent(unittest.TestCase):
     def test_returns_generated_component(self, mock_call_llm):
         expected_code = (
             "from __future__ import annotations\n"
-            "from pydantic import BaseModel, Field\n\n"
+            "from pydantic import BaseModel, Field\n"
+            "from chat_workflow import atomic_workflow\n\n"
             "class Order(BaseModel):\n"
-            '    name: str = Field(..., description="Order name")\n'
+            '    name: str = Field(..., min_length=1, description="Order name")\n'
+            "\n"
+            "    @atomic_workflow\n"
+            "    @classmethod\n"
+            "    def create(cls, context: str, max_turns: int = 10):\n"
+            '        """Create order."""\n'
+            "        ...\n"
         )
         expected = GeneratedComponent(code=expected_code)
         mock_call_llm.return_value = AgentResponse[GeneratedComponent](
@@ -77,9 +85,16 @@ class TestDesignComponent(unittest.TestCase):
     def test_code_contains_expected_imports(self, mock_call_llm):
         expected_code = (
             "from __future__ import annotations\n"
-            "from pydantic import BaseModel, Field\n\n"
+            "from pydantic import BaseModel, Field\n"
+            "from chat_workflow import atomic_workflow\n\n"
             "class TestComponent(BaseModel):\n"
-            '    name: str = Field(..., description="Test name")\n'
+            '    name: str = Field(..., min_length=1, description="Test name")\n'
+            "\n"
+            "    @atomic_workflow\n"
+            "    @classmethod\n"
+            "    def create(cls, context: str, max_turns: int = 10):\n"
+            '        """Create test component."""\n'
+            "        ...\n"
         )
         mock_call_llm.return_value = AgentResponse[GeneratedComponent](
             intent=AgentIntent.SUCCESS,

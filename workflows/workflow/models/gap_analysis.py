@@ -13,21 +13,11 @@ from .process_analysis import ProcessAnalysis
 class GapAnalysis(BaseModel):
     """Analysis of missing elements."""
 
-    missing_components: list[str] = Field(
-        ..., description="Components referenced but not existing"
-    )
-    missing_playbooks: list[str] = Field(
-        ..., description="Playbooks referenced but not created"
-    )
-    integration_gaps: list[str] = Field(
-        ..., description="Unclear handoffs or incomplete interfaces"
-    )
-    organizational_gaps: list[str] = Field(
-        ..., description="Activities without clear ownership"
-    )
-    recommendations: list[str] = Field(
-        ..., description="How to fill each gap"
-    )
+    missing_components: list[str] = Field(..., description="Components referenced but not existing")
+    missing_playbooks: list[str] = Field(..., description="Playbooks referenced but not created")
+    integration_gaps: list[str] = Field(..., description="Unclear handoffs or incomplete interfaces")
+    organizational_gaps: list[str] = Field(..., description="Activities without clear ownership")
+    recommendations: list[str] = Field(..., description="How to fill each gap")
 
     @atomic_workflow
     @classmethod

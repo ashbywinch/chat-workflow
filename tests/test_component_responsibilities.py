@@ -1,4 +1,5 @@
 """Tests for ComponentResponsibilities model."""
+
 import unittest
 
 from pydantic import ValidationError
@@ -31,9 +32,7 @@ class TestComponentResponsibilities(unittest.TestCase):
     def test_valid_construction(self):
         c = self.make_valid()
         self.assertEqual(c.name, "Invoice")
-        self.assertEqual(
-            c.purpose, "Generate and manage invoices for completed orders"
-        )
+        self.assertEqual(c.purpose, "Generate and manage invoices for completed orders")
         self.assertIn("invoice lifecycle", c.scope_description)
         self.assertEqual(c.required_inputs, ["Order", "Customer"])
         self.assertEqual(c.component_type, "artifact_producing")
@@ -44,21 +43,15 @@ class TestComponentResponsibilities(unittest.TestCase):
         self.assertEqual(c.incidental_notes, "")
 
     def test_incidental_notes_can_be_set(self):
-        c = self.make_valid(
-            incidental_notes="User mentioned they use QuickBooks"
-        )
-        self.assertEqual(
-            c.incidental_notes, "User mentioned they use QuickBooks"
-        )
+        c = self.make_valid(incidental_notes="User mentioned they use QuickBooks")
+        self.assertEqual(c.incidental_notes, "User mentioned they use QuickBooks")
 
     def test_required_inputs_can_be_empty(self):
         c = self.make_valid(required_inputs=[])
         self.assertEqual(c.required_inputs, [])
 
     def test_required_inputs_with_multiple_values(self):
-        c = self.make_valid(
-            required_inputs=["Order", "Customer", "PaymentGateway"]
-        )
+        c = self.make_valid(required_inputs=["Order", "Customer", "PaymentGateway"])
         self.assertEqual(len(c.required_inputs), 3)
 
     # --- Missing required fields ---

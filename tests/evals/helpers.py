@@ -87,9 +87,7 @@ class JudgeVerdict(BaseModel):
 
     rule: str = Field(..., description="Short label of the validation rule")
     passed: bool = Field(..., description="Whether the conversation satisfies this rule")
-    explanation: str | None = Field(
-        None, description="Brief explanation if the rule was violated"
-    )
+    explanation: str | None = Field(None, description="Brief explanation if the rule was violated")
 
 
 class JudgeResult(BaseModel):
@@ -98,8 +96,7 @@ class JudgeResult(BaseModel):
     verdicts: list[JudgeVerdict] = Field(
         ...,
         description=(
-            "Individual verdicts — one per rule. "
-            "The number of verdicts MUST match the number of rules provided."
+            "Individual verdicts — one per rule. The number of verdicts MUST match the number of rules provided."
         ),
     )
 
@@ -137,7 +134,7 @@ def llm_judge(
     """
     from chat_workflow import get_client
 
-    rules_text = "\n".join(f"{i+1}. {name}: {desc}" for i, (name, desc) in enumerate(rules.items()))
+    rules_text = "\n".join(f"{i + 1}. {name}: {desc}" for i, (name, desc) in enumerate(rules.items()))
     client = get_client(provider=config.provider)
     result: JudgeResult = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
         model=config.model,
@@ -195,14 +192,11 @@ def capture_on_failure(session: Session, label: str = "conversation"):
 
         # Write transcript
         tx_path = outdir / f"{label}-{ts}.txt"
-        tx_path.write_text(
-            f"=== CONVERSATION TRANSCRIPT ({label}) ===\n"
-            + transcript
-            + "\n=== END TRANSCRIPT ===\n"
-        )
+        tx_path.write_text(f"=== CONVERSATION TRANSCRIPT ({label}) ===\n" + transcript + "\n=== END TRANSCRIPT ===\n")
 
         # Write full exception traceback to companion file
         import traceback
+
         tb_path = outdir / f"{label}-{ts}-exception.txt"
         tb_path.write_text(
             f"=== EXCEPTION DETAILS ({label}) ===\n"
@@ -219,11 +213,7 @@ def capture_on_failure(session: Session, label: str = "conversation"):
                 cause = cause.__cause__
             msg = str(cause).split("\n")[0] if str(cause) else type(cause).__name__
 
-        raise AssertionError(
-            f"{msg}\n"
-            f"[Transcript: {tx_path}]\n"
-            f"[Details: {tb_path}]"
-        ) from exc
+        raise AssertionError(f"{msg}\n[Transcript: {tx_path}]\n[Details: {tb_path}]") from exc
 
 
 def run_multi_turn_eval(
@@ -285,8 +275,6 @@ def run_multi_turn_eval(
     return result
 
 
-
-
 def make_meeting_analysis():
     """Create a standard meeting-minutes ProcessAnalysis for eval tests."""
     from workflows.workflow.models import ProcessAnalysis
@@ -294,9 +282,12 @@ def make_meeting_analysis():
     return ProcessAnalysis(
         phases=["Note-taking", "Review & Clarify", "Draft Minutes", "Review & Approve"],
         activities=[
-            "Take meeting notes", "Review notes for clarity",
-            "Identify action items", "Write minutes draft",
-            "Circulate for review", "Incorporate feedback",
+            "Take meeting notes",
+            "Review notes for clarity",
+            "Identify action items",
+            "Write minutes draft",
+            "Circulate for review",
+            "Incorporate feedback",
             "Distribute final minutes",
         ],
         orchestrating_component="Meeting Organizer",

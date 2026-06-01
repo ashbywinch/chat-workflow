@@ -261,9 +261,7 @@ class TestInteractiveEntityValidationSystem(unittest.TestCase):
             pass  # Expected — this IS a chat_workflow.ValidationError
         except Exception as e:
             # Currently this path is taken — pydantic.ValidationError
-            self.fail(
-                f"Expected chat_workflow.ValidationError, got {type(e).__name__}: {e}"
-            )
+            self.fail(f"Expected chat_workflow.ValidationError, got {type(e).__name__}: {e}")
 
     def test_validation_rules_inherited_by_subclasses(self):
         """FAILS: _validation_rules should be inherited by subclasses.

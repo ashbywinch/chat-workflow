@@ -1,12 +1,13 @@
 """Tests for Workflow._generate_diagram and _create_diagram."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
 from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.models import AgentIntent, AgentResponse
+from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
-    ComponentRequirement,
     Input,
     Output,
     ProcessAnalysis,
@@ -39,13 +40,13 @@ def _make_analysis() -> ProcessAnalysis:
     )
 
 
-def _make_components() -> list[ComponentRequirement]:
+def _make_components() -> list[ComponentResponsibilities]:
     return [
-        ComponentRequirement(
+        ComponentResponsibilities(
             name="Order",
             purpose="Manage orders",
+            scope_description="Manage orders",
             required_inputs=["Details"],
-            expected_outputs=["Confirmation"],
             component_type="artifact_producing",
         )
     ]
@@ -76,9 +77,7 @@ def _make_outputs() -> list[Output]:
 
 class TestGenerateDiagram(unittest.TestCase):
     def test_has_workflow_attribute(self):
-        self.assertTrue(
-            getattr(Workflow._generate_diagram, "_is_workflow", False)
-        )
+        self.assertTrue(getattr(Workflow._generate_diagram, "_is_workflow", False))
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
@@ -90,9 +89,10 @@ class TestGenerateDiagram(unittest.TestCase):
             )
         self.assertIn("session", str(ctx.exception))
 
+    @patch.object(Workflow, "collect_all_rules", return_value=[])
     @patch.object(AtomicWorkflow, "_call_llm")
-    def test_returns_workflow(self, mock_call_llm):
-        expected = Workflow(
+    def test_returns_workflow(self, mock_call_llm, mock_collect):
+        expected = Workflow.model_construct(
             name="Test Workflow",
             diagram="sequenceDiagram\nparticipant A\nA->>B: hello",
             inputs=_make_inputs(),
@@ -101,7 +101,7 @@ class TestGenerateDiagram(unittest.TestCase):
             gap_analysis=None,
             architectural_validation="All components properly owned",
         )
-        mock_call_llm.return_value = AgentResponse[Workflow](
+        mock_call_llm.return_value = AgentResponse[Workflow].model_construct(
             intent=AgentIntent.SUCCESS,
             result=expected,
         )
@@ -122,7 +122,7 @@ class TestCreateDiagram(unittest.TestCase):
     @patch("workflows.evaluation_criteria.refine.refine")
     @patch.object(Workflow, "_generate_diagram")
     def test_materializes_blobs(self, mock_generate, mock_refine):
-        workflow = Workflow(
+        workflow = Workflow.model_construct(
             name="Test Workflow",
             diagram="sequenceDiagram\nA->>B: test",
             inputs=_make_inputs(),
@@ -150,7 +150,7 @@ class TestCreateDiagram(unittest.TestCase):
     @patch("workflows.evaluation_criteria.refine.refine")
     @patch.object(Workflow, "_generate_diagram")
     def test_refine_loop_reruns_on_changes(self, mock_generate, mock_refine):
-        original = Workflow(
+        original = Workflow.model_construct(
             name="Test Workflow",
             diagram="sequenceDiagram\nA->>B: original",
             inputs=_make_inputs(),
@@ -159,7 +159,7 @@ class TestCreateDiagram(unittest.TestCase):
             gap_analysis=None,
             architectural_validation="OK",
         )
-        changed = Workflow(
+        changed = Workflow.model_construct(
             name="Test Workflow",
             diagram="sequenceDiagram\nA->>B: changed",
             inputs=_make_inputs(),

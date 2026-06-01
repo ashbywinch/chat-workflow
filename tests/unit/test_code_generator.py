@@ -327,7 +327,7 @@ class TestMethodGenerator(unittest.TestCase):
         from chat_workflow.code_generator import generate_model_validator
 
         result = generate_model_validator("name must be non-empty")
-        self.assertIn("@model_validator(mode=\"after\")", result)
+        self.assertIn('@model_validator(mode="after")', result)
 
     def test_generate_model_validator_contains_method_signature(self):
         """Generated code should contain the validate_business_rules method."""
@@ -495,8 +495,8 @@ class TestClassGenerator(unittest.TestCase):
             {"name": "count", "type": "int", "desc": "The count"},
         ]
         result = generate_class("TestEntity", fields)
-        self.assertIn("name: str = Field(..., description=\"The name\")", result)
-        self.assertIn("count: int = Field(..., description=\"The count\")", result)
+        self.assertIn('name: str = Field(..., description="The name")', result)
+        self.assertIn('count: int = Field(..., description="The count")', result)
 
     def test_generate_class_includes_validation_rules(self):
         """Generated code should include _validation_rules class attribute."""

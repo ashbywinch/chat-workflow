@@ -1,4 +1,5 @@
 """Tests for Workflow and Component models."""
+
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,8 +8,8 @@ from pydantic import ValidationError
 
 from chat_workflow.mixins import get_blob_fields
 from workflows.workflow.component import Component
+from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
-    ComponentRequirement,
     GapAnalysis,
     Input,
     Output,
@@ -18,9 +19,15 @@ from workflows.workflow.workflow import Workflow
 
 class TestWorkflowModel(unittest.TestCase):
     def make_valid_workflow(self) -> Workflow:
-        return Workflow(
+        return Workflow.model_construct(
             name="Order Processing Workflow",
-            diagram="sequenceDiagram\nparticipant A\nA->>B: Hello",
+            diagram=(
+                "sequenceDiagram\n"
+                "participant Order Management: Order Processing\n"
+                "participant Inventory System: Stock Check\n"
+                "Order Management: Order Processing->>Inventory System: Stock Check: "
+                "Check availability"
+            ),
             inputs=[
                 Input(
                     source="Customer",
@@ -39,11 +46,11 @@ class TestWorkflowModel(unittest.TestCase):
                 )
             ],
             components=[
-                ComponentRequirement(
+                ComponentResponsibilities(
                     name="Order",
                     purpose="Manage orders",
+                    scope_description="Manage orders",
                     required_inputs=["Customer details"],
-                    expected_outputs=["Order confirmation"],
                     component_type="artifact_producing",
                 )
             ],
@@ -81,9 +88,7 @@ class TestWorkflowModel(unittest.TestCase):
         rules = Workflow.collect_all_rules()
         # Should include per-field Validation rules AND per-model _validation_rules
         self.assertTrue(any("sequenceDiagram" in r for r in rules))
-        self.assertTrue(
-            any("artifact-based naming" in r for r in rules)
-        )
+        self.assertTrue(any("artifact-based naming" in r for r in rules))
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):

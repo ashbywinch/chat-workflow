@@ -1,8 +1,10 @@
 """Unit tests for GeneratedComponent.generate() with ComponentDesignSpec."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import AgentIntent, AgentResponse, Session, SessionLog
+from tests.sample_code import VALID_COMPONENT_CODE as SAMPLE_CODE
 from workflows.workflow.design_spec import ComponentDesignSpec
 from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
 from workflows.workflow.generated_component import GeneratedComponent
@@ -16,21 +18,6 @@ class FakeConfig:
     max_retries = 3
     request_timeout_seconds = 30
     debug = False
-
-
-SAMPLE_CODE = """from __future__ import annotations
-
-from pydantic import BaseModel, Field
-
-
-class MinutesDraft(BaseModel):
-    \"\"\"Structured meeting minutes that capture what happened.\"\"\"
-
-    meeting_date: str = Field(..., description="When the meeting took place")
-    attendees: list[str] = Field(..., description="People who attended", min_length=1)
-    decisions: list[str] = Field(..., description="Key decisions made")
-    action_items: list[str] = Field(..., description="Action items assigned")
-"""
 
 
 def _make_design_spec(**overrides) -> ComponentDesignSpec:
@@ -90,14 +77,10 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
-    def test_generate_accepts_design_spec(
-        self, mock_get_client, mock_validate
-    ):
+    def test_generate_accepts_design_spec(self, mock_get_client, mock_validate):
         """generate() should accept ComponentDesignSpec and return GeneratedComponent."""
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = (
-            self._make_success_response()
-        )
+        mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
         result = GeneratedComponent.generate(
@@ -111,14 +94,10 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
-    def test_generate_passes_design_spec_to_llm(
-        self, mock_get_client, mock_validate
-    ):
+    def test_generate_passes_design_spec_to_llm(self, mock_get_client, mock_validate):
         """The design spec should be included in the LLM prompt."""
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = (
-            self._make_success_response()
-        )
+        mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
         GeneratedComponent.generate(
@@ -137,14 +116,10 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
-    def test_generated_code_is_valid_python(
-        self, mock_get_client, mock_validate
-    ):
+    def test_generated_code_is_valid_python(self, mock_get_client, mock_validate):
         """The generated code should be syntactically valid Python."""
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = (
-            self._make_success_response()
-        )
+        mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
         result = GeneratedComponent.generate(
@@ -157,9 +132,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
-    def test_generate_with_minimal_design_spec(
-        self, mock_get_client, mock_validate
-    ):
+    def test_generate_with_minimal_design_spec(self, mock_get_client, mock_validate):
         """generate() should work with a minimal design spec (empty fields, etc.)."""
         minimal_spec = ComponentDesignSpec(
             domain_spec=ComponentDomainSpec(
@@ -178,9 +151,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
         )
 
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = (
-            self._make_success_response()
-        )
+        mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
         result = GeneratedComponent.generate(
@@ -192,9 +163,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
-    def test_generate_requires_session(
-        self, mock_get_client, mock_validate
-    ):
+    def test_generate_requires_session(self, mock_get_client, mock_validate):
         """generate() should raise TypeError when session is missing."""
         with self.assertRaises(TypeError):
             GeneratedComponent.generate(
@@ -203,14 +172,10 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
-    def test_generate_uses_low_max_turns(
-        self, mock_get_client, mock_validate
-    ):
+    def test_generate_uses_low_max_turns(self, mock_get_client, mock_validate):
         """generate() should default to 3 max turns (stateless, single-shot)."""
         mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = (
-            self._make_success_response()
-        )
+        mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
         GeneratedComponent.generate(

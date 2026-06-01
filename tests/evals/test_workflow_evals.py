@@ -124,14 +124,16 @@ class TestComponentRequirementEval(unittest.TestCase):
         analysis = make_meeting_analysis()
         inputs = [
             Input(
-                source="Note Taker", format="Free-text notes",
+                source="Note Taker",
+                format="Free-text notes",
                 trigger_conditions="Meeting ends",
                 validation_criteria="Contains date and key topics",
             ),
         ]
         outputs = [
             Output(
-                consumer="Attendees", format="Formatted document",
+                consumer="Attendees",
+                format="Formatted document",
                 success_criteria="Accurate and timely",
                 integration_points="Email",
                 storage_requirements="Shared drive",
@@ -147,7 +149,9 @@ class TestComponentRequirementEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=ComponentRequirement.identify_from_chat,
             method_kwargs=dict(
-                analysis=analysis, inputs=inputs, outputs=outputs,
+                analysis=analysis,
+                inputs=inputs,
+                outputs=outputs,
                 max_turns=10,
             ),
             user_persona=user_persona,
@@ -187,7 +191,8 @@ class TestGeneratedComponentEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=GeneratedComponent.generate,
             method_kwargs=dict(
-                requirements=req, max_turns=10,
+                requirements=req,
+                max_turns=10,
             ),
             user_persona=user_persona,
         )

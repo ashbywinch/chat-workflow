@@ -1,4 +1,5 @@
 """Tests for ProcessAnalysis.generate_from_chat atomic workflow."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 

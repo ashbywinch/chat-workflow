@@ -61,14 +61,14 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
             {"name": "count", "type": "int", "desc": "The count"},
         ]
         result = generate_class("TestEntity", fields)
-        self.assertIn("name: str = Field(..., description=\"The name\")", result)
-        self.assertIn("count: int = Field(..., description=\"The count\")", result)
+        self.assertIn('name: str = Field(..., description="The name")', result)
+        self.assertIn('count: int = Field(..., description="The count")', result)
 
     def test_generated_code_includes_model_validator(self):
         """Generated code should include a model_validator method."""
         fields = [{"name": "name", "type": "str", "desc": "The name"}]
         result = generate_class("TestEntity", fields)
-        self.assertIn("@model_validator(mode=\"after\")", result)
+        self.assertIn('@model_validator(mode="after")', result)
         self.assertIn("def validate_business_rules(self):", result)
 
     def test_generated_code_includes_workflow_classmethod(self):
@@ -340,6 +340,7 @@ class TestCliDiscovery(unittest.TestCase):
     def test_workflow_discoverable_by_cli(self):
         """The CLI should be able to build a sub-app for workflow with a Workflow > create command."""
         from chat_workflow_cli.cli import _build_workflow_sub_app
+
         sub_app = _build_workflow_sub_app("workflow")
         self.assertIsNotNone(sub_app)
         # The workflow module has only class-level methods (Workflow.create)

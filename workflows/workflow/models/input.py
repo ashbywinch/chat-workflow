@@ -14,16 +14,12 @@ class Input(BaseModel):
 
     source: str = Field(..., description="Where this input originates", min_length=1)
     format: str = Field(..., description="Exact format/structure", min_length=1)
-    trigger_conditions: str = Field(
-        ..., description="What initiates workflow execution"
-    )
+    trigger_conditions: str = Field(..., description="What initiates workflow execution")
     dependencies: list[str] = Field(
         default_factory=list,
         description="Required inputs from other components",
     )
-    validation_criteria: str = Field(
-        ..., description="How to verify input completeness", min_length=1
-    )
+    validation_criteria: str = Field(..., description="How to verify input completeness", min_length=1)
 
     @atomic_workflow
     @classmethod

@@ -1,4 +1,5 @@
 """Tests for ComponentInteractionContext model."""
+
 import unittest
 
 from pydantic import ValidationError
@@ -11,12 +12,8 @@ class TestComponentInteractionContext(unittest.TestCase):
 
     def make_valid(self, **overrides) -> ComponentInteractionContext:
         kwargs = dict(
-            must_prioritize=[
-                "Always ask about decisions early in the conversation"
-            ],
-            auto_suggest=[
-                "Suggest action item owners based on the topic discussed"
-            ],
+            must_prioritize=["Always ask about decisions early in the conversation"],
+            auto_suggest=["Suggest action item owners based on the topic discussed"],
             tone_preference="Professional but friendly",
             user_pain_points=["Users often forget to list attendees"],
         )
@@ -36,9 +33,7 @@ class TestComponentInteractionContext(unittest.TestCase):
             ["Suggest action item owners based on the topic discussed"],
         )
         self.assertEqual(ctx.tone_preference, "Professional but friendly")
-        self.assertEqual(
-            ctx.user_pain_points, ["Users often forget to list attendees"]
-        )
+        self.assertEqual(ctx.user_pain_points, ["Users often forget to list attendees"])
 
     def test_multiple_priorities(self):
         ctx = self.make_valid(

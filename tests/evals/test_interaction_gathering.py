@@ -29,8 +29,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
         domain_spec = ComponentDomainSpec(
             name="MeetingMinutes",
             description=(
-                "Structured meeting minutes that capture what happened,"
-                " what was decided, and what needs to happen next"
+                "Structured meeting minutes that capture what happened, what was decided, and what needs to happen next"
             ),
             fields=[
                 ComponentDomainField(
@@ -64,8 +63,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
 
         structure = ComponentStructure(
             description=(
-                "Structured meeting minutes that capture what happened,"
-                " what was decided, and what needs to happen next"
+                "Structured meeting minutes that capture what happened, what was decided, and what needs to happen next"
             ),
             base_class="BaseModel",
             fields=[
@@ -85,30 +83,22 @@ class TestInteractionGatheringEval(unittest.TestCase):
                 StructField(
                     name="key_decisions",
                     type_expr="list[Decision]",
-                    field_def_kwargs={
-                        "description": "Important decisions made during the meeting"
-                    },
+                    field_def_kwargs={"description": "Important decisions made during the meeting"},
                 ),
                 StructField(
                     name="action_items",
                     type_expr="list[ActionItem]",
-                    field_def_kwargs={
-                        "description": "Tasks assigned during the meeting"
-                    },
+                    field_def_kwargs={"description": "Tasks assigned during the meeting"},
                 ),
             ],
             model_validators=[
                 StructValidator(
                     rule="Every decision must include enough context to stand on its own",
-                    domain_origin=(
-                        "Someone who missed the meeting can catch up in two minutes"
-                    ),
+                    domain_origin=("Someone who missed the meeting can catch up in two minutes"),
                 ),
                 StructValidator(
                     rule="Every action item must have both an owner and a due date",
-                    domain_origin=(
-                        "Every action item has a clear owner and a due date"
-                    ),
+                    domain_origin=("Every action item has a clear owner and a due date"),
                 ),
             ],
         )

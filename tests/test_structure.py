@@ -1,4 +1,5 @@
 """Tests for ComponentStructure, StructField, and StructValidator models."""
+
 import unittest
 
 from pydantic import ValidationError
@@ -70,9 +71,7 @@ class TestStructValidator(unittest.TestCase):
     def test_valid_construction(self):
         v = self.make_valid()
         self.assertEqual(v.rule, "description must not exceed 3 sentences")
-        self.assertEqual(
-            v.domain_origin, "Descriptions should be concise and scannable"
-        )
+        self.assertEqual(v.domain_origin, "Descriptions should be concise and scannable")
 
     # --- Missing required fields ---
 
@@ -130,9 +129,7 @@ class TestComponentStructure(unittest.TestCase):
             ]
         )
         self.assertEqual(len(c.model_validators), 1)
-        self.assertEqual(
-            c.model_validators[0].rule, "at least one action item required"
-        )
+        self.assertEqual(c.model_validators[0].rule, "at least one action item required")
 
     def test_with_extra_imports(self):
         c = self.make_valid(

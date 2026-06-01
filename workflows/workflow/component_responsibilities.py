@@ -29,12 +29,8 @@ class ComponentRequirement(BaseModel):
 
     name: str = Field(..., description="Artifact-based name (noun)", min_length=1)
     purpose: str = Field(..., description="Single-sentence purpose", min_length=1)
-    required_inputs: list[str] = Field(
-        ..., description="Input names from input analysis"
-    )
-    expected_outputs: list[str] = Field(
-        ..., description="Output names from output analysis"
-    )
+    required_inputs: list[str] = Field(..., description="Input names from input analysis")
+    expected_outputs: list[str] = Field(..., description="Output names from output analysis")
     component_type: str = Field(
         ...,
         description="One of: value_stream, artifact_producing, planning_service",
@@ -73,9 +69,7 @@ from .models.input import Input  # noqa: E402
 from .models.output import Output  # noqa: E402
 from .models.process_analysis import ProcessAnalysis  # noqa: E402
 
-_VALID_COMPONENT_TYPES: frozenset[str] = frozenset(
-    {"value_stream", "artifact_producing", "planning_service"}
-)
+_VALID_COMPONENT_TYPES: frozenset[str] = frozenset({"value_stream", "artifact_producing", "planning_service"})
 
 
 class ComponentResponsibilities(BaseModel):
@@ -97,18 +91,12 @@ class ComponentResponsibilities(BaseModel):
     )
     scope_description: str = Field(
         ...,
-        description=(
-            "What this component represents AND doesn't represent "
-            "in the user's domain"
-        ),
+        description=("What this component represents AND doesn't represent in the user's domain"),
         min_length=1,
     )
     required_inputs: list[str] = Field(
         ...,
-        description=(
-            "Names of inputs this component needs from other components "
-            "to create its artifact"
-        ),
+        description=("Names of inputs this component needs from other components to create its artifact"),
     )
     component_type: str = Field(
         ...,
@@ -116,10 +104,7 @@ class ComponentResponsibilities(BaseModel):
     )
     incidental_notes: str = Field(
         "",
-        description=(
-            "Raw notes the user mentioned during Workflow conversations "
-            "about internals"
-        ),
+        description=("Raw notes the user mentioned during Workflow conversations about internals"),
     )
 
     _valid_component_types: ClassVar[frozenset[str]] = _VALID_COMPONENT_TYPES
@@ -129,7 +114,6 @@ class ComponentResponsibilities(BaseModel):
     def _validate_component_type(cls, v: str) -> str:
         if v not in cls._valid_component_types:
             raise ValueError(
-                f"component_type must be one of: "
-                f"{', '.join(sorted(cls._valid_component_types))}, got '{v}'"
+                f"component_type must be one of: {', '.join(sorted(cls._valid_component_types))}, got '{v}'"
             )
         return v

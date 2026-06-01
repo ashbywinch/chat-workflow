@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from chat_workflow import composite_workflow
 from chat_workflow.code_generator import verify_code
@@ -37,6 +38,44 @@ class Component(LLMValidated):
         "The expert_role describes a real, specific domain expertise the component "
         "embodies, not a generic role ('MinutesDraft Expert' is vague; "
         "'Meeting Minutes Administrator' is better).",
+        # Tier 1 — Core Structural Integrity
+        "Single Artifact Type Rule: The component defines exactly one business "
+        "artifact type. The purpose must describe a single artifact concept. "
+        "BAD: 'Invoice processing pipeline with integrated timesheet management' "
+        "(two artifact types: invoices and timesheets). "
+        "GOOD: 'Processes customer invoices through their complete lifecycle'.",
+        "Single Responsibility: The component's responsibility must be stateable "
+        "in one sentence describing exactly one domain concept. The purpose must "
+        "not describe multiple distinct responsibilities. "
+        "BAD: 'Oversees customer onboarding handles billing inquiries manages "
+        "support tickets' (three distinct responsibilities). "
+        "GOOD: 'Processes customer invoices through their complete lifecycle'.",
+        "No Multiple Artifact Creation: The component creates exactly one primary "
+        "artifact type. The purpose must not imply creation of multiple distinct "
+        "business artifacts. "
+        "BAD: 'Creates customer invoices generates monthly reports produces "
+        "analytics dashboards' (three distinct artifacts). "
+        "GOOD: 'Creates customer invoices from start to finish'.",
+        "Clear Boundaries: The purpose must clearly define what is inside and "
+        "outside the component's responsibility. Another LLM should be able to "
+        "use the purpose to decide if a given concern belongs here. "
+        "BAD: 'Handles everything related to the business operations of the "
+        "company' (no clear boundary). "
+        "GOOD: 'Creates customer invoices from submission through final "
+        "distribution' (clear start and end).",
+        "Encapsulation: The component's fields and methods must all relate to "
+        "the same domain concept. The purpose must not mix unrelated concerns. "
+        "BAD: 'Manages user authentication database backups email notifications' "
+        "(three unrelated domains). "
+        "GOOD: 'Creates customer invoices from submission through final "
+        "distribution' (single domain).",
+        "Cohesion: All functionality described in the purpose must serve the "
+        "same primary artifact. The purpose must not describe orphaned "
+        "functionality that belongs to a different domain. "
+        "BAD: 'Handles email notifications performs database maintenance' "
+        "(functionality serves no common artifact). "
+        "GOOD: 'Creates customer invoices from submission through final "
+        "distribution' (all serves invoice artifact).",
     ]
 
     name: str = Field(
@@ -73,6 +112,24 @@ class Component(LLMValidated):
         default="simple",
         description="simple or complex — indicates implementation effort",
     )
+
+    @model_validator(mode="after")
+    def _check_single_responsibility(self) -> Component:
+        """Enforce single responsibility: purpose must not contain 'and' or 'also'.
+
+        This is a fast programmatic heuristic that catches obvious violations.
+        Deeper semantic checks are handled by _validation_rules (LLM-judged).
+        """
+        purpose_lower = self.purpose.lower()
+        if re.search(r"\band\b", purpose_lower):
+            raise ValueError(
+                f"Purpose must describe a single responsibility — remove conjunctions like 'and': '{self.purpose}'"
+            )
+        if re.search(r"\balso\b", purpose_lower):
+            raise ValueError(
+                f"Purpose must describe a single responsibility — remove conjunctions like 'also': '{self.purpose}'"
+            )
+        return self
 
     @composite_workflow
     @classmethod
@@ -112,9 +169,7 @@ class Component(LLMValidated):
                 session=session,
             )
 
-            session.io.echo(
-                f"Gathering interaction context: {domain_spec.name}..."
-            )
+            session.io.echo(f"Gathering interaction context: {domain_spec.name}...")
             interaction_context = ComponentInteractionContext.gather(
                 domain_spec=domain_spec,
                 structure=structure,
@@ -127,9 +182,7 @@ class Component(LLMValidated):
                 interaction_context=interaction_context,
             )
 
-            session.io.echo(
-                f"Generating component code: {domain_spec.name}..."
-            )
+            session.io.echo(f"Generating component code: {domain_spec.name}...")
             generated = GeneratedComponent.generate(
                 design_spec=design_spec,
                 session=session,

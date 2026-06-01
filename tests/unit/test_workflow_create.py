@@ -1,10 +1,11 @@
 """Tests for create composite workflow."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
+from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
-    ComponentRequirement,
     GapAnalysis,
     Input,
     Output,
@@ -30,9 +31,7 @@ class TestWorkflowCreate(unittest.TestCase):
         )
 
     def test_has_workflow_attribute(self):
-        self.assertTrue(
-            getattr(Workflow.create, "_is_workflow", False)
-        )
+        self.assertTrue(getattr(Workflow.create, "_is_workflow", False))
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
@@ -81,22 +80,25 @@ class TestWorkflowCreate(unittest.TestCase):
         )
         mock_collect_outputs.return_value = [out]
 
-        req = ComponentRequirement(
+        req = ComponentResponsibilities(
             name="TestComponent",
             purpose="Test",
+            scope_description="Test",
             required_inputs=["Test"],
-            expected_outputs=["Test"],
             component_type="artifact_producing",
         )
-        mock_resolve_gaps.return_value = ([req], GapAnalysis(
-            missing_components=[],
-            missing_playbooks=[],
-            integration_gaps=[],
-            organizational_gaps=[],
-            recommendations=[],
-        ))
+        mock_resolve_gaps.return_value = (
+            [req],
+            GapAnalysis(
+                missing_components=[],
+                missing_playbooks=[],
+                integration_gaps=[],
+                organizational_gaps=[],
+                recommendations=[],
+            ),
+        )
 
-        workflow = Workflow(
+        workflow = Workflow.model_construct(
             name="Test Workflow",
             diagram="sequenceDiagram",
             inputs=[inp],
@@ -169,30 +171,33 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_collect_outputs.return_value = [out]
 
         reqs = [
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="ComponentA",
                 purpose="Test A",
+                scope_description="Test A",
                 required_inputs=["A"],
-                expected_outputs=["A"],
                 component_type="artifact_producing",
             ),
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="ComponentB",
                 purpose="Test B",
+                scope_description="Test B",
                 required_inputs=["B"],
-                expected_outputs=["B"],
                 component_type="value_stream",
             ),
         ]
-        mock_resolve_gaps.return_value = (reqs, GapAnalysis(
-            missing_components=[],
-            missing_playbooks=[],
-            integration_gaps=[],
-            organizational_gaps=[],
-            recommendations=[],
-        ))
+        mock_resolve_gaps.return_value = (
+            reqs,
+            GapAnalysis(
+                missing_components=[],
+                missing_playbooks=[],
+                integration_gaps=[],
+                organizational_gaps=[],
+                recommendations=[],
+            ),
+        )
 
-        workflow = Workflow(
+        workflow = Workflow.model_construct(
             name="Test",
             diagram="seq",
             inputs=[inp],
@@ -259,37 +264,40 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_collect_outputs.return_value = [out]
 
         reqs = [
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="Good",
                 purpose="Test",
+                scope_description="Test",
                 required_inputs=["A"],
-                expected_outputs=["A"],
                 component_type="artifact_producing",
             ),
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="Bad",
                 purpose="Test",
+                scope_description="Test",
                 required_inputs=["B"],
-                expected_outputs=["B"],
                 component_type="value_stream",
             ),
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="AlsoGood",
                 purpose="Test",
+                scope_description="Test",
                 required_inputs=["C"],
-                expected_outputs=["C"],
                 component_type="artifact_producing",
             ),
         ]
-        mock_resolve_gaps.return_value = (reqs, GapAnalysis(
-            missing_components=[],
-            missing_playbooks=[],
-            integration_gaps=[],
-            organizational_gaps=[],
-            recommendations=[],
-        ))
+        mock_resolve_gaps.return_value = (
+            reqs,
+            GapAnalysis(
+                missing_components=[],
+                missing_playbooks=[],
+                integration_gaps=[],
+                organizational_gaps=[],
+                recommendations=[],
+            ),
+        )
 
-        workflow = Workflow(
+        workflow = Workflow.model_construct(
             name="Test",
             diagram="seq",
             inputs=[inp],

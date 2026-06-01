@@ -8,7 +8,7 @@ from chat_workflow import Session, atomic_workflow, composite_workflow
 from chat_workflow.annotations import Blob, Validation
 from chat_workflow.mixins import BlobSyncMixin, LLMValidated
 
-from .component_responsibilities import ComponentRequirement
+from .component_responsibilities import ComponentRequirement, ComponentResponsibilities
 from .models import (
     GapAnalysis,
     Input,
@@ -52,7 +52,7 @@ class Workflow(BlobSyncMixin, LLMValidated):
         description="All workflow outputs with consumer, format, success criteria, and integration analysis",
     )
 
-    components: list[ComponentRequirement] = Field(
+    components: list[ComponentResponsibilities] = Field(
         ...,
         description="Identified components required by this workflow",
     )
@@ -78,7 +78,7 @@ class Workflow(BlobSyncMixin, LLMValidated):
     def _generate_diagram(
         cls,
         analysis: Annotated[ProcessAnalysis, "The process analysis"],
-        components: Annotated[list[ComponentRequirement], "The identified components"],
+        components: Annotated[list[ComponentResponsibilities], "The identified components"],
         inputs: Annotated[list[Input], "The workflow inputs"],
         outputs: Annotated[list[Output], "The workflow outputs"],
         gap_analysis: Annotated[GapAnalysis | None, "Optional gap analysis to incorporate"] = None,
@@ -112,7 +112,7 @@ class Workflow(BlobSyncMixin, LLMValidated):
     def _create_diagram(
         cls,
         analysis: ProcessAnalysis,
-        components: list[ComponentRequirement],
+        components: list[ComponentResponsibilities],
         inputs: list[Input],
         outputs: list[Output],
         gap_analysis: GapAnalysis | None = None,
@@ -219,6 +219,61 @@ class Workflow(BlobSyncMixin, LLMValidated):
         return workflow
 
 
+def _requirement_to_responsibilities(
+    req: ComponentRequirement,
+) -> ComponentResponsibilities:
+    """Convert a ComponentRequirement to ComponentResponsibilities.
+
+    Uses the requirement's purpose as the initial scope_description.
+    Incidental notes are captured separately via _capture_incidental_notes.
+    """
+    return ComponentResponsibilities(
+        name=req.name,
+        purpose=req.purpose,
+        scope_description=req.purpose,
+        required_inputs=req.required_inputs,
+        component_type=req.component_type,
+        incidental_notes="",
+    )
+
+
+def _requirements_to_responsibilities(
+    requirements: list[ComponentRequirement],
+) -> list[ComponentResponsibilities]:
+    return [_requirement_to_responsibilities(r) for r in requirements]
+
+
+def _capture_incidental_notes(
+    components: list[ComponentResponsibilities],
+    *,
+    session: Session,
+) -> list[ComponentResponsibilities]:
+    """Ask the user about incidental notes for each component.
+
+    During Workflow conversations, the user may mention internal details,
+    implementation preferences, or constraints about a component. This
+    function gives them an explicit opportunity to share those notes.
+    """
+    result: list[ComponentResponsibilities] = []
+    for comp in components:
+        session.io.echo(f"\nAny incidental notes about the '{comp.name}' component?")
+        session.io.echo(
+            "(e.g., internal details, implementation preferences, or constraints the component should follow)"
+        )
+        notes = session.io.prompt(f"Incidental notes for {comp.name}")
+        result.append(
+            ComponentResponsibilities(
+                name=comp.name,
+                purpose=comp.purpose,
+                scope_description=comp.scope_description,
+                required_inputs=comp.required_inputs,
+                component_type=comp.component_type,
+                incidental_notes=notes,
+            )
+        )
+    return result
+
+
 def _resolve_gaps(
     analysis: ProcessAnalysis,
     inputs: list[Input],
@@ -226,31 +281,34 @@ def _resolve_gaps(
     existing_components: list[str] | None = None,
     *,
     session: Session,
-) -> tuple[list[ComponentRequirement], GapAnalysis]:
-    """Loop: identify components -> analyze gaps -> refine until clean."""
+) -> tuple[list[ComponentResponsibilities], GapAnalysis]:
+    """Loop: identify components -> analyze gaps -> refine until clean.
+
+    Returns ComponentResponsibilities objects (not ComponentRequirement)
+    with incidental notes captured from the user.
+    """
     existing = existing_components or []
     max_iterations = 5
 
     for _ in range(max_iterations):
-        components = ComponentRequirement.identify_from_chat(
+        requirements = ComponentRequirement.identify_from_chat(
             analysis=analysis,
             inputs=inputs,
             outputs=outputs,
             session=session,
         )
         gaps = _GapAnalysis.analyze_from_chat(
-            components=components,
+            components=requirements,
             analysis=analysis,
             existing_components=existing,
             session=session,
         )
 
         # Check if gaps are resolved
-        if (
-            not gaps.missing_components
-            and not gaps.integration_gaps
-            and not gaps.organizational_gaps
-        ):
+        if not gaps.missing_components and not gaps.integration_gaps and not gaps.organizational_gaps:
+            # Convert to ComponentResponsibilities and capture incidental notes
+            components = _requirements_to_responsibilities(requirements)
+            components = _capture_incidental_notes(components, session=session)
             return components, gaps
 
         # Pass gap info back — the LLM sub-workflows will see it and adjust
@@ -258,18 +316,16 @@ def _resolve_gaps(
         existing.extend(gaps.missing_components)
 
     # After max iterations, return best effort
-    return ComponentRequirement.identify_from_chat(
+    requirements = ComponentRequirement.identify_from_chat(
         analysis=analysis,
         inputs=inputs,
         outputs=outputs,
         session=session,
-    ), _GapAnalysis.analyze_from_chat(
-        components=ComponentRequirement.identify_from_chat(
-            analysis=analysis,
-            inputs=inputs,
-            outputs=outputs,
-            session=session,
-        ),
+    )
+    components = _requirements_to_responsibilities(requirements)
+    components = _capture_incidental_notes(components, session=session)
+    return components, _GapAnalysis.analyze_from_chat(
+        components=requirements,
         analysis=analysis,
         existing_components=existing,
         session=session,

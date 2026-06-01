@@ -26,8 +26,7 @@ class TestStructuralDesignEval(unittest.TestCase):
         domain_spec = ComponentDomainSpec(
             name="MeetingMinutes",
             description=(
-                "Structured meeting minutes that capture what happened,"
-                " what was decided, and what needs to happen next"
+                "Structured meeting minutes that capture what happened, what was decided, and what needs to happen next"
             ),
             fields=[
                 ComponentDomainField(

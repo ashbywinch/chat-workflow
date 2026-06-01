@@ -31,17 +31,13 @@ class StructField(BaseModel):
     )
     type_expr: str = Field(
         ...,
-        description=(
-            "Python type expression as a string "
-            "(e.g. 'str', 'list[str]', 'list[ActionItem]')"
-        ),
+        description=("Python type expression as a string (e.g. 'str', 'list[str]', 'list[ActionItem]')"),
         min_length=1,
     )
     field_def_kwargs: dict[str, str] = Field(
         default_factory=dict,
         description=(
-            "Pydantic Field kwargs as string key-value pairs "
-            "(e.g. {'description': '...', 'min_length': '1'})"
+            "Pydantic Field kwargs as string key-value pairs (e.g. {'description': '...', 'min_length': '1'})"
         ),
     )
 
@@ -55,18 +51,12 @@ class StructValidator(BaseModel):
 
     rule: str = Field(
         ...,
-        description=(
-            "Validation rule text "
-            "(e.g. 'description must not exceed 3 sentences')"
-        ),
+        description=("Validation rule text (e.g. 'description must not exceed 3 sentences')"),
         min_length=1,
     )
     domain_origin: str = Field(
         ...,
-        description=(
-            "The 'what good looks like' statement or business rule "
-            "this validation came from"
-        ),
+        description=("The 'what good looks like' statement or business rule this validation came from"),
         min_length=1,
     )
 
@@ -86,10 +76,7 @@ class ComponentStructure(BaseModel):
     )
     base_class: str = Field(
         "BaseModel",
-        description=(
-            "Base class for the generated model: 'BaseModel' (default) "
-            "or 'LLMValidated'"
-        ),
+        description=("Base class for the generated model: 'BaseModel' (default) or 'LLMValidated'"),
     )
     fields: list[StructField] = Field(
         default_factory=list,

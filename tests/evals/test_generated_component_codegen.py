@@ -36,8 +36,7 @@ def make_minutes_draft_design_spec() -> ComponentDesignSpec:
         domain_spec=ComponentDomainSpec(
             name="MinutesDraft",
             description=(
-                "Structured meeting minutes that capture what happened, "
-                "decisions made, and action items assigned"
+                "Structured meeting minutes that capture what happened, decisions made, and action items assigned"
             ),
             fields=[
                 ComponentDomainField(
@@ -76,14 +75,11 @@ def make_minutes_draft_design_spec() -> ComponentDesignSpec:
         ),
         structure=ComponentStructure(
             description=(
-                "Structured meeting minutes that capture what happened, "
-                "decisions made, and action items assigned"
+                "Structured meeting minutes that capture what happened, decisions made, and action items assigned"
             ),
         ),
         interaction_context=ComponentInteractionContext(
-            must_prioritize=[
-                "Always ask about decisions and action items early in the conversation"
-            ],
+            must_prioritize=["Always ask about decisions and action items early in the conversation"],
             auto_suggest=[
                 "Suggest action item owners based on the topic discussed",
                 "Propose a due date for each action item",
@@ -142,9 +138,7 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
         # auto-fixable and LLM-generated docstrings may exceed 120 chars.
         compile(generated.code, "<generated>", "exec")
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False, dir=Path(__file__).parent
-        ) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, dir=Path(__file__).parent) as f:
             f.write(generated.code)
             temp_path = f.name
 
@@ -183,7 +177,8 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
                     break
 
             classes_found = [
-                n for n in dir(mod)
+                n
+                for n in dir(mod)
                 if isinstance(getattr(mod, n), type)
                 and issubclass(getattr(mod, n), BaseModel)
                 and getattr(mod, n) is not BaseModel
@@ -217,8 +212,7 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
                     "to produce output."
                 ),
                 "No repetition": (
-                    "The agent didn't ask for the same information again after the "
-                    "user already provided it."
+                    "The agent didn't ask for the same information again after the user already provided it."
                 ),
                 "Uses domain language": (
                     "The agent used natural business language (meeting, decisions, "

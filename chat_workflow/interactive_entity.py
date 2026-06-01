@@ -89,9 +89,7 @@ class InteractiveEntity(BaseModel):
                 val_x = getattr(self, field_x, 0)
                 val_y = getattr(self, field_y, "")
                 if val_x > threshold and not val_y:
-                    raise ValidationError(
-                        f"Validation rule violated: '{rule}'"
-                    )
+                    raise ValidationError(f"Validation rule violated: '{rule}'")
             return
 
         # X must be between A and B
@@ -103,9 +101,7 @@ class InteractiveEntity(BaseModel):
             if field_name is not None:
                 val = getattr(self, field_name, 0)
                 if not (lower <= val <= upper):
-                    raise ValidationError(
-                        f"Validation rule violated: '{rule}'"
-                    )
+                    raise ValidationError(f"Validation rule violated: '{rule}'")
             return
 
         # X must be after Y
@@ -117,9 +113,7 @@ class InteractiveEntity(BaseModel):
                 val_x = getattr(self, field_x, 0)
                 val_y = getattr(self, field_y, 0)
                 if not (val_x > val_y):
-                    raise ValidationError(
-                        f"Validation rule violated: '{rule}'"
-                    )
+                    raise ValidationError(f"Validation rule violated: '{rule}'")
             return
 
         # X must be non-empty
@@ -129,9 +123,7 @@ class InteractiveEntity(BaseModel):
             if field_name is not None:
                 val = getattr(self, field_name, "")
                 if not val:
-                    raise ValidationError(
-                        f"Validation rule violated: '{rule}'"
-                    )
+                    raise ValidationError(f"Validation rule violated: '{rule}'")
             return
 
         # X is required
@@ -141,7 +133,5 @@ class InteractiveEntity(BaseModel):
             if field_name is not None:
                 val = getattr(self, field_name, "")
                 if not val:
-                    raise ValidationError(
-                        f"Validation rule violated: '{rule}'"
-                    )
+                    raise ValidationError(f"Validation rule violated: '{rule}'")
             return

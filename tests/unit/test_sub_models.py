@@ -1,4 +1,5 @@
 """Tests for workflow sub-models."""
+
 import unittest
 from unittest.mock import patch
 
@@ -108,8 +109,20 @@ class TestComponentRequirement(unittest.TestCase):
 class TestGeneratedComponent(unittest.TestCase):
     @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
     def test_valid_instance(self, mock_validate):
-        model = GeneratedComponent(code="class MyModel(BaseModel): pass")
-        self.assertEqual(model.code, "class MyModel(BaseModel): pass")
+        code = (
+            "from chat_workflow import atomic_workflow\n"
+            "from pydantic import BaseModel, Field\n\n"
+            "class MyModel(BaseModel):\n"
+            '    name: str = Field(..., min_length=1, description="Name")\n'
+            "\n"
+            "    @atomic_workflow\n"
+            "    @classmethod\n"
+            "    def create(cls, context: str):\n"
+            '        """Create."""\n'
+            "        ...\n"
+        )
+        model = GeneratedComponent(code=code)
+        self.assertEqual(model.code, code)
 
     def test_missing_code(self):
         with self.assertRaises(ValidationError):

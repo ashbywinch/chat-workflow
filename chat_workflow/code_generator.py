@@ -62,10 +62,7 @@ def _generate_model_class(class_name: str, fields: list[tuple[str, str]]) -> str
 
     # Build the class body as an IndentedBlock containing SimpleStatementLines
     body = cst.IndentedBlock(
-        body=[
-            cst.SimpleStatementLine(body=[stmt])
-            for stmt in field_statements
-        ],
+        body=[cst.SimpleStatementLine(body=[stmt]) for stmt in field_statements],
     )
 
     class_def = cst.ClassDef(
@@ -113,16 +110,16 @@ def generate_workflow_method(class_name: str) -> str:
         A multi-line string with decorators and method body.
     """
     return (
-        '@atomic_workflow\n'
-        '@classmethod\n'
-        'def generate_from_chat(\n'
-        '    cls,\n'
-        '    context: str,\n'
-        '    max_turns: int = 10,\n'
-        '    session = None,\n'
-        '):\n'
+        "@atomic_workflow\n"
+        "@classmethod\n"
+        "def generate_from_chat(\n"
+        "    cls,\n"
+        "    context: str,\n"
+        "    max_turns: int = 10,\n"
+        "    session = None,\n"
+        "):\n"
         f'    """Workflow method for {class_name}."""\n'
-        '    ...\n'
+        "    ...\n"
     )
 
 
@@ -147,13 +144,13 @@ def generate_model_validator(rule: str, field_name: str | None = None) -> str:
         field_name = rule.split()[0]
 
     return (
-        'from chat_workflow import ValidationError\n'
-        '\n'
+        "from chat_workflow import ValidationError\n"
+        "\n"
         '@model_validator(mode="after")\n'
-        'def validate_business_rules(self):\n'
-        f'    if not self.{field_name}:\n'
+        "def validate_business_rules(self):\n"
+        f"    if not self.{field_name}:\n"
         f'        raise ValidationError("{rule}")\n'
-        '    return self\n'
+        "    return self\n"
     )
 
 
@@ -199,26 +196,30 @@ def verify_code(code: str, max_attempts: int = 3) -> str:
             # Check formatting
             fmt_result = subprocess.run(
                 [ruff_path, "format", "--check", tmp_path],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
 
             if fmt_result.returncode != 0:
                 subprocess.run(
                     [ruff_path, "format", tmp_path],
-                    capture_output=True, text=True,
+                    capture_output=True,
+                    text=True,
                 )
                 continue
 
             # Check linting
             lint_result = subprocess.run(
                 [ruff_path, "check", tmp_path],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
 
             if lint_result.returncode != 0:
                 subprocess.run(
                     [ruff_path, "check", "--fix", tmp_path],
-                    capture_output=True, text=True,
+                    capture_output=True,
+                    text=True,
                 )
                 continue
 
@@ -258,9 +259,7 @@ def _find_ruff() -> str:
     if found is not None:
         return found
 
-    raise RuntimeError(
-        "ruff executable not found. Install it with: pip install ruff"
-    )
+    raise RuntimeError("ruff executable not found. Install it with: pip install ruff")
 
 
 def import_module(path: str):
@@ -342,7 +341,7 @@ def generate_class(
         if field_desc:
             lines.append(f'    {field["name"]}: {field["type"]} = Field(..., description="{field_desc}")')
         else:
-            lines.append(f'    {field["name"]}: {field["type"]} = Field(...)')
+            lines.append(f"    {field['name']}: {field['type']} = Field(...)")
 
     lines.append("")
     lines.append('    @model_validator(mode="after")')
@@ -350,11 +349,11 @@ def generate_class(
 
     if validation_rules:
         v_field = validation_rules.split()[0]
-        lines.append(f'        if not self.{v_field}:')
+        lines.append(f"        if not self.{v_field}:")
         lines.append(f'            raise ValidationError("{validation_rules}")')
     elif fields:
         first_field = fields[0]["name"]
-        lines.append(f'        if not self.{first_field}:')
+        lines.append(f"        if not self.{first_field}:")
         lines.append(f'            raise ValidationError("{first_field} must be non-empty")')
     else:
         lines.append("        pass")

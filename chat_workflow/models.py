@@ -38,8 +38,7 @@ class AgentResponse(BaseModel, Generic[TResult]):
     result: TResult | None = Field(
         default=None,
         description=(
-            'The final object. Required when intent is "success". '
-            'Must be null when intent is "continue" or "failure".'
+            'The final object. Required when intent is "success". Must be null when intent is "continue" or "failure".'
         ),
     )
 
@@ -53,8 +52,7 @@ class AgentResponse(BaseModel, Generic[TResult]):
                 )
             if self.result is not None:
                 raise ValueError(
-                    "CONTINUE intent cannot include result. "
-                    "Use SUCCESS intent if you have a complete result to return."
+                    "CONTINUE intent cannot include result. Use SUCCESS intent if you have a complete result to return."
                 )
         elif self.intent == AgentIntent.FAILURE:
             if not self.message:

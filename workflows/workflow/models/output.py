@@ -12,19 +12,11 @@ from .process_analysis import ProcessAnalysis
 class Output(BaseModel):
     """A single workflow output."""
 
-    consumer: str = Field(
-        ..., description="Which components use this output", min_length=1
-    )
+    consumer: str = Field(..., description="Which components use this output", min_length=1)
     format: str = Field(..., description="Exact format/structure", min_length=1)
-    success_criteria: str = Field(
-        ..., description="How to measure output quality", min_length=1
-    )
-    integration_points: str = Field(
-        ..., description="How outputs connect downstream"
-    )
-    storage_requirements: str = Field(
-        ..., description="Where/how outputs are preserved"
-    )
+    success_criteria: str = Field(..., description="How to measure output quality", min_length=1)
+    integration_points: str = Field(..., description="How outputs connect downstream")
+    storage_requirements: str = Field(..., description="Where/how outputs are preserved")
 
     @atomic_workflow
     @classmethod
