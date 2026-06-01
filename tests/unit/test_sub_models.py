@@ -3,10 +3,10 @@ import unittest
 
 from pydantic import ValidationError
 
+from workflows.workflow import GeneratedComponent
 from workflows.workflow.models import (
     ComponentRequirement,
     GapAnalysis,
-    GeneratedComponent,
     Input,
     Output,
     ProcessAnalysis,

@@ -8,11 +8,10 @@ from unittest.mock import MagicMock, patch
 from chat_workflow import Session, SessionLog
 from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.models import AgentIntent, AgentResponse
-from workflows.workflow import Workflow
+from workflows.workflow import GeneratedComponent, Workflow
 from workflows.workflow.models import (
     ComponentRequirement,
     GapAnalysis,
-    GeneratedComponent,
     Input,
     Output,
     ProcessAnalysis,

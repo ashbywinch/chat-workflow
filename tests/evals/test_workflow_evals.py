@@ -163,7 +163,8 @@ class TestGeneratedComponentEval(unittest.TestCase):
     def test_multi_turn_component_design(self):
         """GeneratedComponent.generate should complete efficiently with a user bot."""
         from tests.evals.helpers import run_multi_turn_eval
-        from workflows.workflow.models import ComponentRequirement, GeneratedComponent
+        from workflows.workflow import GeneratedComponent
+        from workflows.workflow.models import ComponentRequirement
 
         req = ComponentRequirement(
             name="MinutesDraft",

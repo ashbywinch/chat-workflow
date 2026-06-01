@@ -10,7 +10,8 @@ from chat_workflow.code_generator import verify_code
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.session import Session
 
-from .models import ComponentRequirement, GeneratedComponent
+from . import GeneratedComponent
+from .models import ComponentRequirement
 
 
 class Component(LLMValidated):

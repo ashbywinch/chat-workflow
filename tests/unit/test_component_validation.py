@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from workflows.workflow import GeneratedComponent
 from workflows.workflow.component import Component
-from workflows.workflow.models import GeneratedComponent
 
 
 class TestComponentValidation(unittest.TestCase):
