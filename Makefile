@@ -43,6 +43,7 @@ test-verbose: setup lint
 	@${UNITTEST} discover tests/unit/ -v
 
 evals: setup lint
+	@rm -f test-results/eval-report.txt
 	@${PYTHON} scripts/run_with_timeout.py --timeout 600 -- ${UNITTEST} discover tests/evals/
 
 evals-verbose: setup lint

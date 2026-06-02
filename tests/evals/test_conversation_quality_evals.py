@@ -134,7 +134,7 @@ class TestJargonFreeEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
             method_kwargs={
-                "max_turns": 10,
+                "max_turns": 8,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
@@ -175,13 +175,12 @@ class TestJargonFreeEval(unittest.TestCase):
                 "analysis": analysis,
                 "inputs": inputs,
                 "outputs": outputs,
-                "max_turns": 12,
+                "max_turns": 8,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
         )
-        if result is not None:
-            self.assertIsInstance(result, list)
+        self.assertIsInstance(result, list)
 
     @timeout(120)
     def test_gap_analysis_jargon_free(self):
@@ -206,7 +205,7 @@ class TestJargonFreeEval(unittest.TestCase):
             method_kwargs={
                 "components": requirements,
                 "analysis": analysis,
-                "max_turns": 12,
+                "max_turns": 8,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,

@@ -1,5 +1,6 @@
 """Shared helpers for eval tests that call real LLMs."""
 
+import inspect
 import os
 import time
 from collections.abc import Callable
@@ -249,6 +250,7 @@ def run_multi_turn_eval(
     judge_rules: dict[str, str] | None = None,
     judge: Callable = llm_judge,
     config: Config | None = None,
+    test_name: str | None = None,
 ) -> Any:
     """Run a multi-turn workflow eval with an LLM user bot and optional LLM judge.
 
@@ -290,6 +292,30 @@ def run_multi_turn_eval(
     except Exception:
         result = None
 
+    # Capture timing and token stats (only when CHAT_WORKFLOW_EVAL_REPORT is set)
+    duration = time.time() - start
+    # Auto-detect unittest test method name from call stack if not provided
+    if test_name is None:
+        for frame in inspect.stack():
+            locals = frame[0].f_locals
+            method = locals.get("self")
+            if method is not None and hasattr(method, "_testMethodName"):
+                test_name = method._testMethodName
+                break
+        else:
+            test_name = model_method.__name__
+
+    stats = EvalStats(
+        test_name=test_name,
+        duration_s=duration,
+        total_tokens=_token_count,
+    )
+    if os.environ.get("CHAT_WORKFLOW_EVAL_REPORT"):
+        report_path = Path("test-results") / "eval-report.txt"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(report_path, "a") as f:
+            f.write(stats.report() + "\n")
+
     # LLM judge on the full conversation — passes even if workflow failed
     # or hit turn limit, as long as the conversation quality is acceptable.
     if judge is not None:
@@ -302,19 +328,6 @@ def run_multi_turn_eval(
                     f"Conversation quality: {len(failures)}/{len(judge_rules)} rules failed:\n"
                     + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures)
                 )
-
-    duration = time.time() - start
-    stats = EvalStats(
-        test_name=model_method.__name__,
-        duration_s=duration,
-        total_tokens=_token_count,
-    )
-
-    # Write to report file only (not stdout — would clutter unittest dots)
-    report_path = Path("test-results") / "eval-report.txt"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(report_path, "a") as f:
-        f.write(stats.report() + "\n")
 
     return result
 

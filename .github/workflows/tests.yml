@@ -28,6 +28,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           CHAT_WORKFLOW_TRANSCRIPT_DIR: test-results/transcripts
+          CHAT_WORKFLOW_EVAL_REPORT: 1
         run: make evals
       
       - name: Upload eval transcripts
