@@ -35,13 +35,28 @@ def main() -> int:
         print("No command specified", file=sys.stderr)
         return 2
 
+    import threading
+
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+
+    def _stream():
+        for line in iter(process.stdout.readline, ""):
+            print(line, end="", flush=True)
+
+    reader = threading.Thread(target=_stream, daemon=True)
+    reader.start()
+
     try:
-        completed = subprocess.run(command, check=False, timeout=args.timeout)
-        return completed.returncode
+        process.wait(timeout=args.timeout)
+        reader.join(timeout=5)
+        return process.returncode
     except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
         print(
-            f"Command timed out after {args.timeout} seconds: {' '.join(command)}",
+            f"\nCommand timed out after {args.timeout} seconds: {' '.join(command)}",
             file=sys.stderr,
+            flush=True,
         )
         return 124
 
