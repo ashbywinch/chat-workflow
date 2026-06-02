@@ -281,9 +281,6 @@ def run_multi_turn_eval(
     # Create session — state.messages records the conversation
     session = make_tools(user_bot)
 
-    test_name = model_method.__name__
-    print(f"  >> {test_name}...", flush=True)
-
     # Inject session into method_kwargs if not present
     kwargs = dict(method_kwargs)
     kwargs.setdefault("session", session)
@@ -308,18 +305,16 @@ def run_multi_turn_eval(
 
     duration = time.time() - start
     stats = EvalStats(
-        test_name=test_name,
+        test_name=model_method.__name__,
         duration_s=duration,
         total_tokens=_token_count,
     )
-    line = stats.report()
-    print(line, flush=True)
 
-    # Append to persistent report file (captured as CI artifact)
+    # Write to report file only (not stdout — would clutter unittest dots)
     report_path = Path("test-results") / "eval-report.txt"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     with open(report_path, "a") as f:
-        f.write(line + "\n")
+        f.write(stats.report() + "\n")
 
     return result
 
