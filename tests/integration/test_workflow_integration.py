@@ -11,10 +11,10 @@ from chat_workflow.models import AgentIntent, AgentResponse
 from workflows.workflow import GeneratedComponent, Workflow
 from workflows.workflow.models import (
     ComponentRequirement,
+    Deliverable,
     GapAnalysis,
-    Input,
-    Output,
-    ProcessAnalysis,
+    ProcessDefinition,
+    Resource,
 )
 
 
@@ -39,14 +39,14 @@ class TestWorkflowIntegration(unittest.TestCase):
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_end_to_end_flow(self, mock_call_llm):
         """Full flow: process in → Workflow + Component files out."""
-        analysis = ProcessAnalysis(
+        analysis = ProcessDefinition(
             phases=["Intake", "Process"],
             activities=["Receive", "Fulfill"],
             orchestrating_component="Order Management",
             participants=["Customer", "System"],
         )
 
-        inp = Input(
+        inp = Resource(
             source="Customer",
             format="JSON",
             trigger_conditions="Order placed",
@@ -54,7 +54,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             validation_criteria="Must have items",
         )
 
-        out = Output(
+        out = Deliverable(
             consumer="Inventory",
             format="Event",
             success_criteria="Items reserved",
@@ -88,9 +88,10 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         mock_responses = [
-            AgentResponse[ProcessAnalysis](intent=AgentIntent.SUCCESS, result=analysis),
-            AgentResponse[list[Input]](intent=AgentIntent.SUCCESS, result=[inp]),
-            AgentResponse[list[Output]](intent=AgentIntent.SUCCESS, result=[out]),
+            AgentResponse[list[Deliverable]](intent=AgentIntent.SUCCESS, result=[out]),
+            AgentResponse[list[Resource]](intent=AgentIntent.SUCCESS, result=[inp]),
+            AgentResponse[str](intent=AgentIntent.SUCCESS, result="raw notes"),
+            AgentResponse[ProcessDefinition](intent=AgentIntent.SUCCESS, result=analysis),
             AgentResponse[list[ComponentRequirement]](intent=AgentIntent.SUCCESS, result=[req]),
             AgentResponse[GapAnalysis](
                 intent=AgentIntent.SUCCESS,
@@ -138,14 +139,14 @@ class TestWorkflowIntegration(unittest.TestCase):
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_handles_multiple_components(self, mock_call_llm):
         """When multiple components identified, files are written for each."""
-        analysis = ProcessAnalysis(
+        analysis = ProcessDefinition(
             phases=["Test"],
             activities=["Test"],
             orchestrating_component="Test",
             participants=["Test"],
         )
 
-        inp = Input(
+        inp = Resource(
             source="Test",
             format="JSON",
             trigger_conditions="Test",
@@ -153,7 +154,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             validation_criteria="Test",
         )
 
-        out = Output(
+        out = Deliverable(
             consumer="Test",
             format="JSON",
             success_criteria="Test",
@@ -192,9 +193,10 @@ class TestWorkflowIntegration(unittest.TestCase):
         code_b = "class ComponentB(BaseModel):\n    pass\n"
 
         mock_responses = [
-            AgentResponse[ProcessAnalysis](intent=AgentIntent.SUCCESS, result=analysis),
-            AgentResponse[list[Input]](intent=AgentIntent.SUCCESS, result=[inp]),
-            AgentResponse[list[Output]](intent=AgentIntent.SUCCESS, result=[out]),
+            AgentResponse[list[Deliverable]](intent=AgentIntent.SUCCESS, result=[out]),
+            AgentResponse[list[Resource]](intent=AgentIntent.SUCCESS, result=[inp]),
+            AgentResponse[str](intent=AgentIntent.SUCCESS, result="raw notes"),
+            AgentResponse[ProcessDefinition](intent=AgentIntent.SUCCESS, result=analysis),
             AgentResponse[list[ComponentRequirement]](intent=AgentIntent.SUCCESS, result=reqs),
             AgentResponse[GapAnalysis](
                 intent=AgentIntent.SUCCESS,

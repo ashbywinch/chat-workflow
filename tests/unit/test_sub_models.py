@@ -8,16 +8,16 @@ from pydantic import ValidationError
 from workflows.workflow import GeneratedComponent
 from workflows.workflow.models import (
     ComponentRequirement,
+    Deliverable,
     GapAnalysis,
-    Input,
-    Output,
-    ProcessAnalysis,
+    ProcessDefinition,
+    Resource,
 )
 
 
-class TestProcessAnalysis(unittest.TestCase):
+class TestProcessDefinition(unittest.TestCase):
     def test_valid_instance(self):
-        model = ProcessAnalysis(
+        model = ProcessDefinition(
             phases=["Intake", "Review"],
             activities=["Receive request", "Check completeness"],
             orchestrating_component="Case Management",
@@ -28,12 +28,12 @@ class TestProcessAnalysis(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            ProcessAnalysis()  # no fields provided
+            ProcessDefinition()
 
 
-class TestInput(unittest.TestCase):
+class TestResource(unittest.TestCase):
     def test_valid_instance(self):
-        model = Input(
+        model = Resource(
             source="Customer",
             format="JSON",
             trigger_conditions="New request submitted",
@@ -44,7 +44,7 @@ class TestInput(unittest.TestCase):
         self.assertEqual(model.dependencies, ["Customer profile"])
 
     def test_default_dependencies(self):
-        model = Input(
+        model = Resource(
             source="System",
             format="CSV",
             trigger_conditions="Daily batch",
@@ -54,12 +54,12 @@ class TestInput(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            Input()
+            Resource()
 
 
-class TestOutput(unittest.TestCase):
+class TestDeliverable(unittest.TestCase):
     def test_valid_instance(self):
-        model = Output(
+        model = Deliverable(
             consumer="Billing System",
             format="XML",
             success_criteria="All invoices processed",
@@ -70,7 +70,7 @@ class TestOutput(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            Output()
+            Deliverable()
 
 
 class TestGapAnalysis(unittest.TestCase):

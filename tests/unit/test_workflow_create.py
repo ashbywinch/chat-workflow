@@ -6,10 +6,10 @@ from unittest.mock import MagicMock, patch
 from chat_workflow import Session, SessionLog
 from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
+    Deliverable,
     GapAnalysis,
-    Input,
-    Output,
-    ProcessAnalysis,
+    ProcessDefinition,
+    Resource,
 )
 from workflows.workflow.workflow import Workflow
 
@@ -38,9 +38,9 @@ class TestWorkflowCreate(unittest.TestCase):
             Workflow.create(process_description="test")
         self.assertIn("session", str(ctx.exception))
 
-    @patch("workflows.workflow.models.output.Output.generate_from_chat")
-    @patch("workflows.workflow.models.input.Input.generate_from_chat")
-    @patch("workflows.workflow.models.process_analysis.ProcessAnalysis.generate_from_chat")
+    @patch("workflows.workflow.models.deliverable.Deliverable.generate_from_chat")
+    @patch("workflows.workflow.models.resource.Resource.generate_from_chat")
+    @patch("workflows.workflow.workflow.generate_from_chat")
     @patch("workflows.workflow.workflow._resolve_gaps")
     @patch.object(Workflow, "_create_diagram")
     @patch("workflows.workflow.component.Component")
@@ -54,15 +54,14 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_analyze,
     ):
         """All sub-steps should be called in order."""
-        analysis = ProcessAnalysis(
+        analysis = ProcessDefinition(
             phases=["Test"],
             activities=["Test"],
             orchestrating_component="Test",
             participants=["Test"],
         )
-        mock_analyze.return_value = analysis
 
-        inp = Input(
+        inp = Resource(
             source="Test",
             format="JSON",
             trigger_conditions="Test",
@@ -71,14 +70,15 @@ class TestWorkflowCreate(unittest.TestCase):
         )
         mock_collect_inputs.return_value = [inp]
 
-        out = Output(
+        out = Deliverable(
             consumer="Test",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
             storage_requirements="Test",
         )
-        mock_collect_outputs.return_value = [out]
+        mock_collect_outputs.return_value = analysis
+        mock_analyze.return_value = [out]
 
         req = ComponentResponsibilities(
             name="TestComponent",
@@ -128,9 +128,9 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_create_diagram.assert_called_once()
         self.assertEqual(mock_component_class.create.call_count, 1)
 
-    @patch("workflows.workflow.models.output.Output.generate_from_chat")
-    @patch("workflows.workflow.models.input.Input.generate_from_chat")
-    @patch("workflows.workflow.models.process_analysis.ProcessAnalysis.generate_from_chat")
+    @patch("workflows.workflow.models.deliverable.Deliverable.generate_from_chat")
+    @patch("workflows.workflow.models.resource.Resource.generate_from_chat")
+    @patch("workflows.workflow.workflow.generate_from_chat")
     @patch("workflows.workflow.workflow._resolve_gaps")
     @patch.object(Workflow, "_create_diagram")
     @patch("workflows.workflow.component.Component")
@@ -144,15 +144,14 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_analyze,
     ):
         """When multiple components identified, Component.create is called for each."""
-        analysis = ProcessAnalysis(
+        analysis = ProcessDefinition(
             phases=["Test"],
             activities=["Test"],
             orchestrating_component="Test",
             participants=["Test"],
         )
-        mock_analyze.return_value = analysis
 
-        inp = Input(
+        inp = Resource(
             source="Test",
             format="JSON",
             trigger_conditions="Test",
@@ -161,14 +160,15 @@ class TestWorkflowCreate(unittest.TestCase):
         )
         mock_collect_inputs.return_value = [inp]
 
-        out = Output(
+        out = Deliverable(
             consumer="Test",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
             storage_requirements="Test",
         )
-        mock_collect_outputs.return_value = [out]
+        mock_collect_outputs.return_value = analysis
+        mock_analyze.return_value = [out]
 
         reqs = [
             ComponentResponsibilities(
@@ -221,9 +221,9 @@ class TestWorkflowCreate(unittest.TestCase):
         self.assertIsInstance(result, Workflow)
         self.assertEqual(mock_component_class.create.call_count, 2)
 
-    @patch("workflows.workflow.models.output.Output.generate_from_chat")
-    @patch("workflows.workflow.models.input.Input.generate_from_chat")
-    @patch("workflows.workflow.models.process_analysis.ProcessAnalysis.generate_from_chat")
+    @patch("workflows.workflow.models.deliverable.Deliverable.generate_from_chat")
+    @patch("workflows.workflow.models.resource.Resource.generate_from_chat")
+    @patch("workflows.workflow.workflow.generate_from_chat")
     @patch("workflows.workflow.workflow._resolve_gaps")
     @patch.object(Workflow, "_create_diagram")
     @patch("workflows.workflow.component.Component")
@@ -237,15 +237,14 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_analyze,
     ):
         """If one component creation fails, others still proceed."""
-        analysis = ProcessAnalysis(
+        analysis = ProcessDefinition(
             phases=["Test"],
             activities=["Test"],
             orchestrating_component="Test",
             participants=["Test"],
         )
-        mock_analyze.return_value = analysis
 
-        inp = Input(
+        inp = Resource(
             source="Test",
             format="JSON",
             trigger_conditions="Test",
@@ -254,14 +253,15 @@ class TestWorkflowCreate(unittest.TestCase):
         )
         mock_collect_inputs.return_value = [inp]
 
-        out = Output(
+        out = Deliverable(
             consumer="Test",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
             storage_requirements="Test",
         )
-        mock_collect_outputs.return_value = [out]
+        mock_collect_outputs.return_value = analysis
+        mock_analyze.return_value = [out]
 
         reqs = [
             ComponentResponsibilities(

@@ -8,9 +8,9 @@ from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.models import AgentIntent, AgentResponse
 from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
-    Input,
-    Output,
-    ProcessAnalysis,
+    Deliverable,
+    ProcessDefinition,
+    Resource,
 )
 from workflows.workflow.workflow import Workflow
 
@@ -31,8 +31,8 @@ def _make_session() -> Session:
     )
 
 
-def _make_analysis() -> ProcessAnalysis:
-    return ProcessAnalysis(
+def _make_analysis() -> ProcessDefinition:
+    return ProcessDefinition(
         phases=["Intake", "Process", "Complete"],
         activities=["Receive", "Validate", "Finalize"],
         orchestrating_component="Order Management",
@@ -52,9 +52,9 @@ def _make_components() -> list[ComponentResponsibilities]:
     ]
 
 
-def _make_inputs() -> list[Input]:
+def _make_inputs() -> list[Resource]:
     return [
-        Input(
+        Resource(
             source="Customer",
             format="JSON",
             trigger_conditions="Order placed",
@@ -63,9 +63,9 @@ def _make_inputs() -> list[Input]:
     ]
 
 
-def _make_outputs() -> list[Output]:
+def _make_outputs() -> list[Deliverable]:
     return [
-        Output(
+        Deliverable(
             consumer="Inventory",
             format="Event",
             success_criteria="Items reserved",

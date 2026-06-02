@@ -60,7 +60,7 @@ class TestDesignComponent(unittest.TestCase):
             "        ...\n"
         )
         expected = GeneratedComponent.model_construct(code=expected_code)
-        mock_call_llm.return_value = AgentResponse[GeneratedComponent](
+        mock_call_llm.return_value = AgentResponse[GeneratedComponent].model_construct(
             intent=AgentIntent.SUCCESS,
             result=expected,
         )
@@ -96,9 +96,9 @@ class TestDesignComponent(unittest.TestCase):
             '        """Create test component."""\n'
             "        ...\n"
         )
-        mock_call_llm.return_value = AgentResponse[GeneratedComponent](
+        mock_call_llm.return_value = AgentResponse[GeneratedComponent].model_construct(
             intent=AgentIntent.SUCCESS,
-            result=GeneratedComponent(code=expected_code),
+            result=GeneratedComponent.model_construct(code=expected_code),
         )
 
         session = self._make_session()

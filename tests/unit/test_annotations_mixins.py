@@ -200,8 +200,6 @@ class TestLLMValidated(unittest.TestCase):
     def test_validation_error_on_violation(self, mock_get_client):
         """Should raise ValidationError when LLM reports violations."""
         mock_instance = unittest.mock.MagicMock()
-        # Return a response that has no 'choices' attribute (so we hit
-        # the instructor-client branch that checks for raw 'valid' attr).
         mock_response = unittest.mock.MagicMock(spec_set=["valid", "violations"])
         mock_response.valid = False
         mock_response.violations = ["Rule 1 violated", "Rule 2 violated"]
@@ -209,10 +207,12 @@ class TestLLMValidated(unittest.TestCase):
         mock_get_client.return_value = mock_instance
 
         class TestModel(LLMValidated):
+            _skip_llm_validation = False
             name: Annotated[str, Validation("Must be at least 3 chars")] = Field(...)
 
+        model = TestModel.model_construct(name="ab")
         with self.assertRaises(ValidationError) as ctx:
-            TestModel(name="ab")
+            model.validate_llm_rules()
 
         self.assertIn("Rule 1 violated", str(ctx.exception))
 

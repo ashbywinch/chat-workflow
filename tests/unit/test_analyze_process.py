@@ -1,12 +1,10 @@
-"""Tests for ProcessAnalysis.generate_from_chat atomic workflow."""
+"""Tests for generate_from_chat composite workflow."""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
-from chat_workflow.atomic_workflow import AtomicWorkflow
-from chat_workflow.models import AgentIntent, AgentResponse
-from workflows.workflow.models import ProcessAnalysis
+from workflows.workflow.models import ProcessDefinition, generate_from_chat
 
 
 class FakeConfig:
@@ -17,68 +15,64 @@ class FakeConfig:
     debug = False
 
 
-class TestAnalyzeProcess(unittest.TestCase):
-    def _make_session(self) -> Session:
-        return Session(
-            io=MagicMock(),
-            state=SessionLog(),
-            config=FakeConfig(),
-        )
+def _make_session() -> Session:
+    return Session(
+        io=MagicMock(),
+        state=SessionLog(),
+        config=FakeConfig(),
+    )
 
+
+class TestGenerateFromChat(unittest.TestCase):
     def test_has_workflow_attribute(self):
-        """generate_from_chat should be discoverable as a workflow function."""
         self.assertTrue(
-            getattr(ProcessAnalysis.generate_from_chat, "_is_workflow", False),
+            getattr(generate_from_chat, "_is_workflow", False),
             "generate_from_chat should have _is_workflow=True",
         )
 
     def test_requires_session(self):
-        """Calling without session should raise TypeError."""
         with self.assertRaises(TypeError) as ctx:
-            ProcessAnalysis.generate_from_chat(process_description="test process")
+            generate_from_chat()
         self.assertIn("session", str(ctx.exception))
 
-    @patch.object(AtomicWorkflow, "_call_llm")
-    def test_returns_process_analysis(self, mock_call_llm):
-        """With mocked LLM returning ProcessAnalysis, method should return it."""
-        expected = ProcessAnalysis(
-            phases=["Intake", "Processing", "Completion"],
-            activities=["Receive request", "Validate data", "Process payment"],
-            orchestrating_component="Order Management",
-            participants=["Customer", "Order System", "Payment Gateway"],
+    @patch("workflows.workflow.models.process_definition._generate_from_notes")
+    @patch("workflows.workflow.models.process_definition._gather_notes")
+    def test_orchestrates_gather_then_generate(
+        self, mock_gather, mock_generate
+    ):
+        mock_gather.return_value = "Some raw notes about the process"
+        mock_generate.return_value = ProcessDefinition(
+            phases=["Plan", "Do", "Review"],
+            activities=["Plan work", "Execute", "Review results"],
+            orchestrating_component="Manager",
+            participants=["Manager", "Team"],
         )
-        mock_call_llm.return_value = AgentResponse[ProcessAnalysis](
-            intent=AgentIntent.SUCCESS,
-            result=expected,
-        )
-        session = self._make_session()
-        result = ProcessAnalysis.generate_from_chat(
-            process_description="Customer order processing",
+        session = _make_session()
+        result = generate_from_chat(session=session)
+        mock_gather.assert_called_once_with(session=session, max_turns=10)
+        mock_generate.assert_called_once_with(
+            notes="Some raw notes about the process",
             session=session,
+            max_turns=10,
         )
-        self.assertIsInstance(result, ProcessAnalysis)
-        self.assertEqual(result.orchestrating_component, "Order Management")
-        self.assertEqual(len(result.phases), 3)
+        self.assertIsInstance(result, ProcessDefinition)
+        self.assertEqual(result.orchestrating_component, "Manager")
 
-    @patch.object(AtomicWorkflow, "_call_llm")
-    def test_passes_process_description_to_llm(self, mock_call_llm):
-        """The process_description should be passed through to the LLM invocation."""
-        mock_call_llm.return_value = AgentResponse[ProcessAnalysis](
-            intent=AgentIntent.SUCCESS,
-            result=ProcessAnalysis(
-                phases=["Test"],
-                activities=["Test"],
-                orchestrating_component="Test",
-                participants=["Test"],
-            ),
+    @patch("workflows.workflow.models.process_definition._generate_from_notes")
+    @patch("workflows.workflow.models.process_definition._gather_notes")
+    def test_passes_max_turns(
+        self, mock_gather, mock_generate
+    ):
+        mock_gather.return_value = "notes"
+        mock_generate.return_value = ProcessDefinition(
+            phases=["Test"],
+            activities=["Test"],
+            orchestrating_component="Test",
+            participants=["Test"],
         )
-        session = self._make_session()
-        ProcessAnalysis.generate_from_chat(
-            process_description="Customer onboarding process for new users",
-            session=session,
+        session = _make_session()
+        generate_from_chat(session=session, max_turns=5)
+        mock_gather.assert_called_once_with(session=session, max_turns=5)
+        mock_generate.assert_called_once_with(
+            notes="notes", session=session, max_turns=5
         )
-        mock_call_llm.assert_called_once()
-
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)

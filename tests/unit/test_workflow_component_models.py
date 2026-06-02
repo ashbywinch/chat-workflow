@@ -10,9 +10,9 @@ from chat_workflow.mixins import get_blob_fields
 from workflows.workflow.component import Component
 from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
+    Deliverable,
     GapAnalysis,
-    Input,
-    Output,
+    Resource,
 )
 from workflows.workflow.workflow import Workflow
 
@@ -29,7 +29,7 @@ class TestWorkflowModel(unittest.TestCase):
                 "Check availability"
             ),
             inputs=[
-                Input(
+                Resource(
                     source="Customer",
                     format="JSON",
                     trigger_conditions="Order placed",
@@ -37,7 +37,7 @@ class TestWorkflowModel(unittest.TestCase):
                 )
             ],
             outputs=[
-                Output(
+                Deliverable(
                     consumer="Inventory",
                     format="Event",
                     success_criteria="Items reserved",
@@ -88,7 +88,7 @@ class TestWorkflowModel(unittest.TestCase):
         rules = Workflow.collect_all_rules()
         # Should include per-field Validation rules AND per-model _validation_rules
         self.assertTrue(any("sequenceDiagram" in r for r in rules))
-        self.assertTrue(any("artifact-based naming" in r for r in rules))
+        self.assertTrue(any("must be nouns" in r for r in rules))
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
