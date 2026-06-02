@@ -77,15 +77,21 @@ Each phase has its own return type with its own validation rules. This keeps the
 
 #### Architecture Principles
 
-The architecture follows five key principles:
+The architecture follows these principles. Because we are building a **system that builds components**, every rule applies twice: our own components must follow them, AND the validation rules we write must ensure the components we generate also follow them.
 
-1. **Every component has a clear domain purpose and boundary** — Named after an artifact (noun), not a process (verb). Boundary is explicit.
-2. **A good workflow has loosely coupled components with clear interfaces** — Minimize dependencies. Each component's interface is explicit and stable.
-3. **All conversations with the user stay in the user's domain** — Never about Python, Pydantic, or code structure.
-4. **"What Good Looks Like" becomes validation rules** — Encode quality criteria as `Field(constraints=...)` and `@model_validator` rules, never as prompt text.
-5. **Validation rules never go in prompts** — Business rules go in Pydantic constraints and validators.
+1. **Every component has a clear domain purpose and boundary** — Named after an artifact (noun), not a process (verb). Boundary is explicit. Other components interact through its interface, not its internals.
 
-For the full architecture document, see the [canonical architecture reference](../../.sisyphus/notepads/refactor-evals/component-architecture.md). For the complete principles, see [architecture principles](../../.sisyphus/evidence/architecture-principles.md).
+2. **A good workflow has loosely coupled components with clear interfaces** — Minimize dependencies. Each component's interface (what it expects and produces) is explicit and stable. Changes to internals should not ripple to other components.
+
+3. **All conversations with the user stay in the user's domain** — Workflow discusses the user's process, Component discusses the user's artifact. Never about Python, Pydantic, or code structure. Generated components' ``@atomic_workflow`` docstrings must frame the task around the user's domain.
+
+4. **"What Good Looks Like" becomes validation rules** — Proactively ask the user what makes excellent output. Encode quality criteria as ``Field(constraints=...)`` and ``@model_validator`` rules, never as prompt text.
+
+5. **Validation rules never go in prompts** — Business rules → ``Field(constraints=...)`` or ``@model_validator``. "Always ask who attended" → ``attendees: list[str] = Field(min_length=1)``. "Don't hallucinate" → framework-level, not per-component.
+
+6. **Pydantic is the Gatekeeper** — Catch bad LLM output at construction time. Never write fallback logic, workarounds, or fuzzy matching to handle incorrect output. The correct response to bad LLM output is always: improve the prompt.
+
+**Information flow** — ``Workflow.create()`` produces ``ComponentResponsibilities`` (name, purpose, scope, inputs, type). ``Component.create()`` runs multi-phase design: ``DomainSpec.explore()`` → ``Structure.design()`` → ``InteractionContext.gather()`` → ``GeneratedComponent.generate()``. Each phase has its own return type and validation. The generated component is a Pydantic BaseModel with its own ``@atomic_workflow`` method for creating business artifacts.
 
 ### File Responsibilities
 
