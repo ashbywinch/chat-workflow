@@ -4,6 +4,7 @@ import os
 import time
 from collections.abc import Callable
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,34 @@ from pydantic import BaseModel, Field
 
 from chat_workflow import Config, Session, SessionLog
 from chat_workflow.conversation_rules import NO_REPETITION
+
+
+@dataclass
+class EvalStats:
+    """Accumulated timing and token usage for a single eval test.
+
+    Printed at test completion so slow / expensive tests are easy to spot.
+    Uses litellm's success_callback to track all LLM calls (workflow,
+    user bot, judge) from a single hook — no per-component tracking needed.
+    """
+    test_name: str = ""
+    duration_s: float = 0.0
+    total_tokens: int = 0
+
+    def report(self) -> str:
+        return f"  [{self.test_name}] {self.duration_s:.0f}s  {self.total_tokens} tok"
+
+
+# Global token counter used by litellm success_callback.
+_token_count: int = 0
+
+
+def _token_counter_callback(kwargs, completion_response, start_time, end_time) -> None:
+    """litellm success_callback — accumulates tokens from every LLM call."""
+    global _token_count
+    usage = getattr(completion_response, "usage", None)
+    if usage:
+        _token_count += getattr(usage, "total_tokens", 0) or 0
 
 _DEFAULT_TRANSCRIPT_DIR = Path(__file__).parent.parent.parent / "test-results" / "transcripts"
 
@@ -237,6 +266,12 @@ def run_multi_turn_eval(
             Defaults to llm_judge. Pass None to skip judging.
         config: Config instance. Defaults to make_config().
     """
+    # Register litellm token callback and reset counter
+    global _token_count
+    _token_count = 0
+    litellm.success_callback = [_token_counter_callback]
+
+    start = time.time()
     config = config or make_config()
     if judge_rules is None:
         judge_rules = getattr(model_method, "__conversation_rules__", None) or DEFAULT_JUDGE_RULES
@@ -245,6 +280,9 @@ def run_multi_turn_eval(
 
     # Create session — state.messages records the conversation
     session = make_tools(user_bot)
+
+    test_name = model_method.__name__
+    print(f"  >> {test_name}...", flush=True)
 
     # Inject session into method_kwargs if not present
     kwargs = dict(method_kwargs)
@@ -267,6 +305,21 @@ def run_multi_turn_eval(
                     f"Conversation quality: {len(failures)}/{len(judge_rules)} rules failed:\n"
                     + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures)
                 )
+
+    duration = time.time() - start
+    stats = EvalStats(
+        test_name=test_name,
+        duration_s=duration,
+        total_tokens=_token_count,
+    )
+    line = stats.report()
+    print(line, flush=True)
+
+    # Append to persistent report file (captured as CI artifact)
+    report_path = Path("test-results") / "eval-report.txt"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(report_path, "a") as f:
+        f.write(line + "\n")
 
     return result
 

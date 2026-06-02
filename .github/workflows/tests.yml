@@ -31,8 +31,10 @@ jobs:
         run: make evals
       
       - name: Upload eval transcripts
-        if: ${{ failure() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: eval-transcripts
-          path: test-results/transcripts/
+          name: eval-results
+          path: |
+            test-results/transcripts/
+            test-results/eval-report.txt
