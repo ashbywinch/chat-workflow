@@ -1,13 +1,14 @@
+from .deliverable import Deliverable
 from .gap_analysis import GapAnalysis
-from .input import Input
-from .output import Output
-from .process_analysis import ProcessAnalysis
+from .process_definition import ProcessDefinition, generate_from_chat
+from .resource import Resource
 
 __all__ = [
-    "ProcessAnalysis",
-    "Input",
-    "Output",
+    "Deliverable",
     "GapAnalysis",
+    "ProcessDefinition",
+    "Resource",
+    "generate_from_chat",
     "ComponentRequirement",
 ]
 
@@ -16,7 +17,7 @@ def __getattr__(name: str):
     """Lazy import ComponentRequirement to avoid circular imports.
 
     ``workflows/workflow/component_responsibilities.py`` imports from
-    ``.models.input`` etc., which triggers this ``__init__.py``. If we
+    ``.models.resource`` etc., which triggers this ``__init__.py``. If we
     imported ``ComponentRequirement`` at module level, the import of
     ``component_responsibilities`` would be half-finished → circular import.
     """

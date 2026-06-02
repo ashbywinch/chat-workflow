@@ -10,10 +10,11 @@ from chat_workflow.mixins import BlobSyncMixin, LLMValidated
 
 from .component_responsibilities import ComponentRequirement, ComponentResponsibilities
 from .models import (
+    Deliverable,
     GapAnalysis,
-    Input,
-    Output,
-    ProcessAnalysis,
+    ProcessDefinition,
+    Resource,
+    generate_from_chat,
 )
 from .models.gap_analysis import GapAnalysis as _GapAnalysis
 
@@ -21,8 +22,8 @@ from .models.gap_analysis import GapAnalysis as _GapAnalysis
 class Workflow(BlobSyncMixin, LLMValidated):
     """A complete workflow specification.
 
-    Combines process analysis, input/output specs, component requirements,
-    gap analysis, and a Mermaid sequence diagram into a single validated artifact.
+    Defines which components (domain concept and interface) are required
+    to implement a workflow end to end and how they will interact.
     """
 
     name: str = Field(
@@ -42,12 +43,12 @@ class Workflow(BlobSyncMixin, LLMValidated):
         description="Mermaid sequence diagram as text (sequenceDiagram format)",
     )
 
-    inputs: list[Input] = Field(
+    inputs: list[Resource] = Field(
         ...,
         description="All workflow inputs with source, format, trigger, and validation analysis",
     )
 
-    outputs: list[Output] = Field(
+    outputs: list[Deliverable] = Field(
         ...,
         description="All workflow outputs with consumer, format, success criteria, and integration analysis",
     )
@@ -68,8 +69,9 @@ class Workflow(BlobSyncMixin, LLMValidated):
     )
 
     _validation_rules: ClassVar[list[str]] = [
-        "All component names must follow artifact-based naming (nouns, not processes)",
-        "Every input must have a matching output consumer",
+        "All component names must be nouns",
+        "All component names must be concepts from the user's domain",
+        "Every input must be consumed by a component that needs it to make decisions",
         "No activities lack proper component ownership",
     ]
 
@@ -77,10 +79,10 @@ class Workflow(BlobSyncMixin, LLMValidated):
     @classmethod
     def _generate_diagram(
         cls,
-        analysis: Annotated[ProcessAnalysis, "The process analysis"],
+        analysis: Annotated[ProcessDefinition, "The process definition"],
         components: Annotated[list[ComponentResponsibilities], "The identified components"],
-        inputs: Annotated[list[Input], "The workflow inputs"],
-        outputs: Annotated[list[Output], "The workflow outputs"],
+        inputs: Annotated[list[Resource], "The workflow inputs"],
+        outputs: Annotated[list[Deliverable], "The workflow outputs"],
         gap_analysis: Annotated[GapAnalysis | None, "Optional gap analysis to incorporate"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> Workflow:
@@ -111,10 +113,10 @@ class Workflow(BlobSyncMixin, LLMValidated):
     @classmethod
     def _create_diagram(
         cls,
-        analysis: ProcessAnalysis,
+        analysis: ProcessDefinition,
         components: list[ComponentResponsibilities],
-        inputs: list[Input],
-        outputs: list[Output],
+        inputs: list[Resource],
+        outputs: list[Deliverable],
         gap_analysis: GapAnalysis | None = None,
         *,
         session: Session,
@@ -175,18 +177,18 @@ class Workflow(BlobSyncMixin, LLMValidated):
         gap resolution, diagram generation, user refinement, and
         component creation.
         """
-        outputs = Output.generate_from_chat(session=session)
-
-        session.io.echo("\nNow let's figure out what you have to work with.")
-        inputs = Input.generate_from_chat(outputs=outputs, session=session)
-
         session.io.echo("\nLet me understand how it all fits together.")
-        analysis = ProcessAnalysis.generate_from_chat(
-            process_description=process_description,
-            outputs=outputs,
-            inputs=inputs,
+        analysis = generate_from_chat(
             session=session,
         )
+
+        session.io.echo(
+            f"\nGreat — {analysis.orchestrating_component} manages this process. Now, what does it produce?"
+        )
+        outputs = Deliverable.generate_from_chat(analysis=analysis, session=session)
+
+        session.io.echo("\nNow let's figure out what you have to work with.")
+        inputs = Resource.generate_from_chat(outputs=outputs, session=session)
 
         components, gap_analysis = _resolve_gaps(
             analysis=analysis,
@@ -279,9 +281,9 @@ def _capture_incidental_notes(
 
 
 def _resolve_gaps(
-    analysis: ProcessAnalysis,
-    inputs: list[Input],
-    outputs: list[Output],
+    analysis: ProcessDefinition,
+    inputs: list[Resource],
+    outputs: list[Deliverable],
     existing_components: list[str] | None = None,
     *,
     session: Session,

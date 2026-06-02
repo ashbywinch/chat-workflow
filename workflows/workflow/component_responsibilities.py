@@ -10,11 +10,11 @@ from chat_workflow import atomic_workflow
 
 # NOTE: ComponentRequirement is defined BEFORE the .models imports to break a
 # circular dependency chain:
-#   component_responsibilities.py → .models.input → models/__init__.py
+#   component_responsibilities.py → .models.resource → models/__init__.py
 #   → .gap_analysis → gap_analysis.py → ..component_responsibilities
 # By defining ComponentRequirement first, it's available in sys.modules when
 # gap_analysis.py tries to import it during the circular chain.
-# The type annotations (ProcessAnalysis, Input, Output) are strings at runtime
+# The type annotations (ProcessDefinition, Resource, Deliverable) are strings at runtime
 # thanks to ``from __future__ import annotations`` and are resolved later by
 # typing.get_type_hints() at call time — by which point the .models imports
 # below will have completed.
@@ -41,9 +41,9 @@ class ComponentRequirement(BaseModel):
     @classmethod
     def identify_from_chat(
         cls,
-        analysis: Annotated[ProcessAnalysis, "The process analysis to identify components from"],
-        inputs: Annotated[list[Input], "The workflow inputs"],
-        outputs: Annotated[list[Output], "The workflow outputs"],
+        analysis: Annotated[ProcessDefinition, "The process definition to identify components from"],
+        inputs: Annotated[list[Resource], "The workflow inputs"],
+        outputs: Annotated[list[Deliverable], "The workflow deliverables"],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[ComponentRequirement]:
         """You help the user identify the building blocks of their process.
@@ -68,9 +68,9 @@ class ComponentRequirement(BaseModel):
         ...  # type: ignore[reportReturnType]
 
 
-from .models.input import Input  # noqa: E402
-from .models.output import Output  # noqa: E402
-from .models.process_analysis import ProcessAnalysis  # noqa: E402
+from .models.deliverable import Deliverable  # noqa: E402
+from .models.process_definition import ProcessDefinition  # noqa: E402
+from .models.resource import Resource  # noqa: E402
 
 _VALID_COMPONENT_TYPES: frozenset[str] = frozenset({"value_stream", "artifact_producing", "planning_service"})
 

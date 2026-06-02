@@ -76,6 +76,17 @@ class GeneratedComponent(LLMValidated):
         "docstring tells the agent to propose and synthesize rather than "
         "asking the user to fill out a form, and includes an example of "
         "the desired conversational rhythm.",
+        "The generated @atomic_workflow decorator includes "
+        "conversation_validation_rules=[ONE_GUESS, SYNTHESIZES_HONESTLY, "
+        "NO_EXECUTOR_MODE] referencing the imported constants.",
+        "The generated @atomic_workflow docstring uses the one-guess "
+        "principle: proposing one possibility at a time and confirming "
+        "with the user, not dumping a complete specification.",
+        "The generated @atomic_workflow docstring does NOT start with a "
+        "greeting — it gets straight to the task (called within parent "
+        "workflow context).",
+        "The generated @atomic_workflow docstring does NOT include "
+        "'DO NOT start brainstorming' or similar over-constraining language.",
         "REJECT if the generated BaseModel has fields from multiple unrelated "
         "business domains (e.g. invoice_number AND employee_salary AND "
         "meeting_room in the same class). All fields must serve one artifact.",
@@ -122,7 +133,11 @@ class GeneratedComponent(LLMValidated):
             node
             for node in ast.walk(tree)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and any(isinstance(d, ast.Name) and d.id == "atomic_workflow" for d in node.decorator_list)
+            and any(
+                (isinstance(d, ast.Name) and d.id == "atomic_workflow")
+                or (isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "atomic_workflow")
+                for d in node.decorator_list
+            )
         ]
         if len(workflow_methods) == 0:
             raise ValidationError(
@@ -185,20 +200,34 @@ class GeneratedComponent(LLMValidated):
 
         Generate a complete Python module that defines:
         1. A Pydantic BaseModel class (or LLMValidated subclass) named after the
-           component, with a class docstring explaining the domain concept
-        2. A classmethod decorated with @atomic_workflow (imported from
-           chat_workflow) whose docstring is a good system prompt — it frames the
-           task around the user's domain, tells the agent to propose and synthesize,
-           and includes a concrete dialogue example.
+          component, with a class docstring explaining the domain concept
+        2. A classmethod decorated with @atomic_workflow whose docstring is a
+          good system prompt — it frames the task around the user's domain,
+          proposes and synthesizes rather than asking the user to fill out a
+          form, and includes a concrete dialogue example.
         3. Field definitions using Field(..., description=...) with plain-English
-           business descriptions and appropriate constraints (min_length, etc.)
+          business descriptions and appropriate constraints (min_length, etc.)
         4. Validation rules (@model_validator or Field constraints) that encode
-           real business semantics from the quality criteria
+          real business semantics from the quality criteria
 
         Code generation rules:
         - Import atomic_workflow from chat_workflow (just the name, no alias)
-        - Use @atomic_workflow on its own line WITHOUT parentheses or arguments
-          (correct: "@atomic_workflow" then "@classmethod" then "def method_name")
+        - Import ONE_GUESS, SYNTHESIZES_HONESTLY, NO_EXECUTOR_MODE from
+          chat_workflow.conversation_rules
+        - Use @atomic_workflow(conversation_validation_rules=[ONE_GUESS, SYNTHESIZES_HONESTLY, NO_EXECUTOR_MODE])
+          on the generated component's classmethod (NOT bare @atomic_workflow)
+        - The @atomic_workflow method's docstring (system prompt) MUST use the
+          one-guess principle: propose what the artifact should contain based on
+          domain knowledge, one field at a time. Confirm with the user before
+          moving on. Example: "Meeting minutes typically capture date, attendees,
+          decisions, and action items — does that sound right?"
+        - The generated prompt MUST include the design spec's holistic quality
+          criteria (from ComponentDomainSpec.what_good_looks_like) as guidance
+          for the agent.
+        - The generated prompt MUST NOT include a greeting — the component is
+          called within an established parent workflow context
+        - The generated prompt MUST NOT include "DO NOT start brainstorming" or
+          similar over-constraining language
         - The @atomic_workflow method MUST have a return type annotation:
           ``-> ClassName`` (e.g., ``def create_minutes_draft(...) -> MinutesDraft:``)
         - The @atomic_workflow method body MUST be just ``...`` (Ellipsis / pass) —

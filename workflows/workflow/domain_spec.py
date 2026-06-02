@@ -72,6 +72,15 @@ class ComponentDomainSpec(BaseModel):
     expert_role: str
     """Who owns this domain — the role responsible for this artifact."""
 
+    conversation_design_pattern: str | None = None
+    """Optional conversation pattern hint for the code generator.
+
+    ``None`` or ``"exploration-then-structure"`` for entry-point workflows
+    (warm open, explore, then propose structure).
+    ``"efficient-fill"`` for sub-conversations (no greeting, propose and
+    confirm fields efficiently).
+    """
+
     @atomic_workflow
     @classmethod
     def explore(

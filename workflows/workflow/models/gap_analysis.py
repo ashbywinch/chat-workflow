@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from chat_workflow import atomic_workflow
 
 from ..component_responsibilities import ComponentRequirement
-from .process_analysis import ProcessAnalysis
+from .process_definition import ProcessDefinition
 
 
 class GapAnalysis(BaseModel):
@@ -24,7 +24,7 @@ class GapAnalysis(BaseModel):
     def analyze_from_chat(
         cls,
         components: Annotated[list[ComponentRequirement], "The identified components"],
-        analysis: Annotated[ProcessAnalysis, "The process analysis"],
+        analysis: Annotated[ProcessDefinition, "The process definition"],
         existing_components: Annotated[list[str] | None, "List of existing component names"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> GapAnalysis:
