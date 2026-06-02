@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
-from .debug import StreamingDebug
 from .models import AgentResponse, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
 from .types_meta import resolve_return_type
@@ -108,9 +107,6 @@ def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
 
         system_prompt = _build_system_prompt(raw_func, kwargs)
         max_turns = kwargs.pop("max_turns", 10)
-
-        if debug is None and session.config.debug:
-            debug = StreamingDebug()
 
         workflow = _setup_atomic_workflow(system_prompt, actual_return_type, max_turns, debug, session)
         result = session.run(workflow=workflow, first_user_input="")
