@@ -26,7 +26,6 @@ class WorkflowRunner:
         user_params: dict[str, Any],
     ) -> None:
         """Run a workflow function with framework plumbing."""
-        typer.echo("Starting conversation... (Ctrl+C to quit)")
         io = TyperUserIO()
         session_log = SessionLog()
         config = Config(self.config_path)

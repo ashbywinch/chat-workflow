@@ -55,13 +55,13 @@ evals-smoke: setup lint
 
 evals-incremental: setup lint
 	@echo "${YELLOW}Updating dependency graph...${NC}"
-	@${PYTHON} -m code_review_graph update 2>&1 | grep -v "^$" || true
+	@${PYTHON} -m code_review_graph update 2>&1 | grep -v "^$$" || true
 	@FILES=$$(${PYTHON} scripts/affected_evals.py --git-base origin/main); \
 	if [ -z "$$FILES" ]; then \
 		echo "${GREEN}No evals affected by current changes.${NC}"; \
 	else \
 		echo "${YELLOW}Running affected evals:${NC} $$FILES"; \
-		${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} $$FILES -v; \
+		${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} $$FILES; \
 	fi
 
 # Test with coverage (requires coverage package)
