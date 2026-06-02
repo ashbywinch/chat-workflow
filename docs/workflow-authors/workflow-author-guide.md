@@ -527,7 +527,7 @@ The design flows through four phases inside `Component.create()`:
 
 Each phase has its own return type with its own validation rules. This keeps the cognitive load on the LLM manageable per step and makes each phase independently testable.
 
-For the full architecture document, see the [canonical architecture reference](../../.sisyphus/notepads/refactor-evals/component-architecture.md). For the architecture principles, see [architecture principles](../../.sisyphus/evidence/architecture-principles.md).
+See the [contributor guide](../contributors/contributor-guide.md#architecture-principles) for the full architecture principles (domain boundaries, loose coupling, user-domain conversations, quality-as-validation, and Pydantic as gatekeeper).
 
 ### Workflow.create()
 
@@ -557,16 +557,13 @@ def create(
 ) -> Workflow:
     """Create a complete workflow artifact through conversation."""
 
-    # Step 1: Analyze the process
-    analysis = ProcessAnalysis.generate_from_chat(
-        process_description=process_description,
-        session=session,
-    )
+    # Step 1: Understand the process
+    analysis = generate_from_chat(session=session)
 
     # Step 2: Analyze inputs and outputs
     session.io.echo("Let's analyze the inputs and outputs for this workflow.")
-    inputs = Input.generate_from_chat(analysis=analysis, session=session)
-    outputs = Output.generate_from_chat(analysis=analysis, session=session)
+    outputs = Deliverable.generate_from_chat(analysis=analysis, session=session)
+    inputs = Resource.generate_from_chat(analysis=analysis, outputs=outputs, session=session)
 
     # Step 3: Identify components, resolve gaps in a loop
     components, gap_analysis = _resolve_gaps(

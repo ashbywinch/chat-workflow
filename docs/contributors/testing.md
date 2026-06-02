@@ -92,15 +92,15 @@ skip, when keys are missing — that's intentional.
 Test that a given prompt + user input produces valid structured output in a single turn:
 
 ```python
-class TestProcessAnalysisEval(unittest.TestCase):
+class TestProcessDefinitionEval(unittest.TestCase):
     @timeout(30)
-    def test_llm_produces_process_analysis(self):
-        from workflows.workflow.models import ProcessAnalysis
+    def test_llm_produces_process_definition(self):
+        from workflows.workflow.models import ProcessDefinition
 
         orchestrator = AtomicWorkflow(
             config=AtomicWorkflowConfig(
                 system_prompt="You are a Business Process Analyst...",
-                response_model=AgentResponse[ProcessAnalysis],
+                response_model=AgentResponse[ProcessDefinition],
                 max_turns=3,
                 ...
                 initial_messages=[{"role": "user", "content": "Customer places an order..."}],
@@ -111,7 +111,7 @@ class TestProcessAnalysisEval(unittest.TestCase):
         )
         result = orchestrator.process_turn("Please analyze...")
         if result.result:
-            self.assertIsInstance(result.result, ProcessAnalysis)
+            self.assertIsInstance(result.result, ProcessDefinition)
             self.assertTrue(len(result.result.phases) >= 1)
 ```
 
@@ -134,13 +134,12 @@ user_persona = (
 user_bot = AgentIO(persona_prompt=user_persona, config=_CONFIG)
 session = make_tools(user_bot)
 
-analysis = ProcessAnalysis.generate_from_chat(
-    process_description="Writing up my sketchy meeting notes...",
+analysis = generate_from_chat(
     session=session,
 )
 
 # Structural assertions (Pydantic validates the output)
-self.assertIsInstance(analysis, ProcessAnalysis)
+self.assertIsInstance(analysis, ProcessDefinition)
 self.assertGreaterEqual(len(analysis.phases), 1)
 
 # Turn efficiency (key regression guard for Socratic loops)

@@ -229,8 +229,8 @@ workflows/workflow/
   Component.py             # class Component(...)
   ComponentRequirement.py  # class ComponentRequirement(...)
   GapAnalysis.py           # class GapAnalysis(...)
-  Input.py                 # class Input(...)
-  Output.py                # class Output(...)
+  Resource.py              # class Resource(...)
+  Deliverable.py            # class Deliverable(...)
   flows.py                 # composite/atomic workflow orchestration functions
 ```
 

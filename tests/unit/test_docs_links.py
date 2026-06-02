@@ -31,9 +31,13 @@ class TestDocLinks(unittest.TestCase):
         failures: list[str] = []
         for md_file in DOC_FILES:
             for link_text, target in _relative_links(md_file):
-                if not target.exists():
+                # Reject links to files outside the repo (e.g. .sisyphus/, .opencode/)
+                if not target.is_relative_to(REPO_ROOT):
                     rel_source = md_file.relative_to(REPO_ROOT)
-                    rel_target = target.relative_to(REPO_ROOT) if target.is_relative_to(REPO_ROOT) else str(target)
+                    failures.append(f"{rel_source}: link '{link_text}' -> {target} (outside repo)")
+                elif not target.exists():
+                    rel_source = md_file.relative_to(REPO_ROOT)
+                    rel_target = target.relative_to(REPO_ROOT)
                     failures.append(f"{rel_source}: link '{link_text}' -> {rel_target}")
         self.assertEqual(failures, [], f"\n{chr(10)}".join(failures))
 
