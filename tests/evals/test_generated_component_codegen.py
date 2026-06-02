@@ -223,7 +223,7 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
             result = run_multi_turn_eval(
                 model_method=workflow_method,
                 method_kwargs=dict(
-                    max_turns=10,
+                    max_turns=8,
                 ),
                 user_persona=user_persona,
                 judge_rules=judge_rules,

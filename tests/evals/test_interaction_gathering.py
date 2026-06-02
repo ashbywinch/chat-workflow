@@ -159,7 +159,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
             method_kwargs=dict(
                 domain_spec=domain_spec,
                 structure=structure,
-                max_turns=10,
+                max_turns=8,
             ),
             user_persona=user_persona,
             judge_rules=judge_rules,
