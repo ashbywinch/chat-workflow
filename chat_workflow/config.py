@@ -1,6 +1,7 @@
 """Configuration management for chat-workflow. Reads from config.json."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -84,6 +85,10 @@ class Config:
     @property
     def model_supports_tools(self) -> bool:
         return self._config_data["llm"].get("model_supports_tools", False)
+
+    @property
+    def debug(self) -> bool:
+        return os.environ.get("CHAT_WORKFLOW_DEBUG", "").lower() in ("1", "true", "yes")
 
     def __str__(self) -> str:
         return json.dumps(self._config_data, indent=2)

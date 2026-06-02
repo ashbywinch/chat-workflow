@@ -53,8 +53,12 @@ class AgentResponse(BaseModel, Generic[TResult]):
         if isinstance(data, list):
             raise ValueError(
                 "Received a bare list/array instead of an AgentResponse object. "
-                "You must wrap your data with intent and result fields, for example:\n"
-                '  AgentResponse(intent="success", result=<your_data>)'
+                "You MUST respond with a JSON object that has 'intent' and 'result' "
+                "keys, not a bare array. "
+                "Correct format for a list result:\n"
+                '  {"intent": "success", "result": [{"field1": "value1", ...}]}\n'
+                "Correct format for a single result:\n"
+                '  {"intent": "success", "result": {"field1": "value1", ...}}'
             )
         if isinstance(data, dict):
             known_inner_fields = {
@@ -74,11 +78,12 @@ class AgentResponse(BaseModel, Generic[TResult]):
             }
             if known_inner_fields & data.keys() and "intent" not in data and "result" not in data:
                 raise ValueError(
-                    "Received only inner/domain fields without an AgentResponse wrapper. "
-                    "Your data includes fields like '{}' but is missing the required "
-                    "'intent' and 'result' keys. Wrap your response, for example:\n"
-                    '  AgentResponse(intent="success", result=<your_domain_data>)'.format(
-                        "', '".join(sorted(known_inner_fields & data.keys()))
+                    "Missing required 'intent' and 'result' wrapper. "
+                    "Your response includes domain fields ({}) but is missing the "
+                    "'intent' and 'result' envelope. "
+                    "Correct format:\n"
+                    '  {{"intent": "success", "result": {{...your fields...}}}}'.format(
+                        ", ".join(sorted(known_inner_fields & data.keys()))
                     )
                 )
         return data

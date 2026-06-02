@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
+from .conversation_rules import UNIVERSAL_RULES as _UNIVERSAL_CONVERSATION_RULES
 from .models import AgentResponse, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
 from .types_meta import resolve_return_type
@@ -42,6 +43,7 @@ def _setup_atomic_workflow(
     max_turns: int,
     debug: Any,
     session: Any,
+    conversation_validation_rules: dict[str, str] | None = None,
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow."""
     from .exceptions import AtomicWorkflowFailedError
@@ -63,63 +65,75 @@ def _setup_atomic_workflow(
             provider=session.config.provider,
             max_retries=session.config.max_retries,
             request_timeout_seconds=session.config.request_timeout_seconds,
+            conversation_validation_rules=conversation_validation_rules,
         )
     )
 
 
-def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
+def atomic_workflow(
+    func: Callable[..., Any] | None = None,
+    *,
+    conversation_validation_rules: list[str] | None = None,
+) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts a ``session`` parameter (:class:`~chat_workflow.session.Session`).
+
+    Can be used as ``@atomic_workflow`` or ``@atomic_workflow(conversation_validation_rules=[...])``.
     """
     from .exceptions import AtomicWorkflowFailedError
 
-    raw_func = func.__func__ if isinstance(func, classmethod) else func
+    author_rules: frozenset[tuple[str, str]] = frozenset(conversation_validation_rules or [])
+    merged_rules: dict[str, str] = dict(_UNIVERSAL_CONVERSATION_RULES | author_rules)
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        session = kwargs.pop("session", None)
-        debug = kwargs.pop("debug", None)
+    def _decorator(f: Callable[..., Any]) -> Callable[..., Any]:
+        raw_func = f.__func__ if isinstance(f, classmethod) else f
 
-        if session is None:
-            raise TypeError(f"Atomic workflow '{func.__name__}' requires 'session' parameter")
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            session = kwargs.pop("session", None)
+            debug = kwargs.pop("debug", None)
 
-        state = session.state
-        actual_return_type = resolve_return_type(raw_func, func, args, kwargs)
+            if session is None:
+                raise TypeError(f"Atomic workflow '{f.__name__}' requires 'session' parameter")
 
-        # Support list[X] where X is a Pydantic model
-        if actual_return_type is not None:
-            origin = get_origin(actual_return_type)
-            if origin is list:
-                inner_type = get_args(actual_return_type)[0]
-                if not (isinstance(inner_type, type) and issubclass(inner_type, BaseModel)):
-                    raise TypeError(
-                        f"@atomic_workflow function '{func.__name__}' list return type "
-                        f"resolves to list[{inner_type}] which is not a Pydantic model subclass"
-                    )
-                # Keep actual_return_type as list[inner_type] — valid for AgentResponse
-            elif not (isinstance(actual_return_type, type) and issubclass(actual_return_type, BaseModel)):
-                raise TypeError(
-                    f"@atomic_workflow function '{func.__name__}' return type resolves "
-                    f"to '{actual_return_type}' which is not a Pydantic model subclass"
-                )
+            state = session.state
+            actual_return_type = resolve_return_type(raw_func, f, args, kwargs)
 
-        system_prompt = _build_system_prompt(raw_func, kwargs)
-        max_turns = kwargs.pop("max_turns", 10)
+            if actual_return_type is not None:
+                origin = get_origin(actual_return_type)
+                if origin is list:
+                    inner_type = get_args(actual_return_type)[0]
+                    if not (isinstance(inner_type, type) and issubclass(inner_type, BaseModel)):
+                        raise TypeError(
+                            f"@atomic_workflow function '{f.__name__}' list return type "
+                            f"resolves to list[{inner_type}] which is not a Pydantic model subclass"
+                        )
 
-        workflow = _setup_atomic_workflow(system_prompt, actual_return_type, max_turns, debug, session)
-        result = session.run(workflow=workflow, first_user_input="")
-        state.initial_result = result
+            system_prompt = _build_system_prompt(raw_func, kwargs)
+            max_turns = kwargs.pop("max_turns", 10)
 
-        if result.result is None:
-            raise AtomicWorkflowFailedError("Atomic workflow completed but no result was produced")
+            workflow = _setup_atomic_workflow(
+                system_prompt, actual_return_type, max_turns, debug, session,
+                conversation_validation_rules=merged_rules,
+            )
+            result = session.run(workflow=workflow, first_user_input="")
+            state.initial_result = result
 
-        return result.result
+            if result.result is None:
+                raise AtomicWorkflowFailedError("Atomic workflow completed but no result was produced")
 
-    wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]
+            return result.result
 
-    return wrapper
+        wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]
+        wrapper.__conversation_rules__ = merged_rules  # pyright: ignore[reportAttributeAccessIssue]
+
+        return wrapper
+
+    if func is not None:
+        return _decorator(func)
+    return _decorator
 
 
 def composite_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
