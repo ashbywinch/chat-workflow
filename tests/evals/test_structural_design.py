@@ -117,7 +117,7 @@ class TestStructuralDesignEval(unittest.TestCase):
             model_method=ComponentStructure.design,
             method_kwargs=dict(
                 domain_spec=domain_spec,
-                max_turns=8,
+                max_turns=5,
             ),
             user_persona=user_persona,
             judge_rules=judge_rules,

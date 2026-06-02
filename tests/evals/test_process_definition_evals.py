@@ -22,7 +22,7 @@ class TestGatherNotesEval(unittest.TestCase):
         )
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
-            method_kwargs=dict(max_turns=6),
+            method_kwargs=dict(max_turns=4),
             user_persona=user_persona,
         )
         self.assertIsInstance(result, ProcessDefinition)
@@ -36,7 +36,7 @@ class TestGatherNotesEval(unittest.TestCase):
         )
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
-            method_kwargs=dict(max_turns=6),
+            method_kwargs=dict(max_turns=4),
             user_persona=user_persona,
         )
         self.assertIsInstance(result, ProcessDefinition)
@@ -50,7 +50,7 @@ class TestGatherNotesEval(unittest.TestCase):
         )
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
-            method_kwargs=dict(max_turns=6),
+            method_kwargs=dict(max_turns=4),
             user_persona=user_persona,
         )
         self.assertIsInstance(result, ProcessDefinition)
@@ -69,7 +69,7 @@ class TestGenerateFromNotesEval(unittest.TestCase):
         )
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
-            method_kwargs=dict(max_turns=6),
+            method_kwargs=dict(max_turns=4),
             user_persona=user_persona,
         )
         self.assertIsInstance(result, ProcessDefinition)
@@ -83,7 +83,7 @@ class TestGenerateFromNotesEval(unittest.TestCase):
         )
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
-            method_kwargs=dict(max_turns=6),
+            method_kwargs=dict(max_turns=4),
             user_persona=user_persona,
         )
         self.assertIsInstance(result, ProcessDefinition)

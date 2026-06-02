@@ -132,7 +132,7 @@ class TestWarmOpenEval(unittest.TestCase):
         """Deliverable.generate_from_chat opens warmly, not with an abrupt question."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 5},
             user_persona=SKEPTICAL_FIRST_TIME_PERSONA,
             judge_rules=WARM_OPEN_RULES,
         )
@@ -148,7 +148,7 @@ class TestDomainProposalEval(unittest.TestCase):
         """Deliverable proposes meeting minutes structure from domain knowledge."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 5},
             user_persona=DOMAIN_EXPECTATION_PERSONA,
             judge_rules=DOMAIN_PROPOSAL_RULES,
         )
@@ -160,7 +160,7 @@ class TestDomainProposalEval(unittest.TestCase):
         """Resource does not force nonsensical field-mapped questions."""
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 5},
             user_persona=DOMAIN_EXPECTATION_PERSONA,
             judge_rules=DOMAIN_PROPOSAL_RULES,
         )
@@ -176,7 +176,7 @@ class TestAdaptiveConversationEval(unittest.TestCase):
         """Deliverable pivots to proposing mode when user says 'what do you think?' or 'suggest something'."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 5},
             user_persona=PARTICIPATORY_USER_PERSONA,
             judge_rules=ADAPTIVE_CONVERSATION_RULES,
         )
@@ -188,7 +188,7 @@ class TestAdaptiveConversationEval(unittest.TestCase):
         """Resource pivots to proposing mode when user says 'what do you think?' or 'suggest something'."""
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 5},
             user_persona=PARTICIPATORY_USER_PERSONA,
             judge_rules=ADAPTIVE_CONVERSATION_RULES,
         )

@@ -39,7 +39,10 @@ def main() -> int:
 
     import threading
 
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    import os as _os
+    _env = dict(_os.environ)
+    _env["PYTHONUNBUFFERED"] = "1"
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=_env)
 
     def _stream():
         for line in iter(process.stdout.readline, ""):
