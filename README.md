@@ -1,5 +1,7 @@
 # Chat Workflow
 
+> **v0.1 — under active construction.** APIs are unstable, documentation may lag, and some features are incomplete. Contributions and issue reports welcome.
+
 Chat Workflow is a framework for developers to create guided conversation flows, where LLMs act as facilitators for generating complex, structured data. Workflow authors define Pydantic models for their data and write conversation functions that can be combined programmatically to guide users through natural dialogue to produce validated outputs.
 
 ## Key Features
