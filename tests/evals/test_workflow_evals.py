@@ -41,14 +41,14 @@ REDIRECT_JUDGE_RULES: dict[str, str] = {
 }
 
 
-class TestProcessAnalysisEval(unittest.TestCase):
-    """Eval tests for ProcessAnalysis model."""
+class TestProcessDefinitionEval(unittest.TestCase):
+    """Eval tests for ProcessDefinition model."""
 
     @timeout(120)
     def test_multi_turn_conversation_with_user_bot(self):
-        """ProcessAnalysis should complete efficiently with a realistic user bot."""
+        """ProcessDefinition should complete efficiently with a realistic user bot."""
         from tests.evals.helpers import run_multi_turn_eval
-        from workflows.workflow.models import ProcessAnalysis
+        from workflows.workflow.models import ProcessDefinition, generate_from_chat
 
         user_persona = (
             "You are a busy professional who attends lots of meetings. You take sketchy "
@@ -68,20 +68,19 @@ class TestProcessAnalysisEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=ProcessAnalysis.generate_from_chat,
+            model_method=generate_from_chat,
             method_kwargs=dict(
-                process_description="Writing up my sketchy meeting notes into a proper set of minutes with actions",
                 max_turns=10,
             ),
             user_persona=user_persona,
         )
-        self.assertIsInstance(result, ProcessAnalysis)
+        self.assertIsInstance(result, ProcessDefinition)
 
     @timeout(120)
     def test_process_analysis_with_adhd_writer(self):
-        """ProcessAnalysis should stay at meta-level with an ADHD writer who keeps describing content."""
+        """ProcessDefinition should stay at meta-level with an ADHD writer who keeps describing content."""
         from tests.evals.helpers import run_multi_turn_eval
-        from workflows.workflow.models import ProcessAnalysis
+        from workflows.workflow.models import ProcessDefinition, generate_from_chat
 
         user_persona = (
             "You are a content writer who creates long-form blog posts. You want to "
@@ -95,36 +94,35 @@ class TestProcessAnalysisEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=ProcessAnalysis.generate_from_chat,
+            model_method=generate_from_chat,
             method_kwargs=dict(
-                process_description="Writing long-form blog posts for a tech company",
                 max_turns=10,
             ),
             user_persona=user_persona,
             judge_rules=REDIRECT_JUDGE_RULES,
         )
-        self.assertIsInstance(result, ProcessAnalysis)
+        self.assertIsInstance(result, ProcessDefinition)
 
 
-class TestInputEval(unittest.TestCase):
-    """Eval tests for Input model."""
+class TestResourceEval(unittest.TestCase):
+    """Eval tests for Resource model."""
 
     @timeout(120)
-    def test_multi_turn_input_generation(self):
-        """Input.generate_from_chat should complete efficiently with a user bot."""
+    def test_multi_turn_resource_generation(self):
+        """Resource.generate_from_chat should complete efficiently with a user bot."""
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
-        from workflows.workflow.models import Input
+        from workflows.workflow.models import Resource
 
         user_persona = (
             "You are a busy professional. You know what information you need "
             "to write up meeting minutes (notes, attendee list, action items from "
-            "last time). But you know nothing about 'workflow input analysis'. "
+            "last time). But you know nothing about 'workflow resource analysis'. "
             "Describe what you start with in plain terms."
             "\n\nRespond helpfully but don't repeat yourself."
         )
 
         result = run_multi_turn_eval(
-            model_method=Input.generate_from_chat,
+            model_method=Resource.generate_from_chat,
             method_kwargs=dict(
                 analysis=make_meeting_analysis(),
                 max_turns=10,
@@ -135,10 +133,10 @@ class TestInputEval(unittest.TestCase):
         self.assertGreaterEqual(len(result), 1)
 
     @timeout(120)
-    def test_input_with_adhd_chef(self):
-        """Input should stay at meta-level with an ADHD chef who keeps describing dishes."""
+    def test_resource_with_adhd_chef(self):
+        """Resource should stay at meta-level with an ADHD chef who keeps describing dishes."""
         from tests.evals.helpers import run_multi_turn_eval
-        from workflows.workflow.models import Input
+        from workflows.workflow.models import Resource
 
         user_persona = (
             "You are a professional chef planning weekly menus for a restaurant. You want "
@@ -152,7 +150,7 @@ class TestInputEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=Input.generate_from_chat,
+            model_method=Resource.generate_from_chat,
             method_kwargs=dict(
                 analysis=None,
                 outputs=None,
@@ -170,9 +168,9 @@ class TestOutputEval(unittest.TestCase):
 
     @timeout(120)
     def test_multi_turn_output_generation(self):
-        """Output.generate_from_chat should complete efficiently with a user bot."""
+        """Deliverable.generate_from_chat should complete efficiently with a user bot."""
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
-        from workflows.workflow.models import Output
+        from workflows.workflow.models import Deliverable
 
         user_persona = (
             "You are a busy professional. You know what comes out of your "
@@ -183,7 +181,7 @@ class TestOutputEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=Output.generate_from_chat,
+            model_method=Deliverable.generate_from_chat,
             method_kwargs=dict(
                 analysis=make_meeting_analysis(),
                 max_turns=10,
@@ -196,7 +194,7 @@ class TestOutputEval(unittest.TestCase):
 
     @timeout(120)
     def test_output_with_adhd_ideas_person(self):
-        """Output should stay at meta-level with an ADHD user who keeps describing business ideas."""
+        """Deliverable should stay at meta-level with an ADHD user who keeps describing business ideas."""
         from chat_workflow.exceptions import TurnLimitExceededError
         from tests.evals.helpers import (
             AgentIO,
@@ -206,7 +204,7 @@ class TestOutputEval(unittest.TestCase):
             make_config,
             make_tools,
         )
-        from workflows.workflow.models import Output
+        from workflows.workflow.models import Deliverable
 
         user_persona = (
             "You have tons of business ideas \u2014 you're always thinking of new ones \u2014 "
@@ -225,7 +223,7 @@ class TestOutputEval(unittest.TestCase):
 
         with capture_on_failure(session):
             try:
-                result = Output.generate_from_chat(
+                result = Deliverable.generate_from_chat(
                     analysis=None,
                     max_turns=10,
                     session=session,
@@ -257,13 +255,13 @@ class TestComponentRequirementEval(unittest.TestCase):
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
         from workflows.workflow.models import (
             ComponentRequirement,
-            Input,
-            Output,
+            Deliverable,
+            Resource,
         )
 
         analysis = make_meeting_analysis()
         inputs = [
-            Input(
+            Resource(
                 source="Note Taker",
                 format="Free-text notes",
                 trigger_conditions="Meeting ends",
@@ -271,7 +269,7 @@ class TestComponentRequirementEval(unittest.TestCase):
             ),
         ]
         outputs = [
-            Output(
+            Deliverable(
                 consumer="Attendees",
                 format="Formatted document",
                 success_criteria="Accurate and timely",
