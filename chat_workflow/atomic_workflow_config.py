@@ -26,3 +26,6 @@ class AtomicWorkflowConfig(Generic[TResult]):
     provider: ProviderType = "openrouter"
     max_retries: int = 3
     request_timeout_seconds: int = 30
+    model_supports_tools: bool = False
+    api_base: str | None = None
+    api_key_env: str | None = None

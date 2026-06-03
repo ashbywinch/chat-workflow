@@ -36,7 +36,7 @@ class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
         """Code that satisfies all rules should pass LLM validation."""
         component = GeneratedComponent(code=VALID_COMPONENT_CODE)
         self.assertIsInstance(component, GeneratedComponent)
-        self.assertIn("class MeetingMinutes", component.code)
+        self.assertIn("class MinutesDraft", component.code)
 
     @timeout(120)
     def test_low_cohesion_code_fails_llm_validation(self):

@@ -34,9 +34,9 @@ class TestTokenCounter(unittest.TestCase):
 
 class TestEvalStats(unittest.TestCase):
     def test_report_format(self):
-        stats = EvalStats(test_name="test_foo", duration_s=12.34, total_tokens=5678)
-        self.assertEqual(stats.report(), "  [test_foo] 12s  5678 tok")
+        stats = EvalStats(test_name="test_foo", duration_s=12.34, agent_tokens=5000, judge_tokens=678)
+        self.assertEqual(stats.report(), "  [test_foo] 12s  5000 agent tok  678 judge tok  5678 tot")
 
     def test_report_zero_tokens(self):
-        stats = EvalStats(test_name="test_bar", duration_s=0.5, total_tokens=0)
-        self.assertEqual(stats.report(), "  [test_bar] 0s  0 tok")
+        stats = EvalStats(test_name="test_bar", duration_s=0.5, agent_tokens=0, judge_tokens=0)
+        self.assertEqual(stats.report(), "  [test_bar] 0s  0 agent tok  0 judge tok  0 tot")

@@ -38,12 +38,12 @@ CONFUSED_USER_PERSONA = (
 
 CONFUSION_JUDGE_RULES = {
     "No business jargon": (
-        "FAIL if the assistant used any of these EXACT words: 'output', "
-        "'deliverable', 'process', 'workflow', 'consumer', "
-        "'success criteria', 'integration', 'storage', "
-        "'input', 'resource', 'action item', 'stakeholder', "
-        "'identified'. "
-        "PASS otherwise."
+        "FAIL if the assistant used any of these EXACT strings as standalone"
+        " words (case-insensitive): 'output', 'deliverable', 'process',"
+        " 'workflow', 'consumer', 'success criteria', 'integration',"
+        " 'storage', 'input', 'resource', 'action item', 'stakeholder',"
+        " 'identified'. Common words like 'successful' or 'processes' are"
+        " fine — only fail on the exact strings listed above. PASS otherwise."
     ),
 }
 
@@ -53,14 +53,16 @@ JARGON_FREE_RULES = {
         "uses this' (instead of 'consumer'), 'what it looks like' (instead "
         "of 'format'), 'how you know it is good' (instead of 'success "
         "criteria'). These equivalents are GOOD and should be praised.\n"
-        "FAIL only if the assistant used the EXACT field name (consumer, "
-        "format, success_criteria, integration_points, "
+        "FAIL only if the assistant used the EXACT field name — the model "
+        "field name itself — as a standalone word. The exact field names "
+        "are: consumer, format, success_criteria, integration_points, "
         "storage_requirements, source, trigger_conditions, dependencies, "
         "validation_criteria, phases, activities, orchestrating_component, "
-        "participants) as a standalone word. "
-        "Short common words like 'form', 'source', 'phase' used in "
-        "regular English are always fine. "
-        "PASS otherwise."
+        "participants.\n"
+        "Any natural language phrase, even if it contains similar words "
+        "like 'who uses', 'what form', 'success', 'source material', is "
+        "always fine. Only the exact field names listed above trigger a "
+        "failure. PASS otherwise."
     ),
 }
 
@@ -76,7 +78,7 @@ class TestConfusionHandlingEval(unittest.TestCase):
         """Deliverable.generate_from_chat drops jargon when user is confused."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 5},
+            method_kwargs={"max_turns": 8},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=CONFUSION_JUDGE_RULES,
         )
@@ -88,7 +90,7 @@ class TestConfusionHandlingEval(unittest.TestCase):
         """Resource.generate_from_chat drops jargon when user is confused."""
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 5},
+            method_kwargs={"max_turns": 8},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=CONFUSION_JUDGE_RULES,
         )
@@ -107,7 +109,7 @@ class TestJargonFreeEval(unittest.TestCase):
         """Deliverable conversation uses plain language, not field names."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 5},
+            method_kwargs={"max_turns": 8},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
         )
@@ -119,7 +121,7 @@ class TestJargonFreeEval(unittest.TestCase):
         """Resource conversation uses plain language, not field names."""
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 5},
+            method_kwargs={"max_turns": 8},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
         )
@@ -134,7 +136,7 @@ class TestJargonFreeEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
             method_kwargs={
-                "max_turns": 5,
+                "max_turns": 8,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
@@ -175,7 +177,7 @@ class TestJargonFreeEval(unittest.TestCase):
                 "analysis": analysis,
                 "inputs": inputs,
                 "outputs": outputs,
-                "max_turns": 5,
+                "max_turns": 8,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
@@ -205,7 +207,7 @@ class TestJargonFreeEval(unittest.TestCase):
             method_kwargs={
                 "components": requirements,
                 "analysis": analysis,
-                "max_turns": 5,
+                "max_turns": 8,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,

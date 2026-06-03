@@ -78,7 +78,9 @@ class TestEndToEndGeneratedComponentEval(unittest.TestCase):
             "When the assistant asks about how they should help you, think about what "
             "you'd want an assistant to do. For example: 'Remind me if I forget to "
             "assign an owner to an action item.'\n\n"
-            "Respond naturally and helpfully. Be patient but don't repeat yourself. "
+            "Respond naturally and helpfully. When asked about one aspect, volunteer "
+            "any related details you have in the same response — this avoids needing "
+            "separate follow-up questions. Be patient but don't repeat yourself. "
             "If asked about something technical, say you don't understand and ask them "
             "to explain in simpler terms."
         )
@@ -160,17 +162,19 @@ class TestEndToEndGeneratedComponentEval(unittest.TestCase):
                 user_persona = (
                     "You are a busy professional who just finished a project kickoff meeting. "
                     "You took sketchy notes and need help turning them into proper minutes.\n\n"
-                    "The meeting was about the Q3 marketing campaign. Key points:\n"
+                    "The meeting was about the Q3 marketing campaign. Key details:\n"
+                    "- Date: June 1st, 2026\n"
                     "- Attended by: Sarah (PM), Mike (Design), Lisa (Engineering)\n"
-                    "- Decided to launch the campaign on August 1st\n"
-                    "- Budget is $50,000\n"
+                    "- Decided to launch the campaign on August 1st with a $50,000 budget\n"
                     "- Action items: Sarah will draft the creative brief by Friday, "
                     "Mike will create mockups by next Wednesday, "
                     "Lisa will estimate engineering hours by Thursday\n"
                     "- Next meeting scheduled for next Monday\n\n"
                     "You know your meeting well but know nothing about data structures "
-                    "or programming. Respond naturally to the assistant's questions. "
-                    "Be patient but don't repeat yourself."
+                    "or programming. Respond naturally. When the assistant asks about "
+                    "one aspect, volunteer ALL related details immediately — don't "
+                    "wait for separate follow-ups about each field. Be patient but "
+                    "don't repeat yourself."
                 )
 
                 judge_rules = {

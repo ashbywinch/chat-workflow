@@ -686,10 +686,11 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         _litellm.completion = capturing_completion
 
         # Patch get_client to return instructor client with our patched litellm
-        def patched_get_client(provider):
+        def patched_get_client(provider, **kwargs):
             import instructor
 
-            return instructor.from_litellm(_litellm.completion, mode=instructor.Mode.JSON)
+            mode = instructor.Mode.TOOLS if kwargs.get("model_supports_tools") else instructor.Mode.JSON
+            return instructor.from_litellm(_litellm.completion, mode=mode)
 
         import chat_workflow.llm_interaction as li
 

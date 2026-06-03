@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import unittest
-from pathlib import Path
 
 from chat_workflow import (
     AgentIntent,
@@ -8,16 +7,16 @@ from chat_workflow import (
     AtomicWorkflow,
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
-    Config,
     Session,
     SessionLog,
     TurnLimitExceededError,
     TurnResult,
 )
 from tests.conftest import timeout
+from tests.evals.helpers import make_config
 from workflows.evaluation_criteria import EvaluationCriteria
 
-_CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
+_CONFIG = make_config()
 
 
 class MockIO:

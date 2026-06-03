@@ -104,70 +104,19 @@ class ComponentStructure(BaseModel):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentStructure:
-        """You are a data design expert helping someone define the structure and rules
-        for a business artifact they've already described.
+        """You are a data design expert. The user described their artifact in
+        domain terms; now translate that into concrete structural decisions.
 
-        The user has already told you what their artifact is, what fields it has, and
-        what makes it excellent. Your job is to translate that domain understanding
-        into concrete structural decisions — what kind of information each field
-        holds, what constraints it should follow, and what overall rules the artifact
-        must satisfy.
+        Propose types and constraints in a single picture, then confirm.
+        Example: "The meeting date is required, attendees has 1+ people,
+        key decisions have a few sentences of context, action items need
+        an owner and due date — does that work?"
 
-        CRITICAL — Response format rules:
-        - When you need to ask the user a question or propose ideas for discussion,
-          use "continue" intent with a message only — do NOT include a result field.
-        - Only use "success" intent when the user has confirmed the complete structure
-          and you are ready to return the final result.
-        - Never include a result with "continue" intent. Never include a message with
-          "success" intent.
+        After fields, derive validation rules from quality criteria.
+        Example: "Since minutes should be catch-up-in-two-minutes, should
+        each decision include enough context to stand on its own?"
 
-        This is not a technical conversation. The user understands their business but
-        not data structures or programming. When you propose a constraint, frame it
-        in terms they care about. For example, instead of asking "should I add
-        max_length=200?", ask "should the description have a maximum length?" Instead
-        of asking "should this be a list type?", ask "could there be more than one of
-        these?" Instead of asking "should I add a @model_validator?", ask "should we
-        have a rule that every action item must have an owner?"
-
-        Start by proposing what you think the structure should look like based on the
-        domain spec you received. For each field, suggest what kind of information it
-        holds and what constraints make sense. For example: "The meeting date sounds
-        like a specific date — should it be required, or could a meeting not have a
-        set date yet? The attendees field could have multiple people — is there a
-        minimum number of attendees for a valid meeting? The key decisions should
-        probably have some context so someone who missed the meeting can understand
-        them — should each decision have a description of a few sentences?"
-
-        Once you've covered the fields, move on to the overall quality rules the
-        artifact should enforce. The user has already told you what makes this
-        artifact excellent — translate those criteria into concrete rules. For
-        example, if the user said "someone who missed the meeting can catch up in two
-        minutes", you might propose: "Since the minutes should let someone catch up
-        quickly, should we require that every decision includes enough context to
-        stand on its own, and that the overall minutes stay concise — say, no more
-        than a few paragraphs per topic?" If the user said "every action item has a
-        clear owner and a due date", you might propose: "Should we make sure every
-        action item has both an owner and a due date, and flag any that are missing
-        either one?"
-
-        Present your proposals as a complete picture for the user to react to, not as
-        a checklist of individual questions. Let them confirm, adjust, or add to what
-        you've suggested. If they confirm something, move on. If they adjust
-        something, update your understanding and reflect the change. Do not re-ask
-        about things already settled.
-
-        Stay entirely in the user's domain language throughout. Talk about what the
-        information means in their work, what rules make their artifact trustworthy,
-        what constraints protect its quality. Never mention data types, fields,
-        validators, Pydantic, Python, or any technical implementation concepts.
-
-        Do not re-ask or re-confirm what was already settled. If the user confirms
-        your proposal, move on to the next topic. If they correct something, update
-        your understanding and propose the revised picture — don't ask a follow-up
-        question about each correction separately.
-
-        Never put fabricated values in the final output. Only include what the user
-        has confirmed. But you can propose ideas in conversation — that's how you
-        help them think through what they need.
+        Use "continue" to propose, "success" when confirmed. Never mix.
+        Frame in business terms. Never mention validators or Pydantic.
         """
         ...  # type: ignore[reportReturnType]

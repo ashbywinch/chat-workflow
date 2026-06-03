@@ -20,16 +20,25 @@ from chat_workflow.conversation_rules import NO_REPETITION
 class EvalStats:
     """Accumulated timing and token usage for a single eval test.
 
-    Printed at test completion so slow / expensive tests are easy to spot.
-    Uses litellm's success_callback to track all LLM calls (workflow,
-    user bot, judge) from a single hook — no per-component tracking needed.
+    Tracks agent (workflow + user bot) and judge LLM calls separately
+    so slow / expensive components are easy to spot.
     """
     test_name: str = ""
     duration_s: float = 0.0
-    total_tokens: int = 0
+    agent_tokens: int = 0
+    judge_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.agent_tokens + self.judge_tokens
 
     def report(self) -> str:
-        return f"  [{self.test_name}] {self.duration_s:.0f}s  {self.total_tokens} tok"
+        return (
+            f"  [{self.test_name}] {self.duration_s:.0f}s"
+            f"  {self.agent_tokens} agent tok"
+            f"  {self.judge_tokens} judge tok"
+            f"  {self.total_tokens} tot"
+        )
 
 
 # Global token counter used by litellm success_callback.
@@ -42,6 +51,17 @@ def _token_counter_callback(kwargs, completion_response, start_time, end_time) -
     usage = getattr(completion_response, "usage", None)
     if usage:
         _token_count += getattr(usage, "total_tokens", 0) or 0
+
+
+def _reset_token_counter() -> None:
+    """Reset the global litellm token counter to zero."""
+    global _token_count
+    _token_count = 0
+
+
+def _read_token_counter() -> int:
+    """Return the current litellm token count without modifying it."""
+    return _token_count
 
 _DEFAULT_TRANSCRIPT_DIR = Path(__file__).parent.parent.parent / "test-results" / "transcripts"
 
@@ -162,7 +182,12 @@ def llm_judge(
     from chat_workflow import get_client
 
     rules_text = "\n".join(f"{i + 1}. {name}: {desc}" for i, (name, desc) in enumerate(rules.items()))
-    client = get_client(provider=config.provider)
+    client = get_client(
+        provider=config.provider,
+        api_key_env=config.api_key_env,
+        api_base=config.api_base,
+        model_supports_tools=config.model_supports_tools,
+    )
     result: JudgeResult = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
         model=config.model,
         messages=[
@@ -268,12 +293,12 @@ def run_multi_turn_eval(
             Defaults to llm_judge. Pass None to skip judging.
         config: Config instance. Defaults to make_config().
     """
-    # Register litellm token callback and reset counter
-    global _token_count
-    _token_count = 0
+    # Register litellm token callback (already registered globally in
+    # tests/evals/__init__.py, but ensure it's active even when running
+    # standalone or if the module-level registration was overridden).
+    _reset_token_counter()
     litellm.success_callback = [_token_counter_callback]
 
-    start = time.time()
     config = config or make_config()
     if judge_rules is None:
         judge_rules = getattr(model_method, "__conversation_rules__", None) or DEFAULT_JUDGE_RULES
@@ -292,8 +317,6 @@ def run_multi_turn_eval(
     except Exception:
         result = None
 
-    # Capture timing and token stats (only when CHAT_WORKFLOW_EVAL_REPORT is set)
-    duration = time.time() - start
     # Auto-detect unittest test method name from call stack if not provided
     if test_name is None:
         for frame in inspect.stack():
@@ -305,29 +328,29 @@ def run_multi_turn_eval(
         else:
             test_name = model_method.__name__
 
-    stats = EvalStats(
-        test_name=test_name,
-        duration_s=duration,
-        total_tokens=_token_count,
-    )
-    if os.environ.get("CHAT_WORKFLOW_EVAL_REPORT"):
-        report_path = Path("test-results") / "eval-report.txt"
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(report_path, "a") as f:
-            f.write(stats.report() + "\n")
-
     # LLM judge on the full conversation — passes even if workflow failed
     # or hit turn limit, as long as the conversation quality is acceptable.
+    failures: list = []
     if judge is not None:
         transcript = format_transcript(session)
         judge_result = judge(judge_rules, transcript, config)
         failures = [v for v in judge_result.verdicts if not v.passed]
-        if failures:
-            with capture_on_failure(session):
-                raise AssertionError(
-                    f"Conversation quality: {len(failures)}/{len(judge_rules)} rules failed:\n"
-                    + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures)
-                )
+
+    # Save transcript on success too when env var is set
+    if os.environ.get("CHAT_WORKFLOW_SAVE_TRANSCRIPT"):
+        transcript = format_transcript(session)
+        outdir = _DEFAULT_TRANSCRIPT_DIR
+        outdir.mkdir(parents=True, exist_ok=True)
+        tx_path = outdir / f"success-{test_name or 'conversation'}-{int(time.time())}.txt"
+        tx_path.write_text(transcript)
+
+    # Raise judge failures after stats are captured
+    if failures:
+        with capture_on_failure(session, label=test_name or "conversation"):
+            raise AssertionError(
+                f"Conversation quality: {len(failures)}/{len(judge_rules)} rules failed:\n"
+                + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures)
+            )
 
     return result
 

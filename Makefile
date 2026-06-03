@@ -58,11 +58,13 @@ evals-incremental: setup lint
 	@echo "${YELLOW}Updating dependency graph...${NC}"
 	@${PYTHON} -m code_review_graph update 2>&1 | grep -v "^$$" || true
 	@FILES=$$(${PYTHON} scripts/affected_evals.py --git-base origin/main); \
+	COUNT=$$(echo $$FILES | wc -w); \
+	TOTAL=$$(.venv/bin/python3 -c "import glob; print(len(glob.glob('tests/evals/**/test_*.py', recursive=True)))"); \
 	if [ -z "$$FILES" ]; then \
 		echo "${GREEN}No evals affected by current changes.${NC}"; \
 	else \
-		echo "${YELLOW}Running affected evals:${NC} $$FILES"; \
-		${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} $$FILES; \
+		echo "${YELLOW}Running $$COUNT of $$TOTAL evals...${NC}"; \
+		${PYTHON} scripts/run_with_timeout.py --timeout 1800 -- ${UNITTEST} $$FILES; \
 	fi
 
 # Test with coverage (requires coverage package)

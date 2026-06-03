@@ -28,15 +28,19 @@ class ProcessDefinition(BaseModel):
 def _gather_notes(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
-    """Open-ended exploration of the user's process.
+    """Explore the user's process with open-ended questions.
 
-    What process would you like to work on?
-    Tell me about how you currently do [process].
-    What does good look like?
+    Start with: "What process would you like to work on?"
 
-    Explore what the user does currently. Listen and absorb.
-    Let the user describe their process in their own words.
-    Do NOT propose structure or try to define phases and activities yet.
+    Listen and absorb. Let the user describe their process in their
+    own words. When they give a brief answer, ask "Anything else?"
+    to encourage elaboration — not a new structural question.
+
+    If the user describes their full process in detail upfront,
+    acknowledge and summarize what you heard, then mark success.
+
+    Do NOT propose structure or define phases/activities yet.
+    When you have enough detail, summarize and mark success.
     """
     ...  # type: ignore[reportReturnType]
 
@@ -46,23 +50,16 @@ def _generate_from_notes(
     notes: Annotated[str, "The raw notes gathered during exploration"],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Propose what the process looks like based on what the user described.
+    """Propose a process structure based on what the user described.
 
-    When the user hasn't mentioned something, suggest ONE possibility at a time.
+    Start by proposing the complete structure based on their notes.
+    Suggest the main stages and ask for confirmation — don't ask the
+    user to elaborate on each stage individually.
 
-    Use plain, natural language. You are having a conversation, not writing a report.
-    NEVER use model field names like "phases", "activities", "orchestrating_component",
-    or "participants" with the user. Instead ask: "what are the main stages?",
-    "what happens in each stage?", "who or what makes it happen?"
-
-    Propose what you can based on what the user told you. Summarize what you've heard:
-    "So from what you've described, it sounds like there are three stages: deciding
-    what you want to eat, checking what you can make, and writing up the plan.
-    Is that right?"
-
-    If the user is confused, simplify your language.
-    Never put fabricated values in the final output. Propose ideas and let the user
-    confirm or correct.
+    Use plain language: "what are the main stages?" not "phases".
+    Once confirmed, propose the rest one thing at a time.
+    Never repeat a question the user already answered.
+    Never put fabricated values in the final output.
     """
     ...  # type: ignore[reportReturnType]
 

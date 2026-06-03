@@ -65,6 +65,9 @@ def _setup_atomic_workflow(
             provider=session.config.provider,
             max_retries=session.config.max_retries,
             request_timeout_seconds=session.config.request_timeout_seconds,
+            model_supports_tools=session.config.model_supports_tools,
+            api_base=session.config.api_base,
+            api_key_env=session.config.api_key_env,
             conversation_validation_rules=conversation_validation_rules,
         )
     )

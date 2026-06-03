@@ -12,6 +12,23 @@ class Config:
     """Configuration manager for LLM settings.
 
     The caller provides the path to config.json. No auto-discovery.
+
+    Supports two config layouts:
+
+    **Simple** (backward compatible):
+    .. code-block:: json
+
+        {"llm": {"provider": "openrouter", "model": "...", ...}}
+
+    **Presets** (for easy switching):
+    .. code-block:: json
+
+        {"llm": {"active": "my-preset",
+                 "presets": {"my-preset": {"provider": "...", ...}},
+                 "temperature": 0.7, ...}}
+
+    When *active* + *presets* are present the named preset is merged into
+    the top-level ``llm`` so all property accessors resolve correctly.
     """
 
     _VALID_PROVIDERS = frozenset({"openai", "google", "anthropic", "groq", "together", "azure", "openrouter"})
@@ -41,6 +58,15 @@ class Config:
             raise ConfigFileError(f"Invalid JSON in {config_path}: {e}") from e
         except OSError as e:
             raise ConfigFileError(f"Could not read {config_path}: {e}") from e
+
+        # Resolve preset if using the presets/active layout
+        llm = self._config_data.get("llm", {})
+        presets = llm.get("presets")
+        active = llm.get("active")
+        if presets and active:
+            if active not in presets:
+                raise ConfigurationError(f"Unknown LLM preset '{active}'. Available: {', '.join(presets)}")
+            llm.update(presets[active])
 
         if not self._config_data.get("llm", {}).get("provider"):
             raise ConfigurationError("Missing required field in config.json: llm.provider")
@@ -85,6 +111,14 @@ class Config:
     @property
     def model_supports_tools(self) -> bool:
         return self._config_data["llm"].get("model_supports_tools", False)
+
+    @property
+    def api_base(self) -> str | None:
+        return self._config_data["llm"].get("api_base")
+
+    @property
+    def api_key_env(self) -> str | None:
+        return self._config_data["llm"].get("api_key_env")
 
     @property
     def debug(self) -> bool:

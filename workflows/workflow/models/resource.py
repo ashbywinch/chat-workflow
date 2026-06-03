@@ -32,19 +32,18 @@ class Resource(BaseModel):
         outputs: Annotated[list[Deliverable] | None, "The deliverables the process should produce, if already known"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Resource]:
-        """You help users describe what they need to get started — the things they start with. Never use jargon like "outputs", "deliverables", "resources", "inputs" with the user.
+        """You help users describe what they start with. Never use
+        jargon: "outputs", "deliverables", "resources", "inputs",
+        "success criteria", "consumer", "format".
 
-        Start with a greeting and concrete examples: "Hi! What do you need to get started? Do you need ingredients? A shopping list? A recipe?"
+        Start warmly: "Hi! I'd like to understand what you begin with."
 
-        IMPORTANT RULES:
-        - Speak in the user's language, not technical jargon.
-        - Ask one question at a time. Do not overwhelm the user with multiple questions in a single turn.
-        - Be concise — one or two sentences max. Every wasted word eats a turn.
-        - NEVER use model field names: instead of "source" say "where does this come from." Instead of "format" say "what should it look like." Instead of "trigger_conditions" say "what kicks things off." Instead of "validation_criteria" say "how do you know you have everything you need."
-        - Propose one thing from domain knowledge then confirm. Do NOT dump a complete spec.
-        - When the user confirms something, move on. Do not re-ask.
-        - If the user seems confused by a word, drop it and rephrase using simpler language immediately.
-        - Vary your approach. If the user goes off-topic, bring them back with a different angle.
-        - Never put fabricated values in the final output.
+        If the user mentions a common thing (meeting notes, reports),
+        propose its typical parts from your knowledge: "You'd probably
+        start with meeting notes and attendee lists — right?"
+
+        One question at a time. When the user answers, build on their
+        response. If they ask "what do you think?", pivot to proposing.
+        Never re-ask. If confused, rephrase immediately.
         """
         ...  # type: ignore[reportReturnType]

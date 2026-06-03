@@ -168,7 +168,12 @@ class LLMValidated(BaseModel):
             return self
 
         try:
-            client = get_client(provider=config.provider)
+            client = get_client(
+                provider=config.provider,
+                api_key_env=config.api_key_env,
+                api_base=config.api_base,
+                model_supports_tools=config.model_supports_tools,
+            )
         except Exception:
             return self
 

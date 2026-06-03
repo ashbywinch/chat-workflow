@@ -30,6 +30,9 @@ class AtomicWorkflow(Generic[TResult]):
         self._provider: ProviderType = config.provider
         self._max_retries = config.max_retries
         self._request_timeout_seconds = config.request_timeout_seconds
+        self._model_supports_tools = config.model_supports_tools
+        self._api_base: str | None = config.api_base
+        self._api_key_env: str | None = config.api_key_env
         self.response_model = config.response_model
         self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_continue
         self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_success
@@ -79,7 +82,12 @@ class AtomicWorkflow(Generic[TResult]):
         from .llm_interaction import get_client
 
         try:
-            client = get_client(provider=self._provider)
+            client = get_client(
+                provider=self._provider,
+                api_key_env=self._api_key_env,
+                api_base=self._api_base,
+                model_supports_tools=self._model_supports_tools,
+            )
             timer = _DebugTimer(self.debug, self.messages, self.model)
 
             with timer:

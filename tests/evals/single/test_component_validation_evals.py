@@ -354,7 +354,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         config = make_config()
         transcript = self._transcript(
             name="InvoiceManager",
-            purpose="Creates customer invoices from submission through final distribution",
+            purpose="Stores and retrieves finalized customer invoices for record-keeping and auditing",
             expert_role="Invoice Processing Specialist",
         )
         result: JudgeResult = llm_judge(self._ALL_RULES, transcript, config)

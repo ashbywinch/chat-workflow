@@ -18,6 +18,9 @@ class FakeConfig:
     max_retries = 3
     request_timeout_seconds = 30
     debug = False
+    model_supports_tools = False
+    api_base = None
+    api_key_env = None
 
 
 def _make_design_spec(**overrides) -> ComponentDesignSpec:

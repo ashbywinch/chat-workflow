@@ -28,11 +28,25 @@ _PROVIDER_API_KEY_ENV = {
 }
 
 
-def get_client(provider: str):
+def get_client(
+    provider: str,
+    *,
+    api_key_env: str | None = None,
+    api_base: str | None = None,
+    model_supports_tools: bool = False,
+):
     """Get an instructor-patched LLM client for *provider*.
 
     The API key is read from the corresponding environment variable
-    (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``).
+    (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``), unless
+    *api_key_env* is given, in which case that env var is used instead.
+
+    When *api_base* is given it is set as the provider-specific
+    ``OPENAI_API_BASE`` (or ``<PROVIDER>_API_BASE``) environment
+    variable so litellm routes requests to the custom endpoint.
+
+    When *model_supports_tools* is True the client uses Instructor's
+    native tool-calling mode (``Mode.TOOLS``) instead of JSON mode.
     """
     provider = provider.lower()
 
@@ -41,14 +55,21 @@ def get_client(provider: str):
             f"Unsupported provider: {provider}. Supported: {', '.join(_PROVIDER_API_KEY_ENV)}"
         )
 
-    api_key = os.getenv(_PROVIDER_API_KEY_ENV[provider])
+    # Resolve API key — custom env var or provider default
+    key_env = api_key_env or _PROVIDER_API_KEY_ENV[provider]
+    api_key = os.getenv(key_env)
     if not api_key:
         raise APIKeyError(
-            f"{_PROVIDER_API_KEY_ENV[provider]} not set. Get your API key and set this environment variable."
+            f"{key_env} not set. Get your API key and set this environment variable."
         )
 
     os.environ[provider.upper() + "_API_KEY"] = api_key
-    mode = instructor.Mode.JSON
+
+    # Custom API base (for OpenAI-compatible endpoints)
+    if api_base:
+        os.environ[provider.upper() + "_API_BASE"] = api_base
+
+    mode = instructor.Mode.TOOLS if model_supports_tools else instructor.Mode.JSON
     return instructor.from_litellm(completion, mode=mode)
 
 

@@ -198,14 +198,189 @@ self.assertTrue(is_good, f"Conversation quality issue:\n{reason}")
 ```bash
 make test              # Unit tests (no API key, ~0.01s)
 make test-verbose      # Same with verbose output
-make evals              # Full suite (real API, ~90-300s)
+make evals              # Full suite (real API, ~300-600s, 600s timeout)
 make evals-smoke        # Quick framework-level check (test_real_api + debug_streaming, ~80s)
-make evals-incremental  # Change-aware subset (auto-detects affected evals via code-review-graph)
+make evals-incremental  # Change-aware subset (auto-detects affected evals via code-review-graph, 600s timeout)
 make evals-verbose      # Same with verbose output
 make evals-debug        # Evals with LLM request/response tracing
 make test-all           # Unit tests + evals
 make lint               # ruff check
 ```
+
+### Cost & time tracking
+
+Set `CHAT_WORKFLOW_EVAL_REPORT=1` to capture per-test timing and token counts to
+`test-results/eval-report.txt`:
+
+```bash
+CHAT_WORKFLOW_EVAL_REPORT=1 make evals 2>&1 | tee .sisyphus/evidence/run-$(date +%s).txt
+```
+
+This is useful for identifying slow or expensive tests, and for comparing
+the cost impact of prompt changes.
+
+## Eval Design Principles
+
+### Turn count strategy
+
+Different eval types need different `max_turns` values. A blanket reduction
+across all evals breaks them. Use these guidelines:
+
+| Eval Type | max_turns | Rationale |
+|-----------|-----------|-----------|
+| Conversation quality / structure | 8 | Need enough turns to demonstrate warm opening, domain proposal, and adaptive patterns across multiple user responses |
+| Component exploration / design / gathering | 8 | Each sub-workflow needs multiple back-and-forth turns to probe, propose, and confirm domain details |
+| Process definition (composite) | 6 | Sub-workflows for gathering and synthesis each need a few turns within the composite limit |
+| Workflow components (Resource, Deliverable, etc.) | 10 | ADHD user personas go off-topic; standard user personas need turns for proposing and confirming multiple fields |
+| End-to-end (full pipeline + run generated workflow) | 5 | User personas are front-loaded with complete domain details; component-level evals already test each phase in depth |
+
+**Key insight**: End-to-end evals can use fewer turns because:
+- The component-level evals already cover each phase in detail
+- The user persona in the end-to-end test provides comprehensive information upfront
+- The test's purpose is to verify the pipeline works, not to re-test conversation quality
+
+### Front-loaded user personas
+
+To reduce turn counts in end-to-end evals without degrading quality, design
+user personas that volunteer comprehensive information. The key pattern:
+
+```
+"When the assistant asks about one aspect, volunteer ALL related details
+immediately — don't wait for separate follow-ups about each field."
+```
+
+This prevents the agent from needing N separate turns to gather N fields.
+Instead, one turn about "what happened in the meeting" triggers a response
+that covers attendees, decisions, action items, dates, and budget.
+
+### Safety: preventing infinite token burning
+
+Eval suites call real LLM APIs and can burn tokens indefinitely if
+something goes wrong. **Never rely on prompts or correct code to prevent
+infinite loops** — the whole point of CI is to catch when code is wrong.
+
+Use multiple layers of protection (belt and braces):
+
+1. **Per-test timeout** — `@timeout(N)` decorator (SIGALRM) on every eval test.
+   Each test has its own generous timeout (120s for component evals, 300s for
+   end-to-end pipeline evals).
+
+2. **Per-workflow max_turns** — Each `@atomic_workflow` has a `max_turns`
+   parameter that limits conversation length regardless of LLM behavior.
+
+3. **Overall suite timeout** — `scripts/run_with_timeout.py` wraps the entire
+   eval suite with a hard kill (600s for both `make evals` and
+   `make evals-incremental`). If the suite exceeds this, the process is
+   killed and the remaining tests are reported as incomplete.
+
+These three layers ensure that a buggy workflow or runaway LLM can never
+burn tokens indefinitely, even if all three fail partially.
+
+### Cost optimization
+
+- **Use `make evals-incremental` by default for local runs** — it detects
+  which tests are affected by your changes via the code-review-graph
+  dependency analysis. This saves time and tokens on iterative work.
+- **CI always runs `make evals` (full suite)** — see ``.github/workflows/tests.yml``.
+  Do not rely on the incremental runner for CI; it's a local optimization.
+  Always run the full suite before pushing to verify nothing is missed.
+- **Reuse existing output** — if you haven't changed code, don't re-run
+  evals. Check `make evals-incremental` output or the CI log from the PR.
+- **Capture output with tee** — always pipe eval runs through `tee` to a
+  file so you don't need to re-run just to read results.
+- **Fix the test, not the model** — eval failures nearly always point to
+  prompt improvements, not model deficiencies. See "Prompt Improvement
+  Mindset" below.
+
+### Eval classification: single-workflow vs composite
+
+Evals live in two subdirectories under ``tests/evals/``:
+
+- **``single/``** — one ``@atomic_workflow`` method, one user persona, one
+  LLM judge. These are the cheapest to run and best for rapid iteration
+  on prompt changes (like unit tests, but for prompts).
+- **``composite/``** — run full pipelines combining multiple workflow
+  phases (``@composite_workflow``, end-to-end generation, debug
+  streaming). These are integration tests.
+
+**Guideline**: When iterating on a workflow prompt, run the relevant
+``single/`` eval first (cheap, fast). Run ``composite/`` evals only
+once the single-workflow tests pass, before pushing.
+
+The cost report (``scripts/eval_report.py``) automatically groups tests
+by their file location, making it easy to spot the most expensive evals.
+
+### Provider selection & model trade-offs
+
+The eval suite supports switching between LLM providers via `config.json`
+using a preset system:
+
+```json
+{"llm": {"active": "opencode-go",
+         "presets": {"opencode-go": {"provider": "openai",
+                                     "model": "openai/deepseek-v4-flash",
+                                     "api_base": "https://opencode.ai/zen/go/v1",
+                                     "api_key_env": "OPENCODE_GO_EVALS_API_KEY",
+                                     "model_supports_tools": false},
+                     "openrouter": {"provider": "openrouter",
+                                    "model": "openrouter/google/gemini-2.5-flash-lite",
+                                    "model_supports_tools": false}}}}
+```
+
+Set ``"active"`` to the preset name to switch. Shared settings
+(``temperature``, ``max_retries``) stay at the ``llm`` level.
+
+#### Instructor mode: JSON vs TOOLS
+
+The ``model_supports_tools`` flag controls which Instructor mode the client
+uses:
+
+| ``model_supports_tools`` | Instructor mode | How it works |
+|---|---|---|
+| ``false`` (default) | ``Mode.JSON`` | Prompts the model to return valid JSON in the message body. Works with any provider. |
+| ``true`` | ``Mode.TOOLS`` | Registers the response model as an OpenAI-compatible function tool and forces the model to call it. |
+
+**Why ``Mode.TOOLS`` doesn't work with DeepSeek V4 via OpenCode Go:**
+
+DeepSeek V4 models (``deepseek-v4-flash`` and ``deepseek-v4-pro``) are
+**always in thinking mode by default** — there is no non-thinking path for
+these models. Thinking mode has two limitations:
+
+1.  **No forced ``tool_choice``** — The API rejects ``tool_choice`` set to
+    a specific function name or ``"required"``. Only ``"auto"`` and
+    ``"none"`` are accepted. Instructor's ``Mode.TOOLS`` sends a forced
+    ``tool_choice``, which fails with:
+    ``"Thinking mode does not support this tool_choice"``
+
+2.  **Strict function name validation** — Function names must match
+    ``^[a-zA-Z0-9_-]+$``. Instructor uses the Pydantic ``schema["title"]``
+    as the function name, which for generic types like
+    ``AgentResponse[EvaluationCriteria]`` includes brackets.
+
+The community workaround (used by Oh My Pi, LangChain, etc.) is to set
+``supportsToolChoice: false`` for V4 models and fall back to prompting the
+model to call the tool voluntarily rather than forcing it. In our case,
+``Mode.JSON`` avoids both issues entirely.
+
+#### What model to use
+
+OpenCode Go (``$10``/month subscription):
+
+| Model | Input/1M | Output/1M | Speed (p50) | Notes |
+|---|---|---|---|---|
+| DeepSeek V4 Flash | \$0.14 | \$0.28 | 3.72s / 42 tok/s | Best value, good for coding |
+| MiMo-V2.5 | \$0.14 | \$0.28 | 3.24s / 35 tok/s | Same price, similar speed |
+| MiMo-V2.5-Pro | \$1.74 | \$3.48 | — | 12× more expensive |
+| Kimi K2.5 | \$0.60 | \$3.00 | — | Good quality, higher cost |
+| GLM-5 | \$1.00 | \$3.20 | — | High quality, expensive |
+
+The cheapest models are DeepSeek V4 Flash and MiMo-V2.5 at the same price.
+Both go through the OpenCode Go proxy which adds latency — expect per-test
+eval times **5-10× slower** than the same model on a direct provider like
+OpenRouter.
+
+For faster eval runs with comparable pricing, use the ``openrouter`` preset
+which routes through OpenRouter's lower-latency endpoints.
 
 ## Test Coverage Goals
 

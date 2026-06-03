@@ -2,18 +2,17 @@
 """Real-API eval tests for StreamingDebug with actual LLM calls."""
 import unittest
 from io import StringIO
-from pathlib import Path
 
 from chat_workflow import (
-    Config,
     Session,
     SessionLog,
     StreamingDebug,
 )
 from tests.conftest import timeout
+from tests.evals.helpers import make_config
 from workflows.evaluation_criteria import EvaluationCriteria
 
-_CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
+_CONFIG = make_config()
 
 
 class MockIO:

@@ -85,6 +85,8 @@ class GeneratedComponent(LLMValidated):
         - Import from __future__ import annotations, pydantic BaseModel and Field
         - One class per file named after the component
         - Valid Python that passes ruff linting
+        - Keep all lines under 120 characters — break long docstrings and
+          Field descriptions into multiple short lines
 
         Output format: Return ONLY the Python code as a string in the 'code' field.
         """
