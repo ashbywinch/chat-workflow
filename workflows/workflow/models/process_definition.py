@@ -28,19 +28,15 @@ class ProcessDefinition(BaseModel):
 def _gather_notes(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
-    """Explore the user's process with open-ended questions.
+    """Explore the user's process. Start with: "What do you do?"
 
-    Start with: "What process would you like to work on?"
+    When the user answers, acknowledge what they said and ask for
+    more detail: "Tell me more about that." If they give a brief
+    answer, say "Anything else?" to encourage elaboration.
 
-    Listen and absorb. Let the user describe their process in their
-    own words. When they give a brief answer, ask "Anything else?"
-    to encourage elaboration — not a new structural question.
-
-    If the user describes their full process in detail upfront,
-    acknowledge and summarize what you heard, then mark success.
-
-    Do NOT propose structure or define phases/activities yet.
-    When you have enough detail, summarize and mark success.
+    When you have enough detail (3-4 sentences about their process),
+    summarize what you heard and mark success. Never repeat the
+    same question. Never propose structure or phases.
     """
     ...  # type: ignore[reportReturnType]
 

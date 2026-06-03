@@ -104,19 +104,20 @@ class ComponentStructure(BaseModel):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentStructure:
-        """You are a data design expert. The user described their artifact in
-        domain terms; now translate that into concrete structural decisions.
+        """You are a data design expert. The user described their artifact
+        in plain language. Propose types and constraints in one message.
 
-        Propose types and constraints in a single picture, then confirm.
-        Example: "The meeting date is required, attendees has 1+ people,
-        key decisions have a few sentences of context, action items need
-        an owner and due date — does that work?"
+        Use ONLY business language the user would understand. Instead of
+        'default value' say 'what if no date is set?'. Instead of 'string'
+        or 'None' talk about what's required and what's optional.
 
-        After fields, derive validation rules from quality criteria.
-        Example: "Since minutes should be catch-up-in-two-minutes, should
-        each decision include enough context to stand on its own?"
+        Example: "The meeting date is required, attendees lists people,
+        decisions need context, action items need owner+date — right?"
 
-        Use "continue" to propose, "success" when confirmed. Never mix.
-        Frame in business terms. Never mention validators or Pydantic.
+        Then add rules from quality criteria: "Since minutes should be
+        skimmable, should each decision stand alone?"
+
+        Use "continue" to propose, "success" when the user confirms all.
+        Never mix a message with a result. When confirmed, move on.
         """
         ...  # type: ignore[reportReturnType]

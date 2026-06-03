@@ -27,23 +27,15 @@ class Deliverable(BaseModel):
         analysis: Annotated[ProcessDefinition | None, "The process definition, if already available"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Deliverable]:
-        """You help users describe what they make. Never generate
-        content for them.
+        """Listen to the user. Help them describe what they make.
 
-        Open warmly: "Hi! I'm here to help you describe what you create.
-        My job is to understand what you make, who uses it, and what it
-        looks like — so I can help you document it clearly."
+        Open: "Hi! I'm here to help you describe what you create so
+        I can understand and document it."
 
-        If the user mentions a common thing (meeting minutes, reports,
-        invoices), propose its typical parts: "Meeting minutes usually
-        capture who attended, what was decided, and action items — does
-        that sound right?"
+        Then ask: "Who uses what you make?" and "What does it look
+        like?" If they mention meeting minutes, propose: "Minutes
+        usually have attendees, decisions, action items — right?"
 
-        If the user asks "what do you think?" or says "you tell me",
-        provide concrete ideas instead of asking another question.
-
-        Use simple words. Never use: process, workflow, output, deliverable,
-        consumer, format, success criteria, input, resource.
-        Never repeat the same question.
+        When the user asks for ideas, give them. Don't repeat yourself.
         """
         ...  # type: ignore[reportReturnType]

@@ -38,31 +38,24 @@ CONFUSED_USER_PERSONA = (
 
 CONFUSION_JUDGE_RULES = {
     "No business jargon": (
-        "FAIL if the assistant used any of these EXACT strings as standalone"
-        " words (case-insensitive): 'output', 'deliverable', 'process',"
-        " 'workflow', 'consumer', 'success criteria', 'integration',"
-        " 'storage', 'input', 'resource', 'action item', 'stakeholder',"
-        " 'identified'. Common words like 'successful' or 'processes' are"
-        " fine — only fail on the exact strings listed above. PASS otherwise."
+        "PASS if the assistant stayed in the user's world and used language"
+        " the user would naturally use. FAIL if the assistant introduced"
+        " business or technical terms that the user wouldn't understand or"
+        " wouldn't use themselves — like 'output', 'deliverable', 'workflow',"
+        " 'consumer', 'input', 'resource', 'stakeholder'. Matching the user's"
+        " own language is always fine. PASS otherwise."
     ),
 }
 
 JARGON_FREE_RULES = {
     "No field name leakage": (
-        "PASS if the assistant used plain English equivalents like 'who "
-        "uses this' (instead of 'consumer'), 'what it looks like' (instead "
-        "of 'format'), 'how you know it is good' (instead of 'success "
-        "criteria'). These equivalents are GOOD and should be praised.\n"
-        "FAIL only if the assistant used the EXACT field name — the model "
-        "field name itself — as a standalone word. The exact field names "
-        "are: consumer, format, success_criteria, integration_points, "
-        "storage_requirements, source, trigger_conditions, dependencies, "
-        "validation_criteria, phases, activities, orchestrating_component, "
-        "participants.\n"
-        "Any natural language phrase, even if it contains similar words "
-        "like 'who uses', 'what form', 'success', 'source material', is "
-        "always fine. Only the exact field names listed above trigger a "
-        "failure. PASS otherwise."
+        "PASS if the assistant used plain English that the user would"
+        " naturally understand. FAIL if the assistant used technical or"
+        " model-specific terms that a non-technical user wouldn't know"
+        " — like using the exact field name 'consumer' instead of asking"
+        " 'who uses this'. Using natural language equivalents like 'who"
+        " uses', 'what form', 'how you know it is good' is always fine,"
+        " even if they contain common words. PASS otherwise."
     ),
 }
 

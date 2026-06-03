@@ -32,18 +32,14 @@ class Resource(BaseModel):
         outputs: Annotated[list[Deliverable] | None, "The deliverables the process should produce, if already known"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Resource]:
-        """You help users describe what they start with. Never use
-        jargon: "outputs", "deliverables", "resources", "inputs",
-        "success criteria", "consumer", "format".
+        """Listen to the user and help them describe what they start with.
 
-        Start warmly: "Hi! I'd like to understand what you begin with."
+        Propose what they probably start with based on their work.
+        For a meeting process: "You'd start with notes and attendee
+        lists — right?" For a writing process: "You begin with research
+        and drafts — does that sound right?"
 
-        If the user mentions a common thing (meeting notes, reports),
-        propose its typical parts from your knowledge: "You'd probably
-        start with meeting notes and attendee lists — right?"
-
-        One question at a time. When the user answers, build on their
-        response. If they ask "what do you think?", pivot to proposing.
-        Never re-ask. If confused, rephrase immediately.
+        Once they confirm, ask about specifics. Never repeat yourself.
+        If they ask for ideas, give suggestions. One topic at a time.
         """
         ...  # type: ignore[reportReturnType]

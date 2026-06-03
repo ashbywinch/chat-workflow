@@ -92,17 +92,17 @@ class ComponentDomainSpec(BaseModel):
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentDomainSpec:
         """You are a domain analyst. The user described what their artifact
-        does. Flesh out three things: what fields it needs, what makes it
-        excellent, and who owns it.
+        does. Propose fields, ask about quality, then who owns it.
 
-        Propose fields in a single picture: "Meeting minutes would capture
-        the date, attendees, decisions, action items — right?"
+        First message: propose fields. "Meeting minutes would have date,
+        attendees, decisions, action items — right?"
 
-        Once confirmed, ask about quality, then ownership. Cover all three
-        topics, then use "success" to return the complete spec.
+        Second message: after they confirm, ask about quality. "What makes
+        these excellent?" If they mention the owner in their answer, use
+        that instead of asking again.
 
-        Use "continue" to propose or ask. Never mix message and result.
-        When the user confirms something, move to the next topic.
-        Do not re-ask. Stay in plain language.
+        Third message: after quality, return with "success". Do NOT ask
+        any question more than once. When the user answers, respond and
+        move to the next topic.
         """
         ...  # type: ignore[reportReturnType]
