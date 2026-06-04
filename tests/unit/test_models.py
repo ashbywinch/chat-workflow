@@ -195,7 +195,7 @@ class TestAgentResponseModel(unittest.TestCase):
         with self.assertRaises(ValueError) as context:
             AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=None)
 
-        self.assertIn("SUCCESS intent requires a result", str(context.exception))
+        self.assertIn("field named 'result'", str(context.exception))
 
     def test_action_validation_failure_without_message(self):
         with self.assertRaises(ValueError) as context:
@@ -236,9 +236,7 @@ class TestTurnResultModel(unittest.TestCase):
         self.assertTrue(result.is_complete)
 
     def test_direct_creation(self):
-        result = TurnResult[EvaluationCriteria](
-            result=self.valid_criteria, message="Custom message", is_complete=True
-        )
+        result = TurnResult[EvaluationCriteria](result=self.valid_criteria, message="Custom message", is_complete=True)
 
         self.assertEqual(result.result, self.valid_criteria)
         self.assertEqual(result.message, "Custom message")

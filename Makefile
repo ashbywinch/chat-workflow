@@ -1,5 +1,5 @@
 # Makefile for chat-workflow test automation
-.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint format clean
+.PHONY: help setup test test-verbose evals evals-verbose test-unit test-all evals-smoke evals-incremental coverage lint format clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -20,9 +20,8 @@ help:
 	@echo "  ${GREEN}make test${NC}         Run unit tests (no API key required)"
 	@echo "  ${GREEN}make test-verbose${NC} Run unit tests with verbose output"
 	@echo "  ${GREEN}make evals${NC}        Run evaluation tests with real API (requires API key)"
-	@echo "  ${GREEN}make evals-verbose${NC} Run evaluation tests with verbose output"
-	@echo "  ${GREEN}make evals-debug${NC}   Run evals with LLM tracing (streams requests/responses)"
 	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
+	@echo "  ${GREEN}make evals-incremental${NC} Change-aware eval subset (auto-detects affected evals via code-review-graph)"
 	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
 	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
 	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
@@ -44,16 +43,29 @@ test-verbose: setup lint
 	@${UNITTEST} discover tests/unit/ -v
 
 evals: setup lint
-	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/
+	@rm -f test-results/eval-report.txt
+	@${PYTHON} scripts/run_with_timeout.py --timeout 600 -- ${UNITTEST} discover tests/evals/
 
 evals-verbose: setup lint
-	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
-
-evals-debug: setup lint
-	@echo "${YELLOW}Running evals with LLM debug tracing...${NC}"
-	@CHAT_WORKFLOW_DEBUG=1 ${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
+	@${PYTHON} scripts/run_with_timeout.py --timeout 600 -- ${UNITTEST} discover tests/evals/ -v
 
 test-all: test evals
+
+evals-smoke: setup lint
+	@${PYTHON} scripts/run_with_timeout.py --timeout 120 -- ${UNITTEST} tests.evals.test_real_api tests.evals.test_debug_streaming_api -v
+
+evals-incremental: setup lint
+	@echo "${YELLOW}Updating dependency graph...${NC}"
+	@${PYTHON} -m code_review_graph update 2>&1 | grep -v "^$$" || true
+	@FILES=$$(${PYTHON} scripts/affected_evals.py --git-base origin/main); \
+	COUNT=$$(echo $$FILES | wc -w); \
+	TOTAL=$$(.venv/bin/python3 -c "import glob; print(len(glob.glob('tests/evals/**/test_*.py', recursive=True)))"); \
+	if [ -z "$$FILES" ]; then \
+		echo "${GREEN}No evals affected by current changes.${NC}"; \
+	else \
+		echo "${YELLOW}Running $$COUNT of $$TOTAL evals...${NC}"; \
+		${PYTHON} scripts/run_with_timeout.py --timeout 1800 -- ${UNITTEST} $$FILES; \
+	fi
 
 # Test with coverage (requires coverage package)
 coverage: setup

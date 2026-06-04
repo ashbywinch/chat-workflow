@@ -1,5 +1,7 @@
 # Chat Workflow
 
+> **v0.1 — under active construction.** APIs are unstable, documentation may lag, and some features are incomplete. Contributions and issue reports welcome.
+
 Chat Workflow is a framework for developers to create guided conversation flows, where LLMs act as facilitators for generating complex, structured data. Workflow authors define Pydantic models for their data and write conversation functions that can be combined programmatically to guide users through natural dialogue to produce validated outputs.
 
 ## Key Features
@@ -70,12 +72,11 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ide
 
 | For | Read |
 |-----|------|
-| **Getting Started** | [User Guide](docs/user-guide.md) |
-| **Using Existing Workflows** | [Example: Evaluation Criteria](docs/example-evaluation-criteria.md) |
-| **Building New Workflows** | [Workflow Author Guide](docs/workflow-author-guide.md) |
-| **Contributing to the Framework** | [Contributor Guide](docs/contributor-guide.md) |
-| **Testing Strategy** | [Testing Guide](docs/TESTING.md) |
-| **Product Specification** | [Product Spec](spec.md) |
+| **Getting Started** | [User Guide](docs/users/user-guide.md) |
+| **Using Existing Workflows** | [Example: Evaluation Criteria](docs/users/example-evaluation-criteria.md) |
+| **Building New Workflows** | [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md) |
+| **Contributing to the Framework** | [Contributor Guide](docs/contributors/contributor-guide.md) |
+| **Testing Strategy** | [Testing Guide](docs/contributors/testing.md) |
 
 **AI Agents**: Read [AGENTS.md](AGENTS.md) for agent-specific onboarding and routing.
 

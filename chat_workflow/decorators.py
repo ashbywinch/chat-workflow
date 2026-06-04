@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any
+from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
-from .debug import StreamingDebug
+from .conversation_rules import UNIVERSAL_RULES as _UNIVERSAL_CONVERSATION_RULES
 from .models import AgentResponse, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
 from .types_meta import resolve_return_type
@@ -43,6 +43,7 @@ def _setup_atomic_workflow(
     max_turns: int,
     debug: Any,
     session: Any,
+    conversation_validation_rules: dict[str, str] | None = None,
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow."""
     from .exceptions import AtomicWorkflowFailedError
@@ -64,67 +65,100 @@ def _setup_atomic_workflow(
             provider=session.config.provider,
             max_retries=session.config.max_retries,
             request_timeout_seconds=session.config.request_timeout_seconds,
+            model_supports_tools=session.config.model_supports_tools,
+            api_base=session.config.api_base,
+            api_key_env=session.config.api_key_env,
+            conversation_validation_rules=conversation_validation_rules,
         )
     )
 
 
-def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
+def atomic_workflow(
+    func: Callable[..., Any] | None = None,
+    *,
+    conversation_validation_rules: list[str] | None = None,
+) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts a ``session`` parameter (:class:`~chat_workflow.session.Session`).
+
+    Can be used as ``@atomic_workflow`` or ``@atomic_workflow(conversation_validation_rules=[...])``.
     """
     from .exceptions import AtomicWorkflowFailedError
 
-    raw_func = func.__func__ if isinstance(func, classmethod) else func
+    author_rules: frozenset[tuple[str, str]] = frozenset(conversation_validation_rules or [])
+    merged_rules: dict[str, str] = dict(_UNIVERSAL_CONVERSATION_RULES | author_rules)
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        session = kwargs.pop("session", None)
-        debug = kwargs.pop("debug", None)
+    def _decorator(f: Callable[..., Any]) -> Callable[..., Any]:
+        raw_func = f.__func__ if isinstance(f, classmethod) else f
 
-        if session is None:
-            raise TypeError(f"Atomic workflow '{func.__name__}' requires 'session' parameter")
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            session = kwargs.pop("session", None)
+            debug = kwargs.pop("debug", None)
 
-        state = session.state
-        actual_return_type = resolve_return_type(raw_func, func, args, kwargs)
+            if session is None:
+                raise TypeError(f"Atomic workflow '{f.__name__}' requires 'session' parameter")
 
-        if actual_return_type is None or not (
-            isinstance(actual_return_type, type) and issubclass(actual_return_type, BaseModel)
-        ):
-            raise TypeError(
-                f"@atomic_workflow function '{func.__name__}' return type resolves "
-                f"to '{actual_return_type}' which is not a Pydantic model subclass"
+            state = session.state
+            actual_return_type = resolve_return_type(raw_func, f, args, kwargs)
+
+            if actual_return_type is not None:
+                origin = get_origin(actual_return_type)
+                if origin is list:
+                    inner_type = get_args(actual_return_type)[0]
+                    if not (isinstance(inner_type, type) and issubclass(inner_type, BaseModel)):
+                        raise TypeError(
+                            f"@atomic_workflow function '{f.__name__}' list return type "
+                            f"resolves to list[{inner_type}] which is not a Pydantic model subclass"
+                        )
+
+            system_prompt = _build_system_prompt(raw_func, kwargs)
+            max_turns = kwargs.pop("max_turns", 10)
+
+            workflow = _setup_atomic_workflow(
+                system_prompt, actual_return_type, max_turns, debug, session,
+                conversation_validation_rules=merged_rules,
             )
+            result = session.run(workflow=workflow, first_user_input="")
+            state.initial_result = result
 
-        system_prompt = _build_system_prompt(raw_func, kwargs)
-        max_turns = kwargs.pop("max_turns", 10)
+            if result.result is None:
+                raise AtomicWorkflowFailedError("Atomic workflow completed but no result was produced")
 
-        if debug is None and session.config.debug:
-            debug = StreamingDebug()
+            return result.result
 
-        workflow = _setup_atomic_workflow(system_prompt, actual_return_type, max_turns, debug, session)
-        result = session.run(workflow=workflow, first_user_input="")
-        state.initial_result = result
+        wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]
+        wrapper.__conversation_rules__ = merged_rules  # pyright: ignore[reportAttributeAccessIssue]
 
-        if result.result is None:
-            raise AtomicWorkflowFailedError("Atomic workflow completed but no result was produced")
+        return wrapper
 
-        return result.result
-
-    return wrapper
+    if func is not None:
+        return _decorator(func)
+    return _decorator
 
 
 def composite_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Passes through to the wrapped function. Caller must provide ``session=``."""
+    """Passes through to the wrapped function. Caller must provide ``session=``.
 
-    @wraps(func)
+    Handles ``@classmethod`` — if the decorated function is a classmethod
+    descriptor, the underlying function is extracted, wrapped, and re-wrapped
+    as a ``classmethod`` so that ``cls`` is automatically prepended on call.
+    """
+
+    raw_func = func.__func__ if isinstance(func, classmethod) else func
+
+    @wraps(raw_func)
     def wrapper(*args, **kwargs):
         session = kwargs.get("session")
         if session is not None:
-            return func(*args, **kwargs)
+            return raw_func(*args, **kwargs)
 
-        raise TypeError(f"Composite workflow '{func.__name__}' requires 'session' parameter")
+        raise TypeError(f"Composite workflow '{raw_func.__name__}' requires 'session' parameter")
 
     wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]
+
+    if isinstance(func, classmethod):
+        return classmethod(wrapper)
     return wrapper

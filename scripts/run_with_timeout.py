@@ -2,8 +2,10 @@
 """Run a command with a hard timeout."""
 
 import argparse
+import re
 import subprocess
 import sys
+from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,15 +37,54 @@ def main() -> int:
         print("No command specified", file=sys.stderr)
         return 2
 
+    import threading
+
+    import os as _os
+    _env = dict(_os.environ)
+    _env["PYTHONUNBUFFERED"] = "1"
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=_env)
+
+    def _stream():
+        for line in iter(process.stdout.readline, ""):
+            print(line, end="", flush=True)
+
+    reader = threading.Thread(target=_stream, daemon=True)
+    reader.start()
+
+    timed_out = False
     try:
-        completed = subprocess.run(command, check=False, timeout=args.timeout)
-        return completed.returncode
+        process.wait(timeout=args.timeout)
+        reader.join(timeout=5)
     except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
         print(
-            f"Command timed out after {args.timeout} seconds: {' '.join(command)}",
+            f"\n✕ TIMED OUT after {args.timeout}s",
             file=sys.stderr,
+            flush=True,
         )
-        return 124
+        timed_out = True
+
+    # Print eval summary if a report file exists
+    report_path = Path("test-results") / "eval-report.txt"
+    if report_path.exists():
+        entries = []
+        total_tok = 0
+        total_s = 0.0
+        for line in report_path.read_text().strip("\n").split("\n"):
+            m = re.match(r"\s+\[(.+?)\]\s+([\d.]+)s\s+(\d+)\s+tok", line)
+            if m:
+                entries.append(m.group(1))
+                total_s += float(m.group(2))
+                total_tok += int(m.group(3))
+        if entries:
+            tag = "⏰ PARTIAL (timed out)" if timed_out else "✓"
+            print(
+                f"\n{tag}  {len(entries)} tests  {total_s:.0f}s  {total_tok:,} tok",
+                flush=True,
+            )
+
+    return 124 if timed_out else (process.returncode or 0)
 
 
 if __name__ == "__main__":

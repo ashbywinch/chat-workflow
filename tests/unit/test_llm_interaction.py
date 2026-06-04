@@ -15,9 +15,7 @@ from workflows.evaluation_criteria import EvaluationCriteria
 
 class TestLLMInteraction(unittest.TestCase):
     def _create_orchestrator(self, max_turns=10):
-        return AtomicWorkflow(
-            config=tests.conftest.make_atomic_workflow_config(max_turns=max_turns)
-        )
+        return AtomicWorkflow(config=tests.conftest.make_atomic_workflow_config(max_turns=max_turns))
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_with_validation_error(self, mock_get_client):
@@ -68,7 +66,6 @@ class TestLLMInteraction(unittest.TestCase):
             30,
         )
 
-
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_success_completion(self, mock_get_client):
         success_action = AgentResponse[EvaluationCriteria](
@@ -94,9 +91,7 @@ class TestLLMInteraction(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_turn_limit_enforcement(self, mock_get_client):
-        continue_action = AgentResponse[EvaluationCriteria](
-            intent=AgentIntent.CONTINUE, message="Tell me more"
-        )
+        continue_action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="Tell me more")
         mock_client = tests.conftest.MockInstructorClient()
         mock_client.responses = [continue_action] * 20
         mock_get_client.return_value = mock_client

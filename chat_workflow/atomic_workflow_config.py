@@ -20,8 +20,12 @@ class AtomicWorkflowConfig(Generic[TResult]):
     on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] | None = None
     on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] | None = None
     on_failure: Callable[[AgentResponse[TResult]], Exception] | None = None
+    conversation_validation_rules: list[str] | None = None
     debug: StreamingDebug | None = None
     model: str = "default-model"
     provider: ProviderType = "openrouter"
     max_retries: int = 3
     request_timeout_seconds: int = 30
+    model_supports_tools: bool = False
+    api_base: str | None = None
+    api_key_env: str | None = None
