@@ -8,7 +8,7 @@ from tests.conftest import timeout
 from tests.evals.helpers import (
     run_multi_turn_eval,
 )
-from workflows.workflow.component_responsibilities import ComponentRequirement
+from workflows.workflow.component_responsibilities import ComponentResponsibilities
 from workflows.workflow.models import (
     Deliverable,
     ProcessDefinition,
@@ -139,7 +139,7 @@ class TestJargonFreeEval(unittest.TestCase):
 
     @timeout(120)
     def test_component_requirement_jargon_free(self):
-        """ComponentRequirement conversation uses plain language, not field names."""
+        """ComponentResponsibilities conversation uses plain language, not field names."""
         analysis = ProcessDefinition(
             phases=["Planning", "Execution"],
             activities=["Plan meals", "Shop", "Cook", "Review"],
@@ -157,6 +157,8 @@ class TestJargonFreeEval(unittest.TestCase):
         ]
         outputs = [
             Deliverable(
+            name="Test",
+            description="Test",
                 consumer="Family",
                 format="Weekly meal plan",
                 success_criteria="Diet-compliant, balanced",
@@ -165,7 +167,7 @@ class TestJargonFreeEval(unittest.TestCase):
             ),
         ]
         result = run_multi_turn_eval(
-            model_method=ComponentRequirement.identify_from_chat,
+            model_method=ComponentResponsibilities.identify_from_chat,
             method_kwargs={
                 "analysis": analysis,
                 "inputs": inputs,
@@ -187,11 +189,11 @@ class TestJargonFreeEval(unittest.TestCase):
             participants=["Cook", "Family Members"],
         )
         requirements = [
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="MealPlan",
                 purpose="Plan weekly meals",
                 required_inputs=["Dietary preferences"],
-                expected_outputs=["Weekly meal plan"],
+                scope_description="description", 
                 component_type="artifact_producing",
             ),
         ]

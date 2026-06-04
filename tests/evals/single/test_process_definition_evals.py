@@ -62,10 +62,11 @@ class TestGenerateFromNotesEval(unittest.TestCase):
     def test_synthesizes_honestly(self):
         """Assistant presents a complete picture based on what the user said, not fabrications."""
         user_persona = (
-            "You've described your content writing process in detail: topic selection, "
-            "research, outlining, drafting, editing, publishing. You mentioned each stage "
-            "clearly. When the assistant proposes a structured summary, it should match "
-            "what you actually described."
+            "You are a content writer describing your writing process. "
+            "You use a six-stage process: topic selection, research, "
+            "outlining, drafting, editing, and publishing. Describe these "
+            "stages naturally when the assistant asks. If asked about a "
+            "specific stage, explain what you do in that stage."
         )
         result = run_multi_turn_eval(
             model_method=generate_from_chat,

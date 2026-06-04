@@ -246,15 +246,15 @@ class TestOutputEval(unittest.TestCase):
             )
 
 
-class TestComponentRequirementEval(unittest.TestCase):
-    """Eval tests for ComponentRequirement model."""
+class TestComponentResponsibilitiesEval(unittest.TestCase):
+    """Eval tests for ComponentResponsibilities model."""
 
     @timeout(120)
     def test_multi_turn_component_identification(self):
-        """ComponentRequirement.identify_from_chat should complete efficiently."""
+        """ComponentResponsibilities.identify_from_chat should complete efficiently."""
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
         from workflows.workflow.models import (
-            ComponentRequirement,
+            ComponentResponsibilities,
             Deliverable,
             Resource,
         )
@@ -270,6 +270,8 @@ class TestComponentRequirementEval(unittest.TestCase):
         ]
         outputs = [
             Deliverable(
+            name="Test",
+            description="Test",
                 consumer="Attendees",
                 format="Formatted document",
                 success_criteria="Accurate and timely",
@@ -285,7 +287,7 @@ class TestComponentRequirementEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=ComponentRequirement.identify_from_chat,
+            model_method=ComponentResponsibilities.identify_from_chat,
             method_kwargs=dict(
                 analysis=analysis,
                 inputs=inputs,
@@ -305,7 +307,7 @@ class TestGeneratedComponentEval(unittest.TestCase):
     def test_multi_turn_component_design(self):
         """GeneratedComponent.generate should complete efficiently with a user bot."""
         from tests.evals.helpers import run_multi_turn_eval
-        from workflows.workflow import GeneratedComponent
+        from workflows.workflow import ComponentSourceCode
         from workflows.workflow.design_spec import ComponentDesignSpec
         from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
         from workflows.workflow.interaction_context import ComponentInteractionContext
@@ -385,14 +387,14 @@ class TestGeneratedComponentEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=GeneratedComponent.generate,
+            model_method=ComponentSourceCode.generate,
             method_kwargs=dict(
                 design_spec=design_spec,
                 max_turns=10,
             ),
             user_persona=user_persona,
         )
-        self.assertIsInstance(result, GeneratedComponent)
+        self.assertIsInstance(result, ComponentSourceCode)
         self.assertGreater(len(result.code), 0)
         self.assertIn("class ", result.code)
         with suppress(SyntaxError):

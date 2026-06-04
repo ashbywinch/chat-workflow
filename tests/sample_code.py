@@ -19,7 +19,7 @@ class MinutesDraft(BaseModel):
 
     @atomic_workflow
     @classmethod
-    def create(cls, context: str, max_turns: int = 10):
+    def create(cls, context: str, max_turns: int = 10) -> MinutesDraft:
         """Create meeting minutes by discussing with the user."""
         ...
 '''

@@ -8,7 +8,7 @@ from chat_workflow import Session, atomic_workflow, composite_workflow
 from chat_workflow.annotations import Blob, Validation
 from chat_workflow.mixins import BlobSyncMixin, LLMValidated
 
-from .component_responsibilities import ComponentRequirement, ComponentResponsibilities
+from .component_responsibilities import ComponentResponsibilities
 from .models import (
     Deliverable,
     GapAnalysis,
@@ -226,9 +226,9 @@ class Workflow(BlobSyncMixin, LLMValidated):
 
 
 def _requirement_to_responsibilities(
-    req: ComponentRequirement,
+    req: ComponentResponsibilities,
 ) -> ComponentResponsibilities:
-    """Convert a ComponentRequirement to ComponentResponsibilities.
+    """Convert a ComponentResponsibilities to ComponentResponsibilities.
 
     Uses the requirement's purpose as the initial scope_description.
     Incidental notes are captured separately via _capture_incidental_notes.
@@ -244,7 +244,7 @@ def _requirement_to_responsibilities(
 
 
 def _requirements_to_responsibilities(
-    requirements: list[ComponentRequirement],
+    requirements: list[ComponentResponsibilities],
 ) -> list[ComponentResponsibilities]:
     return [_requirement_to_responsibilities(r) for r in requirements]
 
@@ -290,14 +290,14 @@ def _resolve_gaps(
 ) -> tuple[list[ComponentResponsibilities], GapAnalysis]:
     """Loop: identify components -> analyze gaps -> refine until clean.
 
-    Returns ComponentResponsibilities objects (not ComponentRequirement)
+    Returns ComponentResponsibilities objects (not ComponentResponsibilities)
     with incidental notes captured from the user.
     """
     existing = existing_components or []
     max_iterations = 5
 
     for _ in range(max_iterations):
-        requirements = ComponentRequirement.identify_from_chat(
+        requirements = ComponentResponsibilities.identify_from_chat(
             analysis=analysis,
             inputs=inputs,
             outputs=outputs,
@@ -322,7 +322,7 @@ def _resolve_gaps(
         existing.extend(gaps.missing_components)
 
     # After max iterations, return best effort
-    requirements = ComponentRequirement.identify_from_chat(
+    requirements = ComponentResponsibilities.identify_from_chat(
         analysis=analysis,
         inputs=inputs,
         outputs=outputs,

@@ -18,7 +18,7 @@ from tests.sample_code import (
     VALID_COMPONENT_CODE,
     VERBOSE_CODE,
 )
-from workflows.workflow.generated_component import GeneratedComponent
+from workflows.workflow.component_source_code import ComponentSourceCode
 
 
 class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
@@ -34,8 +34,8 @@ class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
     @timeout(120)
     def test_valid_code_passes_llm_validation(self):
         """Code that satisfies all rules should pass LLM validation."""
-        component = GeneratedComponent(code=VALID_COMPONENT_CODE)
-        self.assertIsInstance(component, GeneratedComponent)
+        component = ComponentSourceCode(code=VALID_COMPONENT_CODE)
+        self.assertIsInstance(component, ComponentSourceCode)
         self.assertIn("class MinutesDraft", component.code)
 
     @timeout(120)
@@ -44,7 +44,7 @@ class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=LOW_COHESION_CODE)
+            ComponentSourceCode(code=LOW_COHESION_CODE)
 
     @timeout(120)
     def test_incomplete_code_fails_llm_validation(self):
@@ -52,7 +52,7 @@ class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=INCOMPLETE_CODE)
+            ComponentSourceCode(code=INCOMPLETE_CODE)
 
     @timeout(120)
     def test_verbose_code_fails_llm_validation(self):
@@ -60,7 +60,7 @@ class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=VERBOSE_CODE)
+            ComponentSourceCode(code=VERBOSE_CODE)
 
     @timeout(120)
     def test_multi_artifact_code_fails_llm_validation(self):
@@ -68,7 +68,7 @@ class TestGeneratedComponentLlmValidationEval(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=MULTI_ARTIFACT_CODE)
+            ComponentSourceCode(code=MULTI_ARTIFACT_CODE)
 
 
 if __name__ == "__main__":

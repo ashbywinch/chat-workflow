@@ -5,9 +5,9 @@ from unittest.mock import MagicMock, patch
 
 from chat_workflow import AgentIntent, AgentResponse, Session, SessionLog
 from tests.sample_code import VALID_COMPONENT_CODE as SAMPLE_CODE
+from workflows.workflow.component_source_code import ComponentSourceCode
 from workflows.workflow.design_spec import ComponentDesignSpec
 from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
-from workflows.workflow.generated_component import GeneratedComponent
 from workflows.workflow.interaction_context import ComponentInteractionContext
 from workflows.workflow.structure import ComponentStructure
 
@@ -71,11 +71,11 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
             config=FakeConfig(),
         )
 
-    def _make_success_response(self) -> AgentResponse[GeneratedComponent]:
+    def _make_success_response(self) -> AgentResponse[ComponentSourceCode]:
         """Create a mock AgentResponse with SUCCESS intent."""
-        return AgentResponse[GeneratedComponent](
+        return AgentResponse[ComponentSourceCode](
             intent=AgentIntent.SUCCESS,
-            result=GeneratedComponent(code=SAMPLE_CODE),
+            result=ComponentSourceCode(code=SAMPLE_CODE),
         )
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
@@ -86,12 +86,12 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
         mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
-        result = GeneratedComponent.generate(
+        result = ComponentSourceCode.generate(
             design_spec=self.design_spec,
             session=self.session,
         )
 
-        self.assertIsInstance(result, GeneratedComponent)
+        self.assertIsInstance(result, ComponentSourceCode)
         self.assertGreater(len(result.code), 0)
         self.assertIn("class MinutesDraft", result.code)
 
@@ -103,7 +103,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
         mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
-        GeneratedComponent.generate(
+        ComponentSourceCode.generate(
             design_spec=self.design_spec,
             session=self.session,
         )
@@ -125,7 +125,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
         mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
-        result = GeneratedComponent.generate(
+        result = ComponentSourceCode.generate(
             design_spec=self.design_spec,
             session=self.session,
         )
@@ -157,19 +157,19 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
         mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
-        result = GeneratedComponent.generate(
+        result = ComponentSourceCode.generate(
             design_spec=minimal_spec,
             session=self.session,
         )
 
-        self.assertIsInstance(result, GeneratedComponent)
+        self.assertIsInstance(result, ComponentSourceCode)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
     def test_generate_requires_session(self, mock_get_client, mock_validate):
         """generate() should raise TypeError when session is missing."""
         with self.assertRaises(TypeError):
-            GeneratedComponent.generate(
+            ComponentSourceCode.generate(
                 design_spec=self.design_spec,
             )
 
@@ -181,7 +181,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
         mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
 
-        GeneratedComponent.generate(
+        ComponentSourceCode.generate(
             design_spec=self.design_spec,
             session=self.session,
         )
@@ -197,7 +197,7 @@ class TestGeneratedComponentConstruction(unittest.TestCase):
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_construct_with_code(self, mock_collect):
         """GeneratedComponent should construct with valid code."""
-        component = GeneratedComponent(code=SAMPLE_CODE)
+        component = ComponentSourceCode(code=SAMPLE_CODE)
         self.assertEqual(component.code, SAMPLE_CODE)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
@@ -206,7 +206,7 @@ class TestGeneratedComponentConstruction(unittest.TestCase):
         from pydantic import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code="")
+            ComponentSourceCode(code="")
 
 
 if __name__ == "__main__":

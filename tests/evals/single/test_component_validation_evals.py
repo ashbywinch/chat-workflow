@@ -1,15 +1,16 @@
-"""Eval tests for Component._validation_rules using llm_judge().
+"""Eval tests that exercise real LLM validation on the framework's own
+classes via the Pydantic validator chain.
 
-Each test constructs a Component that should violate one of the 9 validation
-rules in Component._validation_rules, then verifies the LLM judge catches it.
-
-A final 'hoover up' test validates a realistic good component against all
-9 rules simultaneously to catch cross-rule interactions.
+Individual rule-vs-violation tests use ``llm_judge()``; the integration
+tests at the bottom read each framework class's own source file and
+validate it through ``GeneratedComponent`` — proving the framework's
+classes satisfy the rules they impose on generated code.
 """
 
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from tests.conftest import timeout
 from tests.evals.helpers import (
@@ -17,6 +18,9 @@ from tests.evals.helpers import (
     llm_judge,
     make_config,
 )
+from workflows.workflow.component_source_code import ComponentSourceCode
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 
 class TestComponentValidationRulesEval(unittest.TestCase):
@@ -304,69 +308,88 @@ class TestComponentValidationRulesEval(unittest.TestCase):
             )
 
     # ==================================================================
-    # Hoover-up: All rules against a realistic good component
+    # Self-validation: each framework class's source validated as code
     # ==================================================================
 
-    _ALL_RULES: dict[str, str] = {
-        "Purpose describes domain concept": (
-            "The purpose field clearly describes the domain concept the component "
-            "represents, in a way that an LLM could use to understand what instances "
-            "of this component mean (not just what they store)."
-        ),
-        "Name is a noun": (
-            "The name is a noun \u2014 it names an artifact (e.g. 'Invoice', "
-            "'MeetingMinutes'), not an action (e.g. 'GenerateInvoice')."
-        ),
-        "Expert role is specific": (
-            "The expert_role describes a real, specific domain expertise the component "
-            "embodies, not a generic role ('MinutesDraft Expert' is vague; "
-            "'Meeting Minutes Administrator' is better)."
-        ),
-        "Single Artifact Type Rule": (
-            "The component defines exactly one business artifact type. "
-            "The purpose must describe a single artifact concept."
-        ),
-        "Single Responsibility": (
-            "The component's responsibility must be stateable in one sentence "
-            "describing exactly one domain concept."
-        ),
-        "No Multiple Artifact Creation": (
-            "The component creates exactly one primary artifact type. "
-            "The purpose must not imply creation of multiple distinct business artifacts."
-        ),
-        "Clear Boundaries": (
-            "The purpose must clearly define what is inside and outside the "
-            "component's responsibility."
-        ),
-        "Encapsulation": (
-            "The component's fields and methods must all relate to the same "
-            "domain concept. The purpose must not mix unrelated concerns."
-        ),
-        "Cohesion": (
-            "All functionality described in the purpose must serve the same "
-            "primary artifact."
-        ),
-    }
+    @timeout(120)
+    def test_component_source_passes_as_generated_code(self):
+        """Component's own source code should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class Component", gc.code)
 
     @timeout(120)
-    def test_hoover_up_all_rules_pass_for_good_component(self):
-        """A realistic good component should satisfy ALL validation rules."""
-        config = make_config()
-        transcript = self._transcript(
-            name="InvoiceManager",
-            purpose="Stores and retrieves finalized customer invoices for record-keeping and auditing",
-            expert_role="Invoice Processing Specialist",
-        )
-        result: JudgeResult = llm_judge(self._ALL_RULES, transcript, config)
+    def test_workflow_source_passes_as_generated_code(self):
+        """Workflow's own source code should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
 
-        failures = [v for v in result.verdicts if not v.passed]
-        self.assertEqual(
-            len(failures),
-            0,
-            f"{len(failures)}/{len(self._ALL_RULES)} rules failed:\n"
-            + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures),
-        )
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "workflow.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class Workflow", gc.code)
 
+    @timeout(120)
+    def test_generated_component_source_passes_as_generated_code(self):
+        """ComponentSourceCode's own source should satisfy its own rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_source_code.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class ComponentSourceCode", gc.code)
+
+    @timeout(120)
+    def test_resource_source_passes_as_generated_code(self):
+        """Resource model source should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "resource.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class Resource", gc.code)
+
+    @timeout(120)
+    def test_deliverable_source_passes_as_generated_code(self):
+        """Deliverable model source should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "deliverable.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class Deliverable", gc.code)
+
+    @timeout(120)
+    def test_gap_analysis_source_passes_as_generated_code(self):
+        """GapAnalysis model source should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "gap_analysis.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class GapAnalysis", gc.code)
+
+    @timeout(120)
+    def test_process_definition_source_passes_as_generated_code(self):
+        """ProcessDefinition model source should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "process_definition.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class ProcessDefinition", gc.code)
+
+    @timeout(120)
+    def test_component_responsibilities_source_passes_as_generated_code(self):
+        """ComponentResponsibilities source should satisfy GeneratedComponent rules."""
+        class _GC(ComponentSourceCode):
+            _skip_llm_validation = False
+
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_responsibilities.py").read_text()
+        gc = _GC(code=code)
+        self.assertIn("class ComponentResponsibilities", gc.code)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

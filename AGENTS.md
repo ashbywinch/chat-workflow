@@ -183,5 +183,14 @@ git checkout main && git pull origin main && git checkout -b <new-branch>
 - If outstanding work exists (unmerged PR, unpushed commits), finish that work first.
 - Run both `make test` and `make evals` before pushing.
 - origin/main is protected — all changes go through PRs.
+- **Never print API keys, secrets, or environment variable values in command output.**
+  Check whether they are *set* without revealing their values:
+  ```bash
+  # ✅ Safe — just confirms a variable is set
+  test -n "$API_KEY" && echo "configured"
+  # ❌ Never — prints the actual secret value into AI context
+  echo "$API_KEY"
+  env | grep -i api_key
+  ```
 
 For debugging LLM interactions, see the [Contributor Guide](docs/contributors/contributor-guide.md#debugging-llm-interactions).

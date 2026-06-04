@@ -104,20 +104,14 @@ class ComponentStructure(BaseModel):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentStructure:
-        """You are a data design expert. The user described their artifact
-        in plain language. Propose types and constraints in one message.
+        """You are a data design expert. Propose all types and constraints
+        in one message, using ONLY business language. Instead of code
+        types (list[str], ActionItem) say what they mean: "attendees is
+        a list of people", "each action item has an owner and due date".
 
-        Use ONLY business language the user would understand. Instead of
-        'default value' say 'what if no date is set?'. Instead of 'string'
-        or 'None' talk about what's required and what's optional.
-
-        Example: "The meeting date is required, attendees lists people,
-        decisions need context, action items need owner+date — right?"
-
-        Then add rules from quality criteria: "Since minutes should be
-        skimmable, should each decision stand alone?"
-
-        Use "continue" to propose, "success" when the user confirms all.
-        Never mix a message with a result. When confirmed, move on.
+        Then derive validation rules from the "what good looks like"
+        criteria. If the user asks about a code term you used, explain
+        it in plain language and move on. Use "continue" to propose,
+        "success" when the user confirms all. When confirmed, move on.
         """
         ...  # type: ignore[reportReturnType]

@@ -11,12 +11,11 @@ from chat_workflow.code_generator import verify_code
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.session import Session
 
-from . import GeneratedComponent
+from . import ComponentSourceCode
 from .component_responsibilities import ComponentResponsibilities
 from .design_spec import ComponentDesignSpec
 from .domain_spec import ComponentDomainSpec
 from .interaction_context import ComponentInteractionContext
-from .models import ComponentRequirement
 from .structure import ComponentStructure
 
 
@@ -136,7 +135,7 @@ class Component(LLMValidated):
     @classmethod
     def create(
         cls,
-        requirements: ComponentRequirement | ComponentResponsibilities,
+        requirements: ComponentResponsibilities | ComponentResponsibilities,
         *,
         session: Session,
         output_dir: Path | None = None,
@@ -147,7 +146,7 @@ class Component(LLMValidated):
         - ComponentResponsibilities (new): Phase 1 (DomainSpec.explore)
           + Phase 2 (Structure.design) — produces a domain spec, designs
           the structure, then builds and returns a Component record.
-        - ComponentRequirement (legacy): Full pipeline — generates code,
+        - ComponentResponsibilities (legacy): Full pipeline — generates code,
           verifies, writes to disk, and returns Component.
 
         Args:
@@ -184,7 +183,7 @@ class Component(LLMValidated):
             )
 
             session.io.echo(f"Generating component code: {domain_spec.name}...")
-            generated = GeneratedComponent.generate(
+            generated = ComponentSourceCode.generate(
                 design_spec=design_spec,
                 session=session,
             )
@@ -214,7 +213,7 @@ class Component(LLMValidated):
             )
             return result
 
-        # --- Legacy path: ComponentRequirement ---
+        # --- Legacy path: ComponentResponsibilities ---
         # Step 1: Construct a ComponentDesignSpec from the requirement
         session.io.echo(f"Designing component: {requirements.name}...")
         design_spec = ComponentDesignSpec(
@@ -234,7 +233,7 @@ class Component(LLMValidated):
                 user_pain_points=[],
             ),
         )
-        generated = GeneratedComponent.generate(
+        generated = ComponentSourceCode.generate(
             design_spec=design_spec,
             session=session,
         )

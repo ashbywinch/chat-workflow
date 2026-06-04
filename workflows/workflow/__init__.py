@@ -1,8 +1,8 @@
 from .component_responsibilities import ComponentResponsibilities as ComponentResponsibilities
+from .component_source_code import ComponentSourceCode as ComponentSourceCode
 from .design_spec import ComponentDesignSpec as ComponentDesignSpec
 from .domain_spec import ComponentDomainField as ComponentDomainField
 from .domain_spec import ComponentDomainSpec as ComponentDomainSpec
-from .generated_component import GeneratedComponent as GeneratedComponent
 from .interaction_context import ComponentInteractionContext as ComponentInteractionContext
 from .structure import ComponentStructure as ComponentStructure
 from .structure import StructField as StructField

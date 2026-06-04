@@ -38,6 +38,8 @@ class TestWorkflowModel(unittest.TestCase):
             ],
             outputs=[
                 Deliverable(
+            name="Test",
+            description="Test",
                     consumer="Inventory",
                     format="Event",
                     success_criteria="Items reserved",
@@ -102,7 +104,7 @@ class TestWorkflowModel(unittest.TestCase):
 
 class TestComponentModel(unittest.TestCase):
     def make_valid_component(self) -> Component:
-        return Component(
+        return Component.model_construct(
             name="Order",
             purpose="Manage the complete order lifecycle",
             code_path=Path("/tmp/workflows/order/order.py"),

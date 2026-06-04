@@ -71,6 +71,8 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_collect_inputs.return_value = [inp]
 
         out = Deliverable(
+            name="Test",
+            description="Test",
             consumer="Test",
             format="JSON",
             success_criteria="Test",
@@ -161,6 +163,8 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_collect_inputs.return_value = [inp]
 
         out = Deliverable(
+            name="Test",
+            description="Test",
             consumer="Test",
             format="JSON",
             success_criteria="Test",
@@ -254,6 +258,8 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_collect_inputs.return_value = [inp]
 
         out = Deliverable(
+            name="Test",
+            description="Test",
             consumer="Test",
             format="JSON",
             success_criteria="Test",

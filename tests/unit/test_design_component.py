@@ -1,13 +1,12 @@
-"""Tests for GeneratedComponent.generate atomic workflow."""
+"""Tests for ComponentSourceCode.generate atomic workflow."""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
-from chat_workflow import Session, SessionLog
+from chat_workflow import AgentIntent, AgentResponse, Session, SessionLog
 from chat_workflow.atomic_workflow import AtomicWorkflow
-from chat_workflow.models import AgentIntent, AgentResponse
-from workflows.workflow import GeneratedComponent
-from workflows.workflow.models import ComponentRequirement
+from workflows.workflow.component_source_code import ComponentSourceCode
+from workflows.workflow.models import ComponentResponsibilities
 
 
 class FakeConfig:
@@ -31,24 +30,27 @@ class TestDesignComponent(unittest.TestCase):
 
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(GeneratedComponent.generate, "_is_workflow", False),
+            getattr(ComponentSourceCode.generate, "_is_workflow", False),
         )
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            GeneratedComponent.generate(
-                requirements=ComponentRequirement(
+            ComponentSourceCode.generate(
+                requirements=ComponentResponsibilities(
                     name="Test",
                     purpose="Test component",
                     required_inputs=["Input"],
-                    expected_outputs=["Output"],
+                    scope_description="description", 
                     component_type="artifact_producing",
                 ),
             )
         self.assertIn("session", str(ctx.exception))
 
+    @patch("chat_workflow.llm_interaction.get_client")
     @patch.object(AtomicWorkflow, "_call_llm")
-    def test_returns_generated_component(self, mock_call_llm):
+    @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
+    def test_returns_generated_component(self, mock_validate, mock_call_llm, mock_get_client):
+        mock_get_client.side_effect = RuntimeError("no api key")
         expected_code = (
             "from __future__ import annotations\n"
             "from pydantic import BaseModel, Field\n"
@@ -58,34 +60,37 @@ class TestDesignComponent(unittest.TestCase):
             "\n"
             "    @atomic_workflow\n"
             "    @classmethod\n"
-            "    def create(cls, context: str, max_turns: int = 10):\n"
+            "    def create(cls, context: str, max_turns: int = 10) -> Order:\n"
             '        """Create order."""\n'
             "        ...\n"
         )
-        expected = GeneratedComponent.model_construct(code=expected_code)
-        mock_call_llm.return_value = AgentResponse[GeneratedComponent].model_construct(
+        expected = ComponentSourceCode.model_construct(code=expected_code)
+        mock_call_llm.return_value = AgentResponse[ComponentSourceCode].model_construct(
             intent=AgentIntent.SUCCESS,
             result=expected,
         )
 
         session = self._make_session()
-        result = GeneratedComponent.generate(
-            requirements=ComponentRequirement(
+        result = ComponentSourceCode.generate(
+            requirements=ComponentResponsibilities(
                 name="Order",
                 purpose="Manage orders",
                 required_inputs=["Customer details"],
-                expected_outputs=["Order confirmation"],
+                scope_description="description", 
                 component_type="artifact_producing",
             ),
             session=session,
         )
 
-        self.assertIsInstance(result, GeneratedComponent)
+        self.assertIsInstance(result, ComponentSourceCode)
         self.assertIn("class Order(BaseModel)", result.code)
         self.assertIn("BaseModel", result.code)
 
+    @patch("chat_workflow.llm_interaction.get_client")
     @patch.object(AtomicWorkflow, "_call_llm")
-    def test_code_contains_expected_imports(self, mock_call_llm):
+    @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
+    def test_code_contains_expected_imports(self, mock_validate, mock_call_llm, mock_get_client):
+        mock_get_client.side_effect = RuntimeError("no api key")
         expected_code = (
             "from __future__ import annotations\n"
             "from pydantic import BaseModel, Field\n"
@@ -95,22 +100,22 @@ class TestDesignComponent(unittest.TestCase):
             "\n"
             "    @atomic_workflow\n"
             "    @classmethod\n"
-            "    def create(cls, context: str, max_turns: int = 10):\n"
+            "    def create(cls, context: str, max_turns: int = 10) -> TestComponent:\n"
             '        """Create test component."""\n'
             "        ...\n"
         )
-        mock_call_llm.return_value = AgentResponse[GeneratedComponent].model_construct(
+        mock_call_llm.return_value = AgentResponse[ComponentSourceCode].model_construct(
             intent=AgentIntent.SUCCESS,
-            result=GeneratedComponent.model_construct(code=expected_code),
+            result=ComponentSourceCode.model_construct(code=expected_code),
         )
 
         session = self._make_session()
-        result = GeneratedComponent.generate(
-            requirements=ComponentRequirement(
+        result = ComponentSourceCode.generate(
+            requirements=ComponentResponsibilities(
                 name="TestComponent",
                 purpose="Test",
                 required_inputs=[],
-                expected_outputs=[],
+                scope_description="description",
                 component_type="artifact_producing",
             ),
             session=session,

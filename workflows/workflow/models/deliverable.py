@@ -14,6 +14,17 @@ from .process_definition import ProcessDefinition
 class Deliverable(BaseModel):
     """A single workflow deliverable."""
 
+    name: str = Field(
+        ...,
+        description="Name of the deliverable, e.g. 'Meeting Minutes', 'Invoice PDF'",
+        min_length=1,
+    )
+    description: str | None = Field(
+        default=None,
+        description="Plain-English description of what this deliverable contains — "
+        "required unless the name alone is unambiguous (e.g. 'Invoice' is clear; "
+        "'Widget' is not).",
+    )
     consumer: str = Field(..., description="Which components use this deliverable", min_length=1)
     format: str = Field(..., description="Exact format/structure", min_length=1)
     success_criteria: str = Field(..., description="How to measure deliverable quality", min_length=1)
@@ -27,15 +38,13 @@ class Deliverable(BaseModel):
         analysis: Annotated[ProcessDefinition | None, "The process definition, if already available"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Deliverable]:
-        """Listen to the user. Help them describe what they make.
+        """Help someone describe what they create. Greet warmly and
+        explain your purpose before anything else. If they mention
+        something common (meeting minutes, invoices), suggest its
+        standard structure from your expertise.
 
-        Open: "Hi! I'm here to help you describe what you create so
-        I can understand and document it."
-
-        Then ask: "Who uses what you make?" and "What does it look
-        like?" If they mention meeting minutes, propose: "Minutes
-        usually have attendees, decisions, action items — right?"
-
-        When the user asks for ideas, give them. Don't repeat yourself.
+        Keep the conversation in their language, not business terms.
+        When they ask for ideas, suggest them. Don't repeat questions.
+        Return success when you have enough for the model.
         """
         ...  # type: ignore[reportReturnType]

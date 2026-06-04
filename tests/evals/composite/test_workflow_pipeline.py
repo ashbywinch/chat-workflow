@@ -3,7 +3,7 @@
 This test calls the real @composite_workflow Workflow.create() with an LLM-powered
 user bot, then verifies:
 - The result is a valid Workflow
-- All components are ComponentResponsibilities (not ComponentRequirement)
+- All components are ComponentResponsibilities (not ComponentResponsibilities)
 - Each component has scope_description and incidental_notes fields
 - The conversation quality passes an LLM judge
 """

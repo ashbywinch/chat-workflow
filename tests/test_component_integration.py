@@ -10,11 +10,11 @@ from workflows.workflow.component import Component
 from workflows.workflow.component_responsibilities import (
     ComponentResponsibilities,
 )
+from workflows.workflow.component_source_code import ComponentSourceCode
 from workflows.workflow.domain_spec import (
     ComponentDomainField,
     ComponentDomainSpec,
 )
-from workflows.workflow.generated_component import GeneratedComponent
 from workflows.workflow.interaction_context import (
     ComponentInteractionContext,
 )
@@ -117,8 +117,8 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             user_pain_points=["Users often forget to list attendees"],
         )
 
-    def _make_generated_component(self) -> GeneratedComponent:
-        return GeneratedComponent(
+    def _make_generated_component(self) -> ComponentSourceCode:
+        return ComponentSourceCode(
             code=(
                 "from __future__ import annotations\n"
                 "from pydantic import BaseModel\n"
@@ -130,7 +130,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
         )
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -171,7 +171,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             self.assertIn("meetingminutes", str(result.code_path).lower())
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -205,7 +205,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             )
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -234,7 +234,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             self.assertIn("meetingminutes", str(result.code_path).lower())
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -263,7 +263,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             session.io.echo.assert_any_call("Exploring domain: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -297,7 +297,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             )
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -326,7 +326,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             session.io.echo.assert_any_call("Designing structure: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -361,7 +361,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             )
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -390,7 +390,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             session.io.echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -430,7 +430,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             self.assertEqual(call_kwargs["session"], session)
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")
@@ -459,7 +459,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             session.io.echo.assert_any_call("Generating component code: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
-    @patch.object(GeneratedComponent, "generate")
+    @patch.object(ComponentSourceCode, "generate")
     @patch.object(ComponentInteractionContext, "gather")
     @patch.object(ComponentStructure, "design")
     @patch.object(ComponentDomainSpec, "explore")

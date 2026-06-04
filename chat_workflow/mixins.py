@@ -8,7 +8,6 @@ LLM calls.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import ClassVar
 
@@ -90,10 +89,9 @@ class LLMValidated(BaseModel):
 
     _validation_rules: ClassVar[list[str]] = []
 
-    # Set by tests/unit/__init__.py to skip LLM calls in unit tests.
-    # Individual tests that need real validation can override on their
-    # model class: ``TestModel._skip_llm_validation = False``.
-    _skip_llm_validation: ClassVar[bool] = True
+    # True → validate_llm_rules returns early (no LLM call).
+    # Set to ``False`` on a model class to exercise real LLM validation.
+    _skip_llm_validation: ClassVar[bool] = False
 
     @classmethod
     def collect_per_field_rules(cls) -> dict[str, list[str]]:
@@ -159,7 +157,7 @@ class LLMValidated(BaseModel):
         if not rules:
             return self
 
-        if self._skip_llm_validation and "unittest" in sys.modules:
+        if self._skip_llm_validation:
             return self
 
         try:

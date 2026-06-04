@@ -69,6 +69,8 @@ def _make_inputs() -> list[Resource]:
 def _make_outputs() -> list[Deliverable]:
     return [
         Deliverable(
+            name="Test",
+            description="Test",
             consumer="Inventory",
             format="Event",
             success_criteria="Items reserved",

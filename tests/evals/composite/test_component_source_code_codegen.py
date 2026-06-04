@@ -23,9 +23,9 @@ from tests.evals.helpers import (
     make_tools,
     run_multi_turn_eval,
 )
+from workflows.workflow.component_source_code import ComponentSourceCode
 from workflows.workflow.design_spec import ComponentDesignSpec
 from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
-from workflows.workflow.generated_component import GeneratedComponent
 from workflows.workflow.interaction_context import ComponentInteractionContext
 from workflows.workflow.structure import ComponentStructure
 
@@ -120,12 +120,12 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
         )
         session = make_tools(user_bot)
 
-        generated: GeneratedComponent = GeneratedComponent.generate(
+        generated: ComponentSourceCode = ComponentSourceCode.generate(
             design_spec=design_spec,
             session=session,
         )
 
-        self.assertIsInstance(generated, GeneratedComponent)
+        self.assertIsInstance(generated, ComponentSourceCode)
         self.assertGreater(len(generated.code), 0)
         self.assertIn("class ", generated.code)
 

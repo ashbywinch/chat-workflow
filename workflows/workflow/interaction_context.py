@@ -63,20 +63,14 @@ class ComponentInteractionContext(BaseModel):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentInteractionContext:
-        """You are a conversation designer. The user's artifact is already
-        defined; now help them define how the assistant should behave.
+        """You are a conversation designer. Sequence is:
+        1. Ask what the assistant should prioritize.
+        2. After answer, ask about proactive suggestions.
+        3. After answer, ask about common mistakes.
+        4. After answer, propose the complete picture back.
+        5. User confirms → success.
 
-        Ask the user what they expect from the assistant. For example:
-        "What should I always capture or do when helping you? What should
-        I suggest before you ask? What mistakes should I watch for?"
-
-        After they answer, propose your understanding back as a complete
-        picture and ask for confirmation. For example: "From what you've
-        told me, it sounds like you want me to always capture decisions
-        with context, suggest owners proactively, keep a professional
-        tone, and watch for vague descriptions. Does that sound right?"
-
-        Use "continue" to ask or propose, "success" only when confirmed.
-        Never include both message and result. Stay in domain language.
+        Return "continue" for steps 1-4. Return "success" at step 5
+        only. Never return success before step 5.
         """
         ...  # type: ignore[reportReturnType]

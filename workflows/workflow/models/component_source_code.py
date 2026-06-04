@@ -7,10 +7,10 @@ from pydantic import Field
 from chat_workflow import atomic_workflow
 from chat_workflow.mixins import LLMValidated
 
-from ..component_responsibilities import ComponentRequirement
+from ..component_responsibilities import ComponentResponsibilities
 
 
-class GeneratedComponent(LLMValidated):
+class ComponentSourceCode(LLMValidated):
     """Python source code for a chat-workflow business component.
 
     Represents a generated Pydantic BaseModel class that owns a single
@@ -52,11 +52,11 @@ class GeneratedComponent(LLMValidated):
     def generate(
         cls,
         requirements: Annotated[
-            ComponentRequirement,
+            ComponentResponsibilities,
             "The component requirements specifying name, purpose, inputs, outputs, and type",
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-    ) -> GeneratedComponent:
+    ) -> ComponentSourceCode:
         """You are a software architect designing a Python business component.
 
         The user has described what they need. Your job is to generate Python code

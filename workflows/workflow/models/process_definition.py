@@ -28,15 +28,11 @@ class ProcessDefinition(BaseModel):
 def _gather_notes(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
-    """Explore the user's process. Start with: "What do you do?"
+    """Explore what the user does. Ask once, listen, then summarize.
 
-    When the user answers, acknowledge what they said and ask for
-    more detail: "Tell me more about that." If they give a brief
-    answer, say "Anything else?" to encourage elaboration.
-
-    When you have enough detail (3-4 sentences about their process),
-    summarize what you heard and mark success. Never repeat the
-    same question. Never propose structure or phases.
+    "What do you do?" — then listen. If they give enough detail,
+    say "Got it, let me summarize what I heard..." and use success.
+    Never ask about the same thing twice. Stay open-ended.
     """
     ...  # type: ignore[reportReturnType]
 
@@ -49,13 +45,13 @@ def _generate_from_notes(
     """Propose a process structure based on what the user described.
 
     Start by proposing the complete structure based on their notes.
-    Suggest the main stages and ask for confirmation — don't ask the
-    user to elaborate on each stage individually.
+    Suggest the main steps and ask for confirmation — don't ask the
+    user to elaborate on each step individually.
 
-    Use plain language: "what are the main stages?" not "phases".
+    Use plain language: "steps" or "parts", not "stages" or "phases".
     Once confirmed, propose the rest one thing at a time.
-    Never repeat a question the user already answered.
-    Never put fabricated values in the final output.
+    If the user doesn't know something, suggest ONE possibility.
+    Never ask the same question twice. Never fabricate values.
     """
     ...  # type: ignore[reportReturnType]
 

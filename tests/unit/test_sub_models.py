@@ -5,14 +5,15 @@ from unittest.mock import patch
 
 from pydantic import ValidationError
 
-from workflows.workflow import GeneratedComponent
+from workflows.workflow import ComponentSourceCode
 from workflows.workflow.models import (
-    ComponentRequirement,
+    ComponentResponsibilities,
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
     Resource,
 )
+from workflows.workflow.models.gap_analysis import IntegrationGap, OwnershipGap
 
 
 class TestProcessDefinition(unittest.TestCase):
@@ -60,6 +61,8 @@ class TestResource(unittest.TestCase):
 class TestDeliverable(unittest.TestCase):
     def test_valid_instance(self):
         model = Deliverable(
+            name="Invoice",
+            description="Processed invoice records",
             consumer="Billing System",
             format="XML",
             success_criteria="All invoices processed",
@@ -78,24 +81,30 @@ class TestGapAnalysis(unittest.TestCase):
         model = GapAnalysis(
             missing_components=["Payment Processor"],
             missing_playbooks=["Create Payment Playbook"],
-            integration_gaps=["Billing \u2192 Payment handoff unclear"],
-            organizational_gaps=["No owner for reconciliation"],
+            integration_gaps=[IntegrationGap(
+                between="Billing → Payment",
+                description="Handoff unclear",
+            )],
+            organizational_gaps=[OwnershipGap(
+                activity="Reconciliation",
+                reason="No owner assigned",
+            )],
             recommendations=["Create Payment Processor component"],
         )
         self.assertEqual(len(model.missing_components), 1)
 
-    def test_missing_required_field(self):
-        with self.assertRaises(ValidationError):
-            GapAnalysis()
+    def test_empty_gap_analysis_is_valid(self):
+        model = GapAnalysis()
+        self.assertEqual(len(model.missing_components), 0)
 
 
-class TestComponentRequirement(unittest.TestCase):
+class TestComponentResponsibilities(unittest.TestCase):
     def test_valid_instance(self):
-        model = ComponentRequirement(
+        model = ComponentResponsibilities(
             name="Invoice",
             purpose="Manage invoice lifecycle",
             required_inputs=["Order details"],
-            expected_outputs=["Invoice PDF"],
+            scope_description="description", 
             component_type="artifact_producing",
         )
         self.assertEqual(model.name, "Invoice")
@@ -103,7 +112,7 @@ class TestComponentRequirement(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            ComponentRequirement()
+            ComponentResponsibilities()
 
 
 class TestGeneratedComponent(unittest.TestCase):
@@ -121,12 +130,12 @@ class TestGeneratedComponent(unittest.TestCase):
             '        """Create."""\n'
             "        ...\n"
         )
-        model = GeneratedComponent.model_construct(code=code)
+        model = ComponentSourceCode.model_construct(code=code)
         self.assertEqual(model.code, code)
 
     def test_missing_code(self):
         with self.assertRaises(ValidationError):
-            GeneratedComponent()
+            ComponentSourceCode()
 
 
 if __name__ == "__main__":

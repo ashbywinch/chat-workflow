@@ -88,6 +88,9 @@ Evals call a real LLM to verify prompt quality. They require `config.json` with 
 and the corresponding `OPENROUTER_API_KEY` (or similar) environment variable. They **fail**, not
 skip, when keys are missing — that's intentional.
 
+> ⚠️ **Security**: See the [agent rules](../../AGENTS.md#rules) for how to safely check
+> that environment variables are set without exposing their values.
+
 #### 3a. One-Shot Evals (hardcoded prompt)
 Test that a given prompt + user input produces valid structured output in a single turn:
 

@@ -20,7 +20,7 @@ class TestComponentSingleArtifactTypeRule(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Invoice processing pipeline with integrated timesheet management",
                 code_path=p,
@@ -39,7 +39,7 @@ class TestComponentSingleResponsibilityRule(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Oversees customer onboarding handles billing inquiries manages support tickets",
                 code_path=p,
@@ -54,7 +54,7 @@ class TestComponentSingleResponsibilityRule(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Processes customer invoices through their complete lifecycle",
                 code_path=p,
@@ -73,7 +73,7 @@ class TestComponentNoMultipleArtifactCreation(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="DataManager",
                 purpose="Creates customer invoices generates monthly reports produces analytics dashboards",
                 code_path=p,
@@ -88,7 +88,7 @@ class TestComponentNoMultipleArtifactCreation(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Creates customer invoices from start to finish",
                 code_path=p,
@@ -107,7 +107,7 @@ class TestComponentClearBoundaries(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="UtilityBelt",
                 purpose="Handles miscellaneous tasks odd jobs general upkeep",
                 code_path=p,
@@ -122,7 +122,7 @@ class TestComponentClearBoundaries(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Manages the complete invoice lifecycle from creation to payment",
                 code_path=p,
@@ -141,7 +141,7 @@ class TestComponentEncapsulation(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="SuperManager",
                 purpose="Processes payroll calculates carbon footprint tracks server uptime",
                 code_path=p,
@@ -156,7 +156,7 @@ class TestComponentEncapsulation(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Manages all aspects of invoice processing and payment collection",
                 code_path=p,
@@ -175,7 +175,7 @@ class TestComponentCohesion(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="TaskMaster",
                 purpose="Handles email notifications performs database maintenance",
                 code_path=p,
@@ -190,7 +190,7 @@ class TestComponentCohesion(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             p = Path(tmpdir) / "test.py"
             p.write_text("")
-            c = Component(
+            c = Component.model_construct(
                 name="InvoiceManager",
                 purpose="Creates customer invoices from submission through final distribution",
                 code_path=p,

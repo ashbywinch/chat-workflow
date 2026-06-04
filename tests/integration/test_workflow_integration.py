@@ -8,9 +8,9 @@ from unittest.mock import MagicMock, patch
 from chat_workflow import Session, SessionLog
 from chat_workflow.atomic_workflow import AtomicWorkflow
 from chat_workflow.models import AgentIntent, AgentResponse
-from workflows.workflow import GeneratedComponent, Workflow
+from workflows.workflow import ComponentSourceCode, Workflow
 from workflows.workflow.models import (
-    ComponentRequirement,
+    ComponentResponsibilities,
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
@@ -55,6 +55,8 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         out = Deliverable(
+            name="Test",
+            description="Test",
             consumer="Inventory",
             format="Event",
             success_criteria="Items reserved",
@@ -62,11 +64,11 @@ class TestWorkflowIntegration(unittest.TestCase):
             storage_requirements="DB",
         )
 
-        req = ComponentRequirement(
+        req = ComponentResponsibilities(
             name="Order",
             purpose="Manage orders",
             required_inputs=["Details"],
-            expected_outputs=["Confirmation"],
+            scope_description="description", 
             component_type="artifact_producing",
         )
 
@@ -92,7 +94,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             AgentResponse[list[Resource]](intent=AgentIntent.SUCCESS, result=[inp]),
             AgentResponse[str](intent=AgentIntent.SUCCESS, result="raw notes"),
             AgentResponse[ProcessDefinition](intent=AgentIntent.SUCCESS, result=analysis),
-            AgentResponse[list[ComponentRequirement]](intent=AgentIntent.SUCCESS, result=[req]),
+            AgentResponse[list[ComponentResponsibilities]](intent=AgentIntent.SUCCESS, result=[req]),
             AgentResponse[GapAnalysis](
                 intent=AgentIntent.SUCCESS,
                 result=GapAnalysis(
@@ -105,9 +107,9 @@ class TestWorkflowIntegration(unittest.TestCase):
             ),
             AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
             AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
-            AgentResponse[GeneratedComponent](
+            AgentResponse[ComponentSourceCode](
                 intent=AgentIntent.SUCCESS,
-                result=GeneratedComponent(code=generated_code),
+                result=ComponentSourceCode(code=generated_code),
             ),
         ]
         mock_call_llm.side_effect = mock_responses
@@ -155,6 +157,8 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         out = Deliverable(
+            name="Test",
+            description="Test",
             consumer="Test",
             format="JSON",
             success_criteria="Test",
@@ -163,18 +167,18 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         reqs = [
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="ComponentA",
                 purpose="Test A",
                 required_inputs=["A"],
-                expected_outputs=["A"],
+                scope_description="description", 
                 component_type="artifact_producing",
             ),
-            ComponentRequirement(
+            ComponentResponsibilities(
                 name="ComponentB",
                 purpose="Test B",
                 required_inputs=["B"],
-                expected_outputs=["B"],
+                scope_description="description", 
                 component_type="artifact_producing",
             ),
         ]
@@ -197,7 +201,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             AgentResponse[list[Resource]](intent=AgentIntent.SUCCESS, result=[inp]),
             AgentResponse[str](intent=AgentIntent.SUCCESS, result="raw notes"),
             AgentResponse[ProcessDefinition](intent=AgentIntent.SUCCESS, result=analysis),
-            AgentResponse[list[ComponentRequirement]](intent=AgentIntent.SUCCESS, result=reqs),
+            AgentResponse[list[ComponentResponsibilities]](intent=AgentIntent.SUCCESS, result=reqs),
             AgentResponse[GapAnalysis](
                 intent=AgentIntent.SUCCESS,
                 result=GapAnalysis(
@@ -210,8 +214,8 @@ class TestWorkflowIntegration(unittest.TestCase):
             ),
             AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
             AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
-            AgentResponse[GeneratedComponent](intent=AgentIntent.SUCCESS, result=GeneratedComponent(code=code_a)),
-            AgentResponse[GeneratedComponent](intent=AgentIntent.SUCCESS, result=GeneratedComponent(code=code_b)),
+            AgentResponse[ComponentSourceCode](intent=AgentIntent.SUCCESS, result=ComponentSourceCode(code=code_a)),
+            AgentResponse[ComponentSourceCode](intent=AgentIntent.SUCCESS, result=ComponentSourceCode(code=code_b)),
         ]
         mock_call_llm.side_effect = mock_responses
 

@@ -18,7 +18,7 @@ from tests.sample_code import (
     NO_WORKFLOW_CODE,
     VALID_COMPONENT_CODE,
 )
-from workflows.workflow.generated_component import GeneratedComponent
+from workflows.workflow.component_source_code import ComponentSourceCode
 
 
 class TestGeneratedComponentProgrammaticValidation(unittest.TestCase):
@@ -27,7 +27,7 @@ class TestGeneratedComponentProgrammaticValidation(unittest.TestCase):
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_valid_code_passes_validation(self, mock_collect):
         """Valid code with one BaseModel and @atomic_workflow should pass."""
-        component = GeneratedComponent(code=VALID_COMPONENT_CODE)
+        component = ComponentSourceCode(code=VALID_COMPONENT_CODE)
         self.assertIn("class MinutesDraft", component.code)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
@@ -36,7 +36,7 @@ class TestGeneratedComponentProgrammaticValidation(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=INVALID_SYNTAX_CODE)
+            ComponentSourceCode(code=INVALID_SYNTAX_CODE)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_no_basemodel_raises_validation_error(self, mock_collect):
@@ -44,7 +44,7 @@ class TestGeneratedComponentProgrammaticValidation(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=NO_BASEMODEL_CODE)
+            ComponentSourceCode(code=NO_BASEMODEL_CODE)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_multiple_basemodels_raises_validation_error(self, mock_collect):
@@ -52,7 +52,7 @@ class TestGeneratedComponentProgrammaticValidation(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=MULTIPLE_BASEMODEL_CODE)
+            ComponentSourceCode(code=MULTIPLE_BASEMODEL_CODE)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_no_atomic_workflow_raises_validation_error(self, mock_collect):
@@ -60,7 +60,7 @@ class TestGeneratedComponentProgrammaticValidation(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises(ValidationError):
-            GeneratedComponent(code=NO_WORKFLOW_CODE)
+            ComponentSourceCode(code=NO_WORKFLOW_CODE)
 
 
 class TestGeneratedComponentRulesCollection(unittest.TestCase):
@@ -68,7 +68,7 @@ class TestGeneratedComponentRulesCollection(unittest.TestCase):
 
     def test_validation_rules_include_new_entries(self):
         """New _validation_rules should be collected by collect_all_rules()."""
-        rules = GeneratedComponent.collect_all_rules()
+        rules = ComponentSourceCode.collect_all_rules()
 
         self.assertGreaterEqual(len(rules), 6)
 
@@ -78,8 +78,13 @@ class TestGeneratedComponentRulesCollection(unittest.TestCase):
         )
 
         self.assertTrue(
-            any("generic boilerplate" in r for r in rules),
-            "Should have Context Effectiveness rule about concise docstrings",
+            any("one rule" in r.lower() for r in rules),
+            "Should have one-rule-per-entry meta-rule",
+        )
+
+        self.assertTrue(
+            any("every word" in r.lower() for r in rules),
+            "Should have conciseness rule",
         )
 
 

@@ -32,14 +32,13 @@ class Resource(BaseModel):
         outputs: Annotated[list[Deliverable] | None, "The deliverables the process should produce, if already known"] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Resource]:
-        """Listen to the user and help them describe what they start with.
+        """Help someone document what they start with. First response:
+        propose the typical starting point based on what they mention.
+        If they mention meetings, suggest what they'd begin with.
 
-        Propose what they probably start with based on their work.
-        For a meeting process: "You'd start with notes and attendee
-        lists — right?" For a writing process: "You begin with research
-        and drafts — does that sound right?"
-
-        Once they confirm, ask about specifics. Never repeat yourself.
-        If they ask for ideas, give suggestions. One topic at a time.
+        Keep the conversation in their language, not business terms.
+        Never ask about trigger conditions — return it empty.
+        When they ask for ideas, suggest them. Return success when
+        you have enough for the model.
         """
         ...  # type: ignore[reportReturnType]
