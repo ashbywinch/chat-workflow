@@ -26,3 +26,14 @@ Prior art and alternative approaches considered for the chat-workflow design.
 
 - **URL**: https://www.anthropic.com/engineering/building-effective-agents
 - **Status**: Prior art — design patterns for agents; informs DQS design in the MVP prototype
+
+## 6. Galileo — "LLM-as-a-judge: the missing piece in financial services AI governance"
+
+- **URL**: https://galileo.ai/blog/llm-as-a-judge-the-missing-piece-in-financial-services-ai-governance
+- **Docs**: https://v2docs.galileo.ai/getting-started/quickstart
+- **Status**: Testing tool for us — competition/prior art
+
+## 7. Humanloop
+
+- **URL**: https://humanloop.com/
+- **Status**: Prior art — reviewed, not adopted
