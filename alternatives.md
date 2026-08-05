@@ -16,3 +16,8 @@ Prior art and alternative approaches considered for the chat-workflow design.
 
 - **URL**: https://github.com/langchain-ai/langgraph-supervisor-py
 - **Status**: Prior art — also a useful tool to use!
+
+## 4. Wisary
+
+- **URL**: https://wisary.ai/
+- **Status**: Prior art — reviewed, not adopted
