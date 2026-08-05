@@ -37,3 +37,13 @@ Prior art and alternative approaches considered for the chat-workflow design.
 
 - **URL**: https://humanloop.com/
 - **Status**: Prior art — reviewed, not adopted
+
+## 8. DeepLearning.AI — "Multi AI Agent Systems with CrewAI"
+
+- **URL**: https://www.deeplearning.ai/short-courses/multi-ai-agent-systems-with-crewai/
+- **Status**: Prior art — references automating business processes normally done by groups of humans
+
+## 9. CrewAI
+
+- **URL**: https://github.com/crewAIInc/crewAI (open source)
+- **Status**: Prior art — agents as crew members that interact
