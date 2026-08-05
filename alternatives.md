@@ -47,3 +47,9 @@ Prior art and alternative approaches considered for the chat-workflow design.
 
 - **URL**: https://github.com/crewAIInc/crewAI (open source)
 - **Status**: Prior art — agents as crew members that interact
+
+## 10. Competitors: LangChain & LlamaIndex
+
+- **LangChain**: https://www.langchain.com/
+- **LlamaIndex**: https://www.llamaindex.ai/
+- **Status**: Key competitors
