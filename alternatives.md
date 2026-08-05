@@ -53,3 +53,8 @@ Prior art and alternative approaches considered for the chat-workflow design.
 - **LangChain**: https://www.langchain.com/
 - **LlamaIndex**: https://www.llamaindex.ai/
 - **Status**: Key competitors
+
+## 11. Greg Isenberg — X post
+
+- **URL**: https://x.com/gregisenberg/status/1931358121504481496
+- **Status**: Prior art — reviewed, not adopted
