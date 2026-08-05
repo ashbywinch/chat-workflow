@@ -24,4 +24,5 @@ jobs:
       - name: Evaluation tests
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENCODE_GO_EVALS_API_KEY: ${{ secrets.OPENCODE_GO_EVALS_API_KEY }}
         run: make evals
