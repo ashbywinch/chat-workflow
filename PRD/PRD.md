@@ -20,3 +20,7 @@ The product is an **executable operating model for a business, made of AI prompt
 2. **Business collaborators** — people wanting a product that collaborates with the user to create, run and grow a business with a mix of AI and human employees. Primarily solo entrepreneurs with only AI "employees" at first, but in theory any size of organisation.
 
 The invention must present a **structured approach to constraining the actions of employees** (e.g. requiring sign-off from a human employee or external expert before proceeding). This is an essential part of AI-in-the-workplace governance and provides a structured way to understand and manage it.
+
+### R4: Information ownership
+
+Important business information must have **clear ownership by a specific expert role** — not just capture by automated functions. The owner is responsible for maintaining, interpreting, and using that information for business decisions. New business functions must specify an owner; the system must make ownership explicit rather than ad hoc.
