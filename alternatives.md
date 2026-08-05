@@ -21,3 +21,8 @@ Prior art and alternative approaches considered for the chat-workflow design.
 
 - **URL**: https://wisary.ai/
 - **Status**: Prior art — reviewed, not adopted
+
+## 5. Anthropic — "Building Effective Agents"
+
+- **URL**: https://www.anthropic.com/engineering/building-effective-agents
+- **Status**: Prior art — design patterns for agents; informs DQS design in the MVP prototype
