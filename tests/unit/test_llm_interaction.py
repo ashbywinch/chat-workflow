@@ -169,5 +169,50 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertEqual(mock_client.call_count, 1)
 
 
+class TestGetClient(unittest.TestCase):
+    @patch("chat_workflow.llm_interaction.instructor.from_litellm")
+    def test_uses_custom_api_key_env_and_api_base(self, mock_from_litellm):
+        import os
+
+        import chat_workflow.llm_interaction as li
+
+        mock_client = object()
+        mock_from_litellm.return_value = mock_client
+        saved_base = li.litellm.api_base
+        try:
+            with patch.dict(os.environ, {"OPENCODE_GO_EVALS_API_KEY": "test-key"}, clear=False):
+                client = li.get_client(
+                    "openai",
+                    api_base="https://opencode.ai/zen/go/v1",
+                    api_key_env="OPENCODE_GO_EVALS_API_KEY",
+                )
+                # Key exposed to litellm under the provider's canonical env name
+                self.assertEqual(os.environ.get("OPENAI_API_KEY"), "test-key")
+                self.assertEqual(li.litellm.api_base, "https://opencode.ai/zen/go/v1")
+            self.assertIs(client, mock_client)
+        finally:
+            li.litellm.api_base = saved_base
+
+    @patch("chat_workflow.llm_interaction.instructor.from_litellm")
+    def test_uses_provider_default_key_env_when_not_overridden(self, mock_from_litellm):
+        import os
+
+        import chat_workflow.llm_interaction as li
+
+        mock_from_litellm.return_value = object()
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "default-key"}, clear=False):
+            li.get_client("openai")
+            self.assertEqual(os.environ.get("OPENAI_API_KEY"), "default-key")
+
+    def test_missing_key_raises_api_key_error(self):
+        import os
+
+        from chat_workflow import APIKeyError
+        from chat_workflow.llm_interaction import get_client
+
+        with patch.dict(os.environ, {}, clear=True), self.assertRaises(APIKeyError):
+            get_client("openai", api_key_env="OPENCODE_GO_EVALS_API_KEY")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

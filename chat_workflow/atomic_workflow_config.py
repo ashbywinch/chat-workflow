@@ -23,5 +23,7 @@ class AtomicWorkflowConfig(Generic[TResult]):
     debug: StreamingDebug | None = None
     model: str = "default-model"
     provider: ProviderType = "openrouter"
+    api_base: str | None = None
+    api_key_env: str | None = None
     max_retries: int = 3
     request_timeout_seconds: int = 30

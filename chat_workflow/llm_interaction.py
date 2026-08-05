@@ -28,11 +28,17 @@ _PROVIDER_API_KEY_ENV = {
 }
 
 
-def get_client(provider: str):
+def get_client(
+    provider: str,
+    api_base: str | None = None,
+    api_key_env: str | None = None,
+):
     """Get an instructor-patched LLM client for *provider*.
 
     The API key is read from the corresponding environment variable
-    (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``).
+    (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``); override with
+    ``api_key_env``. A custom endpoint can be set with ``api_base``
+    (e.g. ``https://opencode.ai/zen/go/v1`` for opencode-go models).
     """
     provider = provider.lower()
 
@@ -41,13 +47,16 @@ def get_client(provider: str):
             f"Unsupported provider: {provider}. Supported: {', '.join(_PROVIDER_API_KEY_ENV)}"
         )
 
-    api_key = os.getenv(_PROVIDER_API_KEY_ENV[provider])
+    key_env = api_key_env or _PROVIDER_API_KEY_ENV[provider]
+    api_key = os.getenv(key_env)
     if not api_key:
         raise APIKeyError(
-            f"{_PROVIDER_API_KEY_ENV[provider]} not set. Get your API key and set this environment variable."
+            f"{key_env} not set. Get your API key and set this environment variable."
         )
 
     os.environ[provider.upper() + "_API_KEY"] = api_key
+    if api_base:
+        litellm.api_base = api_base
     mode = instructor.Mode.JSON
     return instructor.from_litellm(completion, mode=mode)
 

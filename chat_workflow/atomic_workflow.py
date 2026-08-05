@@ -28,6 +28,8 @@ class AtomicWorkflow(Generic[TResult]):
         self.max_turns = config.max_turns
         self.model = config.model
         self._provider: ProviderType = config.provider
+        self._api_base = config.api_base
+        self._api_key_env = config.api_key_env
         self._max_retries = config.max_retries
         self._request_timeout_seconds = config.request_timeout_seconds
         self.response_model = config.response_model
@@ -77,7 +79,11 @@ class AtomicWorkflow(Generic[TResult]):
         from .llm_interaction import get_client
 
         try:
-            client = get_client(provider=self._provider)
+            client = get_client(
+                provider=self._provider,
+                api_base=self._api_base,
+                api_key_env=self._api_key_env,
+            )
             timer = _DebugTimer(self.debug, self.messages, self.model)
 
             with timer:
