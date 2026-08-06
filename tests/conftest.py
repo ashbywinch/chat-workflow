@@ -60,6 +60,8 @@ class FakeConfig:
 
     model = "test-model"
     provider = "test-provider"
+    api_base = None
+    api_key_env = None
     max_retries = 3
     request_timeout_seconds = 30
     debug = False

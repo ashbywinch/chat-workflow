@@ -686,7 +686,7 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         _litellm.completion = capturing_completion
 
         # Patch get_client to return instructor client with our patched litellm
-        def patched_get_client(provider):
+        def patched_get_client(provider, api_base=None, api_key_env=None):
             import instructor
 
             return instructor.from_litellm(_litellm.completion, mode=instructor.Mode.JSON)
