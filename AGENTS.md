@@ -91,6 +91,11 @@ Examples: modifying tests → check [the testing guide](docs/contributors/testin
 | Full verification | `make evals` | Runs all evals |
 | Unsure | `make evals-incremental` | Safe default, auto-detects |
 
+CI runs `make evals-smoke` on every PR (gateway connectivity + the core real-API
+cases). The full suite (`make evals`, ~60 real conversations, 30+ min and
+hundreds of thousands of tokens) runs on the weekly schedule and on manual
+dispatch — run it locally before pushing prompt or framework changes.
+
 ### Tool Selection
 
 | Tool | When to Use | Why |

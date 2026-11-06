@@ -17,6 +17,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: '17 3 * * 1'   # weekly full eval run (Monday 03:17 UTC)
   workflow_dispatch:
 concurrency:
   group: ${{ github.ref }}
@@ -63,11 +65,23 @@ jobs:
         with:
           recreate: true
           path: code-coverage-results.md
-      - name: Evaluation tests
-        # Evals call a real LLM through Cloudflare AI Gateway. Dependabot PRs
-        # and forked PRs get no secrets, so the step can only fail there —
-        # skip it for them and always run it on main.
-        if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
+      - name: Evaluation smoke (gateway connectivity + core evals)
+        # Every PR proves the Cloudflare path with the smoke subset: the full
+        # suite is ~60 real conversations (30+ min, hundreds of thousands of
+        # tokens) and belongs in the weekly/manual run, not every push.
+        # Dependabot PRs and forked PRs get no secrets, so the step can only
+        # fail there — skip it for them and always run it on main.
+        if: ${{ github.event_name != 'workflow_dispatch' && github.event_name != 'schedule' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
+          OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
+          CHAT_WORKFLOW_TRANSCRIPT_DIR: test-results/transcripts
+          CHAT_WORKFLOW_EVAL_REPORT: 1
+        run: make evals-smoke
+      - name: Evaluation tests (full)
+        # Weekly schedule and manual dispatch only: the complete real-model
+        # suite, with the cost it implies.
+        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
         env:
           OPENAI_API_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
           OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
