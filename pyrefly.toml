@@ -1,0 +1,24 @@
+# pyrefly config — TOP-LEVEL keys only. The `[pyrefly]` header belongs in
+# pyproject.toml's `[tool.pyrefly]`; in this standalone file it is silently
+# IGNORED (the file is parsed as already-pyrefly — a `[pyrefly]` section
+# shows an "Extra keys found in config: pyrefly" warning and preset +
+# errors do nothing).
+#
+# CHANGE: add more default-off [errors] rules deliberately (verify they
+# fire on the codebase first — `strict`/`all` presets may produce IDENTICAL
+# error sets on a given codebase).
+#
+# DO NOT CHANGE:
+# - preset "default" ≈ basedpyright's "standard". `strict`/`all` are NOT a
+#   sane gate — `--check-all` is ~13x errors of unannotated-internals noise.
+# - missing-override-decorator + missing-super-call are the two default-off
+#   rules with real signal (DAG-style structural typing + __init__ hygiene).
+# - The baseline lock in scripts/pyrefly-lock.py is the gate, NOT this
+#   file — pyrefly's OWN baseline is one-way and misses stale entries.
+
+preset = "default"
+
+[errors]
+missing-override-decorator = true   # every override must carry @override — real correctness guard for structurally-typed frameworks
+missing-super-call = true           # __init__ must call super().__init__() — caught a real test-stub bug
+unknown-name = false                # three-LSP: never-defined names belong to ruff F821 — pyrefly must not double-report

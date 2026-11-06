@@ -51,7 +51,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 ### 5. Write Documentation
 **Goal**: Create or update project documentation.
 
-**Read**: [Writing Documentation Guide](docs/contributors/writing-documentation.md)
+**Read**: [Writing Documentation Guide](docs/writing-documentation.md)
 - Context Efficiency principle
 - SOLID/DRY principles for documentation
 - Documentation structure and conventions
@@ -74,8 +74,8 @@ larger plan (testing, documentation, migration, etc.) may have their own
 guides under `docs/`. Check `docs/` for relevant conventions before doing
 work in an area you haven't worked with in this project.
 
-Examples: modifying tests → check testing.md. Writing documentation → check
-writing-documentation.md. Migrating workflows → check couch2food-migration-guide.md.
+Examples: modifying tests → check [the testing guide](docs/contributors/testing.md). Writing documentation → check
+[docs/writing-documentation.md](docs/writing-documentation.md). Migrating workflows → check [the migration guide](docs/workflow-authors/couch2food-migration-guide.md).
 
 ### Testing Rules
 
@@ -86,10 +86,16 @@ writing-documentation.md. Migrating workflows → check couch2food-migration-gui
 | Situation | Target | What it does |
 |-----------|--------|-------------|
 | Any unit test | `make test` | Runs lint + unit tests |
-| Quick framework check | `make evals-smoke` | test_real_api + debug_streaming (~80s) |
+| Quick framework check | `make evals-smoke` | test_real_api + debug_streaming (~5 min) |
 | Changed code or prompts | `make evals-incremental` | Auto-detects affected evals via graph |
 | Full verification | `make evals` | Runs all evals |
 | Unsure | `make evals-incremental` | Safe default, auto-detects |
+
+CI runs the unit/lint/coverage gate on every PR. The full eval suite
+(`make evals`, ~60 real conversations, 30+ min and hundreds of thousands of
+tokens) runs on the weekly schedule and on manual dispatch — real-model
+output is non-deterministic, so it is not a per-PR gate. Run it locally
+before pushing prompt or framework changes.
 
 ### Tool Selection
 
@@ -116,12 +122,16 @@ writing-documentation.md. Migrating workflows → check couch2food-migration-gui
 ### Development Commands
 
 ```bash
-make                # Set up python venv for development
-make test          # Unit tests only (no API key needed, ~0.01s)
+make                # Create venv, install deps + hooks, create .env from .env.example
+make check          # Lint + typecheck — the gate CI and the pre-push hook run
+make test          # Unit tests only (no API key needed, ~2s)
 make test-verbose  # Same with verbose output per test
-make evals          # Real-API evals (requires config.json + API key, ~90s)
+make evals          # Real-API evals through Cloudflare AI Gateway (~90s)
 make evals-verbose  # Same with verbose output
-make lint           # black --check + ruff check
+make coverage       # Unit tests + coverage.xml for CI
+make docs-check     # Every relative markdown link resolves
+make lint           # ruff check
+make typecheck      # pyrefly against the committed baseline
 ```
 
 ### Evals Cost Rule
@@ -154,8 +164,15 @@ Do not re-run the eval suite just to see something you already captured. Before 
 | [Example: Evaluation Criteria](docs/users/example-evaluation-criteria.md) | Complete sample workflow walkthrough | Learning by example |
 | [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md) | Building new conversation flows | Developers creating workflows |
 | [Contributor Guide](docs/contributors/contributor-guide.md) | Developing the framework itself | Library contributors |
-| [Writing Documentation Guide](docs/contributors/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
+| [Writing Documentation Guide](docs/writing-documentation.md) | Principles for creating and updating docs | Documentation authors |
+| [Documentation Structure](docs/documentation-structure.md) | The required doc set and folder layout | Documentation authors |
 | [Testing Guide](docs/contributors/testing.md) | Testing strategy and patterns | Quality assurance |
+| [Testing Standards](docs/testing-standards.md) | Normative testing rules | All contributors |
+| [Coding Standards](docs/coding-standards.md) | Global standard + Python/project conventions | All contributors |
+| [PRD](docs/PRD.md) | Jobs, personas, requirements and constraints | Product decisions |
+| [TECHSPEC](docs/TECHSPEC.md) | Technology choices, architecture, layer boundaries | Architecture decisions |
+| [PLAN](docs/PLAN.md) | Phases, operations and quality gates | Delivery planning |
+| [UX](docs/UX.md) | The conversational UX spec | Prompt and flow design |
 | [Couch2food Migration Guide](docs/workflow-authors/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
 | [Code Generation](docs/workflow-authors/code-generation.md) | Generating workflow code via LLM + verify_code() | Developers creating new workflows |
 

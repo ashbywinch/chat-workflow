@@ -4,7 +4,7 @@ This guide is for developers working **on** the chat-workflow library itself. If
 
 If you are new to the codebase, start with [../reference/domain-concepts.md](../reference/domain-concepts.md) — it defines the core vocabulary (atomic workflow, turn, session, etc.) and maps each term to equivalent concepts in the broader LLM ecosystem.
 
-For coding standards, see [coding-standards.md](coding-standards.md).
+For coding standards, see [../coding-standards.md](../coding-standards.md).
 For git workflow and PR guidance, see [git-workflow.md](git-workflow.md).
 
 ---
@@ -49,7 +49,7 @@ Example workflows live in the `workflows/` directory.
 - **High usability for workflow authors**: Authors must be able to easily figure out the library and create extremely readable workflows with minimal boilerplate
 - **Structured outputs via Instructor**: LLM returns Pydantic objects
 - **Multi-turn conversation**: Stateful orchestrator manages dialogue flow
-- **Dual configuration**: Provider/model in `config.json`, API keys in environment
+- **Dual configuration**: Provider/model/preset in `config.json`, API keys and the gateway endpoint in the environment (`OPENAI_API_KEY`, `OPENAI_BASE_URL`)
 - **Configuration at the edge**: Configuration must only be set/read at the perimeter (CLI, test setup, etc.)
 - **Fail fast**: We are never backwards compatible. If something is configured incorrectly we fail fast instead of using defaults
 - **User-friendly error messages**: All error messages shown to users or workflow authors should be clear and helpful
@@ -115,18 +115,21 @@ The architecture follows these principles. Because we are building a **system th
 #### `config.py` — Configuration Management
 - Singleton configuration manager
 - Reads ONLY from `config.json`
-- Provides: provider, model, temperature, `max_retries`
-- Note: API keys come from environment variables, not config.json
+- Provides: provider, model, temperature, `max_retries`, `api_base`, `api_key_env`
+- Note: API keys and the gateway endpoint (`OPENAI_BASE_URL`) come from the environment, not config.json
 
 ## Development Commands
 
 ```bash
-make                # Set up python venv for development
-make test          # Unit tests only (no API key needed, ~0.01s)
+make                # Create venv, install deps + hooks, create .env from .env.example
+make check          # Lint + typecheck — the gate CI and the pre-push hook run
+make test          # Unit tests only (no API key needed, ~2s)
 make test-verbose  # Same with verbose output per test
-make evals          # Real-API evals (requires config.json + API key, ~90s)
+make evals          # Real-API evals through Cloudflare AI Gateway (~90s)
 make evals-verbose  # Same with verbose output
-make lint           # ruff and basedpyright
+make lint           # ruff check
+make typecheck      # pyrefly against the committed baseline
+make coverage       # Unit tests + coverage.xml
 ```
 
 ## Critical Patterns
@@ -220,6 +223,6 @@ This streams all LLM requests/responses to stderr with timing:
 ## Reference Docs
 
 - [Domain Concepts](../reference/domain-concepts.md) — Vocabulary defined and mapped to the broader LLM ecosystem
-- [Coding Standards](coding-standards.md) — Types, principles, naming, smells
+- [Coding Standards](../coding-standards.md) — Types, principles, naming, smells
 - [Git Workflow](git-workflow.md) — Branching, commits, PR descriptions
 - [testing.md](testing.md) — Full testing strategy and patterns

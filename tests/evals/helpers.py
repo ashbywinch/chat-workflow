@@ -70,7 +70,23 @@ _CONFIG_PATH = _PROJECT_ROOT / "config.json"
 
 
 def make_config() -> Config:
-    return Config(_CONFIG_PATH)
+    """Load the eval config and prove it is pointed at Cloudflare AI Gateway.
+
+    All house LLM traffic goes through the gateway (`skill://cloudflare-ai-gateway`):
+    the gateway owns the provider keys and fails over between them. A preset
+    with the `openai` provider and no explicit `api_base` relies on
+    `OPENAI_BASE_URL`; without it litellm would silently call api.openai.com.
+    """
+    config = Config(_CONFIG_PATH)
+    base_url = os.getenv("OPENAI_BASE_URL", "")
+    if config.provider == "openai" and not config.api_base and (not base_url or "{" in base_url):
+        raise RuntimeError(
+            "OPENAI_BASE_URL is not set (or still contains the .env.example "
+            "placeholder). Evals must route through Cloudflare AI Gateway — run "
+            "`make setup` to create .env from .env.example, fill in the account "
+            "and gateway, then set OPENAI_API_KEY (the gateway token)."
+        )
+    return config
 
 
 def make_tools(io) -> Session:
