@@ -78,11 +78,13 @@ def make_config() -> Config:
     `OPENAI_BASE_URL`; without it litellm would silently call api.openai.com.
     """
     config = Config(_CONFIG_PATH)
-    if config.provider == "openai" and not config.api_base and not os.getenv("OPENAI_BASE_URL"):
+    base_url = os.getenv("OPENAI_BASE_URL", "")
+    if config.provider == "openai" and not config.api_base and (not base_url or "{" in base_url):
         raise RuntimeError(
-            "OPENAI_BASE_URL is not set. Evals must route through Cloudflare AI "
-            "Gateway — run `make setup` to create .env from .env.example, then set "
-            "OPENAI_API_KEY (the gateway token)."
+            "OPENAI_BASE_URL is not set (or still contains the .env.example "
+            "placeholder). Evals must route through Cloudflare AI Gateway — run "
+            "`make setup` to create .env from .env.example, fill in the account "
+            "and gateway, then set OPENAI_API_KEY (the gateway token)."
         )
     return config
 

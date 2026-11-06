@@ -1,6 +1,6 @@
 """Tests for eval helper utilities (token counting, EvalStats)."""
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import tests.evals.helpers as helpers
 from tests.evals.helpers import EvalStats, _token_counter_callback
@@ -40,3 +40,22 @@ class TestEvalStats(unittest.TestCase):
     def test_report_zero_tokens(self):
         stats = EvalStats(test_name="test_bar", duration_s=0.5, agent_tokens=0, judge_tokens=0)
         self.assertEqual(stats.report(), "  [test_bar] 0s  0 agent tok  0 judge tok  0 tot")
+
+
+class TestEvalGatewayConfig(unittest.TestCase):
+    """Evals must fail loudly when the gateway endpoint is missing/placeholder."""
+
+    def test_missing_base_url_is_rejected(self):
+        with patch.dict("os.environ", {}, clear=True), self.assertRaises(RuntimeError):
+            helpers.make_config()
+
+    def test_placeholder_base_url_is_rejected(self):
+        with (
+            patch.dict("os.environ", {"OPENAI_BASE_URL": "https://gateway.example/v1/{ACCOUNT_ID}/{GATEWAY}/compat"}),
+            self.assertRaises(RuntimeError),
+        ):
+            helpers.make_config()
+
+    def test_gateway_base_url_is_accepted(self):
+        with patch.dict("os.environ", {"OPENAI_BASE_URL": "https://gateway.example/v1/account/gateway/compat"}):
+            self.assertEqual(helpers.make_config().provider, "openai")
