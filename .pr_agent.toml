@@ -60,6 +60,11 @@ persistent_comment = true
 [github_action_config]
 handle_push_trigger = true
 push_commands = ["/review", "/improve"]
+# The OpenCode harness pushes commits as an app (`sender.type == "Bot"`).
+# PR-Agent's default skips those synchronize events, so an agent-driven PR
+# would only ever get the initial review and every later push would leave
+# the verify check red. Review every synchronize regardless of sender.
+push_trigger_ignore_bot_commits = false
 # A human posting "/skip" on the PR skips the AI review for that PR
 # (the check-review step passes on it). Deliberate opt-out only — the
 # default is that every PR gets reviewed. Do NOT use /skip on your own
