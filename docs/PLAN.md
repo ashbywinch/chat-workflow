@@ -58,4 +58,4 @@ later one.
 | Docs links | `make docs-check` | a merge |
 | Architecture | `tests/unit/test_architecture.py` | a merge |
 | Coverage | `make coverage` | a merge below the CI floor |
-| Evals | `make evals` | a merge (CI runs the smoke subset on PRs; the full suite runs weekly/manual) |
+| Evals | `make evals` | the weekly/manual CI run (run locally before pushing prompt changes) |
