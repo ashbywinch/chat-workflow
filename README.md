@@ -28,22 +28,35 @@ make
 
 ### Configuration
 
-1. **Edit `config.json`** to set your preferred LLM provider and model:
+1. **`config.json` selects the LLM preset.** The default is `cloudflare`
+   (Cloudflare AI Gateway → `dynamic/fallback2`, OpenCode primary with
+   DeepSeek failover):
 
 ```json
 {
-  "provider": "openrouter",
-  "model": "google/gemini-2.0-flash-lite-001",
-  "temperature": 0.7,
-  "max_retries": 3
+  "llm": {
+    "active": "cloudflare",
+    "presets": {
+      "cloudflare": {
+        "provider": "openai",
+        "model": "openai/dynamic/fallback2",
+        "api_key_env": "OPENAI_API_KEY"
+      }
+    }
+  }
 }
 ```
 
-2. **Set your API key** environment variable:
+2. **Set the gateway credentials** (see `.env.example`; `make setup`
+   creates `.env`):
 
 ```bash
-export OPENROUTER_API_KEY=your-key-here  # or OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
+export OPENAI_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat
+export OPENAI_API_KEY=<gateway token>
 ```
+
+Switching to a direct provider is a preset change in `config.json` (for
+example `openrouter`) plus its key (`OPENROUTER_API_KEY`).
 
 ### Run the Example Workflow
 
@@ -77,6 +90,9 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ide
 | **Building New Workflows** | [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md) |
 | **Contributing to the Framework** | [Contributor Guide](docs/contributors/contributor-guide.md) |
 | **Testing Strategy** | [Testing Guide](docs/contributors/testing.md) |
+| **Coding Standards** | [Coding Standards](docs/coding-standards.md) |
+| **Testing Standards** | [Testing Standards](docs/testing-standards.md) |
+| **Product & Architecture** | [PRD](docs/PRD.md) · [TECHSPEC](docs/TECHSPEC.md) · [PLAN](docs/PLAN.md) · [UX](docs/UX.md) |
 
 **AI Agents**: Read [AGENTS.md](AGENTS.md) for agent-specific onboarding and routing.
 

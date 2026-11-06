@@ -49,12 +49,16 @@ fixable = ["ALL"]
 
 [dependency-groups]
 dev = [
+    "archunitpython>=1.5.0",
     "code-review-graph>=2.3.3",
-]
-
-[project.optional-dependencies]
-dev = [
     "coverage>=7.0.0",
+    "pyrefly>=1.4.1",
     "python-lsp-server>=1.12.0",
     "ruff>=0.11.0",
 ]
+
+[tool.coverage.run]
+source = ["chat_workflow", "workflows", "chat_workflow_cli"]
+
+[tool.coverage.report]
+show_missing = true

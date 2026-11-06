@@ -85,8 +85,10 @@ def test_call_llm_success(self, mock_get_client):
 
 ### 3. Real API Evals (no mocking)
 Evals call a real LLM to verify prompt quality. They require `config.json` with a valid provider
-and the corresponding `OPENROUTER_API_KEY` (or similar) environment variable. They **fail**, not
-skip, when keys are missing — that's intentional.
+and the gateway token (`OPENAI_API_KEY`) plus `OPENAI_BASE_URL`. One-shot
+evals also work against a direct provider by switching the active preset and
+setting that provider's key. They **fail**, not skip, when credentials are
+missing — that's intentional.
 
 > ⚠️ **Security**: See the [agent rules](../../AGENTS.md#rules) for how to safely check
 > that environment variables are set without exposing their values.
@@ -316,22 +318,28 @@ by their file location, making it easy to spot the most expensive evals.
 ### Provider selection & model trade-offs
 
 The eval suite supports switching between LLM providers via `config.json`
-using a preset system:
+using a preset system. The default routes through Cloudflare AI Gateway:
 
 ```json
-{"llm": {"active": "opencode-go",
-         "presets": {"opencode-go": {"provider": "openai",
-                                     "model": "openai/deepseek-v4-flash",
-                                     "api_base": "https://opencode.ai/zen/go/v1",
-                                     "api_key_env": "OPENCODE_GO_EVALS_API_KEY",
-                                     "model_supports_tools": false},
+{"llm": {"active": "cloudflare",
+         "presets": {"cloudflare": {"provider": "openai",
+                                    "model": "openai/dynamic/fallback2",
+                                    "api_key_env": "OPENAI_API_KEY",
+                                    "model_supports_tools": false},
                      "openrouter": {"provider": "openrouter",
                                     "model": "openrouter/google/gemini-2.5-flash-lite",
+                                    "api_key_env": "OPENROUTER_API_KEY",
                                     "model_supports_tools": false}}}}
 ```
 
+The `cloudflare` preset has no `api_base`: litellm reads `OPENAI_BASE_URL`,
+which must point at the gateway compat endpoint. `make setup` creates
+`.env` from `.env.example`, and the eval helper fails loudly if
+`OPENAI_BASE_URL` is missing rather than silently calling api.openai.com.
+
 Set ``"active"`` to the preset name to switch. Shared settings
-(``temperature``, ``max_retries``) stay at the ``llm`` level.
+(``temperature``, ``max_retries``, ``request_timeout_seconds``) stay at the
+``llm`` level.
 
 #### Instructor mode: JSON vs TOOLS
 

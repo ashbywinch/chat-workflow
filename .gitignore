@@ -1,12 +1,23 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+# .gitignore — the house set, curated.
+#
+# DO NOT CHANGE:
+# - Never ignore lockfiles (uv.lock) — committed for reproducibility.
+# - Test fixtures are committed under tests/, never ignored.
+
+# env/secrets
+.env
+.env.local
+*.keystore
+
+# envs/deps
+.venv/
+venv/
+ENV/
+env/
+node_modules/
+dist/
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -16,38 +27,42 @@ parts/
 sdist/
 var/
 wheels/
+
+# caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# build artifacts
 *.egg-info/
 *.egg
 
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
+# agent/tool state
+.sisyphus/
+.opencode/
+.code-review-graph/
+.logs/
+.tools/
 
-# IDEs
+# IDE/OS
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
-.nox/
-test-results/
-
-# OS
 .DS_Store
 Thumbs.db
 
 # Project specific
 *.log
 evaluation_criteria.json
-.opencode/
-.sisyphus/
-# Added by code-review-graph
-.code-review-graph/
+test-results/

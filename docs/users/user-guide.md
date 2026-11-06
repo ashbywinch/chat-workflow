@@ -50,35 +50,52 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluati
 
 ### API Keys
 
-The library supports multiple LLM providers. Set your API key as an environment variable:
+This project routes all LLM traffic through **Cloudflare AI Gateway**
+(`skill://cloudflare-ai-gateway`). The gateway holds the provider keys, so
+you only need the gateway token and its compat endpoint. `make setup`
+copies `.env.example` to `.env`; fill in the token there or export it:
 
 ```bash
-# For OpenRouter
-export OPENROUTER_API_KEY=your-openrouter-key
-
-# For OpenAI
-export OPENAI_API_KEY=your-openai-key
-
-# For Anthropic
-export ANTHROPIC_API_KEY=your-anthropic-key
+export OPENAI_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat
+export OPENAI_API_KEY=<gateway token>
 ```
+
+Forking to a direct provider? Set its key instead (`OPENROUTER_API_KEY`,
+`ANTHROPIC_API_KEY`, …) and switch the active preset.
 
 ### Provider Configuration
 
-Edit `config.json` in the project root to configure your preferred provider and model:
+`config.json` uses presets. The default active preset is `cloudflare`:
 
 ```json
 {
   "llm": {
-    "provider": "openrouter",
-    "model": "openrouter/google/gemini-2.0-flash-lite-001",
+    "active": "cloudflare",
+    "presets": {
+      "cloudflare": {
+        "provider": "openai",
+        "model": "openai/dynamic/fallback2",
+        "api_key_env": "OPENAI_API_KEY"
+      },
+      "openrouter": {
+        "provider": "openrouter",
+        "model": "openrouter/google/gemini-2.5-flash-lite",
+        "api_key_env": "OPENROUTER_API_KEY"
+      }
+    },
     "temperature": 0.7,
     "max_retries": 3
   }
 }
 ```
 
-**Available providers**: `openrouter`, `openai`, `anthropic`, `cohere`, `groq`
+`model` is `openai/dynamic/fallback2`: litellm strips the `openai/` prefix and
+sends `dynamic/fallback2` to `OPENAI_BASE_URL`, where the gateway selects the
+route. `api_base` may be set explicitly in a preset to override the
+environment variable.
+
+**Available providers**: `openrouter`, `openai`, `anthropic`, `groq`,
+`together`, `azure`
 
 **Temperature**: Controls randomness (0.0 = deterministic, 1.0 = creative)
 

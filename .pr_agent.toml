@@ -1,0 +1,74 @@
+# PR-Agent config — the house review contract.
+#
+# CHANGE: `<PROJECT>_API_KEY` -> repo secret name; add/remove docs from
+# repo_context_files as the repo's doc set changes.
+#
+# The house provider is Cloudflare AI Gateway: routes through OpenCode Go
+# (primary) with automatic failover to DeepSeek-direct. For forkers: set
+# your own api_base, model, and OPENAI_KEY secret.
+#
+# DO NOT CHANGE:
+# - api_base points at the house provider. Never let a PR branch override
+#   it (the workflow has no checkout for exactly this reason).
+# - model stays "openai/dynamic/fallback2": the action's handler strips the
+#   openai/ prefix and sends "dynamic/fallback2" to api_base. Cloudflare
+#   routes this to the fallback2 dynamic route (OpenCode -> DeepSeek).
+# - This file applies ONLY when the workflow pins PR_AGENT_CONFIG_BRANCH to
+#   a branch holding it: the action gates repo .pr_agent.toml keys by
+#   per-host allowed-keys, so without the pin the image defaults run
+#   (model gpt-5.6, api_base api.openai.com) and the key is rejected as
+#   "Incorrect API key provided: sk-..." — when that error shows, check the
+#   pin and the branch's file, never the key.
+# - repo_context_files lists ALL the standards + plan docs: the reviewer
+#   reads ONLY these files, so a rule that isn't listed here is invisible
+#   to review.
+# - extra_instructions demands a per-doc Compliance section — this is what
+#   makes the bot enforce the standards instead of rubber-stamping.
+
+[openai]
+custom_llm_provider = "openai"
+api_base = "https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat"
+
+[config]
+model = "openai/dynamic/fallback2"
+custom_model_max_tokens = 128000
+max_model_tokens = 128000
+ai_timeout = 1800
+fallback_models = []
+repo_context_from_default_branch = false
+repo_context_files = [
+    "docs/PRD.md",
+    "docs/TECHSPEC.md",
+    "docs/PLAN.md",
+    "docs/coding-standards.md",
+    "docs/testing-standards.md",
+    "docs/writing-documentation.md",
+    "docs/documentation-structure.md",
+    "docs/ux-standards.md",
+    "docs/UX.md",
+]
+
+[pr_reviewer]
+require_tests_review = true
+require_security_review = true
+num_max_findings = 50
+extra_instructions = "Check the PR against each file in repo_context_files. Before checking compliance, derive the domain glossary from docs/PRD.md and docs/TECHSPEC.md (entities, actions, personas, states, object model), then read the diff against it two ways. Vocabulary: a domain-level name (class, module, public entry point, domain-typed field) using technical or vague words instead of the documented term is a finding. Latent concepts: domain behaviour smeared across several functions or buried inside one, owned by no identifier, is equally a finding — draw it out under a glossary name, proposing a new glossary term where none fits. Generic helper, plumbing, and config-key names are not glossary checks.  Add a 'Compliance' section per doc, listing any violations found or 'No violations'. Flag violations as findings, not just notes: style and semantic deviations from docs/coding-standards.md, test-standard deviations from docs/testing-standards.md, requirement deviations from docs/PRD.md (a change that violates a stated requirement, constraint, persona, or JTBD is a finding), documentation-standard deviations from docs/writing-documentation.md (docs failing the documentation-quality checklist — context efficiency, density, no-duplication, one topic per file), folder-structure deviations from docs/documentation-structure.md (missing or malformed required docs — PRD with JTBD/personas/constraints/user requirements, TECHSPEC with choices/spikes/diagrams, UX.md, PLAN with the software's phase inputs/outputs and quality gates — every doc discoverable from AGENTS.md, skills exempt from reachability since the harness discovers them), and UX deviations from docs/ux-standards.md. Structural findings the standards name are findings too: a missed class (bare dict/tuple/list in a record position), a name that violates the object model or domain-noun rules, and separation-of-concerns violations. Suppression comments are findings when their why fails the evidence bar in docs/coding-standards.md ('Suppressions carry checkable evidence') — review every exemption form that section names (`lucidlint: ignore`, `ignore-file`, `# type: ignore`, `#[allow(...)]`, `# noqa`), not only the lucidlint ones."
+
+[pr_code_suggestions]
+persistent_comment = true
+
+[github_action_config]
+handle_push_trigger = true
+push_commands = ["/review", "/improve"]
+# A human posting "/skip" on the PR skips the AI review for that PR
+# (the check-review step passes on it). Deliberate opt-out only — the
+# default is that every PR gets reviewed. Do NOT use /skip on your own
+# initiative; only when the user explicitly asks.
+skip_commands = ["/skip"]
+
+[litellm]
+# Cloudflare timeout/retry headers — sent as HTTP headers to the gateway.
+# 10 min timeout, 0 retries (client owns retries — see skill://cloudflare-ai-gateway).
+# cf-aig-metadata tags requests for Cloudflare analytics.
+# CHANGE: set repo to the project name and ACCOUNT_ID/GATEWAY to match your Cloudflare gateway.
+extra_headers = '{"cf-aig-request-timeout": "1800000", "cf-aig-max-attempts": "0", "cf-aig-backoff": "exponential", "cf-aig-metadata": "{\"source\":\"review\",\"repo\":\"chat-workflow\"}"}'
