@@ -191,16 +191,6 @@ class AtomicWorkflowStep(Generic[TResult]):
                         event["recovered"] = True
                 return response
             except InstructorRetryException as e:
-                # A plain-text reply is a normal assistant turn that forgot the
-                # JSON envelope. Accept it as `continue` rather than failing the
-                # workflow; the next turn can still produce the structured
-                # result. Malformed JSON is a real validation failure and is
-                # retried below.
-                plain_text = _plain_text_completion(e)
-                if plain_text is not None:
-                    return AgentResponse(
-                        intent=AgentIntent.CONTINUE, message=plain_text
-                    )
                 reason = _retry_reason(e)
                 if (
                     not _is_validation_failure(e)
@@ -307,6 +297,14 @@ def _retry_reason(exc: Exception) -> str:
                     " Write plain ASCII Python: remove Markdown fences, full-width "
                     "characters, and non-ASCII punctuation."
                 )
+            elif "expected value at line 1 column 1" in reason:
+                reason += (
+                    " You replied with plain text instead of JSON. Return only a "
+                    'JSON object: {"intent": "continue", "message": "<your reply '
+                    'to the user>", "result": null} or {"intent": "success", '
+                    '"message": null, "result": {...}}. Put the user-facing text '
+                    "in `message`."
+                )
             elif (
                 "control character" in reason
                 or "EOF while parsing" in reason
@@ -336,23 +334,6 @@ def _completion_text(exc: Exception) -> str | None:
     if isinstance(content, str) and content.strip():
         return content
     return None
-
-
-def _plain_text_completion(exc: Exception) -> str | None:
-    """Return the completion when it is a plain-text assistant turn.
-
-    The model occasionally answers in prose instead of the JSON envelope. That
-    is a valid message to the user, not a corrupt result: treat it as
-    ``continue``. Text that starts with ``{`` or ``[`` is a malformed JSON
-    attempt and must still go through validation retries.
-    """
-    text = _completion_text(exc)
-    if text is None:
-        return None
-    stripped = text.lstrip()
-    if stripped.startswith("{") or stripped.startswith("["):
-        return None
-    return text
 
 
 def _is_validation_failure(exc: Exception) -> bool:
