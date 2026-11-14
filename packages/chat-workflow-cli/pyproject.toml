@@ -1,0 +1,23 @@
+[project]
+name = "chat-workflow-cli"
+version = "0.1.0"
+description = "Command-line interface for chat-workflow"
+requires-python = ">=3.12"
+dependencies = [
+    "chat-workflow",
+    "typer>=0.24.1",
+]
+
+[project.scripts]
+chat-workflow = "chat_workflow_cli.cli:app"
+
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["chat_workflow_cli*"]
+
+[tool.uv.sources]
+chat-workflow = { workspace = true }

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import unittest
+from typing import override
 
 from pydantic import ValidationError
 
@@ -41,6 +42,7 @@ class TestCriterionModel(unittest.TestCase):
 
 
 class TestEvaluationCriteriaModel(unittest.TestCase):
+    @override
     def setUp(self):
         self.valid_criteria = [
             Criterion(name="budget", description="Budget constraint", weight=8.0),
@@ -205,6 +207,7 @@ class TestAgentResponseModel(unittest.TestCase):
 
 
 class TestTurnResultModel(unittest.TestCase):
+    @override
     def setUp(self):
         self.valid_criteria = EvaluationCriteria(
             context="test",

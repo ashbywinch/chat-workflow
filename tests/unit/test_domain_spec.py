@@ -4,6 +4,7 @@ import unittest
 
 from pydantic import ValidationError
 
+from tests.conftest import invalid_model
 from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
 
 
@@ -23,11 +24,12 @@ class TestComponentDomainField(unittest.TestCase):
 
     def test_missing_required_fields_raises_error(self):
         with self.assertRaises(ValidationError):
-            ComponentDomainField()
+            invalid_model(ComponentDomainField)
 
     def test_missing_name_raises_error(self):
         with self.assertRaises(ValidationError):
-            ComponentDomainField(
+            invalid_model(
+                ComponentDomainField,
                 domain_description="some description",
                 field_type_hint="some hint",
             )
@@ -115,11 +117,12 @@ class TestComponentDomainSpec(unittest.TestCase):
 
     def test_missing_required_fields_raises_error(self):
         with self.assertRaises(ValidationError):
-            ComponentDomainSpec()
+            invalid_model(ComponentDomainSpec)
 
     def test_missing_name_raises_error(self):
         with self.assertRaises(ValidationError):
-            ComponentDomainSpec(
+            invalid_model(
+                ComponentDomainSpec,
                 description="Some description",
                 fields=[],
                 what_good_looks_like=[],

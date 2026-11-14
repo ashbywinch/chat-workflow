@@ -36,6 +36,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from urllib.error import HTTPError
 

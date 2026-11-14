@@ -1,0 +1,19 @@
+[project]
+name = "chat-workflow-components"
+version = "0.1.0"
+description = "Chat Workflow components and example workflows"
+requires-python = ">=3.12"
+dependencies = [
+    "chat-workflow",
+]
+
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["workflows*"]
+
+[tool.uv.sources]
+chat-workflow = { workspace = true }

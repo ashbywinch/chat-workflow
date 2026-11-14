@@ -15,6 +15,10 @@ The `EvaluationCriteria` workflow helps users create structured evaluation crite
 
 ## Key Files
 
+Paths are relative to the owning package's `src/` directory
+(`packages/chat-workflow-components/src/` and `packages/chat-workflow-cli/src/`);
+the module names are unchanged by the package split.
+
 | File | Purpose |
 |------|---------|
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |

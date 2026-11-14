@@ -109,6 +109,11 @@ CI (or locally before pushing) as the gate.
 
 ### Key Files for Quick Understanding
 
+Sources live in a `src/` layout under `packages/` — `packages/chat-workflow/src/`,
+`packages/chat-workflow-cli/src/`, and `packages/chat-workflow-components/src/`.
+Paths below are relative to the package's `src/` directory; module names are
+unchanged by the split.
+
 | File | What |
 |------|------|
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
@@ -131,7 +136,7 @@ make evals-verbose  # Same with verbose output
 make coverage       # Unit tests + coverage.xml for CI
 make docs-check     # Every relative markdown link resolves
 make lint           # ruff check
-make typecheck      # pyrefly against the committed baseline
+make typecheck      # pyrefly — zero diagnostics allowed
 ```
 
 ### Evals Cost Rule
@@ -173,6 +178,7 @@ Do not re-run the eval suite just to see something you already captured. Before 
 | [Documentation Structure](docs/documentation-structure.md) | The required doc set and folder layout | Documentation authors |
 | [Testing Guide](docs/contributors/testing.md) | Testing strategy and patterns | Quality assurance |
 | [Testing Standards](docs/testing-standards.md) | Normative testing rules | All contributors |
+| [Core Split Plan](docs/PLAN/core-split.md) | Package layout, dependency rules, and phase order for separating core from components | Contributors doing the split |
 | [Coding Standards](docs/coding-standards.md) | Global standard + Python/project conventions | All contributors |
 | [PRD](docs/PRD.md) | Jobs, personas, requirements and constraints | Product decisions |
 | [TECHSPEC](docs/TECHSPEC.md) | Technology choices, architecture, layer boundaries | Architecture decisions |

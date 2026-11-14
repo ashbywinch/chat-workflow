@@ -2,6 +2,7 @@
 
 import types
 import unittest
+from typing import Any, cast
 from unittest.mock import patch
 
 from chat_workflow_cli.cli import (
@@ -42,13 +43,13 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
         def wf_func():
             pass
 
-        wf_func._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, wf_func)._is_workflow_step = True
 
         def plain_func():
             pass
 
-        module.wf_func = wf_func  # type: ignore[attr-defined]
-        module.plain_func = plain_func  # type: ignore[attr-defined]
+        cast(Any, module).wf_func = wf_func
+        cast(Any, module).plain_func = plain_func
 
         result = discover_workflow_functions(module)
         self.assertEqual(result, {"wf_func": wf_func})
@@ -59,7 +60,7 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
         def plain_func():
             pass
 
-        module.plain_func = plain_func  # type: ignore[attr-defined]
+        cast(Any, module).plain_func = plain_func
 
         result = discover_workflow_functions(module)
         self.assertEqual(result, {})
@@ -92,9 +93,9 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
         def my_workflow(context: str = "", *, tools):
             pass
 
-        my_workflow._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, my_workflow)._is_workflow_step = True
 
-        fake_module.my_workflow = my_workflow  # type: ignore[attr-defined]
+        cast(Any, fake_module).my_workflow = my_workflow
 
         with patch("chat_workflow_cli.cli.importlib.import_module", return_value=fake_module):
             sub_app = _build_workflow_sub_app("test_workflow")

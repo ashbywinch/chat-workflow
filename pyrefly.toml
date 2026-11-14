@@ -13,8 +13,9 @@
 #   sane gate — `--check-all` is ~13x errors of unannotated-internals noise.
 # - missing-override-decorator + missing-super-call are the two default-off
 #   rules with real signal (DAG-style structural typing + __init__ hygiene).
-# - The baseline lock in scripts/pyrefly-lock.py is the gate, NOT this
-#   file — pyrefly's OWN baseline is one-way and misses stale entries.
+# - There is NO baseline: the codebase is at zero diagnostics, so any new
+#   error fails `make typecheck`. Fix the code; do not reintroduce a
+#   suppression file.
 
 preset = "default"
 

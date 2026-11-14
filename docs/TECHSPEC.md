@@ -31,17 +31,22 @@ flowchart TD
 
 ### Layer boundaries (enforced)
 
-`tests/unit/test_architecture.py` asserts, with absolute path globs:
+`tests/unit/test_architecture.py` asserts, by scanning production imports:
 
-- `chat_workflow/` (the core) may not import `workflows/` or
-  `chat_workflow_cli/`.
-- `workflows/` may import the core; it may not import the CLI.
-- `chat_workflow_cli/` is the composition root and may import both.
+- `packages/chat-workflow/src/chat_workflow/` (the core) may not import
+  `workflows/` or `chat_workflow_cli/`.
+- `packages/chat-workflow-components/src/workflows/` may import the core; it
+  may not import the CLI.
+- `packages/chat-workflow-cli/src/chat_workflow_cli/` is the composition root
+  and may import both.
 
 The architecture test encodes the layering as designed now; a deliberate
 layering change updates the test in the same commit.
 
 ## Object model
+
+Paths below are relative to the owning package's `src/` directory
+(`packages/<package>/src/`); module names are unchanged by the package split.
 
 | Concept | Owner | Contract |
 |---|---|---|
@@ -81,7 +86,7 @@ is an atomic or composite workflow step. Further vocabulary:
 | Cloudflare AI Gateway is the eval/CI provider | Direct OpenRouter/OpenCode keys per repo | R5: one credential, failover, analytics |
 | Instructor JSON mode by default | Forced tool calling | R5: DeepSeek V4 thinking mode rejects forced `tool_choice` |
 | `unittest` for the eval harness | pytest | Evals need module discovery and a wall-clock timeout wrapper |
-| Pyrefly with a both-direction baseline lock | basedpyright, mypy | A large existing codebase; the lock catches new and stale diagnostics |
+| Pyrefly, zero-diagnostic gate | basedpyright, mypy, committed baseline files | No baseline to drift or re-key; a diagnostic is fixed in the code |
 | No server or database | Web service | The library runs in the caller's process |
 
 ## Security and operations

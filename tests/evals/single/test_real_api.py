@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import unittest
+from typing import cast
 
 from chat_workflow import (
     AgentIntent,
@@ -60,9 +61,12 @@ class TestRealAPI(unittest.TestCase):
                         "content": "Create criteria for choosing a birthday gift. My budget is $50.",
                     }
                 ],
-                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
-                on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message),
+                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
+                # AgentResponse guarantees a result on a SUCCESS turn.
+                on_success=lambda action: TurnResult[EvaluationCriteria].success(
+                    cast(EvaluationCriteria, action.result)
+                ),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or ""),
             )
         )
 
@@ -151,9 +155,12 @@ class TestRealAPI(unittest.TestCase):
                         "content": "I want to evaluate coffee makers. Budget is $200.",
                     }
                 ],
-                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
-                on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message),
+                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
+                # AgentResponse guarantees a result on a SUCCESS turn.
+                on_success=lambda action: TurnResult[EvaluationCriteria].success(
+                    cast(EvaluationCriteria, action.result)
+                ),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or ""),
             )
         )
 
@@ -240,9 +247,12 @@ class TestRealAPI(unittest.TestCase):
                         "content": "I want to create criteria for choosing a laptop. My budget is $1000.",
                     }
                 ],
-                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
-                on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message),
+                on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
+                # AgentResponse guarantees a result on a SUCCESS turn.
+                on_success=lambda action: TurnResult[EvaluationCriteria].success(
+                    cast(EvaluationCriteria, action.result)
+                ),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or ""),
             )
         )
 

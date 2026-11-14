@@ -7,6 +7,7 @@ The generic else branch must keep the sanitized str(error)[:200] display.
 """
 
 import unittest
+from typing import override
 from unittest.mock import patch
 
 from typer import Exit as TyperExit
@@ -22,6 +23,7 @@ from chat_workflow.exceptions import (
 class TestHandleError(unittest.TestCase):
     """handle_error must never leak tracebacks to users."""
 
+    @override
     def setUp(self):
         self.patcher = patch("chat_workflow_cli.runner.typer.secho")
         self.mock_secho = self.patcher.start()

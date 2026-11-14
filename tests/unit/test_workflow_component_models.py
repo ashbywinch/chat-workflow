@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from pydantic import ValidationError
 
 from chat_workflow.mixins import get_blob_fields
+from tests.conftest import invalid_model
 from workflows.workflow.component import Component
 from workflows.workflow.component_spec import ComponentSpec
 from workflows.workflow.models import (
@@ -106,7 +107,7 @@ class TestWorkflowModel(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            WorkflowSpec()
+            invalid_model(WorkflowSpec)
 
     def test_gap_analysis_optional(self):
         wf = self.make_valid_workflow()
@@ -150,7 +151,7 @@ class TestComponentModel(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            Component()
+            invalid_model(Component)
 
 
 if __name__ == "__main__":

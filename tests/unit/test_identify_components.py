@@ -2,6 +2,7 @@
 and _resolve_gaps."""
 
 import unittest
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
@@ -168,7 +169,7 @@ class TestResolveGaps(unittest.TestCase):
         )
 
         session = _make_session()
-        session.raw_io.prompt.return_value = ""
+        cast(MagicMock, session.raw_io).prompt.return_value = ""
         components, gaps = _resolve_gaps(
             analysis=_make_analysis(),
             inputs=_make_inputs(),
@@ -219,7 +220,7 @@ class TestResolveGaps(unittest.TestCase):
         ]
 
         session = _make_session()
-        session.raw_io.prompt.return_value = ""
+        cast(MagicMock, session.raw_io).prompt.return_value = ""
         components, gaps = _resolve_gaps(
             analysis=_make_analysis(),
             inputs=_make_inputs(),

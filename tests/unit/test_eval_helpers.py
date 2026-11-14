@@ -1,5 +1,6 @@
 """Tests for eval helper utilities (token counting, EvalStats)."""
 import unittest
+from typing import override
 from unittest.mock import MagicMock, patch
 
 import tests.evals.helpers as helpers
@@ -7,6 +8,7 @@ from tests.evals.helpers import EvalStats, _token_counter_callback
 
 
 class TestTokenCounter(unittest.TestCase):
+    @override
     def setUp(self):
         helpers._token_count = 0
 

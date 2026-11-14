@@ -26,7 +26,8 @@ class TestConfig(unittest.TestCase):
     def test_invalid_json_raises_error(self):
         from chat_workflow import ConfigFileError
 
-        temp_path = tempfile.mktemp(suffix=".json")
+        fd, temp_path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
         try:
             with open(temp_path, "w") as f:
                 f.write("not valid json {{{")
@@ -38,7 +39,8 @@ class TestConfig(unittest.TestCase):
     def test_io_error_raises_config_file_error(self):
         from chat_workflow import ConfigFileError
 
-        temp_path = tempfile.mktemp(suffix=".json")
+        fd, temp_path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
         try:
             with open(temp_path, "w") as f:
                 json.dump({"llm": {"provider": "x", "model": "y"}}, f)

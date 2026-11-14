@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from pydantic import ValidationError
 
+from tests.conftest import invalid_model
 from workflows.workflow import ComponentSourceCode
 from workflows.workflow.models import (
     ComponentSpec,
@@ -29,7 +30,7 @@ class TestProcessDefinition(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            ProcessDefinition()
+            invalid_model(ProcessDefinition)
 
 
 class TestResource(unittest.TestCase):
@@ -53,7 +54,7 @@ class TestResource(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            Resource()
+            invalid_model(Resource)
 
 
 class TestDeliverable(unittest.TestCase):
@@ -71,7 +72,7 @@ class TestDeliverable(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            Deliverable()
+            invalid_model(Deliverable)
 
     def test_consumer_must_not_be_the_artifact(self):
         with self.assertRaises(ValidationError):
@@ -123,7 +124,7 @@ class TestComponentSpec(unittest.TestCase):
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            ComponentSpec()
+            invalid_model(ComponentSpec)
 
     def test_name_ending_in_activity_is_rejected(self):
         with self.assertRaises(ValidationError) as ctx:
@@ -160,7 +161,7 @@ class TestComponentSourceCode(unittest.TestCase):
 
     def test_missing_code(self):
         with self.assertRaises(ValidationError):
-            ComponentSourceCode()
+            invalid_model(ComponentSourceCode)
 
 
 if __name__ == "__main__":

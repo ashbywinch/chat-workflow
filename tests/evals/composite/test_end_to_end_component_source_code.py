@@ -10,6 +10,7 @@ This test:
 """
 
 import importlib
+import importlib.util
 import sys
 import tempfile
 import unittest
@@ -124,6 +125,7 @@ class TestEndToEndComponentSourceCodeEval(unittest.TestCase):
                 self.assertIsNotNone(
                     spec, f"Could not create spec for {component.code_path}"
                 )
+                assert spec is not None and spec.loader is not None
                 mod = importlib.util.module_from_spec(spec)
                 sys.modules[module_name] = mod
                 spec.loader.exec_module(mod)

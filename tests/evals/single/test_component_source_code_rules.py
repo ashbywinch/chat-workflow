@@ -7,6 +7,7 @@ These tests call real LLM APIs and require config.json + API key.
 """
 
 import unittest
+from typing import override
 
 from tests.conftest import timeout
 from tests.evals.helpers import make_config
@@ -25,6 +26,7 @@ class TestComponentSourceCodeLlmValidationEval(unittest.TestCase):
     catch structural and quality issues in generated component code.
     """
 
+    @override
     def setUp(self):
         self.config = make_config()
 

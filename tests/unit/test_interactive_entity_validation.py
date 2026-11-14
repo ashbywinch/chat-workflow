@@ -13,6 +13,7 @@ When the validation system is implemented:
 """
 
 import unittest
+from typing import Any, cast
 
 from pydantic import Field
 
@@ -45,7 +46,7 @@ class TestInteractiveEntityFieldValidation(unittest.TestCase):
             score: int = Field(default=0, ge=0)
 
         with self.assertRaises(ValidationError):
-            ScoredEntity(score=-5)
+            ScoredEntity(score=cast(Any, -5))
 
     def test_le_constraint_rejects_above_maximum(self):
         """FAILS: Field(le=100) raises pydantic.ValidationError,
@@ -55,7 +56,7 @@ class TestInteractiveEntityFieldValidation(unittest.TestCase):
             score: int = Field(default=0, ge=0, le=100)
 
         with self.assertRaises(ValidationError):
-            ScoredEntity(score=200)
+            ScoredEntity(score=cast(Any, 200))
 
     def test_multiple_constraints_reject_invalid(self):
         """FAILS: Multiple Field constraints raise pydantic.ValidationError,

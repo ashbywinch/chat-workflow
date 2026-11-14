@@ -1,6 +1,7 @@
 """Unit tests for ComponentSourceCode.generate() with ComponentDesignSpec."""
 
 import unittest
+from typing import override
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import AgentIntent, AgentResponse, Session, SessionLog
@@ -63,6 +64,7 @@ def _make_design_spec(**overrides) -> ComponentDesignSpec:
 class TestComponentSourceCodeGenerate(unittest.TestCase):
     """Tests for ComponentSourceCode.generate() with ComponentDesignSpec."""
 
+    @override
     def setUp(self):
         self.design_spec = _make_design_spec()
         self.session = Session(

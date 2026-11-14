@@ -3,8 +3,8 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Annotated, ClassVar
-from unittest.mock import patch
+from typing import Annotated, Any, ClassVar, cast
+from unittest.mock import MagicMock, patch
 
 from pydantic import Field
 
@@ -174,7 +174,7 @@ class TestLLMValidated(unittest.TestCase):
         self.assertIn("name", rules)
         self.assertEqual(rules["name"], ["Must be non-empty", "Must be unique"])
 
-        desc = TestModel.model_fields["name"].description
+        desc = TestModel.model_fields["name"].description or ""
         self.assertIn("Must be non-empty", desc)
         self.assertIn("Must be unique", desc)
 
@@ -193,7 +193,7 @@ class TestLLMValidated(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_validate_llm_rules_called_when_mocked(self, mock_get_client):
         """LLM validation runs when get_client is mocked to return a passing result."""
-        mock_instance = unittest.mock.MagicMock()
+        mock_instance = MagicMock()
         mock_instance.chat.completions.create.return_value = RuleVerdicts(verdicts=[])
         mock_get_client.return_value = mock_instance
 
@@ -208,7 +208,7 @@ class TestLLMValidated(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_validation_error_on_violation(self, mock_get_client):
         """Should raise ValidationError when the judge reports a cited violation."""
-        mock_instance = unittest.mock.MagicMock()
+        mock_instance = MagicMock()
         mock_instance.chat.completions.create.return_value = RuleVerdicts(
             verdicts=[
                 RuleVerdict(
@@ -228,14 +228,14 @@ class TestLLMValidated(unittest.TestCase):
 
         model = TestModel.model_construct(name="ab")
         with self.assertRaises(ValidationError) as ctx:
-            model.validate_llm_rules()
+            cast(Any, model).validate_llm_rules()
 
         self.assertIn("Must be at least 3 chars", str(ctx.exception))
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_failed_verdict_without_evidence_is_discarded(self, mock_get_client):
         """A failed verdict with no evidence is ignored, per the judge contract."""
-        mock_instance = unittest.mock.MagicMock()
+        mock_instance = MagicMock()
         mock_instance.chat.completions.create.return_value = RuleVerdicts(
             verdicts=[
                 RuleVerdict(
@@ -254,7 +254,7 @@ class TestLLMValidated(unittest.TestCase):
 
         model = TestModel.model_construct(name="ab")
 
-        model.validate_llm_rules()
+        cast(Any, model).validate_llm_rules()
 
 
 if __name__ == "__main__":
