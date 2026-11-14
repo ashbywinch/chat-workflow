@@ -136,14 +136,15 @@ class ComponentDomainSpec(LLMValidated):
         confirmation, acknowledge it and ask about the assistant's expertise
         separately; otherwise ask about quality once. Then return "success".
 
-        Only after the user has responded to the field list, ask about the
-        expertise the assistant should bring — in their words, not as a job
-        title: "Would it help if I acted as someone who knows how to structure
-        meeting highlights?" Do not introduce a role title the user has not
-        used; if you propose one, mark it as a suggestion and confirm it
-        separately. For meeting minutes, the owner is the meeting organizer or
-        chair; a scribe records the notes, which is neither the owner nor the
-        assistant's expertise. A field list derived from the responsibilities
+        Only after the user has responded to the field list, confirm the
+        expertise in plain language: "Would it help if I focused on structuring
+        the highlights?" The expertise is your choice, inferred from the
+        artifact; never ask the user to choose a job title or ask "what title
+        should I act as?" For meeting minutes, the owner is the meeting
+        organizer or chair; a scribe records the notes, which is neither the
+        owner nor the assistant's expertise. If the user offers a sample or
+        moves to the next practical step, accept and follow it; do not divert
+        to the role question. A field list derived from the responsibilities
         is a draft for approval, not a hypothesis dump. Return at least one
         field and one quality criterion.
 

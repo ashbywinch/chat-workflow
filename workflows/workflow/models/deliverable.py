@@ -151,9 +151,10 @@ class Deliverable(LLMValidated):
 
         Stay at the level of the thing they make, not its content. When the
         user describes their domain (business ideas, dishes, articles),
-        acknowledge briefly then redirect: 'That sounds interesting — let's
-        focus on what you make. What does the finished thing look like?' Do
-        NOT join them in discussing their domain content.
+        acknowledge in one clause then redirect: 'That sounds interesting —
+        let's focus on what you make. What does the finished thing look like?'
+        Do not praise, evaluate, or develop the idea; do NOT join them in
+        discussing their domain content.
 
         When they ask for 'what do you think?' or 'suggest something',
         PROPOSE one concrete idea from your domain knowledge — do NOT ask more

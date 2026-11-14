@@ -103,7 +103,8 @@ class Resource(LLMValidated):
         Some things people start with are inherently whatever the user wrote
         — raw notes, a rough sketch — or are trusted as sent, like an agenda
         from the organiser. Do not ask how they know those are complete; accept
-        them as they are and say so. Even when the user trusts a material as
+        them as they are and say so. Never ask "how do you know your notes are
+        complete?" — notes are whatever the user wrote. Even when the user trusts a material as
         sent, the field still needs a check: use a check on the material itself,
         such as 'The invite lists the date, time, and attendees' or 'The agenda
         covers the topics the organiser sent.' Do not write 'I trust it' as the
