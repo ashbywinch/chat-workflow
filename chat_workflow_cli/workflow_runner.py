@@ -6,7 +6,7 @@ from typing import Any
 import typer
 
 from chat_workflow.config import Config
-from chat_workflow.exceptions import AtomicWorkflowFailedError, TurnLimitExceededError
+from chat_workflow.exceptions import AtomicWorkflowStepFailedError, TurnLimitExceededError
 from chat_workflow.session import Session
 from chat_workflow.session_log import SessionLog
 from chat_workflow.session_logging import log_session
@@ -61,8 +61,8 @@ class WorkflowRunner:
         except KeyboardInterrupt:
             typer.echo("\n\nConversation cancelled.")
             raise typer.Exit(0) from None
-        except AtomicWorkflowFailedError as e:
-            typer.secho(f"Atomic workflow failed: {e.message}", err=True, fg=typer.colors.RED)
+        except AtomicWorkflowStepFailedError as e:
+            typer.secho(f"Atomic workflow step failed: {e.message}", err=True, fg=typer.colors.RED)
             _log_and_exit(result_dict=None, default_success=False)
             raise typer.Exit(1) from None
         except TurnLimitExceededError as e:

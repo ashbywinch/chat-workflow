@@ -10,7 +10,13 @@ from pydantic import Field
 
 from chat_workflow.annotations import Blob, Validation
 from chat_workflow.exceptions import ValidationError
-from chat_workflow.mixins import BlobSyncMixin, LLMValidated, get_blob_fields
+from chat_workflow.mixins import (
+    BlobSyncMixin,
+    LLMValidated,
+    RuleVerdict,
+    RuleVerdicts,
+    get_blob_fields,
+)
 
 
 class TestBlob(unittest.TestCase):
@@ -187,6 +193,9 @@ class TestLLMValidated(unittest.TestCase):
     @patch("chat_workflow.llm_interaction.get_client")
     def test_validate_llm_rules_called_when_mocked(self, mock_get_client):
         """LLM validation runs when get_client is mocked to return a passing result."""
+        mock_instance = unittest.mock.MagicMock()
+        mock_instance.chat.completions.create.return_value = RuleVerdicts(verdicts=[])
+        mock_get_client.return_value = mock_instance
 
         class TestModel(LLMValidated):
             name: str = Field(...)
@@ -198,12 +207,19 @@ class TestLLMValidated(unittest.TestCase):
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_validation_error_on_violation(self, mock_get_client):
-        """Should raise ValidationError when LLM reports violations."""
+        """Should raise ValidationError when the judge reports a cited violation."""
         mock_instance = unittest.mock.MagicMock()
-        mock_response = unittest.mock.MagicMock(spec_set=["valid", "violations"])
-        mock_response.valid = False
-        mock_response.violations = ["Rule 1 violated", "Rule 2 violated"]
-        mock_instance.chat.completions.create.return_value = mock_response
+        mock_instance.chat.completions.create.return_value = RuleVerdicts(
+            verdicts=[
+                RuleVerdict(
+                    rule="[name] Must be at least 3 chars",
+                    passed=False,
+                    explanation="'ab' has only 2 characters",
+                    evidence="name='ab'",
+                    fix="replace name 'ab' with a name of at least 3 characters",
+                )
+            ]
+        )
         mock_get_client.return_value = mock_instance
 
         class TestModel(LLMValidated):
@@ -214,7 +230,31 @@ class TestLLMValidated(unittest.TestCase):
         with self.assertRaises(ValidationError) as ctx:
             model.validate_llm_rules()
 
-        self.assertIn("Rule 1 violated", str(ctx.exception))
+        self.assertIn("Must be at least 3 chars", str(ctx.exception))
+
+    @patch("chat_workflow.llm_interaction.get_client")
+    def test_failed_verdict_without_evidence_is_discarded(self, mock_get_client):
+        """A failed verdict with no evidence is ignored, per the judge contract."""
+        mock_instance = unittest.mock.MagicMock()
+        mock_instance.chat.completions.create.return_value = RuleVerdicts(
+            verdicts=[
+                RuleVerdict(
+                    rule="[name] Must be at least 3 chars",
+                    passed=False,
+                    explanation="no citation supplied",
+                    evidence=None,
+                )
+            ]
+        )
+        mock_get_client.return_value = mock_instance
+
+        class TestModel(LLMValidated):
+            _skip_llm_validation = False
+            name: Annotated[str, Validation("Must be at least 3 chars")] = Field(...)
+
+        model = TestModel.model_construct(name="ab")
+
+        model.validate_llm_rules()
 
 
 if __name__ == "__main__":

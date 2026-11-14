@@ -1,50 +1,140 @@
 # ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import Field, model_validator
 
-from chat_workflow import atomic_workflow
-from chat_workflow.conversation_rules import NO_EXECUTOR_MODE, ONE_GUESS, SYNTHESIZES_HONESTLY
+from chat_workflow import atomic_workflow_step
+from chat_workflow.mixins import LLMValidated
 
 from .process_definition import ProcessDefinition
 
+_NO_EXECUTOR_MODE: tuple[str, str] = (
+    "No executor mode",
+    "The assistant defines what good looks like — it does not generate "
+    "content or execute the process for the user.",
+)
 
-class Deliverable(BaseModel):
+
+class Deliverable(LLMValidated):
     """A single workflow deliverable."""
+
+    _validation_rules: ClassVar[list[str]] = [
+        "The success criteria are a check someone can apply when the "
+        "deliverable is produced — not an after-the-fact outcome like 'no one "
+        "complains' or 'everyone is happy', and not just its format.",
+        "The integration points say what happens to it after it is made: "
+        "who receives it next and what they do with it, or that it stays "
+        "with the user and is not handed on. The storage requirements say "
+        "where it is kept. Neither restates what it contains.",
+        "If the name alone is ambiguous, the description explains what the "
+        "deliverable contains.",
+    ]
 
     name: str = Field(
         ...,
-        description="Name of the deliverable, e.g. 'Meeting Minutes', 'Invoice PDF'",
+        description="What the person calls what they make, e.g. 'Meeting Minutes', 'Invoice PDF'",
         min_length=1,
     )
     description: str | None = Field(
         default=None,
-        description="Plain-English description of what this deliverable contains — "
+        description="Plain-English description of what it contains — "
         "required unless the name alone is unambiguous (e.g. 'Invoice' is clear; "
         "'Widget' is not).",
     )
-    consumer: str = Field(..., description="Which components use this deliverable", min_length=1)
-    format: str = Field(..., description="Exact format/structure", min_length=1)
-    success_criteria: str = Field(..., description="How to measure deliverable quality", min_length=1)
-    integration_points: str = Field(..., description="How deliverables connect downstream")
-    storage_requirements: str = Field(..., description="Where/how deliverables are preserved")
+    consumer: str = Field(
+        ...,
+        description="Who uses or receives it (a person, role, or team)",
+        min_length=1,
+    )
+    format: str = Field(
+        ...,
+        description="Its exact shape or layout (e.g. 'one-page PDF', 'shared spreadsheet')",
+        min_length=1,
+    )
+    success_criteria: str = Field(
+        ...,
+        description=(
+            "A check someone can apply when the deliverable is produced — not "
+            "an after-the-fact outcome and not just its format"
+        ),
+        min_length=1,
+    )
+    integration_points: str = Field(
+        ...,
+        description="Who receives it next, and what they do with it",
+        min_length=1,
+    )
+    storage_requirements: str = Field(
+        ...,
+        description="Where it is kept",
+        min_length=1,
+    )
 
-    @atomic_workflow(conversation_validation_rules=[ONE_GUESS, SYNTHESIZES_HONESTLY, NO_EXECUTOR_MODE])
+    @model_validator(mode="after")
+    def _consumer_is_a_party(self) -> Deliverable:
+        """The consumer is a person, role, or team — not the artifact itself."""
+        if self.consumer.strip().casefold() == self.name.strip().casefold():
+            raise ValueError(
+                "consumer must be a person, role, or team, not the deliverable itself"
+            )
+        return self
+
+    @atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
     @classmethod
     def generate_from_chat(
         cls,
-        analysis: Annotated[ProcessDefinition | None, "The process definition, if already available"] = None,
+        analysis: Annotated[
+            ProcessDefinition | None,
+            "What the person has already told you about how their work happens",
+        ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Deliverable]:
-        """Help someone describe what they create. Greet warmly and
-        explain your purpose before anything else. If they mention
-        something common (meeting minutes, invoices), suggest its
-        standard structure from your expertise.
+        """Help someone describe what they make. Say in one sentence what you
+        are doing, then reflect back what they said. If they name something
+        common (meeting minutes, invoices), propose its standard shape
+        immediately as a draft for confirmation — do not ask who it is for
+        before offering the shape.
 
-        Keep the conversation in their language, not business terms.
-        When they ask for ideas, suggest them. Don't repeat questions.
-        Return success when you have enough for the model.
+        Match the user's register: use the words they use, and never introduce
+        a term for the output shape, a field, or the framework. Never say
+        'deliverable' to the user; say 'the thing you make'. If they speak
+        plainly, speak plainly; if they use specialist terms, use theirs. Ask
+        who it is for, what it looks like, how they know it is good enough,
+        who it is handed to next and what happens then, and where it is kept —
+        in whatever words fit the user. Make sure the criterion can be checked
+        the moment the thing exists, rather than waiting for an outcome like
+        'no one complains' or 'everyone is happy'. If the user gives an
+        outcome, propose a concrete check from your domain knowledge (for
+        minutes: every decision has a reason, every action item has an owner
+        and due date, the attendee list is complete) and ask them to confirm.
+
+        Ask each question once. When the user answers, accept the answer and
+        move on; never ask the same substantive question again.
+
+        If the user says they do not make anything, find the artifact in what
+        they do — a plan, a list, a schedule, a document — and name it as a
+        draft: 'It sounds like you make a weekly meal plan; does that fit?'
+        Do not give up while there is something they produce. Use failure only
+        if they reject every concrete proposal.
+
+        When you summarize or confirm, describe the thing they make in the
+        user's words. Never use 'name', 'description', 'consumer', 'format',
+        'success criteria', 'integration points', or 'storage requirements' —
+        those are your labels, not theirs. Say what it is, who it is for, what
+        it looks like, how they know it is good, who gets it next, and where
+        it is kept. Write a short paragraph; never a labelled list. Do not
+        make them fill in a form.
+
+        Stay at the level of the thing they make, not its content. When the
+        user describes their domain (business ideas, dishes, articles),
+        acknowledge briefly then redirect: 'That sounds interesting — let's
+        focus on what you make. What does the finished thing look like?' Do
+        NOT join them in discussing their domain content.
+
+        When they ask for 'what do you think?' or 'suggest something',
+        PROPOSE one concrete idea from your domain knowledge — do NOT ask more
+        questions or say 'how would you like to structure it'.
         """
         ...  # type: ignore[reportReturnType]

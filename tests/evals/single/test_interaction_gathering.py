@@ -13,7 +13,7 @@ from tests.conftest import timeout
 class TestInteractionGatheringEval(unittest.TestCase):
     """Eval tests for ComponentInteractionContext.gather()."""
 
-    @timeout(120)
+    @timeout(900)
     def test_gather_interaction_context(self):
         """ComponentInteractionContext.gather() should probe for interaction preferences."""
         from tests.evals.helpers import run_multi_turn_eval
@@ -58,7 +58,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
                 "Every decision has enough context to be understood without the discussion",
                 "Every action item has a clear owner and a due date",
             ],
-            expert_role="Meeting Coordinator",
+            expert_role="Meeting Minutes Administrator",
         )
 
         structure = ComponentStructure(

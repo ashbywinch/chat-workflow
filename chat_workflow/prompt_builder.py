@@ -4,24 +4,31 @@ This module provides utilities for introspecting decorated workflow
 functions and generating structured sections (parameters, formatted
 docstrings) for inclusion in LLM system prompts.
 
-It is consumed by the ``@atomic_workflow`` / ``@composite_workflow`` decorator machinery
+It is consumed by the ``@atomic_workflow_step`` / ``@composite_workflow_step`` decorator machinery
     in :mod:`chat_workflow.decorators`.
 """
 
 import inspect
+import json
+import types
+import typing
 from collections.abc import Callable
 from typing import Any
+
+from pydantic import BaseModel
 
 from .metadata import (
     _format_param_value,
     _format_type_name,
     _get_param_description,
     _get_typed_hint,
+    _unwrap_annotated,
 )
 
-# Internal params that the @atomic_workflow decorator consumes and should NOT
+# Internal params that the @atomic_workflow_step decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
-_INTERNAL_PARAMS: frozenset[str] = frozenset({"session", "debug", "cls"})
+# ``max_turns`` is an orchestration knob, not content; the model cannot use it.
+_INTERNAL_PARAMS: frozenset[str] = frozenset({"session", "debug", "cls", "max_turns"})
 
 
 def _format_docstring(docstring: str | None, **kwargs) -> str:
@@ -44,6 +51,10 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
 
     if not docstring:
         return ""
+
+    # Remove the source indentation before formatting; otherwise every prompt
+    # inherits the method's 8-12 space gutter.
+    docstring = inspect.cleandoc(docstring)
 
     # Pattern to match {identifier.method_name()} - method calls on objects
     # This handles cases like {initial_object.model_dump()}
@@ -77,7 +88,34 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
         return processed
 
 
-def _build_params_section(func: Callable[..., Any], runtime_kwargs: dict[str, Any]) -> str:
+def _model_for_hint(hint: Any) -> type[BaseModel] | None:
+    """Return the Pydantic model behind a parameter hint, if any.
+
+    Handles ``Model``, ``list[Model]``, ``Model | None`` and
+    ``list[Model] | None`` (including ``Annotated`` wrappers).
+    """
+    hint = _unwrap_annotated(hint)
+    origin = typing.get_origin(hint)
+    if origin is typing.Union or origin is types.UnionType:
+        args = [arg for arg in typing.get_args(hint) if arg is not type(None)]
+        if len(args) == 1:
+            return _model_for_hint(args[0])
+        return None
+    if isinstance(hint, type) and issubclass(hint, BaseModel):
+        return hint
+    if origin is list:
+        args = typing.get_args(hint)
+        if args:
+            return _model_for_hint(args[0])
+    return None
+
+
+def _build_params_section(
+    func: Callable[..., Any],
+    runtime_kwargs: dict[str, Any],
+    *,
+    skip_shapes: frozenset[str] = frozenset(),
+) -> str:
     """Build a ``## Parameters`` section from the function signature.
 
     For every user-defined parameter (excluding internal plumbing like
@@ -120,6 +158,14 @@ def _build_params_section(func: Callable[..., Any], runtime_kwargs: dict[str, An
             parts.append(f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}")
         elif param.default is not inspect.Parameter.empty:
             parts.append(f"\n  Default: {_format_param_value(param.default)}")
+
+        # Include the annotated shape of Pydantic model parameters. The value
+        # above shows data; the schema shows the field descriptions and
+        # constraints the model needs.
+        model = _model_for_hint(_get_typed_hint(func, param_name))
+        if model is not None and model.__name__ not in skip_shapes:
+            schema = json.dumps(model.model_json_schema(), indent=2)
+            parts.append(f"\n  Shape:\n```json\n{schema}\n```")
 
         lines.append("".join(parts))
 

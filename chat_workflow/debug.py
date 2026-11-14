@@ -54,7 +54,7 @@ class StreamingDebug:
 
     Usage:
         debug = StreamingDebug()
-        workflow = AtomicWorkflow(..., debug=debug)
+        workflow = AtomicWorkflowStep(..., debug=debug)
     """
 
     def __init__(self, file: Any = None, include_timestamps: bool = True):

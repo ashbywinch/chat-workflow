@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Annotated, Self
+from typing import Annotated, ClassVar, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
+from chat_workflow.mixins import LLMValidated
 
 
 class Criterion(BaseModel):
@@ -32,7 +33,7 @@ class Criterion(BaseModel):
     )
 
 
-class EvaluationCriteria(BaseModel):
+class EvaluationCriteria(LLMValidated):
     """A list of criteria for evaluating possible choices in a specific context.
 
     For example, evaluating options for a planned purchase.
@@ -42,6 +43,13 @@ class EvaluationCriteria(BaseModel):
         context: Context for these evaluation criteria
             (e.g., 'Birthday presents for a 7-year-old child').
     """
+
+    _validation_rules: ClassVar[list[str]] = [
+        "Each criterion is specific to the user's context, not a generic "
+        "criterion that could apply to any decision.",
+        "The weights reflect the user's stated priorities, not arbitrary defaults.",
+        "The criteria cover the trade-offs the user actually faces.",
+    ]
 
     criteria: list[Criterion] = Field(
         default_factory=list,
@@ -53,7 +61,7 @@ class EvaluationCriteria(BaseModel):
         description="Context for these evaluation criteria (e.g., 'Birthday presents for a 7-year-old child')",
     )
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def generate_from_chat(
         cls,
@@ -65,12 +73,20 @@ class EvaluationCriteria(BaseModel):
         creating good evaluation criteria.
 
         Behavior:
+        - Use the context to frame the criteria.
         - Ask one question at a time.
         - Start broad, then ask specific follow-ups.
         - Base output only on information explicitly provided by the user.
         - If the user is vague, ask clarifying questions.
-        - If the user is uncooperative or refuses to provide useful information within max_turns,
-            use action="failure".
+        - The criteria must include one named "budget". If the user has not
+          mentioned cost, ask about it in plain language; do not invent a number.
+        - Ask which criteria matter most, or infer the ranking from the use
+          case the user describes, and set the weights from that ranking.
+          Never give every criterion the same default weight unless the user
+          says they matter equally; state an inferred ranking for confirmation.
+        - When you have enough, propose the complete set of criteria for
+          confirmation, then return success.
+        - If the user refuses to provide useful information, use intent="failure".
         """
         ...  # type: ignore[reportReturnType]
 

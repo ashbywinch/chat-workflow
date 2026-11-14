@@ -1,4 +1,4 @@
-"""Tests for Component.create composite workflow."""
+"""Tests for Component.create composite workflow step."""
 
 import unittest
 from pathlib import Path
@@ -10,7 +10,7 @@ from workflows.workflow import ComponentSourceCode
 from workflows.workflow.component import Component
 from workflows.workflow.domain_spec import ComponentDomainSpec
 from workflows.workflow.interaction_context import ComponentInteractionContext
-from workflows.workflow.models import ComponentResponsibilities
+from workflows.workflow.models import ComponentSpec
 from workflows.workflow.structure import ComponentStructure
 
 
@@ -31,17 +31,18 @@ class TestComponentCreate(unittest.TestCase):
         )
 
     def test_has_workflow_attribute(self):
-        self.assertTrue(getattr(Component.create, "_is_workflow", False))
+        self.assertTrue(getattr(Component.create, "_is_workflow_step", False))
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
             Component.create(
-                requirements=ComponentResponsibilities(
+                requirements=ComponentSpec(
                     name="Test",
                     purpose="Test",
                     required_inputs=[],
                     scope_description="description",
                     component_type="artifact_producing",
+                    owner_role="Owner",
                 ),
             )
         self.assertIn("session", str(ctx.exception))
@@ -58,11 +59,11 @@ class TestComponentCreate(unittest.TestCase):
         valid_code = (
             "from __future__ import annotations\n"
             "from pydantic import BaseModel, Field\n"
-            "from chat_workflow import atomic_workflow\n\n"
+            "from chat_workflow import atomic_workflow_step\n\n"
             "class Order(BaseModel):\n"
             '    name: str = Field(..., min_length=1, description="Order name")\n'
             "\n"
-            "    @atomic_workflow\n"
+            "    @atomic_workflow_step\n"
             "    @classmethod\n"
             "    def create(cls, context: str, max_turns: int = 10):\n"
             '        """Create order."""\n'
@@ -81,12 +82,13 @@ class TestComponentCreate(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             session = self._make_session()
             result = Component.create(
-                requirements=ComponentResponsibilities(
+                requirements=ComponentSpec(
                     name="Order",
                     purpose="Manage orders",
                     required_inputs=["Details"],
                     scope_description="description", 
                     component_type="artifact_producing",
+                    owner_role="Owner",
                 ),
                 session=session,
                 output_dir=Path(tmpdir),
@@ -107,11 +109,11 @@ class TestComponentCreate(unittest.TestCase):
         valid_code = (
             "from __future__ import annotations\n"
             "from pydantic import BaseModel, Field\n"
-            "from chat_workflow import atomic_workflow\n\n"
+            "from chat_workflow import atomic_workflow_step\n\n"
             "class Bad(BaseModel):\n"
             '    name: str = Field(..., min_length=1, description="Name")\n'
             "\n"
-            "    @atomic_workflow\n"
+            "    @atomic_workflow_step\n"
             "    @classmethod\n"
             "    def create(cls, context: str, max_turns: int = 10):\n"
             '        """Create."""\n'
@@ -130,12 +132,13 @@ class TestComponentCreate(unittest.TestCase):
         session = self._make_session()
         with self.assertRaises(RuntimeError):
             Component.create(
-                requirements=ComponentResponsibilities(
+                requirements=ComponentSpec(
                     name="Bad",
                     purpose="Bad component",
                     required_inputs=[],
                     scope_description="description",
                     component_type="artifact_producing",
+                    owner_role="Owner",
                 ),
                 session=session,
                 output_dir=Path("/tmp"),
@@ -151,11 +154,11 @@ class TestComponentCreate(unittest.TestCase):
         valid_code = (
             "from __future__ import annotations\n"
             "from pydantic import BaseModel, Field\n"
-            "from chat_workflow import atomic_workflow\n\n"
+            "from chat_workflow import atomic_workflow_step\n\n"
             "class X(BaseModel):\n"
             '    name: str = Field(..., min_length=1, description="Name")\n'
             "\n"
-            "    @atomic_workflow\n"
+            "    @atomic_workflow_step\n"
             "    @classmethod\n"
             "    def create(cls, context: str, max_turns: int = 10):\n"
             '        """Create."""\n'
@@ -177,12 +180,13 @@ class TestComponentCreate(unittest.TestCase):
             patch.object(Path, "cwd", return_value=Path("/tmp")),
         ):
                 result = Component.create(
-                    requirements=ComponentResponsibilities(
+                    requirements=ComponentSpec(
                         name="TestComponent",
                         purpose="Test",
                         required_inputs=[],
                         scope_description="description",
                         component_type="artifact_producing",
+                        owner_role="Owner",
                     ),
                     session=session,
                 )

@@ -2,21 +2,122 @@
 
 This document defines the core vocabulary of the chat-workflow library and maps it to equivalent concepts in the broader LLM ecosystem. Understanding these terms helps newcomers leverage existing domain knowledge when reading or contributing to the codebase.
 
-## Atomic Workflow
+## Workflow
 
-**What it is:** The smallest unit of LLM-driven conversation that produces a validated Pydantic object. An atomic workflow runs a multi-turn loop (user ↔ LLM) until the LLM signals success with a valid result, failure, or the turn limit is reached.
+**What it is:** The whole: the components that produce the deliverable, the
+workflow steps they own, and the order they run in. A workflow may be one
+component with a few steps, or a chain of components that each own part of the
+work.
+
+**Not:** A workflow step, and not the workflow spec. A workflow step forms part
+of a workflow; a workflow is never a kind of step. The spec is the design of
+the workflow, not the workflow itself.
+
+**In the code:** the `WorkflowSpec` model and the components it lists.
+
+## Workflow Step
+
+**What it is:** A piece of work that forms part of a workflow. A workflow step
+is **atomic** when it runs one LLM conversation that produces or changes an
+artifact; it is **composite** when it runs other workflow steps, including
+steps owned by other components.
+
+**Broadly known as:** an *activity* or *sub-process* (BPMN), a *step*
+(Temporal, Airflow), a *task* in most workflow engines.
+
+**In the code:** a method decorated with `@atomic_workflow_step` or
+`@composite_workflow_step`.
+
+## Atomic Workflow Step
+
+**What it is:** The smallest unit of LLM-driven conversation that produces a validated Pydantic object. An atomic workflow step runs a multi-turn loop (user ↔ LLM) until the LLM signals success with a valid result, failure, or the turn limit is reached.
 
 **Broadly known as:** In other frameworks this concept appears as a *structured output agent loop*, a *function-calling agent*, a *tool-use loop*, or a *run* (OpenAI SDK). Vercel's AI SDK calls it a multi-step *generation* with `stopWhen`. LangGraph implements it as a *StateGraph* that loops until a condition is met. LlamaIndex has *FunctionAgent* for the same pattern.
 
-**In the code:** `AtomicWorkflow` (class), `@atomic_workflow` (decorator), `process_turn()` (method that drives one user → LLM cycle).
+**In the code:** `AtomicWorkflowStep` (class), `@atomic_workflow_step` (decorator), `process_turn()` (method that drives one user → LLM cycle).
 
-## Composite Workflow
+## Composite Workflow Step
 
-**What it is:** A function that composes multiple atomic workflows and other composite workflows into a higher-level process. It does not drive its own LLM loop — it passes a `Session` object to child workflows and orchestrates their execution.
+**What it is:** A workflow step that composes multiple atomic workflow steps
+and other composite workflow steps into a larger piece of work. It does not
+drive its own LLM loop — it passes a `Session` object to child steps and
+orchestrates their execution.
 
 **Broadly known as:** *Multi-agent workflow* (LlamaIndex), *workflow graph* (LangGraph), *pipeline* or *orchestration*. The pattern of composing reusable steps into a larger process is universal in workflow systems (Amazon States Language, Temporal, Airflow).
 
-**In the code:** `@composite_workflow` (decorator), `Session.run()` (drives an atomic workflow within a composite), `generate_reviewed_criteria` (example).
+**In the code:** `@composite_workflow_step` (decorator), `Session.run()` (drives an atomic workflow step within a composite), `generate_reviewed_criteria` (example).
+
+## Component
+
+**What it is:** A class that owns exactly one business artifact — the set of
+data members of the Pydantic model it defines — and the workflow steps that
+create or update it. The class may have several steps on that one artifact
+(`create`, `update`, and other operations its lifecycle needs), and it may be
+responsible for the whole deliverable by delegating to other components that
+own their own artifacts. Types it uses or returns from steps are dependencies,
+not its artifact.
+
+When a component delegates, its artifact is still the finished thing — the
+plan, the report, the minutes — assembled from what the delegated components
+produce. The delegated components own subsets of it (a section) or temporary
+artifacts used along the way (raw notes). The coordinator's artifact is not
+"coordination"; coordination is how it produces its artifact.
+
+**Not:** A workflow, a component spec, or the workflow spec. A business model is
+an example of a component, not something a component owns.
+
+**In the code:** `Component` (generated record), `ComponentSourceCode`
+(generated source), a generated class such as `MinutesDraft`. Examples:
+`MinutesDraft`, `Invoice`, `BusinessModel`.
+
+## Workflow Spec
+
+**What it is:** The specification of a top-level workflow (a business process):
+its name, diagram, inputs, outputs, and component specs. It is a design
+artifact, not a runtime object. The spec names every component the process
+needs, including indirect dependencies, because it must describe the whole
+thing.
+
+**Not:** A workflow step, and not the owner of the components. A
+workflow spec has component specs; it does not have components.
+
+**In the code:** the `WorkflowSpec` model.
+
+## Component Spec
+
+**What it is:** The design-time description of one component: its name,
+purpose, scope, required inputs, and type. It is what a workflow spec lists so
+the process can be implemented end to end.
+
+**Not:** The generated component class. The spec describes what the component
+must be; the generated component is the code that satisfies it.
+
+**In the code:** `ComponentSpec`.
+
+## Has, Uses, Needs
+
+“Workflow” alone means the whole workflow — its components and their workflow
+steps — not a workflow step and not the workflow spec. A workflow step is
+always named as such.
+
+| Statement | True? | Why |
+|---|---|---|
+| A workflow has components. | ✓ | The components are what the workflow is made of. |
+| A component has workflow steps. | ✓ | The steps produce and change the component's artifact. |
+| A workflow step forms part of a workflow. | ✓ | Through the component that owns it. |
+| A workflow step has a component, parameters, and a return type. | ✓ | The bound class, the signature, and the return annotation. |
+| A workflow is a workflow step. | ✗ | A workflow step forms part of a workflow. |
+| A workflow spec has component specs. | ✓ | The specs are data in the spec; a dependency list, not ownership of the components. |
+| A workflow spec has components. | ✗ | It has component specs; the components are separate code artifacts. |
+| A component has dependencies. | ✓ | It can depend on other components; it does not own them. |
+| A component represents a business artifact. | ✓ | The artifact is the model's data members; its steps create or update it. |
+| A component has exactly one artifact. | ✓ | The artifact is defined as the set of data members of its model. |
+| A component has exactly one workflow step. | ✗ | It may have as many steps on its one artifact as the lifecycle needs. |
+| A workflow needs a coordinator component. | ✗ | Coordination is an optional pattern; a pipeline of direct handoffs is valid. |
+
+Example: a process for making a business plan needs a vision/mission definition
+and a strategy, but the process does not *have* the vision or the strategy. The
+workflow spec lists the component specs that will define them.
 
 ## Turn
 
@@ -28,11 +129,11 @@ This document defines the core vocabulary of the chat-workflow library and maps 
 
 ## Session
 
-**What it is:** The runtime context passed to every workflow function. A session wraps three things: IO (how to talk to the user), state log (accumulated conversation history across all turns), and config (provider, model, timeout). It persists for the lifetime of a single CLI invocation.
+**What it is:** The runtime context passed to every workflow step. A session wraps three things: IO (how to talk to the user), state log (accumulated conversation history across all turns), and config (provider, model, timeout). It persists for the lifetime of a single CLI invocation.
 
 **Broadly known as:** *Session* is widely used (OpenAI SDK, Microsoft Agent Framework, Agent Client Protocol). It represents durable, multi-turn state that survives individual LLM calls. Other frameworks call the same concept *runtime context* or *invocation context*.
 
-**In the code:** `Session` (class), `SessionLog` (the accumulated transcript), injected as the `session` parameter in workflow functions.
+**In the code:** `Session` (class), `SessionLog` (the accumulated transcript), injected as the `session` parameter in workflow steps.
 
 ## Agent Response
 
@@ -54,17 +155,17 @@ This document defines the core vocabulary of the chat-workflow library and maps 
 
 ```
 Session (one CLI invocation)
-  └── Composite Workflow
-        ├── Atomic Workflow          ← has its own turn loop
-        │     ├── Turn 1 (user → LLM → AgentResponse)
-        │     ├── Turn 2 (user → LLM → AgentResponse)
-        │     └── ... → returns TurnResult
-        ├── Atomic Workflow
-        │     └── ...
-        └── (can nest further)
+  └── Workflow
+        └── Component (one artifact)
+              ├── Atomic Workflow Step       ← has its own turn loop
+              │     ├── Turn 1 (user → LLM → AgentResponse)
+              │     ├── Turn 2 (user → LLM → AgentResponse)
+              │     └── ... → returns TurnResult
+              └── Composite Workflow Step    ← runs other steps
+                    └── (steps on this or other components)
 ```
 
-The outer container is a **Session** (one user session). Inside it, a **Composite Workflow** coordinates one or more **Atomic Workflows**. Each atomic workflow runs a **turn** loop until the LLM returns an **Agent Response** with `intent=SUCCESS` or `intent=FAILURE`. That response is wrapped in a **Turn Result** and recorded in the session's log.
+The outer container is a **Session** (one user session). Inside it, a **Workflow** is made of **Components**; each component owns one artifact and the workflow steps that produce and change it. An **Atomic Workflow Step** runs a **turn** loop until the LLM returns an **Agent Response** with `intent=SUCCESS` or `intent=FAILURE`. A **Composite Workflow Step** runs other steps. Each response is wrapped in a **Turn Result** and recorded in the session's log.
 
 ## Blob Field
 
@@ -84,7 +185,7 @@ The outer container is a **Session** (one user session). Inside it, a **Composit
 
 ## Gap Resolution Loop
 
-**What it is:** A looping pattern inside a `@composite_workflow` function where an atomic workflow identifies gaps or issues in a result, a follow-up refinement step addresses them, and the cycle repeats until all gaps are resolved. Each iteration narrows the delta between the current state and the desired outcome.
+**What it is:** A looping pattern inside a `@composite_workflow_step` function where an atomic workflow step identifies gaps or issues in a result, a follow-up refinement step addresses them, and the cycle repeats until all gaps are resolved. Each iteration narrows the delta between the current state and the desired outcome.
 
 **Broadly known as:** *Iterative refinement*, *critique-revise loop*, *reflection agent pattern*. LangGraph implements this as a *feedback loop* between nodes. Vercel's AI SDK supports it through chained generations. The key idea is that a second pass (often a different prompt or model) finds flaws the first pass missed.
 

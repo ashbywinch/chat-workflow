@@ -27,6 +27,7 @@ class TestComponentSingleArtifactTypeRule(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 
@@ -46,6 +47,7 @@ class TestComponentSingleResponsibilityRule(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 
@@ -61,6 +63,7 @@ class TestComponentSingleResponsibilityRule(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 
@@ -80,6 +83,7 @@ class TestComponentNoMultipleArtifactCreation(unittest.TestCase):
                 model_class="DataManager",
                 expert_role="Data Management Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "DataManager")
 
@@ -95,6 +99,7 @@ class TestComponentNoMultipleArtifactCreation(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 
@@ -114,6 +119,7 @@ class TestComponentClearBoundaries(unittest.TestCase):
                 model_class="UtilityBelt",
                 expert_role="General Utility Administrator",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "UtilityBelt")
 
@@ -129,6 +135,7 @@ class TestComponentClearBoundaries(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 
@@ -148,6 +155,7 @@ class TestComponentEncapsulation(unittest.TestCase):
                 model_class="SuperManager",
                 expert_role="Super Manager",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "SuperManager")
 
@@ -163,6 +171,7 @@ class TestComponentEncapsulation(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 
@@ -182,6 +191,7 @@ class TestComponentCohesion(unittest.TestCase):
                 model_class="TaskMaster",
                 expert_role="Task Master Administrator",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "TaskMaster")
 
@@ -197,6 +207,7 @@ class TestComponentCohesion(unittest.TestCase):
                 model_class="InvoiceManager",
                 expert_role="Invoice Processing Specialist",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "InvoiceManager")
 

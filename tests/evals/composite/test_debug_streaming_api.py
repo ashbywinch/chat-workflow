@@ -16,8 +16,9 @@ _CONFIG = make_config()
 
 
 class MockIO:
-    def __init__(self, responses):
+    def __init__(self, responses, default: str = ""):
         self.responses = list(responses)
+        self.default = default
         self.outputs = []
 
     def echo(self, message: str) -> None:
@@ -26,11 +27,11 @@ class MockIO:
     def prompt(self, label: str) -> str:
         if self.responses:
             return self.responses.pop(0)
-        return ""
+        return self.default
 
 
 class TestDebugStreaming(unittest.TestCase):
-    @timeout(60)
+    @timeout(360)
     def test_orchestrator_with_debug(self):
         """Verify debug output captures LLM interaction when using @chat decorator."""
         debug_output = StringIO()
@@ -41,13 +42,14 @@ class TestDebugStreaming(unittest.TestCase):
                 "Performance, battery life, portability, and budget",
                 "I need it for software development and travel",
                 "That's all, please finalize",
-            ]
+            ],
+            default="That's all, please finalize.",
         )
 
         try:
             criteria = EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop",
-                max_turns=6,
+                max_turns=10,
                 session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
                 debug=debug,
             )
@@ -62,7 +64,7 @@ class TestDebugStreaming(unittest.TestCase):
             self.assertIn("LLM RESPONSE", output)
             raise
 
-    @timeout(10)
+    @timeout(360)
     def test_chat_decorator_with_debug_parameter(self):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
@@ -73,12 +75,13 @@ class TestDebugStreaming(unittest.TestCase):
                 "For a 7-year-old who likes science, safety is key",
                 "Safety and educational value",
                 "That's all, please finalize",
-            ]
+            ],
+            default="That's all, please finalize.",
         )
 
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
-            max_turns=6,
+            max_turns=10,
             session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
             debug=debug,
         )

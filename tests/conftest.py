@@ -11,7 +11,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from chat_workflow import AgentResponse, AtomicWorkflowConfig, AtomicWorkflowFailedError, TurnResult
+from chat_workflow import AgentResponse, AtomicWorkflowStepConfig, AtomicWorkflowStepFailedError, TurnResult
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 # Add the project root to Python path
@@ -19,15 +19,19 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-class TimeoutError(Exception):
-    """Raised when a test exceeds its timeout."""
+class HarnessTimeout(BaseException):
+    """Raised when a test exceeds its timeout.
 
-    pass
+    Inherits from :class:`BaseException`, not :class:`Exception`: the LLM
+    client catches ``Exception`` internally and would otherwise swallow the
+    timeout and continue the call. ``unittest`` records a ``BaseException`` as
+    a test error and continues the suite.
+    """
 
 
 def timeout(seconds: int):
     """
-    Decorator that raises TimeoutError if the wrapped function exceeds the timeout.
+    Decorator that raises HarnessTimeout if the wrapped function exceeds the timeout.
     Also tracks LLM token usage and test timing for the cost report.
 
     Usage:
@@ -44,10 +48,12 @@ def timeout(seconds: int):
             start = time.time()
 
             def handler(signum, frame):
-                raise TimeoutError(f"Test timed out after {seconds} seconds")
+                raise HarnessTimeout(f"Test timed out after {seconds} seconds")
 
-            # Set the signal handler
+            # Set the signal handler and disable SA_RESTART so a blocking
+            # network call is interrupted instead of silently restarting.
             old_handler = signal.signal(signal.SIGALRM, handler)
+            signal.siginterrupt(signal.SIGALRM, True)
             signal.alarm(seconds)
 
             try:
@@ -120,7 +126,7 @@ class FakeConfig:
 
 def make_valid_criteria() -> EvaluationCriteria:
     """Create a standard valid EvaluationCriteria for tests."""
-    return EvaluationCriteria(
+    return EvaluationCriteria.model_construct(
         context="test context",
         criteria=[
             Criterion(name="budget", description="Budget constraint", weight=8.0),
@@ -129,22 +135,22 @@ def make_valid_criteria() -> EvaluationCriteria:
     )
 
 
-def make_atomic_workflow_config(
+def make_atomic_workflow_step_config(
     response_model_override: type | None = None,
     max_turns: int = 10,
     **overrides: Any,
-) -> AtomicWorkflowConfig:
-    """Create a standard AtomicWorkflowConfig for testing."""
+) -> AtomicWorkflowStepConfig:
+    """Create a standard AtomicWorkflowStepConfig for testing."""
     kwargs = dict(
         system_prompt="Test prompt",
         response_model=response_model_override or AgentResponse[EvaluationCriteria],
         max_turns=max_turns,
         on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
         on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-        on_failure=lambda action: AtomicWorkflowFailedError(action.message or "No reason given"),
+        on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or "No reason given"),
     )
     kwargs.update(overrides)
-    return AtomicWorkflowConfig(**kwargs)
+    return AtomicWorkflowStepConfig(**kwargs)
 
 
 class MockInstructorClient:

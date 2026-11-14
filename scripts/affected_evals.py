@@ -66,7 +66,7 @@ def get_transitive_dep_map() -> dict[str, set[str]]:
 
     For each eval file, follows ``IMPORTS_FROM`` edges transitively so
     that a change to ``llm_interaction.py`` triggers evals that import
-    ``atomic_workflow.py`` (which imports ``llm_interaction.py``).
+    ``atomic_workflow_step.py`` (which imports ``llm_interaction.py``).
     """
     if not GRAPH_DB.exists():
         return _fallback_ast_deps()

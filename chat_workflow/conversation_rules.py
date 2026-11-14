@@ -1,4 +1,4 @@
-"""Shared conversation quality rules for the LLM judge.
+"""Shared conversation-quality rules for prompts and the LLM judge.
 
 Each rule is a ``(label, description)`` tuple. The label is a short
 human-readable name; the description is the complete judge-facing rule.
@@ -6,7 +6,8 @@ Rules MUST be falsifiable — each describes a condition that could actually
 be violated.
 
 Workflow authors reference these constants in their ``conversation_validation_rules``
-on ``@atomic_workflow``. Evals also read from here instead of hardcoding dicts.
+on ``@atomic_workflow_step``. The framework applies ``UNIVERSAL_RULES`` to every
+chat-on workflow; author declarations add to that floor.
 """
 
 WARM_OPEN: tuple[str, str] = (
@@ -17,7 +18,24 @@ WARM_OPEN: tuple[str, str] = (
 
 EXPLAINS_PURPOSE: tuple[str, str] = (
     "Explains purpose",
-    "The assistant explains what it is trying to do and why.",
+    "The assistant explains what the current step is trying to do and why.",
+)
+
+NO_HYPOTHESIS_DUMPS: tuple[str, str] = (
+    "No hypothesis dumps",
+    "When the assistant proposes something the user has not said or agreed, "
+    "it introduces one such hypothesis at a time and asks for confirmation. "
+    "It never presents a batch of guessed details as if they were established. "
+    "A draft derived from information the user already provided (including "
+    "earlier phases) is not a hypothesis dump.",
+)
+
+COMPLETE_DRAFT_FROM_AGREED: tuple[str, str] = (
+    "Complete draft only from agreed facts",
+    "The assistant may present the complete draft in one message for approval "
+    "only when every element is grounded in what the user said or agreed. It "
+    "labels the result as a draft for approval rather than asserting it as fact. "
+    "Information the user already provided counts as grounded.",
 )
 
 ONE_GUESS: tuple[str, str] = (
@@ -32,15 +50,10 @@ SYNTHESIZES_HONESTLY: tuple[str, str] = (
     "but does not fabricate details the user never mentioned.",
 )
 
-NO_EXECUTOR_MODE: tuple[str, str] = (
-    "No executor mode",
-    "The assistant defines what good looks like — it does not generate "
-    "content or execute the process for the user.",
-)
-
 LISTENS_FIRST: tuple[str, str] = (
     "Listens first",
-    "The assistant asks open-ended questions before proposing structure.",
+    "The assistant absorbs what the user has already said and builds on it "
+    "before proposing; it does not ignore or restart.",
 )
 
 NO_REPETITION: tuple[str, str] = (
@@ -51,9 +64,24 @@ NO_REPETITION: tuple[str, str] = (
 )
 
 NO_FORCED_FIELD_MAPPING: tuple[str, str] = (
-    "No forced field mapping",
-    "The assistant does not mechanically ask about every data model field "
-    "when a question doesn't apply.",
+    "No schema interrogation",
+    "The assistant does not ask about a field just because it exists in the "
+    "schema. If domain knowledge suggests the field does not apply but the "
+    "user has not said so, it confirms that assumption in the user's language "
+    "(for example, 'So we start with your raw meeting notes, and enhance them "
+    "from there?'). Every field must be something the user can know and "
+    "confirm; implementation facts such as 'who calls this' are never fields.",
+)
+
+THINKING_PARTNER: tuple[str, str] = (
+    "Thinking partner, not a form",
+    "The assistant proposes concrete ideas grounded in what the user said and "
+    "asks for a reaction, rather than interrogating the user field by field. "
+    "A follow-up question on the point under discussion is fine; the failure "
+    "is an unrelated open question that ignores the user's last message. When "
+    "the user rejects a proposal or asks for the assistant's opinion, it "
+    "responds to that point with one concrete alternative proposal or "
+    "recommendation.",
 )
 
 INCORPORATES_CONTEXT: tuple[str, str] = (
@@ -62,7 +90,34 @@ INCORPORATES_CONTEXT: tuple[str, str] = (
     "asking for it again.",
 )
 
-UNIVERSAL_RULES: frozenset[tuple[str, str]] = frozenset({
+INPUTS_ARE_CONTEXT: tuple[str, str] = (
+    "Inputs are context",
+    "The method's inputs already contain what the user told you in earlier "
+    "phases. Use them as established facts; do not ask the user to repeat "
+    "them or to re-confirm the same picture. Ask only about what the inputs "
+    "do not cover.",
+)
+
+USES_USER_LANGUAGE: tuple[str, str] = (
+    "Uses the user's language",
+    "The assistant does not introduce framework or model jargon the user "
+    "has not used.",
+)
+
+# The framework default. Every chat-on atomic workflow step gets these; an author's
+# ``conversation_validation_rules`` adds to this floor. The tuple preserves the
+# display order in the prompt; UNIVERSAL_RULES keeps the set form for callers
+# that just need membership.
+DEFAULT_RULES: tuple[tuple[str, str], ...] = (
+    NO_HYPOTHESIS_DUMPS,
+    COMPLETE_DRAFT_FROM_AGREED,
     NO_REPETITION,
     INCORPORATES_CONTEXT,
-})
+    INPUTS_ARE_CONTEXT,
+    USES_USER_LANGUAGE,
+    NO_FORCED_FIELD_MAPPING,
+    THINKING_PARTNER,
+    EXPLAINS_PURPOSE,
+    LISTENS_FIRST,
+)
+UNIVERSAL_RULES: frozenset[tuple[str, str]] = frozenset(DEFAULT_RULES)

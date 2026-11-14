@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from chat_workflow import Session, composite_workflow
+from chat_workflow import Session, composite_workflow_step
 
 from .evaluation_criteria import EvaluationCriteria
 from .formatter import echo_criteria
 from .refine import refine
 
 
-@composite_workflow
+@composite_workflow_step
 def generate_reviewed_criteria(
     context: str = "",
     max_turns: int = 10,

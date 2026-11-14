@@ -31,8 +31,10 @@ class AgentResponse(BaseModel, Generic[TResult]):
     message: str | None = Field(
         default=None,
         description=(
-            'Message for the user. Required when intent is "continue" or "failure". '
-            'Must be null when intent is "success".'
+            "Message for the user, in their words. Never name a field, a type, "
+            "a schema, or a workflow term. If the user says they do not "
+            'understand a word, do not use it again. Required when intent is "continue" '
+            'or "failure". Must be null when intent is "success".'
         ),
     )
     result: TResult | None = Field(
@@ -109,11 +111,16 @@ class AgentResponse(BaseModel, Generic[TResult]):
                 "SUCCESS intent requires a field named 'result' containing the complete object. "
                 "Your data must use 'result' as the key name, not 'outputs', 'inputs', or any other name."
             )
+        # A success turn has no user-facing message. Some models put the whole
+        # response JSON in `message`; clearing it keeps the conversation
+        # transcript free of internal output.
+        if self.intent == AgentIntent.SUCCESS:
+            self.message = None
         return self
 
 
 class TurnResult(BaseModel, Generic[TResult]):
-    """The outcome of processing a single turn in an atomic workflow."""
+    """The outcome of processing a single turn in an atomic workflow step."""
 
     result: TResult | None = None
     message: str
@@ -130,8 +137,13 @@ class TurnResult(BaseModel, Generic[TResult]):
         result: TResult,
         message: str = "Completed successfully!",
     ) -> TurnResult[TResult]:
-        """The workflow completed with a valid result."""
-        return cls(result=result, message=message, is_complete=True)
+        """The workflow completed with a valid result.
+
+        ``result`` has already been validated as part of the agent response.
+        Re-validating it here would run model validators (including the LLM
+        judge) a second time, so construct the trusted wrapper directly.
+        """
+        return cls.model_construct(result=result, message=message, is_complete=True)
 
     @classmethod
     def failure(cls, message: str) -> TurnResult[TResult]:

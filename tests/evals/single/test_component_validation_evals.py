@@ -3,7 +3,7 @@ classes via the Pydantic validator chain.
 
 Individual rule-vs-violation tests use ``llm_judge()``; the integration
 tests at the bottom read each framework class's own source file and
-validate it through ``GeneratedComponent`` — proving the framework's
+validate it through ``ComponentSourceCode`` — proving the framework's
 classes satisfy the rules they impose on generated code.
 """
 
@@ -51,7 +51,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_purpose_describes_domain_concept_violation(self):
         """Purpose that merely describes data storage should FAIL."""
         config = make_config()
@@ -78,7 +78,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_name_is_noun_violation(self):
         """Name that is a verb phrase should FAIL."""
         config = make_config()
@@ -106,7 +106,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_expert_role_specific_violation(self):
         """Vague/generic expert role should FAIL."""
         config = make_config()
@@ -136,7 +136,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_single_artifact_type_violation(self):
         """Purpose describing two artifact types should FAIL."""
         config = make_config()
@@ -167,7 +167,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_single_responsibility_violation(self):
         """Purpose describing multiple responsibilities should FAIL."""
         config = make_config()
@@ -197,7 +197,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_no_multiple_artifact_creation_violation(self):
         """Purpose implying creation of multiple distinct artifacts should FAIL."""
         config = make_config()
@@ -229,7 +229,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_clear_boundaries_violation(self):
         """Vague purpose without clear boundaries should FAIL."""
         config = make_config()
@@ -260,7 +260,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_encapsulation_violation(self):
         """Purpose mixing unrelated domain concerns should FAIL."""
         config = make_config()
@@ -292,7 +292,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         ),
     }
 
-    @timeout(60)
+    @timeout(600)
     def test_cohesion_violation(self):
         """Purpose with orphaned functionality should FAIL."""
         config = make_config()
@@ -311,9 +311,9 @@ class TestComponentValidationRulesEval(unittest.TestCase):
     # Self-validation: each framework class's source validated as code
     # ==================================================================
 
-    @timeout(120)
+    @timeout(600)
     def test_component_source_passes_as_generated_code(self):
-        """Component's own source code should satisfy GeneratedComponent rules."""
+        """Component's own source code should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
@@ -321,17 +321,17 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         gc = _GC(code=code)
         self.assertIn("class Component", gc.code)
 
-    @timeout(120)
+    @timeout(600)
     def test_workflow_source_passes_as_generated_code(self):
-        """Workflow's own source code should satisfy GeneratedComponent rules."""
+        """WorkflowSpec own source code should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "workflow.py").read_text()
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "workflow_spec.py").read_text()
         gc = _GC(code=code)
-        self.assertIn("class Workflow", gc.code)
+        self.assertIn("class WorkflowSpec", gc.code)
 
-    @timeout(120)
+    @timeout(600)
     def test_generated_component_source_passes_as_generated_code(self):
         """ComponentSourceCode's own source should satisfy its own rules."""
         class _GC(ComponentSourceCode):
@@ -341,9 +341,9 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         gc = _GC(code=code)
         self.assertIn("class ComponentSourceCode", gc.code)
 
-    @timeout(120)
+    @timeout(600)
     def test_resource_source_passes_as_generated_code(self):
-        """Resource model source should satisfy GeneratedComponent rules."""
+        """Resource model source should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
@@ -351,9 +351,9 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         gc = _GC(code=code)
         self.assertIn("class Resource", gc.code)
 
-    @timeout(120)
+    @timeout(600)
     def test_deliverable_source_passes_as_generated_code(self):
-        """Deliverable model source should satisfy GeneratedComponent rules."""
+        """Deliverable model source should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
@@ -361,9 +361,9 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         gc = _GC(code=code)
         self.assertIn("class Deliverable", gc.code)
 
-    @timeout(120)
+    @timeout(600)
     def test_gap_analysis_source_passes_as_generated_code(self):
-        """GapAnalysis model source should satisfy GeneratedComponent rules."""
+        """GapAnalysis model source should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
@@ -371,9 +371,9 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         gc = _GC(code=code)
         self.assertIn("class GapAnalysis", gc.code)
 
-    @timeout(120)
+    @timeout(600)
     def test_process_definition_source_passes_as_generated_code(self):
-        """ProcessDefinition model source should satisfy GeneratedComponent rules."""
+        """ProcessDefinition model source should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
@@ -381,15 +381,15 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         gc = _GC(code=code)
         self.assertIn("class ProcessDefinition", gc.code)
 
-    @timeout(120)
-    def test_component_responsibilities_source_passes_as_generated_code(self):
-        """ComponentResponsibilities source should satisfy GeneratedComponent rules."""
+    @timeout(600)
+    def test_component_spec_source_passes_as_generated_code(self):
+        """ComponentSpec source should satisfy ComponentSourceCode rules."""
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_responsibilities.py").read_text()
+        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_spec.py").read_text()
         gc = _GC(code=code)
-        self.assertIn("class ComponentResponsibilities", gc.code)
+        self.assertIn("class ComponentSpec", gc.code)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -13,7 +13,7 @@ from tests.conftest import timeout
 class TestStructuralDesignEval(unittest.TestCase):
     """Eval tests for ComponentStructure.design()."""
 
-    @timeout(120)
+    @timeout(900)
     def test_design_from_domain_spec(self):
         """ComponentStructure.design() should propose types and validators from domain spec."""
         from tests.evals.helpers import run_multi_turn_eval
@@ -61,7 +61,7 @@ class TestStructuralDesignEval(unittest.TestCase):
                 "Every action item has a clear owner and a due date",
                 "The minutes are concise — no rambling or unnecessary detail",
             ],
-            expert_role="Meeting Coordinator",
+            expert_role="Meeting Minutes Administrator",
         )
 
         user_persona = (

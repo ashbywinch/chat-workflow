@@ -6,8 +6,8 @@ later one.
 ## Phase 0 — Framework skeleton (done)
 
 - **Inputs**: a domain model and a prompt.
-- **Outputs**: `@atomic_workflow`, turn loop, `AgentResponse`, typed result
-  or named exception; `@composite_workflow`; CLI discovery.
+- **Outputs**: `@atomic_workflow_step`, turn loop, `AgentResponse`, typed result
+  or named exception; `@composite_workflow_step`; CLI discovery.
 - **Operations**: `make` creates the venv and installs the package.
 - **Quality gate**: unit tests with a fake instructor client; `make lint`.
 

@@ -17,8 +17,6 @@ on:
   pull_request:
   push:
     branches: [main]
-  schedule:
-    - cron: '17 3 * * 1'   # weekly full eval run (Monday 03:17 UTC)
   workflow_dispatch:
 concurrency:
   group: ${{ github.ref }}
@@ -66,16 +64,17 @@ jobs:
           recreate: true
           path: code-coverage-results.md
       - name: Evaluation tests (full)
-        # Weekly schedule and manual dispatch only: the complete real-model
-        # suite (~60 conversations, 30+ min, hundreds of thousands of tokens).
-        # Real-model output is non-deterministic, so it is not a per-PR gate;
-        # run `make evals` locally before pushing prompt or framework changes.
-        if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+        # The full real-model suite is a required CI gate on every PR and on
+        # main. It is never weekly/manual. Dependabot and forked PRs have no
+        # access to the gateway secret, so they are the only exception.
+        if: ${{ github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.fork != true }}
+        timeout-minutes: 240
         env:
           OPENAI_API_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
           OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
           CHAT_WORKFLOW_TRANSCRIPT_DIR: test-results/transcripts
           CHAT_WORKFLOW_EVAL_REPORT: 1
+          EVAL_TIMEOUT: 14400
         run: make evals
       - name: Upload eval transcripts
         if: ${{ always() }}

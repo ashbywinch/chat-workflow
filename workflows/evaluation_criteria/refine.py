@@ -6,12 +6,12 @@ from typing import Annotated, TypeVar
 
 from pydantic import BaseModel
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
 
-@atomic_workflow
+@atomic_workflow_step
 def refine(  # pyright: ignore[reportReturnType]
     initial_object: Annotated[ModelType, "The object to review and potentially modify based on user feedback"],
     max_turns: Annotated[int, "Maximum number of refinement turns"] = 5,
@@ -27,4 +27,4 @@ def refine(  # pyright: ignore[reportReturnType]
 
     """
     ...
-    pass  # noqa: covered by @atomic_workflow decorator
+    pass  # noqa: covered by @atomic_workflow_step decorator

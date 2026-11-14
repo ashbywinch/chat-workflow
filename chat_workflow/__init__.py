@@ -1,11 +1,11 @@
-from .atomic_workflow import AtomicWorkflow
-from .atomic_workflow_config import AtomicWorkflowConfig
+from .atomic_workflow_step import AtomicWorkflowStep
+from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .config import Config
 from .debug import StreamingDebug
-from .decorators import atomic_workflow, composite_workflow
+from .decorators import atomic_workflow_step, composite_workflow_step
 from .exceptions import (
     APIKeyError,
-    AtomicWorkflowFailedError,
+    AtomicWorkflowStepFailedError,
     ChatWorkflowError,
     ConfigFileError,
     ConfigurationError,
@@ -25,9 +25,9 @@ __all__ = [
     "APIKeyError",
     "AgentIntent",
     "AgentResponse",
-    "AtomicWorkflow",
-    "AtomicWorkflowConfig",
-    "AtomicWorkflowFailedError",
+    "AtomicWorkflowStep",
+    "AtomicWorkflowStepConfig",
+    "AtomicWorkflowStepFailedError",
     "ChatWorkflowError",
     "Config",
     "ConfigFileError",
@@ -42,8 +42,8 @@ __all__ = [
     "TurnLimitExceededError",
     "TurnResult",
     "ValidationError",
-    "atomic_workflow",
-    "composite_workflow",
+    "atomic_workflow_step",
+    "composite_workflow_step",
     "get_client",
     "list_available_providers",
 ]

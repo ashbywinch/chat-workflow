@@ -1,4 +1,4 @@
-"""Integration test: Workflow.create orchestrates Component.create end-to-end."""
+"""Integration test: WorkflowSpec.create orchestrates Component.create end-to-end."""
 
 import unittest
 from pathlib import Path
@@ -6,11 +6,11 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
-from chat_workflow.atomic_workflow import AtomicWorkflow
+from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
 from chat_workflow.models import AgentIntent, AgentResponse
-from workflows.workflow import ComponentSourceCode, Workflow
+from workflows.workflow import ComponentSourceCode, WorkflowSpec
 from workflows.workflow.models import (
-    ComponentResponsibilities,
+    ComponentSpec,
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
@@ -27,7 +27,7 @@ class FakeConfig:
 
 
 class TestWorkflowIntegration(unittest.TestCase):
-    """End-to-end integration test: Workflow.create() → Component.create() → files."""
+    """End-to-end integration test: WorkflowSpec.create() → Component.create() → files."""
 
     def setUp(self):
         self.session = Session(
@@ -36,7 +36,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             config=FakeConfig(),
         )
 
-    @patch.object(AtomicWorkflow, "_call_llm")
+    @patch.object(AtomicWorkflowStep, "_call_llm")
     def test_end_to_end_flow(self, mock_call_llm):
         """Full flow: process in → Workflow + Component files out."""
         analysis = ProcessDefinition(
@@ -49,7 +49,6 @@ class TestWorkflowIntegration(unittest.TestCase):
         inp = Resource(
             source="Customer",
             format="JSON",
-            trigger_conditions="Order placed",
             dependencies=[],
             validation_criteria="Must have items",
         )
@@ -64,12 +63,13 @@ class TestWorkflowIntegration(unittest.TestCase):
             storage_requirements="DB",
         )
 
-        req = ComponentResponsibilities(
+        req = ComponentSpec(
             name="Order",
             purpose="Manage orders",
             required_inputs=["Details"],
             scope_description="description", 
             component_type="artifact_producing",
+            owner_role="Owner",
         )
 
         generated_code = (
@@ -79,7 +79,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             '    name: str = Field(..., description="Order name")\n'
         )
 
-        workflow = Workflow(
+        workflow = WorkflowSpec(
             name="Order Processing Workflow",
             diagram="sequenceDiagram\nparticipant A\nA->>B: hello",
             inputs=[inp],
@@ -94,7 +94,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             AgentResponse[list[Resource]](intent=AgentIntent.SUCCESS, result=[inp]),
             AgentResponse[str](intent=AgentIntent.SUCCESS, result="raw notes"),
             AgentResponse[ProcessDefinition](intent=AgentIntent.SUCCESS, result=analysis),
-            AgentResponse[list[ComponentResponsibilities]](intent=AgentIntent.SUCCESS, result=[req]),
+            AgentResponse[list[ComponentSpec]](intent=AgentIntent.SUCCESS, result=[req]),
             AgentResponse[GapAnalysis](
                 intent=AgentIntent.SUCCESS,
                 result=GapAnalysis(
@@ -105,8 +105,8 @@ class TestWorkflowIntegration(unittest.TestCase):
                     recommendations=[],
                 ),
             ),
-            AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
-            AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
+            AgentResponse[WorkflowSpec](intent=AgentIntent.SUCCESS, result=workflow),
+            AgentResponse[WorkflowSpec](intent=AgentIntent.SUCCESS, result=workflow),
             AgentResponse[ComponentSourceCode](
                 intent=AgentIntent.SUCCESS,
                 result=ComponentSourceCode(code=generated_code),
@@ -121,12 +121,12 @@ class TestWorkflowIntegration(unittest.TestCase):
         ):
             mock_verify.return_value = generated_code
 
-            result = Workflow.create(
+            result = WorkflowSpec.create(
                 process_description="Order processing",
                 session=self.session,
             )
 
-            self.assertIsInstance(result, Workflow)
+            self.assertIsInstance(result, WorkflowSpec)
             self.assertEqual(result.name, "Order Processing Workflow")
             self.assertIn("sequenceDiagram", result.diagram)
             self.assertEqual(len(result.components), 1)
@@ -138,7 +138,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             file_content = expected_path.read_text()
             self.assertIn("class Order(BaseModel)", file_content)
 
-    @patch.object(AtomicWorkflow, "_call_llm")
+    @patch.object(AtomicWorkflowStep, "_call_llm")
     def test_handles_multiple_components(self, mock_call_llm):
         """When multiple components identified, files are written for each."""
         analysis = ProcessDefinition(
@@ -151,7 +151,6 @@ class TestWorkflowIntegration(unittest.TestCase):
         inp = Resource(
             source="Test",
             format="JSON",
-            trigger_conditions="Test",
             dependencies=[],
             validation_criteria="Test",
         )
@@ -159,7 +158,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         out = Deliverable(
             name="Test",
             description="Test",
-            consumer="Test",
+            consumer="Test Consumer",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
@@ -167,23 +166,25 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         reqs = [
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="ComponentA",
                 purpose="Test A",
                 required_inputs=["A"],
                 scope_description="description", 
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="ComponentB",
                 purpose="Test B",
                 required_inputs=["B"],
                 scope_description="description", 
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
         ]
 
-        workflow = Workflow(
+        workflow = WorkflowSpec(
             name="Multi Workflow",
             diagram="seq",
             inputs=[inp],
@@ -201,7 +202,7 @@ class TestWorkflowIntegration(unittest.TestCase):
             AgentResponse[list[Resource]](intent=AgentIntent.SUCCESS, result=[inp]),
             AgentResponse[str](intent=AgentIntent.SUCCESS, result="raw notes"),
             AgentResponse[ProcessDefinition](intent=AgentIntent.SUCCESS, result=analysis),
-            AgentResponse[list[ComponentResponsibilities]](intent=AgentIntent.SUCCESS, result=reqs),
+            AgentResponse[list[ComponentSpec]](intent=AgentIntent.SUCCESS, result=reqs),
             AgentResponse[GapAnalysis](
                 intent=AgentIntent.SUCCESS,
                 result=GapAnalysis(
@@ -212,8 +213,8 @@ class TestWorkflowIntegration(unittest.TestCase):
                     recommendations=[],
                 ),
             ),
-            AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
-            AgentResponse[Workflow](intent=AgentIntent.SUCCESS, result=workflow),
+            AgentResponse[WorkflowSpec](intent=AgentIntent.SUCCESS, result=workflow),
+            AgentResponse[WorkflowSpec](intent=AgentIntent.SUCCESS, result=workflow),
             AgentResponse[ComponentSourceCode](intent=AgentIntent.SUCCESS, result=ComponentSourceCode(code=code_a)),
             AgentResponse[ComponentSourceCode](intent=AgentIntent.SUCCESS, result=ComponentSourceCode(code=code_b)),
         ]
@@ -226,12 +227,12 @@ class TestWorkflowIntegration(unittest.TestCase):
         ):
             mock_verify.side_effect = [code_a, code_b]
 
-            result = Workflow.create(
+            result = WorkflowSpec.create(
                 process_description="multi-component test",
                 session=self.session,
             )
 
-            self.assertIsInstance(result, Workflow)
+            self.assertIsInstance(result, WorkflowSpec)
             self.assertEqual(len(result.components), 2)
 
             path_a = Path(tmpdir) / "workflows" / "componenta" / "componenta.py"

@@ -1,11 +1,11 @@
-from ..component_responsibilities import ComponentResponsibilities
+from ..component_spec import ComponentSpec
 from .deliverable import Deliverable
 from .gap_analysis import GapAnalysis
 from .process_definition import ProcessDefinition, generate_from_chat
 from .resource import Resource
 
 __all__ = [
-    "ComponentResponsibilities",
+    "ComponentSpec",
     "Deliverable",
     "GapAnalysis",
     "ProcessDefinition",

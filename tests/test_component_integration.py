@@ -1,4 +1,4 @@
-"""Integration tests for Component.create with ComponentResponsibilities."""
+"""Integration tests for Component.create with ComponentSpec."""
 
 import unittest
 from pathlib import Path
@@ -7,10 +7,10 @@ from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
 from workflows.workflow.component import Component
-from workflows.workflow.component_responsibilities import (
-    ComponentResponsibilities,
-)
 from workflows.workflow.component_source_code import ComponentSourceCode
+from workflows.workflow.component_spec import (
+    ComponentSpec,
+)
 from workflows.workflow.domain_spec import (
     ComponentDomainField,
     ComponentDomainSpec,
@@ -34,7 +34,7 @@ class FakeConfig:
 
 
 class TestComponentCreateWithResponsibilities(unittest.TestCase):
-    """Component.create() with ComponentResponsibilities (Phase 1 skeleton)."""
+    """Component.create() with ComponentSpec (Phase 1 skeleton)."""
 
     def _make_session(self) -> Session:
         return Session(
@@ -43,7 +43,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             config=FakeConfig(),
         )
 
-    def _make_responsibilities(self, **overrides) -> ComponentResponsibilities:
+    def _make_responsibilities(self, **overrides) -> ComponentSpec:
         kwargs = dict(
             name="MeetingMinutes",
             purpose="Capture and structure meeting discussions into actionable minutes",
@@ -54,9 +54,10 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             ),
             required_inputs=["MeetingAgenda", "AttendeeList"],
             component_type="artifact_producing",
+            owner_role="Owner",
         )
         kwargs.update(overrides)
-        return ComponentResponsibilities(**kwargs)
+        return ComponentSpec.model_validate(kwargs)
 
     def _make_domain_spec(self) -> ComponentDomainSpec:
         return ComponentDomainSpec(
@@ -260,7 +261,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.io.echo.assert_any_call("Exploring domain: MeetingMinutes...")
+            session.raw_io.echo.assert_any_call("Exploring domain: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")
@@ -323,7 +324,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.io.echo.assert_any_call("Designing structure: MeetingMinutes...")
+            session.raw_io.echo.assert_any_call("Designing structure: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")
@@ -387,7 +388,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.io.echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
+            session.raw_io.echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")
@@ -456,7 +457,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.io.echo.assert_any_call("Generating component code: MeetingMinutes...")
+            session.raw_io.echo.assert_any_call("Generating component code: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")

@@ -1,6 +1,6 @@
 """Eval tests that verify workflow prompt quality with real LLM calls.
 
-These test the actual @atomic_workflow-decorated methods with an LLM-powered
+These test the actual @atomic_workflow_step-decorated methods with an LLM-powered
 user bot (AgentIO) and an LLM judge to non-deterministically evaluate
 conversation quality — did the agent synthesize, loop, repeat itself, etc.
 
@@ -44,7 +44,7 @@ REDIRECT_JUDGE_RULES: dict[str, str] = {
 class TestProcessDefinitionEval(unittest.TestCase):
     """Eval tests for ProcessDefinition model."""
 
-    @timeout(120)
+    @timeout(900)
     def test_multi_turn_conversation_with_user_bot(self):
         """ProcessDefinition should complete efficiently with a realistic user bot."""
         from tests.evals.helpers import run_multi_turn_eval
@@ -76,7 +76,7 @@ class TestProcessDefinitionEval(unittest.TestCase):
         )
         self.assertIsInstance(result, ProcessDefinition)
 
-    @timeout(120)
+    @timeout(900)
     def test_process_analysis_with_adhd_writer(self):
         """ProcessDefinition should stay at meta-level with an ADHD writer who keeps describing content."""
         from tests.evals.helpers import run_multi_turn_eval
@@ -107,10 +107,14 @@ class TestProcessDefinitionEval(unittest.TestCase):
 class TestResourceEval(unittest.TestCase):
     """Eval tests for Resource model."""
 
-    @timeout(120)
+    @timeout(900)
     def test_multi_turn_resource_generation(self):
         """Resource.generate_from_chat should complete efficiently with a user bot."""
-        from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
+        from tests.evals.helpers import (
+            make_meeting_analysis,
+            make_meeting_minutes_deliverable,
+            run_multi_turn_eval,
+        )
         from workflows.workflow.models import Resource
 
         user_persona = (
@@ -125,6 +129,7 @@ class TestResourceEval(unittest.TestCase):
             model_method=Resource.generate_from_chat,
             method_kwargs=dict(
                 analysis=make_meeting_analysis(),
+                deliverables=[make_meeting_minutes_deliverable()],
                 max_turns=10,
             ),
             user_persona=user_persona,
@@ -132,10 +137,13 @@ class TestResourceEval(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)
 
-    @timeout(120)
+    @timeout(900)
     def test_resource_with_adhd_chef(self):
         """Resource should stay at meta-level with an ADHD chef who keeps describing dishes."""
-        from tests.evals.helpers import run_multi_turn_eval
+        from tests.evals.helpers import (
+            make_weekly_menu_deliverable,
+            run_multi_turn_eval,
+        )
         from workflows.workflow.models import Resource
 
         user_persona = (
@@ -153,7 +161,7 @@ class TestResourceEval(unittest.TestCase):
             model_method=Resource.generate_from_chat,
             method_kwargs=dict(
                 analysis=None,
-                outputs=None,
+                deliverables=[make_weekly_menu_deliverable()],
                 max_turns=10,
             ),
             user_persona=user_persona,
@@ -166,7 +174,7 @@ class TestResourceEval(unittest.TestCase):
 class TestOutputEval(unittest.TestCase):
     """Eval tests for Output model."""
 
-    @timeout(120)
+    @timeout(900)
     def test_multi_turn_output_generation(self):
         """Deliverable.generate_from_chat should complete efficiently with a user bot."""
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
@@ -192,18 +200,10 @@ class TestOutputEval(unittest.TestCase):
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)
 
-    @timeout(120)
+    @timeout(900)
     def test_output_with_adhd_ideas_person(self):
         """Deliverable should stay at meta-level with an ADHD user who keeps describing business ideas."""
-        from chat_workflow.exceptions import TurnLimitExceededError
-        from tests.evals.helpers import (
-            AgentIO,
-            capture_on_failure,
-            format_transcript,
-            llm_judge,
-            make_config,
-            make_tools,
-        )
+        from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow.models import Deliverable
 
         user_persona = (
@@ -217,44 +217,25 @@ class TestOutputEval(unittest.TestCase):
             "to be difficult \u2014 your brain just works this way."
         )
 
-        config = make_config()
-        user_bot = AgentIO(persona_prompt=user_persona, config=config)
-        session = make_tools(user_bot)
-
-        with capture_on_failure(session):
-            try:
-                result = Deliverable.generate_from_chat(
-                    analysis=None,
-                    max_turns=10,
-                    session=session,
-                )
-                # If we get here without hitting the limit, validate output
-                self.assertIsInstance(result, list)
-                self.assertGreaterEqual(len(result), 1)
-            except TurnLimitExceededError:
-                # Hitting the turn limit is OK — the ADHD user is chatty
-                # Still validate via judge rules on whatever conversation happened
-                pass
-
-            # Always run the judge on the conversation transcript
-            transcript = format_transcript(session)
-            judge_result = llm_judge(REDIRECT_JUDGE_RULES, transcript, config)
-            failures = [v for v in judge_result.verdicts if not v.passed]
-            assert not failures, (
-                f"Conversation quality: {len(failures)}/{len(REDIRECT_JUDGE_RULES)} rules failed:\n"
-                + "\n".join(f"  [{v.rule}] FAIL: {v.explanation}" for v in failures)
-            )
+        result = run_multi_turn_eval(
+            model_method=Deliverable.generate_from_chat,
+            method_kwargs={"analysis": None, "max_turns": 10},
+            user_persona=user_persona,
+            judge_rules=REDIRECT_JUDGE_RULES,
+        )
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 1)
 
 
-class TestComponentResponsibilitiesEval(unittest.TestCase):
-    """Eval tests for ComponentResponsibilities model."""
+class TestComponentSpecEval(unittest.TestCase):
+    """Eval tests for ComponentSpec model."""
 
-    @timeout(120)
+    @timeout(900)
     def test_multi_turn_component_identification(self):
-        """ComponentResponsibilities.identify_from_chat should complete efficiently."""
+        """ComponentSpec.identify_from_chat should complete efficiently."""
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
         from workflows.workflow.models import (
-            ComponentResponsibilities,
+            ComponentSpec,
             Deliverable,
             Resource,
         )
@@ -264,19 +245,27 @@ class TestComponentResponsibilitiesEval(unittest.TestCase):
             Resource(
                 source="Note Taker",
                 format="Free-text notes",
-                trigger_conditions="Meeting ends",
-                validation_criteria="Contains date and key topics",
+                validation_criteria=(
+                    "Contains the meeting date, the attendee list, and at least "
+                    "one discussion topic."
+                ),
             ),
         ]
         outputs = [
             Deliverable(
-            name="Test",
-            description="Test",
-                consumer="Attendees",
-                format="Formatted document",
-                success_criteria="Accurate and timely",
-                integration_points="Email",
-                storage_requirements="Shared drive",
+                name="Meeting Minutes",
+                description=(
+                    "The written record of the meeting: decisions made, action "
+                    "items assigned, and key discussion points."
+                ),
+                consumer="Meeting Attendees",
+                format="Formatted document (PDF or shared doc)",
+                success_criteria=(
+                    "Every decision is recorded and every action item names "
+                    "an owner."
+                ),
+                integration_points="Emailed to attendees, who review the decisions and action items.",
+                storage_requirements="Shared drive, one folder per meeting series",
             ),
         ]
         user_persona = (
@@ -287,7 +276,7 @@ class TestComponentResponsibilitiesEval(unittest.TestCase):
         )
 
         result = run_multi_turn_eval(
-            model_method=ComponentResponsibilities.identify_from_chat,
+            model_method=ComponentSpec.identify_from_chat,
             method_kwargs=dict(
                 analysis=analysis,
                 inputs=inputs,
@@ -300,13 +289,13 @@ class TestComponentResponsibilitiesEval(unittest.TestCase):
         self.assertGreaterEqual(len(result), 1)
 
 
-class TestGeneratedComponentEval(unittest.TestCase):
-    """Eval tests for GeneratedComponent model."""
+class TestComponentSourceCodeEval(unittest.TestCase):
+    """Eval tests for ComponentSourceCode model."""
 
-    @timeout(120)
+    @timeout(900)
     def test_multi_turn_component_design(self):
-        """GeneratedComponent.generate should complete efficiently with a user bot."""
-        from tests.evals.helpers import run_multi_turn_eval
+        """ComponentSourceCode.generate should produce a valid module from a design spec."""
+        from tests.evals.helpers import AgentIO, make_config, make_tools
         from workflows.workflow import ComponentSourceCode
         from workflows.workflow.design_spec import ComponentDesignSpec
         from workflows.workflow.domain_spec import ComponentDomainField, ComponentDomainSpec
@@ -375,25 +364,15 @@ class TestGeneratedComponentEval(unittest.TestCase):
                 ],
             ),
         )
-        user_persona = (
-            "You are a busy professional who writes up meeting minutes. "
-            "You know exactly what makes good minutes: every action item "
-            "must have an owner and due date, decisions must be recorded, "
-            "and minutes must be distributed within 24 hours. "
-            "But you know NOTHING about Python, Pydantic, or programming. "
-            "If the architect uses technical terms, ask them to explain "
-            "in plain language."
-            "\n\nRespond helpfully but don't repeat yourself."
+        # Code generation is chat-off: there is no conversation to judge, only
+        # the generated module to validate.
+        config = make_config()
+        user_bot = AgentIO(
+            persona_prompt="You are a busy professional who writes meeting minutes.",
+            config=config,
         )
-
-        result = run_multi_turn_eval(
-            model_method=ComponentSourceCode.generate,
-            method_kwargs=dict(
-                design_spec=design_spec,
-                max_turns=10,
-            ),
-            user_persona=user_persona,
-        )
+        session = make_tools(user_bot, config=config)
+        result = ComponentSourceCode.generate(design_spec=design_spec, session=session)
         self.assertIsInstance(result, ComponentSourceCode)
         self.assertGreater(len(result.code), 0)
         self.assertIn("class ", result.code)

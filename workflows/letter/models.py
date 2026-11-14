@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import Field, model_validator
 
-from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow
+from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow_step
 
 
 class Letter(InteractiveEntity):
@@ -17,7 +17,7 @@ class Letter(InteractiveEntity):
             raise ValidationError("The letter should flow well and achieve the author's aims")
         return self
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def generate_from_chat(
         cls,

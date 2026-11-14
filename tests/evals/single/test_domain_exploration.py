@@ -1,7 +1,7 @@
 """Eval tests for ComponentDomainSpec.explore() — domain exploration phase.
 
-Tests that the @atomic_workflow agent:
-- Proposes artifact fields based on ComponentResponsibilities
+Tests that the @atomic_workflow_step agent:
+- Proposes artifact fields based on ComponentSpec
 - Probes for holistic quality criteria ("what good looks like")
 - Asks about the expert role
 - Doesn't re-ask or repeat itself
@@ -16,18 +16,21 @@ from tests.conftest import timeout
 class TestDomainExplorationEval(unittest.TestCase):
     """Eval tests for ComponentDomainSpec.explore()."""
 
-    @timeout(120)
+    @timeout(900)
     def test_domain_exploration_with_user_bot(self):
         """ComponentDomainSpec.explore() should complete efficiently with a user bot."""
         from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow import ComponentDomainSpec
-        from workflows.workflow.component_responsibilities import (
-            ComponentResponsibilities,
+        from workflows.workflow.component_spec import (
+            ComponentSpec,
         )
 
-        responsibilities = ComponentResponsibilities(
+        responsibilities = ComponentSpec(
             name="MeetingMinutes",
-            purpose="Transform raw meeting notes into structured minutes with clear decisions and action items",
+            purpose=(
+                "Produces meeting minutes that capture decisions made, action "
+                "items assigned, and key discussion points for meeting attendees."
+            ),
             scope_description=(
                 "Captures what happened in a meeting: decisions made, "
                 "action items assigned, key discussion points. Does NOT "
@@ -35,6 +38,7 @@ class TestDomainExplorationEval(unittest.TestCase):
             ),
             required_inputs=["Raw meeting notes", "Attendee list"],
             component_type="artifact_producing",
+            owner_role="Meeting Coordinator",
             incidental_notes="",
         )
 

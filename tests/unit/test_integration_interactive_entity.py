@@ -52,7 +52,7 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
         result = generate_class("TestEntity", fields)
         self.assertIn("from __future__ import annotations", result)
         self.assertIn("from pydantic import BaseModel, Field, model_validator", result)
-        self.assertIn("from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow", result)
+        self.assertIn("from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow_step", result)
 
     def test_generated_code_includes_fields(self):
         """Generated code should include the specified fields."""
@@ -75,7 +75,7 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
         """Generated code should include a generate_from_chat classmethod."""
         fields = [{"name": "name", "type": "str", "desc": "The name"}]
         result = generate_class("TestEntity", fields)
-        self.assertIn("@atomic_workflow", result)
+        self.assertIn("@atomic_workflow_step", result)
         self.assertIn("@classmethod", result)
         self.assertIn("def generate_from_chat(", result)
 
@@ -253,7 +253,7 @@ class TestEdgeCases(unittest.TestCase):
         code = generate_class("EmptyEntity", [])
         self.assertIsInstance(code, str)
         self.assertIn("class EmptyEntity(InteractiveEntity):", code)
-        # Should still have model_validator and workflow method
+        # Should still have model_validator and workflow step
         self.assertIn("@model_validator", code)
         self.assertIn("generate_from_chat", code)
 
@@ -338,15 +338,15 @@ class TestCliDiscovery(unittest.TestCase):
         self.assertTrue((workflow_path / "__init__.py").exists())
 
     def test_workflow_discoverable_by_cli(self):
-        """The CLI should be able to build a sub-app for workflow with a Workflow > create command."""
+        """The CLI should build a `workflow` sub-app with a `workflow create` command."""
         from chat_workflow_cli.cli import _build_workflow_sub_app
 
         sub_app = _build_workflow_sub_app("workflow")
         self.assertIsNotNone(sub_app)
-        # The workflow module has only class-level methods (Workflow.create)
-        # which are registered as a sub-typer, not flat commands
-        self.assertEqual(len(sub_app.registered_commands), 0)
-        self.assertGreaterEqual(len(sub_app.registered_groups), 1)
+        # WorkflowSpec is the only workflow class in the module, so its methods
+        # are flat commands: `workflow create`, not `workflow workflow create`.
+        self.assertEqual([c.name for c in sub_app.registered_commands], ["create"])
+        self.assertEqual(sub_app.registered_groups, [])
 
 
 class TestFullEndToEndFlow(unittest.TestCase):

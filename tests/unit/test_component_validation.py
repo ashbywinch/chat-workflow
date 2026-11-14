@@ -1,4 +1,4 @@
-"""Tests for Component and GeneratedComponent LLMValidated validation rules."""
+"""Tests for Component and ComponentSourceCode LLMValidated validation rules."""
 
 import unittest
 from pathlib import Path
@@ -16,18 +16,28 @@ class TestComponentValidation(unittest.TestCase):
         self.assertTrue(any("name" in r.lower() for r in rules), "Should have a rule about the name field")
 
     def test_generated_component_collects_code_quality_rules(self):
-        """GeneratedComponent validates the generated Python code quality."""
+        """ComponentSourceCode judges the judgment calls, not schema mechanics."""
         rules = ComponentSourceCode.collect_all_rules()
         self.assertTrue(len(rules) >= 4)
         self.assertTrue(
-            any("Pydantic model" in r or "BaseModel" in r for r in rules),
-            "Should validate that class inherits from BaseModel",
+            any("LLMValidated" in r or "primary model" in r for r in rules),
+            "Should validate the primary model's self-enforced quality rules",
         )
-        self.assertTrue(any("Field" in r for r in rules), "Should validate that fields have descriptions")
-        self.assertTrue(any("min_length" in r for r in rules), "Should validate min_length=1 on required fields")
         self.assertTrue(
-            any("atomic_workflow" in r or "docstring" in r for r in rules),
-            "Should validate the @atomic_workflow method's docstring quality",
+            any("domain-quality" in r for r in rules),
+            "Should reserve generated-model rules for domain quality",
+        )
+        self.assertFalse(
+            any("description=" in r for r in rules),
+            "Field descriptions are deterministic, not judged",
+        )
+        self.assertFalse(
+            any("min_length" in r for r in rules),
+            "min_length is deterministic, not judged",
+        )
+        self.assertTrue(
+            any("atomic_workflow_step" in r or "docstring" in r for r in rules),
+            "Should validate the @atomic_workflow_step method's docstring quality",
         )
 
     def test_valid_component_passes_validation(self):
@@ -42,6 +52,7 @@ class TestComponentValidation(unittest.TestCase):
                 model_class="TestModel",
                 expert_role="Test Expert",
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
             self.assertEqual(c.name, "Test")
 
@@ -58,6 +69,7 @@ class TestComponentValidation(unittest.TestCase):
             model_class="TestModel",
             expert_role="Domain Expert",
             component_type="artifact_producing",
+            owner_role="Owner",
         )
 
     def test_purpose_with_and_raises_validation_error(self):

@@ -13,7 +13,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: help setup deps uv-sync install-hooks run test test-unit test-verbose test-all check lint lint-check lint-github typecheck typecheck-update-baseline format coverage docs-check evals evals-verbose evals-smoke evals-incremental clean
+.PHONY: help setup deps uv-sync install-hooks run test test-unit test-verbose test-all check lint lint-check lint-github typecheck typecheck-update-baseline format coverage docs-check evals evals-test evals-verbose evals-smoke evals-incremental clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -22,6 +22,7 @@ OUT := .venv/bin/chat-workflow
 RUFF := .venv/bin/ruff
 UNITTEST := $(PYTHON) -m unittest
 COVERAGE := .venv/bin/coverage
+EVAL_TIMEOUT ?= 1800
 
 # Colors for output
 GREEN := \033[0;32m
@@ -37,7 +38,8 @@ help:
 	@echo "  ${GREEN}make test-verbose${NC}       Run unit tests with verbose output"
 	@echo "  ${GREEN}make test-all${NC}           Run unit tests + evals"
 	@echo "  ${GREEN}make evals${NC}              Run evaluation tests with real API (requires gateway token)"
-	@echo "  ${GREEN}make evals-smoke${NC}        Quick eval subset (test_real_api + debug_streaming, ~80s)"
+	@echo "  ${GREEN}make evals-test TEST=...${NC} Run one targeted eval (module/class/test path)"
+	@echo "  ${GREEN}make evals-smoke${NC}        Quick eval subset (test_real_api + debug_streaming, ~5 min)"
 	@echo "  ${GREEN}make evals-incremental${NC}  Change-aware eval subset (auto-detects affected evals)"
 	@echo "  ${GREEN}make coverage${NC}           Run tests with coverage report (coverage.xml for CI)"
 	@echo "  ${GREEN}make docs-check${NC}         Every relative markdown link resolves"
@@ -123,10 +125,15 @@ format: setup
 # the library reads .env (created by `make setup`); real env vars win.
 evals: deps lint-check typecheck
 	@rm -f test-results/eval-report.txt
-	@$(PYTHON) scripts/run_with_timeout.py --timeout 1800 -- $(UNITTEST) discover tests/evals/
+	@CHAT_WORKFLOW_EVAL_REPORT=1 $(PYTHON) scripts/run_with_timeout.py --timeout $(EVAL_TIMEOUT) -- $(UNITTEST) discover tests/evals/
 
 evals-verbose: deps lint-check typecheck
-	@$(PYTHON) scripts/run_with_timeout.py --timeout 1800 -- $(UNITTEST) discover tests/evals/ -v
+	@CHAT_WORKFLOW_EVAL_REPORT=1 $(PYTHON) scripts/run_with_timeout.py --timeout $(EVAL_TIMEOUT) -- $(UNITTEST) discover tests/evals/ -v
+
+evals-test: deps lint-check typecheck
+	@test -n "$(TEST)" || { echo "${RED}Usage: make evals-test TEST=tests.evals.single...${NC}"; exit 1; }
+	@rm -f test-results/eval-report.txt
+	@CHAT_WORKFLOW_EVAL_REPORT=1 $(PYTHON) scripts/run_with_timeout.py --timeout $(EVAL_TIMEOUT) -- $(UNITTEST) $(TEST)
 
 evals-smoke: deps lint-check typecheck
 	@$(PYTHON) scripts/run_with_timeout.py --timeout 600 -- $(UNITTEST) tests.evals.single.test_real_api tests.evals.composite.test_debug_streaming_api -v

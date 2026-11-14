@@ -6,8 +6,8 @@ import tests.conftest
 from chat_workflow import (
     AgentIntent,
     AgentResponse,
-    AtomicWorkflow,
-    AtomicWorkflowFailedError,
+    AtomicWorkflowStep,
+    AtomicWorkflowStepFailedError,
     TurnLimitExceededError,
 )
 from workflows.evaluation_criteria import EvaluationCriteria
@@ -15,7 +15,7 @@ from workflows.evaluation_criteria import EvaluationCriteria
 
 class TestLLMInteraction(unittest.TestCase):
     def _create_orchestrator(self, max_turns=10):
-        return AtomicWorkflow(config=tests.conftest.make_atomic_workflow_config(max_turns=max_turns))
+        return AtomicWorkflowStep(config=tests.conftest.make_atomic_workflow_step_config(max_turns=max_turns))
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_with_validation_error(self, mock_get_client):
@@ -60,7 +60,9 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertEqual(model, "default-model")
         self.assertEqual(messages, orchestrator.messages)
         self.assertEqual(response_model, AgentResponse[EvaluationCriteria])
-        self.assertEqual(max_retries, 3)
+        # One sample per call: the outer correction loop feeds the rejection
+        # reason back, so Instructor must not retry blind.
+        self.assertEqual(max_retries, 1)
         self.assertEqual(
             mock_client.last_call_kwargs.get("timeout"),
             30,
@@ -87,7 +89,9 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertEqual(mock_client.call_count, 1)
         _, _, response_model, max_retries = mock_client.last_call_args
         self.assertEqual(response_model, AgentResponse[EvaluationCriteria])
-        self.assertEqual(max_retries, 3)
+        # One sample per call: the outer correction loop feeds the rejection
+        # reason back, so Instructor must not retry blind.
+        self.assertEqual(max_retries, 1)
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_conversation_turn_limit_enforcement(self, mock_get_client):
@@ -143,7 +147,7 @@ class TestLLMInteraction(unittest.TestCase):
 
         orchestrator = self._create_orchestrator()
 
-        with self.assertRaises(AtomicWorkflowFailedError) as context:
+        with self.assertRaises(AtomicWorkflowStepFailedError) as context:
             orchestrator.process_turn("Some user input")
 
         self.assertIn("Cannot generate criteria", str(context.exception))

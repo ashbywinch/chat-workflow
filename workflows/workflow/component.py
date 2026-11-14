@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
 
-from chat_workflow import composite_workflow
+from chat_workflow import composite_workflow_step
 from chat_workflow.code_generator import verify_code
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.session import Session
 
 from . import ComponentSourceCode
-from .component_responsibilities import ComponentResponsibilities
+from .component_spec import ComponentSpec
 from .design_spec import ComponentDesignSpec
 from .domain_spec import ComponentDomainSpec
 from .interaction_context import ComponentInteractionContext
@@ -20,41 +20,59 @@ from .structure import ComponentStructure
 
 
 class Component(LLMValidated):
-    """Represents a business component written to disk.
+    """A generated component written to disk.
 
-    Wraps a generated Pydantic BaseModel class that owns a single
-    business artifact type. The Component's create() method calls
-    GeneratedComponent.generate() to produce the code, then verifies,
-    writes, and validates the result.
+    Represents a business artifact and the set of workflow steps that create
+    or update it. The Component's create() method calls
+    ComponentSourceCode.generate() to produce the code, then verifies, writes,
+    and validates the result.
     """
 
     _validation_rules: ClassVar[list[str]] = [
         "The purpose field clearly describes the domain concept the component "
         "represents, in a way that an LLM could use to understand what instances "
         "of this component mean (not just what they store).",
-        "The name is a noun — it names an artifact (e.g. 'Invoice', "
-        "'MeetingMinutes'), not an action (e.g. 'GenerateInvoice').",
-        "The expert_role describes a real, specific domain expertise the component "
-        "embodies, not a generic role ('MinutesDraft Expert' is vague; "
-        "'Meeting Minutes Administrator' is better).",
+        "The name is a noun — it names a concrete artifact (e.g. 'Invoice', "
+        "'MeetingMinutes'), not an action (e.g. 'GenerateInvoice') or an "
+        "abstract activity ('Approval', 'Distribution', 'Review').",
+        "The expert_role is the agent's domain expertise — the role the agent "
+        "acts as when helping with this artifact. It may equal or differ from "
+        "the owner_role; it is not a generic role ('MinutesDraft Expert' is "
+        "vague; 'Meeting Minutes Administrator' is better).",
+        "The owner_role is the capacity the artifact belongs to — the role "
+        "whose job includes it, which may be the user. 'Owner' only when the "
+        "artifact is the owner's own work; not the person who supplies the "
+        "input unless they are accountable.",
         # Tier 1 — Core Structural Integrity
-        "Single Artifact Type Rule: The component defines exactly one business "
-        "artifact type. The purpose must describe a single artifact concept. "
+        "Single Artifact Type Rule: The component owns exactly one artifact — "
+        "the set of data members of the model it defines. The purpose must "
+        "describe that one artifact concept, and its methods may create, "
+        "update, review, or send it: those are operations on the same "
+        "artifact, not additional artifacts. "
         "BAD: 'Invoice processing pipeline with integrated timesheet management' "
         "(two artifact types: invoices and timesheets). "
         "GOOD: 'Processes customer invoices through their complete lifecycle'.",
-        "Single Responsibility: The component's responsibility must be stateable "
-        "in one sentence describing exactly one domain concept. The purpose must "
-        "not describe multiple distinct responsibilities. "
-        "BAD: 'Oversees customer onboarding handles billing inquiries manages "
-        "support tickets' (three distinct responsibilities). "
-        "GOOD: 'Processes customer invoices through their complete lifecycle'.",
-        "No Multiple Artifact Creation: The component creates exactly one primary "
-        "artifact type. The purpose must not imply creation of multiple distinct "
-        "business artifacts. "
+        "Single Responsibility: The purpose states this component's own "
+        "responsibility, not a bundle of subcomponents, existing or latent. "
+        "It describes the one artifact the component owns and the operations "
+        "it performs on it. Work it delegates to other components that own "
+        "their own artifacts is allowed in the purpose, but must not be "
+        "restated as its own work. A piece of work that is itself an artifact — a "
+        "section with its own content, audience, or quality criteria (a "
+        "strategy section, a financial projection), a separate record or "
+        "deliverable, or unrelated technical work such as parsing or file "
+        "handling — is a latent subcomponent and does not belong here. "
+        "BAD: 'Business plan: market analysis, financials, operations, and "
+        "file parsing' (four subcomponents in one component). "
+        "GOOD: 'The business plan document: a coherent plan assembled from "
+        "components that each own one section'.",
+        "No Multiple Artifact Creation: The component owns exactly one primary "
+        "artifact type. Creating and updating that artifact, or recording "
+        "several of its operations, is still one artifact. The purpose must "
+        "not imply ownership of multiple distinct business artifacts. "
         "BAD: 'Creates customer invoices generates monthly reports produces "
         "analytics dashboards' (three distinct artifacts). "
-        "GOOD: 'Creates customer invoices from start to finish'.",
+        "GOOD: 'Creates and updates customer invoices from start to finish'.",
         "Clear Boundaries: The purpose must clearly define what is inside and "
         "outside the component's responsibility. Another LLM should be able to "
         "use the purpose to decide if a given concern belongs here. "
@@ -80,11 +98,26 @@ class Component(LLMValidated):
     name: str = Field(
         ...,
         description="Component name (primary artifact, noun-based)",
+        min_length=1,
     )
 
     purpose: str = Field(
         ...,
-        description="Component purpose and capabilities in one sentence",
+        description=(
+            "This component's own atomic responsibility — what the component "
+            "itself does, with no subcomponents, existing or latent"
+        ),
+        min_length=1,
+    )
+
+    owner_role: str = Field(
+        ...,
+        description=(
+            "The capacity the artifact belongs to — the role whose job "
+            "includes it. It may be the user. 'Owner' only when the artifact "
+            "is the owner's own work."
+        ),
+        min_length=1,
     )
 
     code_path: Path = Field(
@@ -95,19 +128,27 @@ class Component(LLMValidated):
     model_class: str = Field(
         ...,
         description="Name of the Pydantic model class defined in the generated file",
+        min_length=1,
     )
 
     expert_role: str = Field(
         ...,
-        description="Single expert role responsible for this component",
+        description=(
+            "The agent's domain expertise — the role the agent acts as when "
+            "helping with this component; may equal owner_role"
+        ),
+        min_length=1,
     )
 
-    component_type: str = Field(
+    component_type: Literal["value_stream", "artifact_producing", "planning_service"] = Field(
         ...,
-        description="One of: value_stream, artifact_producing, planning_service",
+        description=(
+            "One of: value_stream (continuous outcome or KPI, not a discrete "
+            "document), artifact_producing, planning_service"
+        ),
     )
 
-    execution_complexity: str = Field(
+    execution_complexity: Literal["simple", "complex"] = Field(
         default="simple",
         description="simple or complex — indicates implementation effort",
     )
@@ -131,11 +172,11 @@ class Component(LLMValidated):
             )
         return self
 
-    @composite_workflow
+    @composite_workflow_step
     @classmethod
     def create(
         cls,
-        requirements: ComponentResponsibilities | ComponentResponsibilities,
+        requirements: ComponentSpec | ComponentSpec,
         *,
         session: Session,
         output_dir: Path | None = None,
@@ -143,10 +184,10 @@ class Component(LLMValidated):
         """Create ONE business component.
 
         Two code paths:
-        - ComponentResponsibilities (new): Phase 1 (DomainSpec.explore)
+        - ComponentSpec (new): Phase 1 (DomainSpec.explore)
           + Phase 2 (Structure.design) — produces a domain spec, designs
           the structure, then builds and returns a Component record.
-        - ComponentResponsibilities (legacy): Full pipeline — generates code,
+        - ComponentSpec (legacy): Full pipeline — generates code,
           verifies, writes to disk, and returns Component.
 
         Args:
@@ -155,8 +196,8 @@ class Component(LLMValidated):
             output_dir: Directory to write the component file. Defaults to
                 current working directory / "workflows" / {name} /
         """
-        # --- New path: ComponentResponsibilities (Phase 1-4) ---
-        if isinstance(requirements, ComponentResponsibilities):
+        # --- New path: ComponentSpec (Phase 1-4) ---
+        if isinstance(requirements, ComponentSpec):
             session.io.echo(f"Exploring domain: {requirements.name}...")
             domain_spec = ComponentDomainSpec.explore(
                 responsibilities=requirements,
@@ -208,12 +249,13 @@ class Component(LLMValidated):
                 purpose=structure.description,
                 code_path=code_path,
                 model_class=domain_spec.name,
+                owner_role=requirements.owner_role,
                 expert_role=domain_spec.expert_role,
                 component_type=requirements.component_type,
             )
             return result
 
-        # --- Legacy path: ComponentResponsibilities ---
+        # --- Legacy path: ComponentSpec ---
         # Step 1: Construct a ComponentDesignSpec from the requirement
         session.io.echo(f"Designing component: {requirements.name}...")
         design_spec = ComponentDesignSpec(
@@ -261,6 +303,7 @@ class Component(LLMValidated):
             purpose=requirements.purpose,
             code_path=code_path,
             model_class=requirements.name,
+            owner_role=requirements.owner_role,
             expert_role=f"{requirements.name} Expert",
             component_type=requirements.component_type,
         )

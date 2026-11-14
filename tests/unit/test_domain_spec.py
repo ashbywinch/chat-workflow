@@ -87,25 +87,31 @@ class TestComponentDomainSpec(unittest.TestCase):
         )
         self.assertEqual(spec.expert_role, "Meeting Minutes Administrator")
 
-    def test_what_good_looks_like_can_be_empty(self):
-        spec = ComponentDomainSpec(
-            name="Action Items",
-            description="List of action items from a meeting",
-            fields=[],
-            what_good_looks_like=[],
-            expert_role="Action Item Coordinator",
-        )
-        self.assertEqual(spec.what_good_looks_like, [])
+    def test_what_good_looks_like_cannot_be_empty(self):
+        with self.assertRaises(ValidationError):
+            ComponentDomainSpec(
+                name="Action Items",
+                description="List of action items from a meeting",
+                fields=[
+                    ComponentDomainField(
+                        name="owner",
+                        domain_description="Who owns the action",
+                        field_type_hint="person name",
+                    )
+                ],
+                what_good_looks_like=[],
+                expert_role="Action Item Coordinator",
+            )
 
-    def test_fields_can_be_empty(self):
-        spec = ComponentDomainSpec(
-            name="Simple Note",
-            description="A simple unstructured note",
-            fields=[],
-            what_good_looks_like=["Notes are clear and actionable"],
-            expert_role="Note Taker",
-        )
-        self.assertEqual(spec.fields, [])
+    def test_fields_cannot_be_empty(self):
+        with self.assertRaises(ValidationError):
+            ComponentDomainSpec(
+                name="Simple Note",
+                description="A simple unstructured note",
+                fields=[],
+                what_good_looks_like=["Notes are clear and actionable"],
+                expert_role="Note Taker",
+            )
 
     def test_missing_required_fields_raises_error(self):
         with self.assertRaises(ValidationError):
@@ -131,7 +137,7 @@ class TestComponentDomainSpec(unittest.TestCase):
         self.assertNotIn("base model", description)
 
     def test_name_matches_domain_convention(self):
-        """Name should be a noun-based artifact name, matching ComponentResponsibilities convention."""
+        """Name should be a noun-based artifact name, matching ComponentSpec convention."""
         spec = self.make_valid_spec()
         self.assertEqual(spec.name, "Meeting Minutes")
 

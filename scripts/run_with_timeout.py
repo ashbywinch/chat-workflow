@@ -2,6 +2,7 @@
 """Run a command with a hard timeout."""
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -39,14 +40,34 @@ def main() -> int:
 
     import threading
 
-    import os as _os
-    _env = dict(_os.environ)
+    _env = dict(os.environ)
     _env["PYTHONUNBUFFERED"] = "1"
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=_env)
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=0,
+        env=_env,
+    )
 
-    def _stream():
-        for line in iter(process.stdout.readline, ""):
-            print(line, end="", flush=True)
+    def _stream() -> None:
+        """Forward raw chunks as they arrive, not line-buffered.
+
+        unittest's default output is a stream of dots with no newlines; a
+        readline() loop would hold them until the next failure or test name.
+        Reading the pipe directly makes the run legible while it is happening.
+        """
+        assert process.stdout is not None
+        fd = process.stdout.fileno()
+        while True:
+            try:
+                chunk = os.read(fd, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            sys.stdout.buffer.write(chunk)
+            sys.stdout.buffer.flush()
 
     reader = threading.Thread(target=_stream, daemon=True)
     reader.start()

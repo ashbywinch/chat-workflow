@@ -6,10 +6,10 @@ from unittest.mock import Mock, patch
 
 from pydantic import ValidationError
 
-from chat_workflow.atomic_workflow import AtomicWorkflow
+from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
 from chat_workflow.exceptions import MaxRetriesExceededError
 from chat_workflow.models import AgentIntent, AgentResponse
-from tests.conftest import make_atomic_workflow_config, make_valid_criteria
+from tests.conftest import make_atomic_workflow_step_config, make_valid_criteria
 from workflows.evaluation_criteria import EvaluationCriteria
 
 
@@ -64,7 +64,7 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         )
         mock_get_client.return_value = mock_client
 
-        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(max_retries=3))
+        orchestrator = AtomicWorkflowStep(config=make_atomic_workflow_step_config(max_retries=3))
 
         with self.assertRaises(MaxRetriesExceededError) as ctx:
             orchestrator._call_llm()
@@ -79,10 +79,110 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         mock_client.chat.completions.create.side_effect = RuntimeError("Unexpected error")
         mock_get_client.return_value = mock_client
 
-        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
+        orchestrator = AtomicWorkflowStep(config=make_atomic_workflow_step_config())
 
         with self.assertRaises(RuntimeError):
             orchestrator._call_llm()
+
+    @patch("chat_workflow.llm_interaction.get_client")
+    def test_validation_failure_is_fed_back_before_retry(self, mock_get_client):
+        """The rejected response and the reason are both appended for the retry."""
+        from types import SimpleNamespace
+
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+
+        from chat_workflow import ValidationError
+
+        rejected_content = '{"intent": "success", "result": {"code": "nested if"}}'
+        rejected = InstructorRetryException(
+            "rejected",
+            n_attempts=1,
+            total_usage=0,
+            last_completion=SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=rejected_content)
+                    )
+                ]
+            ),
+            failed_attempts=[FailedAttempt(1, ValidationError("meeting_date needs min_length"))],
+        )
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = [
+            rejected,
+            AgentResponse[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                result=make_valid_criteria(),
+            ),
+        ]
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(max_retries=1, validation_corrections=1)
+        )
+
+        result = orchestrator._call_llm()
+
+        self.assertEqual(result.intent, AgentIntent.SUCCESS)
+        self.assertEqual(orchestrator.messages[-2]["role"], "assistant")
+        self.assertEqual(orchestrator.messages[-2]["content"], rejected_content)
+        correction = orchestrator.messages[-1]["content"]
+        self.assertIn("meeting_date needs min_length", correction)
+        self.assertIn("[framework]", correction)
+
+    @patch("chat_workflow.llm_interaction.get_client")
+    def test_correction_budget_is_bounded(self, mock_get_client):
+        """Exhausting the correction budget raises MaxRetriesExceededError."""
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+
+        from chat_workflow import ValidationError
+
+        def rejected():
+            return InstructorRetryException(
+                "rejected",
+                n_attempts=1,
+                total_usage=0,
+                failed_attempts=[FailedAttempt(1, ValidationError("still wrong"))],
+            )
+
+        def always_reject(**_):
+            raise rejected()
+
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = always_reject
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(max_retries=1, validation_corrections=1)
+        )
+
+        with self.assertRaises(MaxRetriesExceededError) as ctx:
+            orchestrator._call_llm()
+
+        self.assertIn("still wrong", str(ctx.exception))
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+
+    def test_invalid_escape_reason_has_remediation(self):
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+
+        from chat_workflow.atomic_workflow_step import _retry_reason
+
+        exc = InstructorRetryException(
+            "rejected",
+            n_attempts=1,
+            total_usage=0,
+            failed_attempts=[
+                FailedAttempt(1, ValueError("Invalid JSON: invalid escape at line 5"))
+            ],
+        )
+
+        reason = _retry_reason(exc)
+
+        self.assertIn("Use `\\n`", reason)
+        self.assertIn("backslash", reason)
 
 
 if __name__ == "__main__":

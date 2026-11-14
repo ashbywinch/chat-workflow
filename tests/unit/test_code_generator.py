@@ -219,7 +219,7 @@ class TestMethodGenerator(unittest.TestCase):
 
     Scenarios tested:
     1. The function is importable and callable
-    2. It returns a string containing @atomic_workflow and @classmethod
+    2. It returns a string containing @atomic_workflow_step and @classmethod
     3. The generated code includes generate_from_chat method name
     4. The generated code includes context, max_turns, and session parameters
     5. The generated code is syntactically valid Python
@@ -242,12 +242,12 @@ class TestMethodGenerator(unittest.TestCase):
         result = generate_workflow_method("TestWorkflow")
         self.assertIsInstance(result, str)
 
-    def test_generate_workflow_method_contains_atomic_workflow(self):
-        """Generated code should contain @atomic_workflow decorator (will FAIL)."""
+    def test_generate_workflow_method_contains_atomic_workflow_step(self):
+        """Generated code should contain @atomic_workflow_step decorator (will FAIL)."""
         from chat_workflow.code_generator import generate_workflow_method
 
         result = generate_workflow_method("TestWorkflow")
-        self.assertIn("@atomic_workflow", result)
+        self.assertIn("@atomic_workflow_step", result)
 
     def test_generate_workflow_method_contains_classmethod(self):
         """Generated code should contain @classmethod decorator (will FAIL)."""
@@ -527,7 +527,7 @@ class TestClassGenerator(unittest.TestCase):
         fields = [{"name": "name", "type": "str", "desc": "The name"}]
         result = generate_class("TestEntity", fields)
         self.assertIn("generate_from_chat", result)
-        self.assertIn("atomic_workflow", result)
+        self.assertIn("atomic_workflow_step", result)
         self.assertIn("@classmethod", result)
 
 

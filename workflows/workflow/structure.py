@@ -11,7 +11,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 from .domain_spec import ComponentDomainSpec
 
@@ -75,8 +75,11 @@ class ComponentStructure(BaseModel):
         min_length=1,
     )
     base_class: str = Field(
-        "BaseModel",
-        description=("Base class for the generated model: 'BaseModel' (default) or 'LLMValidated'"),
+        "LLMValidated",
+        description=(
+            "Base class for the generated model: 'LLMValidated' (required — "
+            "the component enforces its own domain rules)"
+        ),
     )
     fields: list[StructField] = Field(
         default_factory=list,
@@ -91,7 +94,7 @@ class ComponentStructure(BaseModel):
         description="Additional Python imports needed by the generated code",
     )
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def design(
         cls,
@@ -104,14 +107,27 @@ class ComponentStructure(BaseModel):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentStructure:
-        """You are a data design expert. Propose all types and constraints
-        in one message, using ONLY business language. Instead of code
-        types (list[str], ActionItem) say what they mean: "attendees is
-        a list of people", "each action item has an owner and due date".
+        """You are a data design expert. Propose the shape and rules in one
+        message, using business language: "attendees is a list of people",
+        "each action item has an owner and due date". Never say code types or
+        framework terms to the user.
 
-        Then derive validation rules from the "what good looks like"
-        criteria. If the user asks about a code term you used, explain
-        it in plain language and move on. Use "continue" to propose,
+        Translate the user's business language into the technical structure
+        silently; do not ask the user to choose code types. If a field needs a
+        nested shape, express it as a nested BaseModel, a dataclass, or a
+        TypedDict; the codegen step will include it. Do not define a second
+        independent artifact. For dates, use a str with an ISO format or a
+        pre-validator; never a date/datetime field.
+
+        Derive rules only for criteria that are field-specific and
+        structurally enforceable; holistic criteria can stay as guidance.
+        Include a validator for every rule a field can enforce structurally —
+        a date format, a non-empty list, a required companion field. Return an
+        empty list only when nothing is structurally enforceable. Never say
+        "string", "list", "optional", "nested type", "BaseModel", or any code
+        type to the user; say "text", "a list of people", "if there is one".
+        If the user asks about a code term you used, explain it in plain
+        language and restate the pending proposal. Use "continue" to propose,
         "success" when the user confirms all. When confirmed, move on.
         """
         ...  # type: ignore[reportReturnType]

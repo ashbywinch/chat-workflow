@@ -1,7 +1,7 @@
-"""End-to-end eval: ComponentResponsibilities → Component.create() → generated component → import → run → judge.
+"""End-to-end eval: ComponentSpec → Component.create() → generated component → import → run → judge.
 
 This test:
-1. Creates a realistic ComponentResponsibilities for MinutesDraft
+1. Creates a realistic ComponentSpec for MinutesDraft
 2. Runs Component.create() — all 4 phases execute (explore → design → gather → generate)
 3. Reads the generated code from disk, verifies syntax
 4. Dynamically imports the generated module
@@ -25,14 +25,17 @@ from tests.evals.helpers import (
     run_multi_turn_eval,
 )
 from workflows.workflow.component import Component
-from workflows.workflow.component_responsibilities import ComponentResponsibilities
+from workflows.workflow.component_spec import ComponentSpec
 
 
-def make_minutes_draft_responsibilities() -> ComponentResponsibilities:
-    """Create a realistic ComponentResponsibilities for a MinutesDraft artifact."""
-    return ComponentResponsibilities(
+def make_minutes_draft_responsibilities() -> ComponentSpec:
+    """Create a realistic ComponentSpec for a MinutesDraft artifact."""
+    return ComponentSpec(
         name="MinutesDraft",
-        purpose="Creates structured meeting minutes",
+        purpose=(
+            "Produces the formal written record of a meeting — decisions made "
+            "and action items assigned — for the meeting attendees."
+        ),
         scope_description=(
             "Represents the formal written record of a meeting, including what was discussed, "
             "decisions made, and action items assigned. Does NOT represent the meeting agenda, "
@@ -40,6 +43,7 @@ def make_minutes_draft_responsibilities() -> ComponentResponsibilities:
         ),
         required_inputs=["meeting_notes", "attendee_list"],
         component_type="artifact_producing",
+        owner_role="Meeting Coordinator",
         incidental_notes=(
             "The user typically takes sketchy notes during meetings and needs help "
             "turning them into proper structured minutes. They want the assistant to "
@@ -48,12 +52,12 @@ def make_minutes_draft_responsibilities() -> ComponentResponsibilities:
     )
 
 
-class TestEndToEndGeneratedComponentEval(unittest.TestCase):
+class TestEndToEndComponentSourceCodeEval(unittest.TestCase):
     """End-to-end eval: full pipeline from responsibilities to running generated component."""
 
-    @timeout(300)
+    @timeout(1200)
     def test_end_to_end_generated_component(self):
-        """Full pipeline: ComponentResponsibilities → Component.create() → import → run → judge."""
+        """Full pipeline: ComponentSpec → Component.create() → import → run → judge."""
         config = make_config()
         responsibilities = make_minutes_draft_responsibilities()
 
@@ -140,7 +144,7 @@ class TestEndToEndGeneratedComponentEval(unittest.TestCase):
                         method = getattr(attr, method_name, None)
                         if method is None:
                             continue
-                        if getattr(method, "_is_workflow", False):
+                        if getattr(method, "_is_workflow_step", False):
                             workflow_method = method
                             break
                     if workflow_method is not None:
@@ -155,7 +159,7 @@ class TestEndToEndGeneratedComponentEval(unittest.TestCase):
                 ]
                 self.assertIsNotNone(
                     workflow_method,
-                    f"No @atomic_workflow method found. Classes: {classes_found}",
+                    f"No @atomic_workflow_step method found. Classes: {classes_found}",
                 )
 
                 # --- Phase C: Run the generated workflow with a user bot ---

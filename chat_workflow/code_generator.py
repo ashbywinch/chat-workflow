@@ -97,7 +97,7 @@ def generate_field(name: str, type_: str, description: str | None = None) -> str
 
 
 def generate_workflow_method(class_name: str) -> str:
-    """Generate an ``@atomic_workflow`` / ``@classmethod`` decorated method.
+    """Generate an ``@atomic_workflow_step`` / ``@classmethod`` decorated method.
 
     Parameters
     ----------
@@ -110,7 +110,7 @@ def generate_workflow_method(class_name: str) -> str:
         A multi-line string with decorators and method body.
     """
     return (
-        "@atomic_workflow\n"
+        "@atomic_workflow_step\n"
         "@classmethod\n"
         "def generate_from_chat(\n"
         "    cls,\n"
@@ -329,7 +329,7 @@ def generate_class(
     lines: list[str] = []
     lines.append("from __future__ import annotations")
     lines.append("from pydantic import BaseModel, Field, model_validator")
-    lines.append("from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow")
+    lines.append("from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow_step")
     lines.append("")
     lines.append(f"class {name}(InteractiveEntity):")
 
@@ -361,7 +361,7 @@ def generate_class(
 
     lines.append("        return self")
     lines.append("")
-    lines.append("    @atomic_workflow")
+    lines.append("    @atomic_workflow_step")
     lines.append("    @classmethod")
     lines.append("    def generate_from_chat(")
     lines.append("        cls,")

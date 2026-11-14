@@ -1,7 +1,7 @@
 """ComponentDesignSpec — assembled complete design type.
 
 ComponentDesignSpec bundles the three design outputs (domain spec, structure,
-and interaction context) into a single parameter for GeneratedComponent.generate().
+and interaction context) into a single parameter for ComponentSourceCode.generate().
 """
 
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ class ComponentDesignSpec(BaseModel):
 
     Combines the domain-level specification, Pydantic structure, and
     interaction context into one composite type. This is the single
-    parameter passed to GeneratedComponent.generate().
+    parameter passed to ComponentSourceCode.generate().
     """
 
     domain_spec: ComponentDomainSpec

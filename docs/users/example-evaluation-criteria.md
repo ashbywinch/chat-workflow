@@ -107,7 +107,7 @@ The workflow consists of three main functions:
 
 ### 1. `generate_criteria()` - Initial generation
 ```python
-@atomic_workflow
+@atomic_workflow_step
 def generate_criteria(
     context: Annotated[
         str, "The topic or domain for which to generate evaluation criteria"
@@ -131,7 +131,7 @@ def generate_criteria(
 
 ### 2. `refine()` - Generic refinement
 ```python
-@atomic_workflow
+@atomic_workflow_step
 def refine(
     initial_object: Annotated[
         ModelType, "The object to review and potentially modify based on user feedback"
@@ -150,9 +150,9 @@ def refine(
     pass
 ```
 
-### 3. `generate_reviewed_criteria()` - Composite workflow
+### 3. `generate_reviewed_criteria()` - Composite workflow step
 ```python
-@composite_workflow
+@composite_workflow_step
 def generate_reviewed_criteria(
     context: str = "",
     max_turns: int = 10,
@@ -183,7 +183,7 @@ def generate_reviewed_criteria(
     return criteria
 ```
 
-**Note**: Functions decorated with `@composite_workflow` are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
+**Note**: Functions decorated with `@composite_workflow_step` are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
 
 ## Critical Code Locations
 
@@ -192,8 +192,8 @@ def generate_reviewed_criteria(
 workflows/evaluation_criteria/models.py:44  # validate_business_rules() model_validator
 
 # Conversation flow:
-chat_workflow/atomic_workflow.py:174  # AtomicWorkflow
-chat_workflow/atomic_workflow.py:204  # process_turn() - main logic
+chat_workflow/atomic_workflow_step.py:174  # AtomicWorkflowStep
+chat_workflow/atomic_workflow_step.py:204  # process_turn() - main logic
 
 # LLM integration:
 chat_workflow/llm_interaction.py:44  # get_client() - provider setup
@@ -293,6 +293,6 @@ This workflow demonstrates several key patterns you can reuse:
 2. **Multi-turn conversation**: Guide users through complex data collection
 3. **Refinement loop**: Allow users to review and adjust generated content
 4. **Generic refinement**: Use `TypeVar` for reusable refinement conversations
-5. **Composite workflows**: Chain multiple `@atomic_workflow` functions with `@composite_workflow`
+5. **Composite workflow steps**: Chain multiple `@atomic_workflow_step` functions with `@composite_workflow_step`
 
 To create your own workflow, copy the `evaluation_criteria` directory structure and adapt the models and prompts for your use case.

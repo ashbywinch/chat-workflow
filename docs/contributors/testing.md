@@ -54,9 +54,9 @@ tests/
 
 ### 1. Orchestrator Logic (mock `_call_llm`)
 ```python
-@patch.object(AtomicWorkflow, '_call_llm')
+@patch.object(AtomicWorkflowStep, '_call_llm')
 def test_multi_turn_conversation(self, mock_call_llm):
-    orchestrator = AtomicWorkflow(
+    orchestrator = AtomicWorkflowStep(
         system_prompt="Test", response_model=AgentResponse[EvaluationCriteria],
         max_turns=5, initial_messages=None,
         on_continue=..., on_success=..., on_failure=...,
@@ -102,8 +102,8 @@ class TestProcessDefinitionEval(unittest.TestCase):
     def test_llm_produces_process_definition(self):
         from workflows.workflow.models import ProcessDefinition
 
-        orchestrator = AtomicWorkflow(
-            config=AtomicWorkflowConfig(
+        orchestrator = AtomicWorkflowStep(
+            config=AtomicWorkflowStepConfig(
                 system_prompt="You are a Business Process Analyst...",
                 response_model=AgentResponse[ProcessDefinition],
                 max_turns=3,
@@ -111,7 +111,7 @@ class TestProcessDefinitionEval(unittest.TestCase):
                 initial_messages=[{"role": "user", "content": "Customer places an order..."}],
                 on_continue=lambda action: TurnResult[...].continuing(action.message or ""),
                 on_success=lambda action: TurnResult[...].success(action.result),
-                on_failure=lambda action: AtomicWorkflowFailedError(action.message or ""),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or ""),
             )
         )
         result = orchestrator.process_turn("Please analyze...")
@@ -124,7 +124,7 @@ Use one-shot evals to verify models can be populated, but understand they don't 
 workflow's decorated docstring — they test a simplified version.
 
 #### 3b. Multi-Turn Evals with AgentIO (LLM-powered user bot)
-To test an actual `@atomic_workflow` decorated method with its real docstring, use `AgentIO` — an
+To test an actual `@atomic_workflow_step` decorated method with its real docstring, use `AgentIO` — an
 LLM-powered `UserIO` implementation that plays a realistic user role:
 
 ```python
@@ -203,9 +203,10 @@ self.assertTrue(is_good, f"Conversation quality issue:\n{reason}")
 ```bash
 make test              # Unit tests (no API key, ~0.01s)
 make test-verbose      # Same with verbose output
-make evals              # Full suite (real API, ~300-600s, 600s timeout)
-make evals-smoke        # Quick framework-level check (test_real_api + debug_streaming, ~80s)
-make evals-incremental  # Change-aware subset (auto-detects affected evals via code-review-graph, 600s timeout)
+make evals              # Full suite (real API, ~2h, 4h wrapper in CI)
+make evals-test TEST=...  # One targeted eval (module/class/test path)
+make evals-smoke        # Quick framework-level check (test_real_api + debug_streaming, ~5 min)
+make evals-incremental  # Change-aware subset (auto-detects affected evals via code-review-graph, 1800s timeout)
 make evals-verbose      # Same with verbose output
 make evals-debug        # Evals with LLM request/response tracing
 make test-all           # Unit tests + evals
@@ -270,25 +271,28 @@ Use multiple layers of protection (belt and braces):
    Each test has its own generous timeout (120s for component evals, 300s for
    end-to-end pipeline evals).
 
-2. **Per-workflow max_turns** — Each `@atomic_workflow` has a `max_turns`
+2. **Per-workflow max_turns** — Each `@atomic_workflow_step` has a `max_turns`
    parameter that limits conversation length regardless of LLM behavior.
 
 3. **Overall suite timeout** — `scripts/run_with_timeout.py` wraps the entire
-   eval suite with a hard kill (600s for both `make evals` and
-   `make evals-incremental`). If the suite exceeds this, the process is
-   killed and the remaining tests are reported as incomplete.
+   eval suite with a hard kill (1800s by default for `make evals` and
+   `make evals-incremental`; CI sets `EVAL_TIMEOUT=14400` because the full
+   suite takes ~2h). If the suite exceeds this, the process is killed and the
+   remaining tests are reported as incomplete.
 
 These three layers ensure that a buggy workflow or runaway LLM can never
 burn tokens indefinitely, even if all three fail partially.
 
 ### Cost optimization
 
-- **Use `make evals-incremental` by default for local runs** — it detects
+- **Use `make evals-test TEST=...` for one targeted test** while iterating.
+  Never run the full suite after every change.
+- **Use `make evals-incremental` for a change-aware subset** — it detects
   which tests are affected by your changes via the code-review-graph
   dependency analysis. This saves time and tokens on iterative work.
 - **CI always runs `make evals` (full suite)** — see ``.github/workflows/tests.yml``.
   Do not rely on the incremental runner for CI; it's a local optimization.
-  Always run the full suite before pushing to verify nothing is missed.
+  The full suite is a required PR gate, not a weekly/manual run.
 - **Reuse existing output** — if you haven't changed code, don't re-run
   evals. Check `make evals-incremental` output or the CI log from the PR.
 - **Capture output with tee** — always pipe eval runs through `tee` to a
@@ -301,11 +305,11 @@ burn tokens indefinitely, even if all three fail partially.
 
 Evals live in two subdirectories under ``tests/evals/``:
 
-- **``single/``** — one ``@atomic_workflow`` method, one user persona, one
+- **``single/``** — one ``@atomic_workflow_step`` method, one user persona, one
   LLM judge. These are the cheapest to run and best for rapid iteration
   on prompt changes (like unit tests, but for prompts).
 - **``composite/``** — run full pipelines combining multiple workflow
-  phases (``@composite_workflow``, end-to-end generation, debug
+  phases (``@composite_workflow_step``, end-to-end generation, debug
   streaming). These are integration tests.
 
 **Guideline**: When iterating on a workflow prompt, run the relevant
@@ -429,4 +433,23 @@ The best prompts for multi-turn conversation workflows share a few patterns:
 3. If "Uses expertise" failed: the agent is asking the user to fill out a form. Add language that tells it to propose, infer, and suggest — "propose the details yourself" — and give a concrete example.
 4. If "Honest about provenance" failed: the agent is hallucinating. Add language that clearly separates proposals from confirmed facts.
 5. Rerun the failing test only — never the full suite until you're ready to verify.
-6. Transcripts are saved to `test-results/transcripts/` for debugging.
+6. Transcripts are saved to `test-results/transcripts/`: the `.json` file is
+   the canonical record (typed events, result, judge verdicts with evidence and
+   fix, metadata); the `.txt` file is the rendered human view; the
+   `-exception.txt` file has the full traceback.
+### Resuming a failed eval
+
+The workflow pipeline writes its component specs to
+`.sisyphus/checkpoints/workflow_pipeline-latest.json` before it asserts, so a
+component failure can be re-run without repeating the pipeline:
+
+```bash
+RESUME_SPECS=.sisyphus/checkpoints/workflow_pipeline-latest.json \
+RESUME_NAMES="Approval Record" \
+make evals-test TEST=tests.evals.composite.test_resume_component_generation
+```
+
+The resume test skips unless `RESUME_SPECS` is set, so the normal suite is
+unaffected. Resume one component at a time; the test's budget covers one. This
+is for iteration — the full pipeline remains the gate. The general pattern is
+in `skill://eval-resume`.

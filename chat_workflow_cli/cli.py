@@ -30,7 +30,7 @@ def discover_workflows() -> dict[str, Path]:
 def discover_workflow_functions(module) -> dict[str, Callable[..., Any]]:
     functions = {}
     for name, obj in inspect.getmembers(module):
-        if inspect.isfunction(obj) and getattr(obj, "_is_workflow", False) and not name.startswith("_"):
+        if inspect.isfunction(obj) and getattr(obj, "_is_workflow_step", False) and not name.startswith("_"):
             functions[name] = obj
     return functions
 
@@ -78,7 +78,7 @@ def _register_command(app: typer.Typer, func_name: str, func: Callable[..., Any]
 
 
 def _discover_class_workflow_methods(module) -> dict[str, dict[str, Callable[..., Any]]]:
-    """Discover {class_name: {method_name: callable}} from exported classes with _is_workflow methods."""
+    """Discover {class_name: {method_name: callable}} from exported classes with _is_workflow_step steps."""
     exported = set(getattr(module, "__all__", []))
     classes: dict[str, dict[str, Callable[..., Any]]] = {}
     for name, obj in inspect.getmembers(module):
@@ -86,7 +86,7 @@ def _discover_class_workflow_methods(module) -> dict[str, dict[str, Callable[...
             continue
         methods: dict[str, Callable[..., Any]] = {}
         for mname, mobj in inspect.getmembers(obj):
-            if not getattr(mobj, "_is_workflow", False) or mname.startswith("_"):
+            if not getattr(mobj, "_is_workflow_step", False) or mname.startswith("_"):
                 continue
             methods[mname] = mobj
         if methods:
@@ -98,12 +98,12 @@ def _build_workflow_sub_app(workflow_name: str) -> typer.Typer | None:
     """Build a Typer sub-app for a single workflow module.
 
     Imports the module via ``workflows.{workflow_name}``, discovers
-    ``@composite_workflow``-decorated module-level functions AND
+    ``@composite_workflow_step``-decorated module-level functions AND
     classmethods, and registers each.
 
     Module-level functions become flat subcommand (e.g. ``generate-reviewed-criteria``).
-    Class-level methods become a sub-app with the class name
-    (e.g. ``Workflow create``).
+    Class-level methods become a sub-app named for the class's ``__cli_name__``
+    when it declares one (e.g. ``workflow create``), otherwise for the class name.
 
     Returns *None* when the module cannot be imported or contains no
     workflow functions — the caller should skip it silently.
@@ -117,7 +117,7 @@ def _build_workflow_sub_app(workflow_name: str) -> typer.Typer | None:
     # Module-level workflow functions (e.g. generate_reviewed_criteria)
     functions = discover_workflow_functions(module)
 
-    # Class-level workflow methods (e.g. Workflow.create)
+    # Class-level workflow steps (e.g. Workflow.create)
     class_methods = _discover_class_workflow_methods(module)
 
     if not functions and not class_methods:
@@ -129,12 +129,25 @@ def _build_workflow_sub_app(workflow_name: str) -> typer.Typer | None:
     for func_name, func in functions.items():
         _register_command(sub_app, func_name, func)
 
-    # Register class-level methods as class sub-apps
+    # A module with one workflow class and no module-level functions is the
+    # workflow itself: its methods are the commands (e.g. `workflow create`).
+    # A class group would only repeat the module name.
+    if len(class_methods) == 1 and not functions:
+        (methods,) = class_methods.values()
+        for mname, mobj in methods.items():
+            _register_command(sub_app, mname, mobj)
+        return sub_app
+
+    # Register class-level methods as class sub-apps. The class may declare a
+    # user-facing CLI name (e.g. WorkflowSpec -> "workflow") because the spec
+    # suffix is an internal term; the command names what it creates.
     for class_name, methods in class_methods.items():
-        class_app = typer.Typer(help=f"Commands for {class_name}")
+        cls = getattr(module, class_name)
+        cli_name = getattr(cls, "__cli_name__", class_name)
+        class_app = typer.Typer(help=f"Commands for {cli_name}")
         for mname, mobj in methods.items():
             _register_command(class_app, mname, mobj)
-        sub_app.add_typer(class_app, name=_snake_to_kebab(class_name))
+        sub_app.add_typer(class_app, name=_snake_to_kebab(cli_name))
 
     return sub_app
 

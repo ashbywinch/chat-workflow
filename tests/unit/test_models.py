@@ -242,6 +242,30 @@ class TestTurnResultModel(unittest.TestCase):
         self.assertEqual(result.message, "Custom message")
         self.assertTrue(result.is_complete)
 
+    def test_success_does_not_revalidate_result(self):
+        """Wrapping an already-validated result must not run validators again."""
+        from typing import ClassVar, override
+
+        from chat_workflow.mixins import LLMValidated
+
+        calls = {"n": 0}
+
+        class Widget(LLMValidated):
+            x: int
+            _skip_llm_validation: ClassVar[bool] = True
+
+            @override
+            def validate_deterministic_rules(self) -> None:
+                calls["n"] += 1
+
+        widget = Widget(x=1)
+        self.assertEqual(calls["n"], 1)
+
+        result = TurnResult[Widget].success(widget)
+
+        self.assertEqual(calls["n"], 1)
+        self.assertIs(result.result, widget)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

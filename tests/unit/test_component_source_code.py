@@ -1,4 +1,4 @@
-"""Unit tests for GeneratedComponent.generate() with ComponentDesignSpec."""
+"""Unit tests for ComponentSourceCode.generate() with ComponentDesignSpec."""
 
 import unittest
 from unittest.mock import MagicMock, patch
@@ -60,8 +60,8 @@ def _make_design_spec(**overrides) -> ComponentDesignSpec:
     return ComponentDesignSpec(**kwargs)
 
 
-class TestGeneratedComponentGenerate(unittest.TestCase):
-    """Tests for GeneratedComponent.generate() with ComponentDesignSpec."""
+class TestComponentSourceCodeGenerate(unittest.TestCase):
+    """Tests for ComponentSourceCode.generate() with ComponentDesignSpec."""
 
     def setUp(self):
         self.design_spec = _make_design_spec()
@@ -81,7 +81,7 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
     def test_generate_accepts_design_spec(self, mock_get_client, mock_validate):
-        """generate() should accept ComponentDesignSpec and return GeneratedComponent."""
+        """generate() should accept ComponentDesignSpec and return ComponentSourceCode."""
         mock_client = MagicMock()
         mock_client.chat.completions.create.return_value = self._make_success_response()
         mock_get_client.return_value = mock_client
@@ -136,13 +136,19 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     @patch("chat_workflow.llm_interaction.get_client")
     def test_generate_with_minimal_design_spec(self, mock_get_client, mock_validate):
-        """generate() should work with a minimal design spec (empty fields, etc.)."""
+        """generate() should work with a minimal valid design spec."""
         minimal_spec = ComponentDesignSpec(
             domain_spec=ComponentDomainSpec(
                 name="SimpleNote",
                 description="A simple note",
-                fields=[],
-                what_good_looks_like=[],
+                fields=[
+                    ComponentDomainField(
+                        name="text",
+                        domain_description="The note text",
+                        field_type_hint="text",
+                    )
+                ],
+                what_good_looks_like=["The note is clear"],
                 expert_role="Note Taker",
             ),
             structure=ComponentStructure(description="A simple note"),
@@ -186,23 +192,23 @@ class TestGeneratedComponentGenerate(unittest.TestCase):
             session=self.session,
         )
 
-        # The AtomicWorkflow should be configured with max_turns=3
+        # The AtomicWorkflowStep should be configured with max_turns=3
         # (the default in the refactored method)
         mock_client.chat.completions.create.assert_called_once()
 
 
-class TestGeneratedComponentConstruction(unittest.TestCase):
-    """Tests for GeneratedComponent model construction."""
+class TestComponentSourceCodeConstruction(unittest.TestCase):
+    """Tests for ComponentSourceCode model construction."""
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_construct_with_code(self, mock_collect):
-        """GeneratedComponent should construct with valid code."""
+        """ComponentSourceCode should construct with valid code."""
         component = ComponentSourceCode(code=SAMPLE_CODE)
         self.assertEqual(component.code, SAMPLE_CODE)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_code_must_be_non_empty(self, mock_collect):
-        """GeneratedComponent should require non-empty code."""
+        """ComponentSourceCode should require non-empty code."""
         from pydantic import ValidationError
 
         with self.assertRaises(ValidationError):

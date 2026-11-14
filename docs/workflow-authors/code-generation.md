@@ -9,7 +9,7 @@ The `chat_workflow/code_generator.py` module provides helpers for this process:
 - `verify_code(code)` -- the core pipeline for turning raw LLM output into clean Python
 - `generate_code()` -- optional pass-through with libcst normalization
 - `generate_field()` -- generates Pydantic field definition strings
-- `generate_workflow_method()` -- generates `@atomic_workflow` / `@classmethod` boilerplate
+- `generate_workflow_method()` -- generates `@atomic_workflow_step` / `@classmethod` boilerplate
 
 A companion convention ("one class per file") keeps the generated codebase organized: each Pydantic model class lives in its own file named after the class.
 
@@ -47,7 +47,7 @@ The LLM might emit something like this:
 from __future__ import annotations
 from pydantic import BaseModel, Field
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 
 class Criterion(BaseModel):
@@ -55,7 +55,7 @@ class Criterion(BaseModel):
     weight: float = Field(default=1.0, ge=0.0, le=10.0)
     description:str=Field(...,description="What this criterion measures")
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def generate_from_chat(cls, context:str, max_turns:int=10, session=None):
         """Generate criterion from chat conversation."""
@@ -70,7 +70,7 @@ This approach is for generating new workflow component classes at runtime. It is
 
 - Writing framework code (that's done by hand, reviewed in PRs).
 - Generating configuration files or data (those use Pydantic models directly).
-- Producing one-off scripts (use the LLM interactively through `@atomic_workflow`).
+- Producing one-off scripts (use the LLM interactively through `@atomic_workflow_step`).
 
 ---
 
@@ -172,7 +172,7 @@ workflows/
     Criterion.py                # class Criterion(...)
 ```
 
-This convention makes the codebase easy to navigate. If you are looking for the `Criterion` model, you open `Criterion.py`. If you are looking for the `Workflow` model, you open `Workflow.py`.
+This convention makes the codebase easy to navigate. If you are looking for the `Criterion` model, you open `Criterion.py`. If you are looking for the `WorkflowSpec` model, you open `WorkflowSpec.py`.
 
 It also keeps each file small and focused. A model file typically contains:
 
@@ -183,16 +183,16 @@ It also keeps each file small and focused. A model file typically contains:
 ### Example
 
 ```python
-# workflows/workflow/Workflow.py
+# workflows/workflow/WorkflowSpec.py
 from __future__ import annotations
 from typing import Annotated, ClassVar
 from pydantic import BaseModel, Field, model_validator
 from chat_workflow.annotations import Blob, Validation
 from chat_workflow.mixins import BlobSyncMixin, LLMValidated
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 
-class Workflow(BlobSyncMixin, LLMValidated):
+class WorkflowSpec(BlobSyncMixin, LLMValidated):
     """Complete workflow specification with diagram."""
 
     name: str = Field(..., description="Workflow name ending in 'Workflow'")
@@ -213,10 +213,10 @@ class Workflow(BlobSyncMixin, LLMValidated):
             raise ValueError("Diagram must declare participants")
         return self
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def generate_from_chat(cls, context: str, max_turns: int = 10, session=None):
-        """Generate a Workflow from a process description."""
+        """Generate a WorkflowSpec from a process description."""
         ...
 ```
 
@@ -224,17 +224,17 @@ class Workflow(BlobSyncMixin, LLMValidated):
 
 ```
 workflows/workflow/
-  __init__.py              # exports workflow functions for CLI discovery
-  Workflow.py              # class Workflow(...)
+  __init__.py              # exports workflow steps for CLI discovery
+  WorkflowSpec.py               # class WorkflowSpec(...)
   Component.py             # class Component(...)
-  ComponentRequirement.py  # class ComponentRequirement(...)
+  ComponentSpec.py  # class ComponentSpec(...)
   GapAnalysis.py           # class GapAnalysis(...)
   Resource.py              # class Resource(...)
   Deliverable.py            # class Deliverable(...)
-  flows.py                 # composite/atomic workflow orchestration functions
+  flows.py                 # composite/atomic workflow step orchestration functions
 ```
 
-The `__init__.py` re-exports the workflow functions for CLI discovery:
+The `__init__.py` re-exports the workflow steps for CLI discovery:
 
 ```python
 # workflows/workflow/__init__.py
@@ -292,7 +292,7 @@ Useful when building field definitions programmatically before passing them to t
 
 ### generate_workflow_method()
 
-Generates the boilerplate for an `@atomic_workflow` classmethod:
+Generates the boilerplate for an `@atomic_workflow_step` classmethod:
 
 ```python
 from chat_workflow.code_generator import generate_workflow_method
@@ -304,7 +304,7 @@ print(method)
 Output:
 
 ```python
-@atomic_workflow
+@atomic_workflow_step
 @classmethod
 def generate_from_chat(
     cls,
@@ -361,14 +361,14 @@ from chat_workflow.code_generator import verify_code
 llm_output = '''from __future__ import annotations
 from pydantic import BaseModel, Field
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 
 class Task(BaseModel):
     title: str = Field(..., description="Task title")
     done: bool = Field(default=False, description="Completion status")
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def generate_from_chat(
         cls,
@@ -398,7 +398,7 @@ output_path.write_text(cleaned_code)
 | `generate_code(source=...)` | `chat_workflow/code_generator.py` | Pass-through with libcst normalization |
 | `generate_code(class_name=..., fields=...)` | `chat_workflow/code_generator.py` | Generate bare model class from field tuples |
 | `generate_field(name, type_, description)` | `chat_workflow/code_generator.py` | Generate Pydantic field definition string |
-| `generate_workflow_method(class_name)` | `chat_workflow/code_generator.py` | Generate `@atomic_workflow` / `@classmethod` boilerplate |
+| `generate_workflow_method(class_name)` | `chat_workflow/code_generator.py` | Generate `@atomic_workflow_step` / `@classmethod` boilerplate |
 | `generate_model_validator(rule, field_name)` | `chat_workflow/code_generator.py` | Generate `@model_validator` with truthiness check |
 | `import_module(path)` | `chat_workflow/code_generator.py` | Dynamic module import |
 | `reload_module(path)` | `chat_workflow/code_generator.py` | Reload already-imported module |

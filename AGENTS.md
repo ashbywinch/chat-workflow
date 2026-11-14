@@ -23,7 +23,7 @@ Chat Workflow is a Python library that can be used to write workflows. Workflows
 **Goal**: Create a new conversation flow for a specific domain.
 
 **Read**: [Workflow Author Guide](docs/workflow-authors/workflow-author-guide.md)
-- Understanding the `@atomic_workflow` and `@composite_workflow` decorators
+- Understanding the `@atomic_workflow_step` and `@composite_workflow_step` decorators
 - Defining Pydantic models with business rules
 - Writing conversation prompts
 - Composing multiple steps into complex workflows
@@ -91,11 +91,11 @@ Examples: modifying tests → check [the testing guide](docs/contributors/testin
 | Full verification | `make evals` | Runs all evals |
 | Unsure | `make evals-incremental` | Safe default, auto-detects |
 
-CI runs the unit/lint/coverage gate on every PR. The full eval suite
-(`make evals`, ~60 real conversations, 30+ min and hundreds of thousands of
-tokens) runs on the weekly schedule and on manual dispatch — real-model
-output is non-deterministic, so it is not a per-PR gate. Run it locally
-before pushing prompt or framework changes.
+CI runs the unit/lint/coverage gate and the full eval suite (`make evals`) on
+every PR and on main. The full suite is never weekly/manual; its runtime is an
+optimization target. Real-model output is non-deterministic, so use targeted
+evals (`make evals-test TEST=...`) while developing, and run the full suite in
+CI (or locally before pushing) as the gate.
 
 ### Tool Selection
 
@@ -112,7 +112,7 @@ before pushing prompt or framework changes.
 | File | What |
 |------|------|
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
-| `chat_workflow/atomic_workflow.py` | `@atomic_workflow`/`@composite_workflow` decorators, `AtomicWorkflow`, `StreamingDebug` |
+| `chat_workflow/atomic_workflow_step.py` | `@atomic_workflow_step`/`@composite_workflow_step` decorators, `AtomicWorkflowStep`, `StreamingDebug` |
 | `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
@@ -150,7 +150,12 @@ The same applies to any command producing output: if it's tee'd, read the file. 
 
 ### Debugging Eval Failures
 
-When an eval fails, the test output shows the judge's verdict per rule. If you need the full conversation transcript, read the file at `test-results/transcripts/` (or the path shown in the error). Full exception traces (including Instructor retry chains) are at a companion `*-exception.txt` file.
+When an eval fails, the test output shows the judge's verdict per rule. The
+canonical transcript is `test-results/transcripts/<label>-<ts>.json`: typed
+events (user, assistant, framework, validation, result), the structured result,
+the judge verdicts with evidence and fix, and the model/token metadata. The
+companion `.txt` is the rendered human view; full exception traces (including
+Instructor retry chains) are in `*-exception.txt`.
 
 Do not re-run the eval suite just to see something you already captured. Before blaming the model, read the [Prompt Improvement Mindset](docs/contributors/testing.md#prompt-improvement-mindset) section — eval failures nearly always point to prompt improvements, not model deficiencies.
 ```

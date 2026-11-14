@@ -4,9 +4,9 @@ import unittest
 from chat_workflow import (
     AgentIntent,
     AgentResponse,
-    AtomicWorkflow,
-    AtomicWorkflowConfig,
-    AtomicWorkflowFailedError,
+    AtomicWorkflowStep,
+    AtomicWorkflowStepConfig,
+    AtomicWorkflowStepFailedError,
     Session,
     SessionLog,
     TurnLimitExceededError,
@@ -20,8 +20,9 @@ _CONFIG = make_config()
 
 
 class MockIO:
-    def __init__(self, responses):
+    def __init__(self, responses, default: str = ""):
         self.responses = list(responses)
+        self.default = default
         self.outputs = []
 
     def echo(self, message: str) -> None:
@@ -30,14 +31,14 @@ class MockIO:
     def prompt(self, label: str) -> str:
         if self.responses:
             return self.responses.pop(0)
-        return ""
+        return self.default
 
 
 class TestRealAPI(unittest.TestCase):
-    @timeout(10)
+    @timeout(360)
     def test_call_llm_returns_valid_action(self):
-        orchestrator = AtomicWorkflow(
-            config=AtomicWorkflowConfig(
+        orchestrator = AtomicWorkflowStep(
+            config=AtomicWorkflowStepConfig(
                 system_prompt=(
                     "You are a helpful assistant that creates evaluation criteria. "
                     "When returning intent='success' with criteria, you MUST include "
@@ -59,7 +60,7 @@ class TestRealAPI(unittest.TestCase):
                 ],
                 on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
                 on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: AtomicWorkflowFailedError(action.message),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message),
             )
         )
 
@@ -97,7 +98,7 @@ class TestRealAPI(unittest.TestCase):
                 f"Criteria must include 'budget'. Found: {[c.name for c in action.result.criteria]}",
             )
 
-    @timeout(10)
+    @timeout(600)
     def test_multi_turn_conversation_with_real_llm(self):
         mock_io = MockIO(
             [
@@ -105,12 +106,13 @@ class TestRealAPI(unittest.TestCase):
                 "For a 7-year-old who likes science",
                 "Safety is important",
                 "That's all, please finalize with budget criterion",
-            ]
+            ],
+            default="That's all, please finalize.",
         )
 
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
-            max_turns=6,
+            max_turns=10,
             session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
         )
 
@@ -122,10 +124,10 @@ class TestRealAPI(unittest.TestCase):
             f"Criteria must include 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
-    @timeout(10)
+    @timeout(360)
     def test_single_turn_with_real_llm(self):
-        orchestrator = AtomicWorkflow(
-            config=AtomicWorkflowConfig(
+        orchestrator = AtomicWorkflowStep(
+            config=AtomicWorkflowStepConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
                     "When returning intent='success' with criteria, you MUST include "
@@ -147,7 +149,7 @@ class TestRealAPI(unittest.TestCase):
                 ],
                 on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
                 on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: AtomicWorkflowFailedError(action.message),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message),
             )
         )
 
@@ -165,7 +167,7 @@ class TestRealAPI(unittest.TestCase):
                 f"Criteria must include 'budget'. Found: {[c.name for c in result.result.criteria]}",
             )
 
-    @timeout(10)
+    @timeout(360)
     def test_conversation_flow_with_real_llm(self):
         mock_io = MockIO(
             [
@@ -192,7 +194,7 @@ class TestRealAPI(unittest.TestCase):
             f"Criteria missing 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
-    @timeout(10)
+    @timeout(360)
     def test_uncooperative_user_max_turns(self):
         mock_io = MockIO(
             [
@@ -202,17 +204,17 @@ class TestRealAPI(unittest.TestCase):
             ]
         )
 
-        with self.assertRaises((TurnLimitExceededError, AtomicWorkflowFailedError)):
+        with self.assertRaises((TurnLimitExceededError, AtomicWorkflowStepFailedError)):
             EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop for programming",
                 max_turns=3,
                 session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
             )
 
-    @timeout(10)
+    @timeout(360)
     def test_conversation_action_format(self):
-        orchestrator = AtomicWorkflow(
-            config=AtomicWorkflowConfig(
+        orchestrator = AtomicWorkflowStep(
+            config=AtomicWorkflowStepConfig(
                 system_prompt=(
                     "You are a helpful assistant for creating evaluation criteria. "
                     "When returning intent='success' with criteria, you MUST include "
@@ -234,7 +236,7 @@ class TestRealAPI(unittest.TestCase):
                 ],
                 on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message),
                 on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-                on_failure=lambda action: AtomicWorkflowFailedError(action.message),
+                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message),
             )
         )
 

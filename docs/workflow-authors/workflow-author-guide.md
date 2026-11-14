@@ -2,18 +2,18 @@
 
 This guide explains how to build workflows using the chat-workflow library. It covers the decorator API, Pydantic model patterns, and conversation orchestration.
 
-## Decorator API: `@atomic_workflow` vs `@composite_workflow`
+## Decorator API: `@atomic_workflow_step` vs `@composite_workflow_step`
 
-The library provides two decorators for authoring workflow functions:
+The library provides two decorators for authoring workflow steps:
 
-### `@atomic_workflow` - Auto-orchestrated leaf functions
+### `@atomic_workflow_step` - Auto-orchestrated leaf functions
 
-Use `@atomic_workflow` on functions that directly interact with the LLM. The function body is a `pass` stub, and the decorator handles everything.
+Use `@atomic_workflow_step` on functions that directly interact with the LLM. The function body is a `pass` stub, and the decorator handles everything.
 
 ```python
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
-@atomic_workflow
+@atomic_workflow_step
 def generate_essay_from_topic(
     topic: Topic
 ) -> Essay:
@@ -29,18 +29,18 @@ def generate_essay_from_topic(
 
 **Required parameters:** `session` - provides the I/O interface for user interaction.
 
-### `@composite_workflow` - Composite functions
+### `@composite_workflow_step` - Composite functions
 
-Use `@composite_workflow` on functions that compose multiple `@atomic_workflow` steps. It injects a `Session` object so the function can pass `session=session` to child functions.
+Use `@composite_workflow_step` on functions that compose multiple `@atomic_workflow_step` steps. It injects a `Session` object so the function can pass `session=session` to child functions.
 
 ```python
-from chat_workflow import atomic_workflow, composite_workflow, Session
+from chat_workflow import atomic_workflow_step, composite_workflow_step, Session
 
-@atomic_workflow
+@atomic_workflow_step
 def generate_topic(session: Session) -> Topic:
     """You are a helpful careers advisor. Help the user (a student) think up a good essay topic for an essay that will be part of their application for a course of some kind. You'll need to ask the user questions to determine what course they're applying for and what background they have that might feed into the essay topic"""
 
-@composite_workflow
+@composite_workflow_step
 def generate_essay(
     session: Session,
 ) -> Essay:
@@ -48,7 +48,7 @@ def generate_essay(
     return generate_essay_from_topic(topic, session)
 ```
 
-**CLI auto-discovery**: Functions decorated with `@composite_workflow` and exported from the module are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_essay` → `generate-essay`).
+**CLI auto-discovery**: Functions decorated with `@composite_workflow_step` and exported from the module are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_essay` → `generate-essay`).
 
 ## Pydantic Model Patterns
 
@@ -80,7 +80,7 @@ When the user describes an output, summarize what they've said and use your doma
 
 ### Business Rules in Models, Not Prompts
 
-Business rules live in your Pydantic models, from where they are automatically added to the system prompt when you write a @atomic_workflow function that returns a model. You shouldn't need to add business rules to prompts that you write.
+Business rules live in your Pydantic models, from where they are automatically added to the system prompt when you write a @atomic_workflow_step function that returns a model. You shouldn't need to add business rules to prompts that you write.
 
 ### Communicate Rules in JSON Schema
 
@@ -155,25 +155,25 @@ A prompt should tell the LLM how to behave, not what data format to produce. Ins
 
 #### Compose Workflows from Small, Single-Purpose Functions
 
-Each `@atomic_workflow` function should do one thing well. Compose them with `@composite_workflow` functions.
+Each `@atomic_workflow_step` function should do one thing well. Compose them with `@composite_workflow_step` functions.
 
 ```python
-from chat_workflow import atomic_workflow, composite_workflow, Session
+from chat_workflow import atomic_workflow_step, composite_workflow_step, Session
 
 
-@atomic_workflow
+@atomic_workflow_step
 def gather_requirements(session: Session) -> Requirements:
     """Help the user articulate their requirements through guided questions."""
     pass
 
-@atomic_workflow
+@atomic_workflow_step
 def generate_specification(
     requirements: Requirements, session: Session
 ) -> Specification:
     """Transform requirements into a structured specification."""
     pass
 
-@composite_workflow
+@composite_workflow_step
 def build_specification(
     topic: str = "", session: Session
 ) -> Specification:
@@ -240,10 +240,10 @@ Use `typing.Annotated[T, "description"]` to add descriptions that appear in the 
 ```python
 from typing import Annotated
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 
-@atomic_workflow
+@atomic_workflow_step
 def my_workflow_step(
     context: Annotated[
         str, "The topic or domain for which to generate data"
@@ -264,11 +264,11 @@ from typing import Annotated, TypeVar
 
 from pydantic import BaseModel
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
-@atomic_workflow
+@atomic_workflow_step
 def refine(
     initial_object: Annotated[ModelType, "The object to review"],
     max_turns: Annotated[int, "Maximum refinement turns"] = 5,
@@ -277,11 +277,11 @@ def refine(
     pass
 ```
 
-The `@atomic_workflow` decorator resolves the `TypeVar` to the concrete type passed as `initial_object` at runtime.
+The `@atomic_workflow_step` decorator resolves the `TypeVar` to the concrete type passed as `initial_object` at runtime.
 
 ## UserIO Base Class
 
-All `@atomic_workflow` functions require an I/O adapter subclassing `UserIO`:
+All `@atomic_workflow_step` functions require an I/O adapter subclassing `UserIO`:
 
 ```python
 class UserIO:
@@ -318,7 +318,7 @@ Here's a complete example showing all patterns together:
 ```python
 from typing import Annotated, TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import atomic_workflow, composite_workflow, Session
+from chat_workflow import atomic_workflow_step, composite_workflow_step, Session
 
 # Define a simple model
 class MyData(BaseModel):
@@ -326,8 +326,8 @@ class MyData(BaseModel):
     description: str = Field(..., min_length=10)
     priority: int = Field(..., ge=1, le=5)
 
-# Leaf atomic_workflow function
-@atomic_workflow
+# Leaf atomic_workflow_step function
+@atomic_workflow_step
 def generate_data(
     topic: Annotated[str, "Topic for data generation"] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
@@ -341,7 +341,7 @@ def generate_data(
 # Generic refinement function
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
-@atomic_workflow
+@atomic_workflow_step
 def refine_data(
     initial_data: Annotated[ModelType, "Data to refine"],
     max_turns: Annotated[int, "Refinement turns"] = 5,
@@ -351,8 +351,8 @@ def refine_data(
     Ask questions to help the user enhance clarity, completeness, and quality."""
     pass
 
-# Composite workflow
-@composite_workflow
+# Composite workflow step
+@composite_workflow_step
 def generate_reviewed_data(
     topic: str = "",
     max_turns: int = 10,
@@ -512,28 +512,28 @@ Real workflows combine the decorators, models, and refinement patterns into reus
 
 The framework uses a three-layer architecture for building components, each with distinct responsibilities:
 
-1. **Workflow** (architect) — `Workflow.create()` defines component boundaries and interfaces. It captures what components exist and how they connect, producing `ComponentResponsibilities` for each one. The architecture is considered final before Component starts.
+1. **WorkflowSpec** (architect) — `WorkflowSpec.create()` defines component boundaries and interfaces. It captures what components exist and how they connect, producing `ComponentSpec` for each one. The architecture is considered final before Component starts.
 
-2. **Component** (designer) — `Component.create()` takes the architecture from Workflow and designs component internals through a multi-phase conversation with the user. It produces a complete design spec.
+2. **Component** (designer) — `Component.create()` takes the architecture from WorkflowSpec and designs component internals through a multi-phase conversation with the user. It produces a complete design spec.
 
-3. **GeneratedComponent** (executor) — `GeneratedComponent.generate()` takes a complete design spec and translates it into Python code statelessly. No design decisions remain at this layer. No user conversation about code.
+3. **ComponentSourceCode** (executor) — `ComponentSourceCode.generate()` takes a complete design spec and translates it into Python code statelessly. No design decisions remain at this layer. No user conversation about code.
 
 The design flows through four phases inside `Component.create()`:
 
 - **Phase 1: Domain Exploration** (`ComponentDomainSpec.explore()`) — Understands what the artifact IS and what makes it good in the user's domain. Returns a `ComponentDomainSpec`.
 - **Phase 2: Structural Design** (`ComponentStructure.design()`) — Translates domain concepts into Pydantic field definitions and `@model_validator` rules. Stays in domain language, never mentions Python types.
 - **Phase 3: Interaction Preferences** (`ComponentInteractionContext.gather()`) — Explores how the user wants the assistant to behave during creation. Returns a `ComponentInteractionContext`.
-- **Phase 4: Code Generation** (`GeneratedComponent.generate()`) — Statelessly translates the complete design spec into Python code. No user conversation about code.
+- **Phase 4: Code Generation** (`ComponentSourceCode.generate()`) — Statelessly translates the complete design spec into Python code. No user conversation about code.
 
 Each phase has its own return type with its own validation rules. This keeps the cognitive load on the LLM manageable per step and makes each phase independently testable.
 
 See the [contributor guide](../contributors/contributor-guide.md#architecture-principles) for the full architecture principles (domain boundaries, loose coupling, user-domain conversations, quality-as-validation, and Pydantic as gatekeeper).
 
-### Workflow.create()
+### WorkflowSpec.create()
 
-A `@composite_workflow` classmethod that orchestrates multiple `@atomic_workflow` steps end to end. This is the top-level entry point users call from the CLI.
+A `@composite_workflow_step` classmethod that orchestrates multiple `@atomic_workflow_step` steps end to end. This is the top-level entry point users call from the CLI.
 
-The canonical example is `Workflow.create()` in `workflows/workflow/workflow.py`. It chains several steps together:
+The canonical example is `WorkflowSpec.create()` in `workflows/workflow/workflow_spec.py`. It chains several steps together:
 
 1. Generate a process analysis from a user's plain-English description
 2. Analyze inputs and outputs
@@ -543,9 +543,9 @@ The canonical example is `Workflow.create()` in `workflows/workflow/workflow.py`
 6. Materialize each component to disk
 
 ```python
-from chat_workflow import Session, atomic_workflow, composite_workflow
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 
-@composite_workflow
+@composite_workflow_step
 @classmethod
 def create(
     cls,
@@ -554,7 +554,7 @@ def create(
     session: Session,
     max_refinements: int = 3,
     existing_components: list[str] | None = None,
-) -> Workflow:
+) -> WorkflowSpec:
     """Create a complete workflow artifact through conversation."""
 
     # Step 1: Understand the process
@@ -596,18 +596,18 @@ def create(
     return workflow
 ```
 
-**When to use this pattern:** When you have a multi-step process where each step is a separate `@atomic_workflow` call and the steps must run in sequence. The `@composite_workflow` decorator injects a shared `Session` so each step gets the same I/O and state. The result is a single CLI command that hides all internal orchestration.
+**When to use this pattern:** When you have a multi-step process where each step is a separate `@atomic_workflow_step` call and the steps must run in sequence. The `@composite_workflow_step` decorator injects a shared `Session` so each step gets the same I/O and state. The result is a single CLI command that hides all internal orchestration.
 
 ### Component.create()
 
-A `@composite_workflow` classmethod that creates a single self-contained artifact through a multi-phase design conversation. It orchestrates four phases: domain exploration, structural design, interaction preferences, and code generation.
+A `@composite_workflow_step` classmethod that creates a single self-contained artifact through a multi-phase design conversation. It orchestrates four phases: domain exploration, structural design, interaction preferences, and code generation.
 
-The canonical example is `Component.create()` in `workflows/workflow/component.py`. It takes a `ComponentResponsibilities` and produces a `Component` with a `code_path` pointing to a written file:
+The canonical example is `Component.create()` in `workflows/workflow/component.py`. It takes a `ComponentSpec` and produces a `Component` with a `code_path` pointing to a written file:
 
 ```python
 from pathlib import Path
 from pydantic import BaseModel
-from chat_workflow import Session, composite_workflow
+from chat_workflow import Session, composite_workflow_step
 
 class Component(BaseModel):
     """A single created business component on disk."""
@@ -616,11 +616,11 @@ class Component(BaseModel):
     code_path: Path
     model_class: str
 
-    @composite_workflow
+    @composite_workflow_step
     @classmethod
     def create(
         cls,
-        requirements: ComponentResponsibilities,
+        requirements: ComponentSpec,
         *,
         session: Session,
         output_dir: Path | None = None,
@@ -652,7 +652,7 @@ class Component(BaseModel):
             structure=structure,
             interaction_context=interaction_context,
         )
-        generated = GeneratedComponent.generate(
+        generated = ComponentSourceCode.generate(
             design_spec=design_spec,
             session=session,
         )
@@ -673,16 +673,16 @@ class Component(BaseModel):
         )
 ```
 
-Each phase is a separate `@atomic_workflow` with its own return type and validation rules:
+Each phase is a separate `@atomic_workflow_step` with its own return type and validation rules:
 
 - **Phase 1** (`ComponentDomainSpec.explore()`) — Conversational. Probes what the artifact is, what makes it good, and what quality criteria matter. Returns a `ComponentDomainSpec` with the domain understanding.
 - **Phase 2** (`ComponentStructure.design()`) — Conversational. Translates domain concepts into Pydantic field definitions and `@model_validator` rules. Stays in domain language, never mentions Python types.
 - **Phase 3** (`ComponentInteractionContext.gather()`) — Conversational. Explores how the user wants the assistant to behave: priorities, proactive suggestions, tone, common pitfalls. Returns a `ComponentInteractionContext`.
-- **Phase 4** (`GeneratedComponent.generate()`) — Stateless. Takes the complete design spec and produces Python code. No user conversation about code.
+- **Phase 4** (`ComponentSourceCode.generate()`) — Stateless. Takes the complete design spec and produces Python code. No user conversation about code.
 
-The pattern separates the LLM conversations (Phases 1-3, each an `@atomic_workflow`) from the procedural work (verification, file writing, object construction) that happens in the `@composite_workflow` wrapper. Each phase has its own return type with its own validation rules, keeping the cognitive load on the LLM manageable per step.
+The pattern separates the LLM conversations (Phases 1-3, each an `@atomic_workflow_step`) from the procedural work (verification, file writing, object construction) that happens in the `@composite_workflow_step` wrapper. Each phase has its own return type with its own validation rules, keeping the cognitive load on the LLM manageable per step.
 
-**When to use this pattern:** When each unit of work produces a file or other side effect on disk. The `@atomic_workflow` leaves handle the generative parts; the `@composite_workflow` parent handles orchestration, I/O, validation, and error recovery. This keeps each LLM conversation focused on one aspect of the design.
+**When to use this pattern:** When each unit of work produces a file or other side effect on disk. The `@atomic_workflow_step` leaves handle the generative parts; the `@composite_workflow_step` parent handles orchestration, I/O, validation, and error recovery. This keeps each LLM conversation focused on one aspect of the design.
 
 ### Gap Resolution Loop
 
@@ -691,9 +691,9 @@ A refinement loop that checks whether the user is satisfied by comparing the ret
 The canonical example is `generate_reviewed_criteria()` in `workflows/evaluation_criteria/generate_reviewed_criteria.py`:
 
 ```python
-from chat_workflow import Session, atomic_workflow, composite_workflow
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 
-@atomic_workflow
+@atomic_workflow_step
 def refine(
     initial_object: Annotated[EvaluationCriteria, "Object to review"],
     max_turns: Annotated[int, "Maximum refinement turns"] = 5,
@@ -703,7 +703,7 @@ def refine(
     return the object unchanged."""
     ...
 
-@composite_workflow
+@composite_workflow_step
 def generate_reviewed_criteria(
     context: str = "",
     max_turns: int = 10,
@@ -737,7 +737,7 @@ def generate_reviewed_criteria(
     return criteria
 ```
 
-The same pattern appears in `Workflow._create_diagram()` in `workflows/workflow/workflow.py`, where the loop also materializes blobs after each refinement to keep files on disk in sync:
+The same pattern appears in `WorkflowSpec._create_diagram()` in `workflows/workflow/workflow_spec.py`, where the loop also materializes blobs after each refinement to keep files on disk in sync:
 
 ```python
 from pathlib import Path
@@ -752,11 +752,11 @@ for _ in range(max_refinements):
     workflow.materialize_blobs(Path(tmp_dir))
 ```
 
-A variant of this pattern resolves structural gaps rather than user satisfaction. The `_resolve_gaps()` function in `workflows/workflow/workflow.py` loops until all missing components, integration gaps, and organizational gaps are empty:
+A variant of this pattern resolves structural gaps rather than user satisfaction. The `_resolve_gaps()` function in `workflows/workflow/workflow_spec.py` loops until all missing components, integration gaps, and organizational gaps are empty:
 
 ```python
 for _ in range(max_iterations):
-    components = ComponentRequirement.identify_from_chat(...)
+    components = ComponentSpec.identify_from_chat(...)
     gaps = GapAnalysis.analyze_from_chat(...)
 
     if not gaps.missing_components and not gaps.integration_gaps:

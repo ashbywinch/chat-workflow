@@ -47,25 +47,31 @@ layering change updates the test in the same commit.
 |---|---|---|
 | `Config` | `chat_workflow/config.py` | Reads `config.json`; resolves the active preset into provider/model/api key env/api base |
 | `Session` | `chat_workflow/session.py` | IO + `SessionLog` + config for one CLI invocation |
-| `AtomicWorkflow` | `chat_workflow/atomic_workflow.py` | Drives one turn loop until success, failure, or the turn limit |
+| `AtomicWorkflowStep` | `chat_workflow/atomic_workflow_step.py` | Drives one turn loop until success, failure, or the turn limit |
 | `CompositeWorkflow` | `chat_workflow/decorators.py` | Calls atomic and composite children with the same `Session` |
 | `AgentResponse` / `AgentIntent` | `chat_workflow/models.py` | The structured turn result: continue, success + value, or failure |
 | `LLMValidated` | `chat_workflow/mixins.py` | Runs `Validation(...)` rules through the model |
 | `BlobSyncMixin` | `chat_workflow/mixins.py` | Materialises annotated fields to files after success |
+| `Component` | `workflows/workflow/component.py` | The generated component: a class with a Pydantic model and workflow steps |
+| `ComponentSourceCode` | `workflows/workflow/component_source_code.py` | The generated Python source for a component |
+| `WorkflowSpec` | `workflows/workflow/workflow_spec.py` | The workflow spec: name, diagram, inputs, outputs, and component specs |
+| `ComponentSpec` | `workflows/workflow/component_spec.py` | The component spec: name, purpose, scope, required inputs, type |
 
-Further vocabulary: [domain concepts](reference/domain-concepts.md).
+`WorkflowSpec` is the **workflow spec**, not a runtime workflow. A runtime workflow
+is an atomic or composite workflow step. Further vocabulary:
+[domain concepts](reference/domain-concepts.md).
 
 ## Data flow
 
 1. The CLI discovers workflow entrypoints and constructs a `Session`.
-2. An atomic workflow sends the accumulated messages plus the response
+2. An atomic workflow step sends the accumulated messages plus the response
    model to `get_client()`.
 3. `get_client()` resolves the credential from `api_key_env`, points litellm
    at `api_base` (or `OPENAI_BASE_URL`), and picks Instructor's JSON or
    TOOLS mode from `model_supports_tools`.
 4. The model returns an `AgentResponse`; a `success` intent runs the
    business-rule validator and the blob mixin, then returns the typed value.
-5. A composite workflow loops over atomic children, feeds gaps back into
+5. A composite workflow step loops over atomic children, feeds gaps back into
    refinement steps, and returns the final typed result.
 
 ## Decisions

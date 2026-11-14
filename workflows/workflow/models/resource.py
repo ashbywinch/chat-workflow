@@ -1,44 +1,133 @@
 # ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from chat_workflow import atomic_workflow
-from chat_workflow.conversation_rules import NO_EXECUTOR_MODE, NO_FORCED_FIELD_MAPPING, ONE_GUESS
+from chat_workflow import atomic_workflow_step
+from chat_workflow.mixins import LLMValidated
 
 from .deliverable import Deliverable
 from .process_definition import ProcessDefinition
 
+_NO_EXECUTOR_MODE: tuple[str, str] = (
+    "No executor mode",
+    "The assistant defines what good looks like — it does not generate "
+    "content or execute the process for the user.",
+)
 
-class Resource(BaseModel):
+
+class Resource(LLMValidated):
     """A single workflow resource."""
 
-    source: str = Field(..., description="Where this resource originates", min_length=1)
-    format: str = Field(..., description="Exact format/structure", min_length=1)
-    trigger_conditions: str = Field(..., description="What initiates workflow execution")
+    _validation_rules: ClassVar[list[str]] = [
+        "The source says where the material comes from — a person, system, "
+        "document, or place — and the format says its shape. A person or "
+        "system source is valid (for example 'The organizer' with format "
+        "'meeting agenda'). If the source is itself the material (for example "
+        "handwritten notes), the format must describe the same kind of "
+        "material, not a contradictory one such as a database.",
+        "The validation criteria are a check the user can apply when the "
+        "resource is produced — specific enough to tell whether it is complete, "
+        "not an after-the-fact outcome like 'no one complains', and not a "
+        "restatement of how they gather it.",
+        "A resource must not list itself as a dependency.",
+    ]
+
+    source: str = Field(
+        ..., description="Where it comes from (a person, system, document, or place)", min_length=1
+    )
+    format: str = Field(
+        ...,
+        description=(
+            "Its exact shape when it exists (e.g. 'handwritten list', 'CSV "
+            "export', 'email thread'), not the action used to gather it"
+        ),
+        min_length=1,
+    )
     dependencies: list[str] = Field(
         default_factory=list,
-        description="Required resources from other components",
+        description="Other things it needs first",
     )
-    validation_criteria: str = Field(..., description="How to verify resource completeness", min_length=1)
+    validation_criteria: str = Field(
+        ...,
+        description=(
+            "A check the user can apply when the resource is produced to know "
+            "it is complete — not a restatement of how they gather it and not "
+            "an after-the-fact outcome"
+        ),
+        min_length=1,
+    )
 
-    @atomic_workflow(conversation_validation_rules=[ONE_GUESS, NO_FORCED_FIELD_MAPPING, NO_EXECUTOR_MODE])
+    @atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
     @classmethod
     def generate_from_chat(
         cls,
-        analysis: Annotated[ProcessDefinition | None, "The process definition, if already available"] = None,
-        outputs: Annotated[list[Deliverable] | None, "The deliverables the process should produce, if already known"] = None,
+        deliverables: Annotated[list[Deliverable], "What the person makes"],
+        analysis: Annotated[
+            ProcessDefinition | None,
+            "What the person has already told you about how their work happens",
+        ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Resource]:
-        """Help someone document what they start with. First response:
-        propose the typical starting point based on what they mention.
-        If they mention meetings, suggest what they'd begin with.
+        """Help someone describe what they start with. Open by saying in one
+        sentence what you are doing and why, for example: "I want to understand
+        what you start with, so the workflow fits how you actually work."
+        Match the user's register: use the words they use, and never introduce
+        a term for the output shape, a field, or the framework.
 
-        Keep the conversation in their language, not business terms.
-        Never ask about trigger conditions — return it empty.
-        When they ask for ideas, suggest them. Return success when
-        you have enough for the model.
+        You already know what they make from `deliverables`. Do not ask what they
+        are making or what they start with from scratch. Name the output and
+        propose the typical things people start with for that kind of work
+        (for meeting minutes: handwritten notes, the agenda, a recording),
+        then ask which of those they have.
+
+        Some things people start with are inherently whatever the user wrote
+        — raw notes, a rough sketch — or are trusted as sent, like an agenda
+        from the organiser. Do not ask how they know those are complete; accept
+        them as they are and say so. Ask the completeness question only where
+        there is something to compare against (a checklist, a recording, a
+        prior version). Ask how they know each such material is complete or
+        usable, in their language. The answer must be something they can check
+        as soon as they have the material, not an outcome like 'no one
+        complains'. A criterion describes the finished material, not the
+        action that produces it: convert 'I recall the meals and list them'
+        to 'The list includes every meal I have made that fits my equipment
+        and restrictions', and 'I check the fridge' to 'The list matches what
+        is in the fridge right now'. 'I have looked at every shelf' is an
+        action; 'Every shelf and container is checked and every item is
+        marked good or bad' is the criterion. The format is what the material
+        looks like when it exists — a list, a document, a spreadsheet, a
+        recording, a photo — not the action you take to gather it. 'Visual
+        and smell inspection' is an action, not a format; the format is the
+        inventory list or condition notes that result. If they give a method
+        or an outcome, propose the converted check and format in their words
+        and ask them to confirm.
+        If it comes from another part of their work, note that it depends on
+        that; otherwise it stands alone. Ask about completeness once per
+        resource; if they answer, accept it and move on. If they say they
+        trust it or do not check it, accept that and never rephrase the same
+        completeness question. If they say they have only one starting
+        material, accept that and do not ask about other materials again.
+
+        When you summarize or confirm, describe each resource in the user's
+        words. Never use 'source', 'format', 'dependencies', or 'validation
+        criteria' — those are your labels, not theirs. Never say 'raw
+        materials' or 'starting materials'; say 'the things you start with'
+        or 'what you already have'. Say where it comes
+        from, what it looks like, what it needs first, and, where it applies,
+        how they know it is complete.
+
+        When they ask for ideas, or ask 'what do you think?' or 'suggest a
+        format', propose one concrete option in that same reply; do not ask
+        another question first, and do not append a new question after the
+        suggestion. Make the suggestion and let them respond.
+
+        Stay at the level of the thing they start with, not its contents. When
+        the user describes their domain (dishes, ingredients, business ideas),
+        acknowledge briefly then redirect: 'That sounds interesting — let's
+        focus on what you start with. What kind of information goes into
+        that?' Do NOT join them in discussing their domain content.
         """
         ...  # type: ignore[reportReturnType]

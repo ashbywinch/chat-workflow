@@ -4,10 +4,10 @@ from typing import Annotated, ClassVar
 
 from pydantic import Field
 
-from chat_workflow import atomic_workflow
+from chat_workflow import atomic_workflow_step
 from chat_workflow.mixins import LLMValidated
 
-from ..component_responsibilities import ComponentResponsibilities
+from ..component_spec import ComponentSpec
 
 
 class ComponentSourceCode(LLMValidated):
@@ -16,7 +16,7 @@ class ComponentSourceCode(LLMValidated):
     Represents a generated Pydantic BaseModel class that owns a single
     business artifact type and provides methods to create instances of it
     through conversational workflows. The generated class carries an
-    @atomic_workflow method whose docstring becomes the system prompt for
+    @atomic_workflow_step method whose docstring becomes the system prompt for
     the LLM conversation that creates those instances.
     """
 
@@ -31,7 +31,7 @@ class ComponentSourceCode(LLMValidated):
         "Validation in the generated code (Field constraints or "
         "@model_validator) encodes business rules a domain expert would care "
         "about — not just type checks.",
-        "The generated class has an @atomic_workflow classmethod whose "
+        "The generated class has an @atomic_workflow_step classmethod whose "
         "docstring tells the agent to propose and synthesize rather than "
         "asking the user to fill out a form, and includes an example of "
         "the desired conversational rhythm.",
@@ -40,19 +40,19 @@ class ComponentSourceCode(LLMValidated):
     code: str = Field(
         ...,
         description="Complete Python source code defining the component: "
-        "a Pydantic BaseModel class with an @atomic_workflow classmethod "
+        "a Pydantic BaseModel class with an @atomic_workflow_step classmethod "
         "whose docstring is a good system prompt (proposes and synthesizes, "
         "includes a dialogue example), field definitions with clear business "
         "descriptions, and validation rules encoding real business semantics.",
         min_length=1,
     )
 
-    @atomic_workflow
+    @atomic_workflow_step
     @classmethod
     def generate(
         cls,
         requirements: Annotated[
-            ComponentResponsibilities,
+            ComponentSpec,
             "The component requirements specifying name, purpose, inputs, outputs, and type",
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
@@ -63,7 +63,7 @@ class ComponentSourceCode(LLMValidated):
         that defines a Pydantic BaseModel class — a business component — with:
         - A class docstring that explains the domain concept the model represents,
           in terms an LLM with no context could understand
-        - An @atomic_workflow classmethod whose docstring is a good system prompt:
+        - An @atomic_workflow_step classmethod whose docstring is a good system prompt:
           it frames the task around the user's domain, tells the agent to propose
           and synthesize, and includes a concrete example of the conversational
           rhythm (e.g., "From what you've described, I'm seeing...")

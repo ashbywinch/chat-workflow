@@ -1,12 +1,12 @@
-"""Tests for ComponentSourceCode.generate atomic workflow."""
+"""Tests for ComponentSourceCode.generate atomic workflow step."""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import AgentIntent, AgentResponse, Session, SessionLog
-from chat_workflow.atomic_workflow import AtomicWorkflow
+from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
 from workflows.workflow.component_source_code import ComponentSourceCode
-from workflows.workflow.models import ComponentResponsibilities
+from workflows.workflow.models import ComponentSpec
 
 
 class FakeConfig:
@@ -30,35 +30,38 @@ class TestDesignComponent(unittest.TestCase):
 
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(ComponentSourceCode.generate, "_is_workflow", False),
+            getattr(ComponentSourceCode.generate, "_is_workflow_step", False),
         )
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
             ComponentSourceCode.generate(
-                requirements=ComponentResponsibilities(
+                requirements=ComponentSpec(
                     name="Test",
                     purpose="Test component",
                     required_inputs=["Input"],
                     scope_description="description", 
                     component_type="artifact_producing",
+                    owner_role="Owner",
                 ),
             )
         self.assertIn("session", str(ctx.exception))
 
     @patch("chat_workflow.llm_interaction.get_client")
-    @patch.object(AtomicWorkflow, "_call_llm")
+    @patch.object(AtomicWorkflowStep, "_call_llm")
     @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
     def test_returns_generated_component(self, mock_validate, mock_call_llm, mock_get_client):
         mock_get_client.side_effect = RuntimeError("no api key")
         expected_code = (
             "from __future__ import annotations\n"
+            "\n"
             "from pydantic import BaseModel, Field\n"
-            "from chat_workflow import atomic_workflow\n\n"
+            "\n"
+            "from chat_workflow import atomic_workflow_step\n\n\n"
             "class Order(BaseModel):\n"
             '    name: str = Field(..., min_length=1, description="Order name")\n'
             "\n"
-            "    @atomic_workflow\n"
+            "    @atomic_workflow_step\n"
             "    @classmethod\n"
             "    def create(cls, context: str, max_turns: int = 10) -> Order:\n"
             '        """Create order."""\n'
@@ -72,12 +75,13 @@ class TestDesignComponent(unittest.TestCase):
 
         session = self._make_session()
         result = ComponentSourceCode.generate(
-            requirements=ComponentResponsibilities(
+            requirements=ComponentSpec(
                 name="Order",
                 purpose="Manage orders",
                 required_inputs=["Customer details"],
                 scope_description="description", 
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
             session=session,
         )
@@ -87,18 +91,20 @@ class TestDesignComponent(unittest.TestCase):
         self.assertIn("BaseModel", result.code)
 
     @patch("chat_workflow.llm_interaction.get_client")
-    @patch.object(AtomicWorkflow, "_call_llm")
+    @patch.object(AtomicWorkflowStep, "_call_llm")
     @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
     def test_code_contains_expected_imports(self, mock_validate, mock_call_llm, mock_get_client):
         mock_get_client.side_effect = RuntimeError("no api key")
         expected_code = (
             "from __future__ import annotations\n"
+            "\n"
             "from pydantic import BaseModel, Field\n"
-            "from chat_workflow import atomic_workflow\n\n"
+            "\n"
+            "from chat_workflow import atomic_workflow_step\n\n\n"
             "class TestComponent(BaseModel):\n"
             '    name: str = Field(..., min_length=1, description="Test name")\n'
             "\n"
-            "    @atomic_workflow\n"
+            "    @atomic_workflow_step\n"
             "    @classmethod\n"
             "    def create(cls, context: str, max_turns: int = 10) -> TestComponent:\n"
             '        """Create test component."""\n'
@@ -111,12 +117,13 @@ class TestDesignComponent(unittest.TestCase):
 
         session = self._make_session()
         result = ComponentSourceCode.generate(
-            requirements=ComponentResponsibilities(
+            requirements=ComponentSpec(
                 name="TestComponent",
                 purpose="Test",
                 required_inputs=[],
                 scope_description="description",
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
             session=session,
         )

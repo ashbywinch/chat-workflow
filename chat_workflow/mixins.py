@@ -7,11 +7,11 @@ LLM calls.
 
 from __future__ import annotations
 
-import json
+import re
 from pathlib import Path
 from typing import ClassVar
 
-from pydantic import BaseModel, PrivateAttr, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 from .annotations import Blob, Validation
 from .exceptions import ValidationError
@@ -79,6 +79,80 @@ class BlobSyncMixin(BaseModel):
         return self._blob_paths.get(field)
 
 
+class RuleVerdict(BaseModel):
+    """One judge verdict for one validation rule."""
+
+    rule: str = Field(..., description="The rule text, copied exactly from the list")
+    passed: bool = Field(..., description="Whether the data satisfies this rule")
+    explanation: str | None = Field(None, description="Why the rule passed or failed")
+    evidence: str | None = Field(
+        None,
+        description=(
+            "Exact quote from the data that supports the verdict. A failed "
+            "verdict MUST quote the code line, field, or phrase that violates "
+            "the rule; a failed verdict without evidence is discarded."
+        ),
+    )
+    fix: str | None = Field(
+        None,
+        description=(
+            "For a failed verdict, the concrete correction: the exact value or "
+            "change to make. Name the field and give the corrected form (for "
+            "example: replace name 'Approval' with 'Approval Record'). Empty "
+            "for a passing verdict."
+        ),
+    )
+
+
+class RuleVerdicts(BaseModel):
+    """The judge's verdicts, one per rule, in the order the rules were given."""
+
+    verdicts: list[RuleVerdict] = Field(
+        ..., description="One verdict per rule, in order"
+    )
+
+
+def _verdict_claims_the_rule_passes(verdict: RuleVerdict) -> bool:
+    """True when a failed verdict's own conclusion says the rule passed.
+
+    A self-contradictory verdict is a malformed judge response, not a
+    violation: the explanation concludes that the data satisfies the rule while
+    the ``passed`` flag says it does not. Read the last sentence, so a hedge
+    ("could be considered a failure, but...") does not hide the conclusion.
+    """
+    text = (verdict.explanation or "").strip().lower()
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    conclusion = sentences[-1] if sentences else text
+    positive = ("passes", "satisfied", "is valid", "meets the rule")
+    negative = (
+        "does not",
+        "doesn't",
+        "fails",
+        "failure",
+        "violates",
+        "is not valid",
+        "not satisfied",
+    )
+    return any(phrase in conclusion for phrase in positive) and not any(
+        phrase in conclusion for phrase in negative
+    )
+
+
+def _is_actionable_failure(verdict: RuleVerdict) -> bool:
+    """A failure must be substantive and fixable, not a malformed verdict.
+
+    The judge is told to attach the violating evidence and a concrete fix to
+    every failed verdict. A failure without both is discarded, as is one whose
+    conclusion says the rule passes.
+    """
+    return (
+        not verdict.passed
+        and bool((verdict.evidence or "").strip())
+        and bool((verdict.fix or "").strip())
+        and not _verdict_claims_the_rule_passes(verdict)
+    )
+
+
 class LLMValidated(BaseModel):
     """Mixin that validates natural-language rules via LLM during validation.
 
@@ -88,6 +162,7 @@ class LLMValidated(BaseModel):
     """
 
     _validation_rules: ClassVar[list[str]] = []
+    _validation_rules_heading: ClassVar[str] = "Object validation rules"
 
     # True → validate_llm_rules returns early (no LLM call).
     # Set to ``False`` on a model class to exercise real LLM validation.
@@ -137,6 +212,19 @@ class LLMValidated(BaseModel):
                 field.description = f"{existing}\n{bullets}"
             else:
                 field.description = bullets
+        # Pydantic builds its core schema before this hook runs. Without a
+        # rebuild, model_json_schema() keeps the pre-mutation description and
+        # the Validation rules never reach the prompt.
+        cls.model_rebuild(force=True)
+
+    def validate_deterministic_rules(self) -> None:
+        """Run structural checks that do not need an LLM.
+
+        Subclasses override this to validate facts a machine can decide:
+        duplicates, required constraints, import resolution. It runs before
+        the LLM judge so a plainly invalid object never costs a judge call.
+        Raise :class:`ValidationError` on violation.
+        """
 
     @model_validator(mode="after")
     def validate_llm_rules(self) -> BaseModel:
@@ -152,6 +240,10 @@ class LLMValidated(BaseModel):
         """
         from .config import Config
         from .llm_interaction import get_client
+
+        # Deterministic first: cheap, precise, and no judge tokens wasted on
+        # an object that is structurally invalid.
+        self.validate_deterministic_rules()
 
         rules = self.collect_all_rules()
         if not rules:
@@ -176,55 +268,54 @@ class LLMValidated(BaseModel):
             return self
 
         prompt = (
-            "You are a validation assistant.  Given the following data, "
-            "verify that ALL of these business rules are satisfied.\n\n"
+            "You are a validation assistant. Evaluate the data against each rule.\n\n"
             f"Data:\n{self.model_dump_json(indent=2)}\n\n"
             "Rules:\n"
         )
         for i, rule in enumerate(rules, 1):
             prompt += f"{i}. {rule}\n"
         prompt += (
-            "\nRespond ONLY with a JSON object containing:\n"
-            '- "valid": boolean — true only if ALL rules pass\n'
-            '- "violations": list of strings describing each violation\n'
+            "\nReturn one verdict per rule, in order. Each verdict has:\n"
+            '- "rule": the rule text, copied exactly\n'
+            '- "passed": true only if the data satisfies the rule\n'
+            '- "explanation": a brief reason\n'
+            '- "evidence": the exact quote from the data that supports the verdict. '
+            "A failed verdict MUST quote the code line, field, or phrase that "
+            "violates the rule. A failed verdict without evidence and a concrete "
+            "fix is discarded.\n"
+            '- "fix": for a failed verdict, the concrete correction — name the '
+            "field and give the exact corrected value or form (for example: "
+            "replace name 'Approval' with 'Approval Record'). Empty on a pass.\n"
+            "If your explanation concludes that the data passes or satisfies a "
+            "rule, set passed to true. A failed verdict must state what is wrong "
+            "and quote the violating text, not the valid value."
         )
 
         try:
-            response = client.chat.completions.create(
+            verdicts = client.chat.completions.create(
                 model=config.model,
                 messages=[{"role": "user", "content": prompt}],
-                response_model=None,
+                response_model=RuleVerdicts,
                 max_retries=config.max_retries,
                 timeout=config.request_timeout_seconds,
+                temperature=0.0,
             )
         except Exception:
             return self
 
-        content = getattr(response, "choices", None)
-        if content and hasattr(content[0], "message"):
-            text = content[0].message.content or "{}"
-        elif hasattr(response, "valid"):
-            text = json.dumps({"valid": response.valid, "violations": getattr(response, "violations", [])})
-        else:
-            text = "{}"
-
-        cleaned = str(text).strip()
-        if cleaned.startswith("```"):
-            first_newline = cleaned.find("\n")
-            if first_newline != -1:
-                cleaned = cleaned[first_newline + 1 :]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3].strip()
-            elif "\n```" in cleaned:
-                cleaned = cleaned.rsplit("\n```", 1)[0].strip()
-
-        try:
-            result = json.loads(cleaned)
-        except (json.JSONDecodeError, TypeError, ValueError):
-            return self
-
-        if not result.get("valid", True):
-            violations = result.get("violations", ["Business rule validation failed"])
-            raise ValidationError("; ".join(violations))
+        failures = [
+            verdict
+            for verdict in verdicts.verdicts
+            if _is_actionable_failure(verdict)
+        ]
+        if failures:
+            raise ValidationError(
+                "; ".join(
+                    f"[{verdict.rule}] {verdict.explanation or 'rule failed'}"
+                    + (f" Evidence: {verdict.evidence}" if verdict.evidence else "")
+                    + (f" Fix: {verdict.fix}" if verdict.fix else "")
+                    for verdict in failures
+                )
+            )
 
         return self

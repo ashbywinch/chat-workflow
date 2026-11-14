@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from workflows.workflow import ComponentSourceCode
 from workflows.workflow.models import (
-    ComponentResponsibilities,
+    ComponentSpec,
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
@@ -37,7 +37,6 @@ class TestResource(unittest.TestCase):
         model = Resource(
             source="Customer",
             format="JSON",
-            trigger_conditions="New request submitted",
             dependencies=["Customer profile"],
             validation_criteria="Must include customer ID",
         )
@@ -48,7 +47,6 @@ class TestResource(unittest.TestCase):
         model = Resource(
             source="System",
             format="CSV",
-            trigger_conditions="Daily batch",
             validation_criteria="File must exist",
         )
         self.assertEqual(model.dependencies, [])
@@ -75,6 +73,18 @@ class TestDeliverable(unittest.TestCase):
         with self.assertRaises(ValidationError):
             Deliverable()
 
+    def test_consumer_must_not_be_the_artifact(self):
+        with self.assertRaises(ValidationError):
+            Deliverable(
+                name="Customer",
+                description="Customer profile",
+                consumer="Customer",
+                format="JSON",
+                success_criteria="Complete",
+                integration_points="API",
+                storage_requirements="Database",
+            )
+
 
 class TestGapAnalysis(unittest.TestCase):
     def test_valid_instance(self):
@@ -98,33 +108,48 @@ class TestGapAnalysis(unittest.TestCase):
         self.assertEqual(len(model.missing_components), 0)
 
 
-class TestComponentResponsibilities(unittest.TestCase):
+class TestComponentSpec(unittest.TestCase):
     def test_valid_instance(self):
-        model = ComponentResponsibilities(
+        model = ComponentSpec(
             name="Invoice",
             purpose="Manage invoice lifecycle",
             required_inputs=["Order details"],
             scope_description="description", 
             component_type="artifact_producing",
+            owner_role="Owner",
         )
         self.assertEqual(model.name, "Invoice")
         self.assertEqual(model.component_type, "artifact_producing")
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            ComponentResponsibilities()
+            ComponentSpec()
+
+    def test_name_ending_in_activity_is_rejected(self):
+        with self.assertRaises(ValidationError) as ctx:
+            ComponentSpec(
+                name="Minutes Distribution",
+                purpose="Distribute the minutes",
+                required_inputs=["Final Minutes"],
+                scope_description=(
+                    "Sends the minutes to attendees. Out of scope: editing them."
+                ),
+                component_type="artifact_producing",
+                owner_role="Owner",
+            )
+        self.assertIn("Minutes Distribution Record", str(ctx.exception))
 
 
-class TestGeneratedComponent(unittest.TestCase):
+class TestComponentSourceCode(unittest.TestCase):
     @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
     def test_valid_instance(self, mock_validate):
         code = (
-            "from chat_workflow import atomic_workflow\n"
+            "from chat_workflow import atomic_workflow_step\n"
             "from pydantic import BaseModel, Field\n\n"
             "class MyModel(BaseModel):\n"
             '    name: str = Field(..., min_length=1, description="Name")\n'
             "\n"
-            "    @atomic_workflow\n"
+            "    @atomic_workflow_step\n"
             "    @classmethod\n"
             "    def create(cls, context: str):\n"
             '        """Create."""\n'

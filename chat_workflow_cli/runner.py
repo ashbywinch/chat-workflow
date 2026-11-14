@@ -6,7 +6,7 @@ import typer
 
 from chat_workflow.exceptions import (
     APIKeyError,
-    AtomicWorkflowFailedError,
+    AtomicWorkflowStepFailedError,
     ChatWorkflowError,
     ConfigFileError,
     ConfigurationError,
@@ -44,8 +44,8 @@ def handle_error(error: Exception) -> None:
         typer.secho(f"\nProvider not found: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, TurnLimitExceededError):
         typer.secho(f"\n{error.message}", err=True, fg=typer.colors.RED)
-    elif isinstance(error, AtomicWorkflowFailedError):
-        typer.secho(f"\nAtomic workflow failed: {error.message}", err=True, fg=typer.colors.RED)
+    elif isinstance(error, AtomicWorkflowStepFailedError):
+        typer.secho(f"\nAtomic workflow step failed: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ValidationError):
         typer.secho(f"\nValidation error: {error.message}", err=True, fg=typer.colors.RED)
     elif isinstance(error, ChatWorkflowError):

@@ -1,18 +1,18 @@
-"""Tests for ComponentResponsibilities model."""
+"""Tests for ComponentSpec model."""
 
 import unittest
 
 from pydantic import ValidationError
 
-from workflows.workflow.component_responsibilities import (
-    ComponentResponsibilities,
+from workflows.workflow.component_spec import (
+    ComponentSpec,
 )
 
 
-class TestComponentResponsibilities(unittest.TestCase):
+class TestComponentSpec(unittest.TestCase):
     """Construction and field validation tests."""
 
-    def make_valid(self, **overrides) -> ComponentResponsibilities:
+    def make_valid(self, **overrides) -> ComponentSpec:
         kwargs = dict(
             name="Invoice",
             purpose="Generate and manage invoices for completed orders",
@@ -23,9 +23,10 @@ class TestComponentResponsibilities(unittest.TestCase):
             ),
             required_inputs=["Order", "Customer"],
             component_type="artifact_producing",
+            owner_role="Owner",
         )
         kwargs.update(overrides)
-        return ComponentResponsibilities(**kwargs)
+        return ComponentSpec.model_validate(kwargs)
 
     # --- Construction ---
 

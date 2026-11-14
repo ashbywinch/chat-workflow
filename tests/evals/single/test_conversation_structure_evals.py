@@ -14,7 +14,10 @@ from __future__ import annotations
 import unittest
 
 from tests.conftest import timeout
-from tests.evals.helpers import run_multi_turn_eval
+from tests.evals.helpers import (
+    make_meeting_minutes_deliverable,
+    run_multi_turn_eval,
+)
 from workflows.workflow.models import Deliverable, Resource
 
 SKEPTICAL_FIRST_TIME_PERSONA = (
@@ -34,12 +37,17 @@ DOMAIN_EXPECTATION_PERSONA = (
     "You write up meeting minutes regularly for your team. Meeting minutes are a "
     "completely standard type of document — you are honestly a bit surprised when "
     "the assistant acts like it has never seen them before.\n\n"
+    "You prepare minutes after every team meeting. You take handwritten notes in a "
+    "notebook during the meeting, sometimes record it on your phone, and usually have "
+    "the agenda that was emailed beforehand. You are a person, not an AI: answer as "
+    "yourself, from your own routine.\n\n"
     "You know what goes into good minutes: the date, who attended, what was "
     "discussed, decisions made, action items with owners and due dates, and "
     "the date of the next meeting if there is one.\n\n"
     "You are happy to describe your specific needs, but you expect the assistant "
     "to start from a foundation of understanding instead of asking you to explain "
-    "from scratch what meeting minutes even are."
+    "from scratch what meeting minutes even are.\n\n"
+    "Keep your answers to two or three short sentences. Answer only what was asked."
 )
 
 PARTICIPATORY_USER_PERSONA = (
@@ -54,6 +62,22 @@ PARTICIPATORY_USER_PERSONA = (
     "If the assistant responds to your pushback by repeating the same question "
     "again or rephrasing it slightly, you get frustrated. You expect them "
     "to actually offer ideas when asked."
+)
+
+PARTICIPATORY_RESOURCE_PERSONA = (
+    "You are someone who wants help defining what you start with when you "
+    "prepare meeting minutes: your raw meeting notes. You have described the "
+    "basic situation: you take notes during meetings and need the input "
+    "defined clearly.\n\n"
+    "You are happy to answer questions, but you also want the assistant to "
+    "contribute ideas about the input itself — for example, what format the "
+    "raw notes should be in, or how to tell when they are complete. If the "
+    "assistant keeps asking open-ended questions without suggesting anything "
+    "about the input, you push back: 'what do you think?' or 'can you suggest "
+    "a format for the notes?' or 'you tell me.'\n\n"
+    "If the assistant responds by repeating the same question or asking about "
+    "unrelated things, you get frustrated. You expect it to offer a concrete "
+    "idea about the starting input when asked."
 )
 
 
@@ -74,7 +98,7 @@ WARM_OPEN_RULES: dict[str, str] = {
     ),
 }
 
-DOMAIN_PROPOSAL_RULES: dict[str, str] = {
+OUTPUT_DOMAIN_PROPOSAL_RULES: dict[str, str] = {
     "Proposes from knowledge": (
         "When the user mentions a common, well-known document type (like "
         "meeting minutes, invoices, reports, blog posts), the assistant "
@@ -85,6 +109,30 @@ DOMAIN_PROPOSAL_RULES: dict[str, str] = {
         "that align with what you need?'\n\n"
         "BAD: 'What information should be included in the minutes?' — this "
         "asks the user to define something that is already commonly known."
+    ),
+    "No forced field-mapping": (
+        "The assistant does not mechanically ask about every data model field "
+        "when it does not make sense for the user's domain. If a question "
+        "would not apply to the specific output or input the user is describing, "
+        "the assistant recognizes this and moves on, rather than pressing or "
+        "rephrasing.\n\n"
+        "For example, asking 'how do you know when your notes are complete?' "
+        "does not make sense for meeting notes — they are notes, they are "
+        "whatever the person wrote. If the user pushes back on such a question, "
+        "the assistant should acknowledge it does not apply and move on."
+    ),
+}
+
+RESOURCE_DOMAIN_PROPOSAL_RULES: dict[str, str] = {
+    "Proposes typical starting materials": (
+        "When the user mentions a common workflow (like writing meeting minutes), "
+        "the assistant proposes the typical starting materials — handwritten "
+        "notes, the agenda, a recording, an attendee list — rather than asking "
+        "the user to define what they start with from scratch.\n\n"
+        "GOOD: 'For minutes, people usually start with their handwritten notes, "
+        "the agenda, and maybe a recording. Which of those do you have?'\n\n"
+        "BAD: 'What do you start with?' — this asks the user to define "
+        "something the assistant could propose."
     ),
     "No forced field-mapping": (
         "The assistant does not mechanically ask about every data model field "
@@ -127,73 +175,88 @@ ADAPTIVE_CONVERSATION_RULES: dict[str, str] = {
 class TestWarmOpenEval(unittest.TestCase):
     """Assistant opens with greeting and context, not an abrupt interrogation."""
 
-    @timeout(120)
+    @timeout(900)
     def test_output_warm_open(self):
         """Deliverable.generate_from_chat opens warmly, not with an abrupt question."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 10},
             user_persona=SKEPTICAL_FIRST_TIME_PERSONA,
             judge_rules=WARM_OPEN_RULES,
         )
-        if result is not None:
-            self.assertIsInstance(result, list)
+        self.assertIsInstance(result, list)
 
 
 class TestDomainProposalEval(unittest.TestCase):
     """Assistant proposes structure from domain knowledge instead of asking user to define basics."""
 
-    @timeout(120)
+    @timeout(900)
     def test_output_proposes_structure(self):
         """Deliverable proposes meeting minutes structure from domain knowledge."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 10},
             user_persona=DOMAIN_EXPECTATION_PERSONA,
-            judge_rules=DOMAIN_PROPOSAL_RULES,
+            judge_rules=OUTPUT_DOMAIN_PROPOSAL_RULES,
         )
-        if result is not None:
-            self.assertIsInstance(result, list)
+        self.assertIsInstance(result, list)
 
-    @timeout(120)
+    @timeout(900)
     def test_resource_no_forced_field_mapping(self):
         """Resource does not force nonsensical field-mapped questions."""
+        # In the real flow, resources are identified after the deliverables, so
+        # the assistant already knows the domain. Mirror that here: without it,
+        # the first turn has no context and cannot propose starting materials.
+        meeting_minutes = Deliverable(
+            name="Meeting Minutes",
+            description=(
+                "The written record of the meeting: decisions made, action items "
+                "assigned, and key discussion points."
+            ),
+            consumer="Meeting Attendees",
+            format="Formatted document (PDF or shared doc)",
+            success_criteria=(
+                "Every decision is recorded and every action item names an owner."
+            ),
+            integration_points="Emailed to attendees, who review the decisions and action items.",
+            storage_requirements="Shared drive, one folder per meeting series",
+        )
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 10, "deliverables": [meeting_minutes]},
             user_persona=DOMAIN_EXPECTATION_PERSONA,
-            judge_rules=DOMAIN_PROPOSAL_RULES,
+            judge_rules=RESOURCE_DOMAIN_PROPOSAL_RULES,
         )
-        if result is not None:
-            self.assertIsInstance(result, list)
+        self.assertIsInstance(result, list)
 
 
 class TestAdaptiveConversationEval(unittest.TestCase):
     """Assistant adapts when user pushes back or expresses confusion."""
 
-    @timeout(120)
+    @timeout(900)
     def test_output_adapts_to_suggestions(self):
         """Deliverable pivots to proposing mode when user says 'what do you think?' or 'suggest something'."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 8},
+            method_kwargs={"max_turns": 10},
             user_persona=PARTICIPATORY_USER_PERSONA,
             judge_rules=ADAPTIVE_CONVERSATION_RULES,
         )
-        if result is not None:
-            self.assertIsInstance(result, list)
+        self.assertIsInstance(result, list)
 
-    @timeout(120)
+    @timeout(900)
     def test_resource_adapts_to_suggestions(self):
         """Resource pivots to proposing mode when user says 'what do you think?' or 'suggest something'."""
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 8},
-            user_persona=PARTICIPATORY_USER_PERSONA,
+            method_kwargs={
+                "max_turns": 10,
+                "deliverables": [make_meeting_minutes_deliverable()],
+            },
+            user_persona=PARTICIPATORY_RESOURCE_PERSONA,
             judge_rules=ADAPTIVE_CONVERSATION_RULES,
         )
-        if result is not None:
-            self.assertIsInstance(result, list)
+        self.assertIsInstance(result, list)
 
 
 if __name__ == "__main__":

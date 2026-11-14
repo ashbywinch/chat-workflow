@@ -2,7 +2,7 @@
 
 This guide is for developers working **on** the chat-workflow library itself. If you're looking to build workflows using the library, see the [workflow author guide](../workflow-authors/workflow-author-guide.md).
 
-If you are new to the codebase, start with [../reference/domain-concepts.md](../reference/domain-concepts.md) — it defines the core vocabulary (atomic workflow, turn, session, etc.) and maps each term to equivalent concepts in the broader LLM ecosystem.
+If you are new to the codebase, start with [../reference/domain-concepts.md](../reference/domain-concepts.md) — it defines the core vocabulary (atomic workflow step, turn, session, etc.) and maps each term to equivalent concepts in the broader LLM ecosystem.
 
 For coding standards, see [../coding-standards.md](../coding-standards.md).
 For git workflow and PR guidance, see [git-workflow.md](git-workflow.md).
@@ -17,8 +17,8 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 
 | File | What |
 |------|------|
-| `chat_workflow/decorators.py` | `@atomic_workflow`/`@composite_workflow` decorators |
-| `chat_workflow/atomic_workflow.py` | `AtomicWorkflow` — drives a single atomic workflow turn loop |
+| `chat_workflow/decorators.py` | `@atomic_workflow_step`/`@composite_workflow_step` decorators |
+| `chat_workflow/atomic_workflow_step.py` | `AtomicWorkflowStep` — drives a single atomic workflow step turn loop |
 | `chat_workflow/session.py` | `Session` — runtime context (IO, state, config) |
 | `chat_workflow/session_log.py` | `SessionLog` — accumulated session state |
 | `chat_workflow/debug.py` | `StreamingDebug` — real-time LLM tracing |
@@ -33,12 +33,12 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/annotations.py` | Blob and Validation annotations |
 | `chat_workflow/mixins.py` | BlobSyncMixin and LLMValidated mixins |
 | `workflows/workflow/component.py` | `Component` — orchestrator with 4-phase `create()` |
-| `workflows/workflow/component_responsibilities.py` | `ComponentResponsibilities` — interface from Workflow to Component |
-| `workflows/workflow/models/generated_component.py` | `GeneratedComponent` — stateless code executor |
-| `workflows/workflow/models/component_domain_spec.py` | `ComponentDomainSpec` — Phase 1 output (domain understanding) |
-| `workflows/workflow/models/component_structure.py` | `ComponentStructure` — Phase 2 output (Pydantic structure) |
-| `workflows/workflow/models/component_interaction_context.py` | `ComponentInteractionContext` — Phase 3 output (interaction preferences) |
-| `workflows/workflow/models/component_design_spec.py` | `ComponentDesignSpec` — composite of all 3 phases, input to Phase 4 |
+| `workflows/workflow/component_spec.py` | `ComponentSpec` — interface from WorkflowSpec to Component |
+| `workflows/workflow/component_source_code.py` | `ComponentSourceCode` — stateless code executor |
+| `workflows/workflow/domain_spec.py` | `ComponentDomainSpec` — Phase 1 output (domain understanding) |
+| `workflows/workflow/structure.py` | `ComponentStructure` — Phase 2 output (Pydantic structure) |
+| `workflows/workflow/interaction_context.py` | `ComponentInteractionContext` — Phase 3 output (interaction preferences) |
+| `workflows/workflow/design_spec.py` | `ComponentDesignSpec` — composite of all 3 phases, input to Phase 4 |
 
 Example workflows live in the `workflows/` directory.
 
@@ -58,20 +58,20 @@ Example workflows live in the `workflows/` directory.
 
 The framework uses a three-layer architecture for building components, each with distinct responsibilities:
 
-1. **Workflow** (architect) — `Workflow.create()` defines component boundaries and interfaces. It captures what components exist and how they connect, producing `ComponentResponsibilities` for each one. The architecture is considered final before Component starts.
+1. **WorkflowSpec** (architect) — `WorkflowSpec.create()` defines component boundaries and interfaces. It captures what components exist and how they connect, producing `ComponentSpec` for each one. The architecture is considered final before Component starts.
 
-2. **Component** (designer) — `Component.create()` takes the architecture from Workflow and designs component internals through a multi-phase conversation with the user. It produces a complete design spec.
+2. **Component** (designer) — `Component.create()` takes the architecture from WorkflowSpec and designs component internals through a multi-phase conversation with the user. It produces a complete design spec.
 
-3. **GeneratedComponent** (executor) — `GeneratedComponent.generate()` takes a complete design spec and translates it into Python code statelessly. No design decisions remain. No user conversation about code.
+3. **ComponentSourceCode** (executor) — `ComponentSourceCode.generate()` takes a complete design spec and translates it into Python code statelessly. No design decisions remain. No user conversation about code.
 
 #### Multi-Phase Design
 
-`Component.create()` orchestrates four phases, each a separate `@atomic_workflow` with its own return type and validation rules:
+`Component.create()` orchestrates four phases, each a separate `@atomic_workflow_step` with its own return type and validation rules:
 
 - **Phase 1: Domain Exploration** (`ComponentDomainSpec.explore()`) — Understands what the artifact IS and what makes it good in the user's domain. Returns a `ComponentDomainSpec`.
 - **Phase 2: Structural Design** (`ComponentStructure.design()`) — Translates domain concepts into Pydantic field definitions and `@model_validator` rules. Returns a `ComponentStructure`.
 - **Phase 3: Interaction Preferences** (`ComponentInteractionContext.gather()`) — Explores how the user wants the assistant to behave during creation. Returns a `ComponentInteractionContext`.
-- **Phase 4: Code Generation** (`GeneratedComponent.generate()`) — Statelessly translates the complete design spec into Python code. Returns a `GeneratedComponent`.
+- **Phase 4: Code Generation** (`ComponentSourceCode.generate()`) — Statelessly translates the complete design spec into Python code. Returns a `ComponentSourceCode`.
 
 Each phase has its own return type with its own validation rules. This keeps the cognitive load on the LLM manageable per step and makes each phase independently testable.
 
@@ -83,7 +83,7 @@ The architecture follows these principles. Because we are building a **system th
 
 2. **A good workflow has loosely coupled components with clear interfaces** — Minimize dependencies. Each component's interface (what it expects and produces) is explicit and stable. Changes to internals should not ripple to other components.
 
-3. **All conversations with the user stay in the user's domain** — Workflow discusses the user's process, Component discusses the user's artifact. Never about Python, Pydantic, or code structure. Generated components' ``@atomic_workflow`` docstrings must frame the task around the user's domain.
+3. **All conversations with the user stay in the user's domain** — Workflow discusses the user's process, Component discusses the user's artifact. Never about Python, Pydantic, or code structure. Generated components' ``@atomic_workflow_step`` docstrings must frame the task around the user's domain.
 
 4. **"What Good Looks Like" becomes validation rules** — Proactively ask the user what makes excellent output. Encode quality criteria as ``Field(constraints=...)`` and ``@model_validator`` rules, never as prompt text.
 
@@ -91,14 +91,14 @@ The architecture follows these principles. Because we are building a **system th
 
 6. **Pydantic is the Gatekeeper** — Catch bad LLM output at construction time. Never write fallback logic, workarounds, or fuzzy matching to handle incorrect output. The correct response to bad LLM output is always: improve the prompt.
 
-**Information flow** — ``Workflow.create()`` produces ``ComponentResponsibilities`` (name, purpose, scope, inputs, type). ``Component.create()`` runs multi-phase design: ``DomainSpec.explore()`` → ``Structure.design()`` → ``InteractionContext.gather()`` → ``GeneratedComponent.generate()``. Each phase has its own return type and validation. The generated component is a Pydantic BaseModel with its own ``@atomic_workflow`` method for creating business artifacts.
+**Information flow** — ``WorkflowSpec.create()`` produces ``ComponentSpec`` (name, purpose, scope, inputs, type). ``Component.create()`` runs multi-phase design: ``DomainSpec.explore()`` → ``Structure.design()`` → ``InteractionContext.gather()`` → ``ComponentSourceCode.generate()``. Each phase has its own return type and validation. The generated component is a Pydantic BaseModel with its own ``@atomic_workflow_step`` method for creating business artifacts.
 
 ### File Responsibilities
 
-#### `chat_workflow/atomic_workflow.py` — Conversation Logic
-- Core class: `AtomicWorkflow`
+#### `chat_workflow/atomic_workflow_step.py` — Conversation Logic
+- Core class: `AtomicWorkflowStep`
 - Manages turn state (`max_turns` configurable)
-- Receives system prompt from `@atomic_workflow` decorator
+- Receives system prompt from `@atomic_workflow_step` decorator
 - Three outcomes: continue/success/failure
 
 #### `llm_interaction.py` — LLM Abstraction
@@ -107,7 +107,7 @@ The architecture follows these principles. Because we are building a **system th
 - Uses instructor for structured output
 
 #### `chat_workflow_cli/cli.py` — CLI with Auto-Discovery
-- Discovers `@composite_workflow` functions in `workflows/` directory
+- Discovers `@composite_workflow_step` functions in `workflows/` directory
 - Converts function parameters to CLI options (excluding `session`, `io`, `state`, `debug`)
 - Uses `__signature__` override with `typing.get_type_hints()` for type resolution
 - Handles `from __future__ import annotations` string annotations
@@ -137,8 +137,8 @@ make coverage       # Unit tests + coverage.xml
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them
 - `AgentResponse` is a Generic BaseModel with `intent: AgentIntent` and a `model_validator` for consistency
-- `AtomicWorkflow.process_turn()` checks turn limit, calls LLM, handles intent
-- Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowFailedError`
+- `AtomicWorkflowStep.process_turn()` checks turn limit, calls LLM, handles intent
+- Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowStepFailedError`
 
 ## Testing Strategy
 
@@ -198,15 +198,15 @@ This streams all LLM requests/responses to stderr with timing:
 | Add/modify type introspection | `chat_workflow/metadata.py` | `_format_type_name()`, `_get_return_type()` |
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
-| Modify conversation flow | `chat_workflow/atomic_workflow.py` | `AtomicWorkflow.process_turn()` |
+| Modify conversation flow | `chat_workflow/atomic_workflow_step.py` | `AtomicWorkflowStep.process_turn()` |
 | Add LLM provider | `chat_workflow/llm_interaction.py` | `get_client()` |
 | Modify CLI auto-discovery | `chat_workflow_cli/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
 
 ### Quick Start for Common Changes
 
 **Modify conversation flow:**
-1. Edit `@atomic_workflow`-decorated function docstrings in example workflow files
-2. Check `AtomicWorkflow.process_turn()` logic in `atomic_workflow.py`
+1. Edit `@atomic_workflow_step`-decorated function docstrings in example workflow files
+2. Check `AtomicWorkflowStep.process_turn()` logic in `atomic_workflow_step.py`
 3. Update `tests/unit/test_orchestrator_logic.py`
 
 **Add LLM provider:**
@@ -215,7 +215,7 @@ This streams all LLM requests/responses to stderr with timing:
 
 **Modify CLI auto-discovery:**
 1. Check `chat_workflow_cli/cli.py` `build_cli_app()` function
-2. The `@composite_workflow` decorator sets `_is_workflow = True` on functions
+2. The `@composite_workflow_step` decorator sets `_is_workflow_step = True` on functions
 3. CLI discovers these functions via `discover_workflow_functions()`
 4. Function parameters (excluding `session`, `io`, `state`, `debug`) become CLI options
 5. Function names are converted to kebab-case for command names

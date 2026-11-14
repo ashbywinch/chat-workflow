@@ -1,17 +1,17 @@
-"""Tests for create composite workflow."""
+"""Tests for create composite workflow step."""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
-from workflows.workflow.component_responsibilities import ComponentResponsibilities
+from workflows.workflow.component_spec import ComponentSpec
 from workflows.workflow.models import (
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
     Resource,
 )
-from workflows.workflow.workflow import Workflow
+from workflows.workflow.workflow_spec import WorkflowSpec
 
 
 class FakeConfig:
@@ -31,18 +31,18 @@ class TestWorkflowCreate(unittest.TestCase):
         )
 
     def test_has_workflow_attribute(self):
-        self.assertTrue(getattr(Workflow.create, "_is_workflow", False))
+        self.assertTrue(getattr(WorkflowSpec.create, "_is_workflow_step", False))
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            Workflow.create(process_description="test")
+            WorkflowSpec.create(process_description="test")
         self.assertIn("session", str(ctx.exception))
 
     @patch("workflows.workflow.models.deliverable.Deliverable.generate_from_chat")
     @patch("workflows.workflow.models.resource.Resource.generate_from_chat")
-    @patch("workflows.workflow.workflow.generate_from_chat")
-    @patch("workflows.workflow.workflow._resolve_gaps")
-    @patch.object(Workflow, "_create_diagram")
+    @patch("workflows.workflow.workflow_spec.generate_from_chat")
+    @patch("workflows.workflow.workflow_spec._resolve_gaps")
+    @patch.object(WorkflowSpec, "_create_diagram")
     @patch("workflows.workflow.component.Component")
     def test_full_orchestration(
         self,
@@ -64,7 +64,6 @@ class TestWorkflowCreate(unittest.TestCase):
         inp = Resource(
             source="Test",
             format="JSON",
-            trigger_conditions="Test",
             dependencies=[],
             validation_criteria="Test",
         )
@@ -73,7 +72,7 @@ class TestWorkflowCreate(unittest.TestCase):
         out = Deliverable(
             name="Test",
             description="Test",
-            consumer="Test",
+            consumer="Test Consumer",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
@@ -82,12 +81,13 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_collect_outputs.return_value = analysis
         mock_analyze.return_value = [out]
 
-        req = ComponentResponsibilities(
+        req = ComponentSpec(
             name="TestComponent",
             purpose="Test",
             scope_description="Test",
             required_inputs=["Test"],
             component_type="artifact_producing",
+            owner_role="Owner",
         )
         mock_resolve_gaps.return_value = (
             [req],
@@ -100,7 +100,7 @@ class TestWorkflowCreate(unittest.TestCase):
             ),
         )
 
-        workflow = Workflow.model_construct(
+        workflow = WorkflowSpec.model_construct(
             name="Test Workflow",
             diagram="sequenceDiagram",
             inputs=[inp],
@@ -116,12 +116,12 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_component_class.create.return_value = mock_component_instance
 
         session = self._make_session()
-        result = Workflow.create(
+        result = WorkflowSpec.create(
             process_description="test process",
             session=session,
         )
 
-        self.assertIsInstance(result, Workflow)
+        self.assertIsInstance(result, WorkflowSpec)
         self.assertEqual(result.name, "Test Workflow")
         mock_analyze.assert_called_once()
         mock_collect_inputs.assert_called_once()
@@ -132,9 +132,9 @@ class TestWorkflowCreate(unittest.TestCase):
 
     @patch("workflows.workflow.models.deliverable.Deliverable.generate_from_chat")
     @patch("workflows.workflow.models.resource.Resource.generate_from_chat")
-    @patch("workflows.workflow.workflow.generate_from_chat")
-    @patch("workflows.workflow.workflow._resolve_gaps")
-    @patch.object(Workflow, "_create_diagram")
+    @patch("workflows.workflow.workflow_spec.generate_from_chat")
+    @patch("workflows.workflow.workflow_spec._resolve_gaps")
+    @patch.object(WorkflowSpec, "_create_diagram")
     @patch("workflows.workflow.component.Component")
     def test_handles_multiple_components(
         self,
@@ -156,7 +156,6 @@ class TestWorkflowCreate(unittest.TestCase):
         inp = Resource(
             source="Test",
             format="JSON",
-            trigger_conditions="Test",
             dependencies=[],
             validation_criteria="Test",
         )
@@ -165,7 +164,7 @@ class TestWorkflowCreate(unittest.TestCase):
         out = Deliverable(
             name="Test",
             description="Test",
-            consumer="Test",
+            consumer="Test Consumer",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
@@ -175,19 +174,21 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_analyze.return_value = [out]
 
         reqs = [
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="ComponentA",
                 purpose="Test A",
                 scope_description="Test A",
                 required_inputs=["A"],
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="ComponentB",
                 purpose="Test B",
                 scope_description="Test B",
                 required_inputs=["B"],
                 component_type="value_stream",
+                owner_role="Owner",
             ),
         ]
         mock_resolve_gaps.return_value = (
@@ -201,7 +202,7 @@ class TestWorkflowCreate(unittest.TestCase):
             ),
         )
 
-        workflow = Workflow.model_construct(
+        workflow = WorkflowSpec.model_construct(
             name="Test",
             diagram="seq",
             inputs=[inp],
@@ -217,19 +218,19 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_component_class.create.return_value = mock_component_instance
 
         session = self._make_session()
-        result = Workflow.create(
+        result = WorkflowSpec.create(
             process_description="multi-component process",
             session=session,
         )
 
-        self.assertIsInstance(result, Workflow)
+        self.assertIsInstance(result, WorkflowSpec)
         self.assertEqual(mock_component_class.create.call_count, 2)
 
     @patch("workflows.workflow.models.deliverable.Deliverable.generate_from_chat")
     @patch("workflows.workflow.models.resource.Resource.generate_from_chat")
-    @patch("workflows.workflow.workflow.generate_from_chat")
-    @patch("workflows.workflow.workflow._resolve_gaps")
-    @patch.object(Workflow, "_create_diagram")
+    @patch("workflows.workflow.workflow_spec.generate_from_chat")
+    @patch("workflows.workflow.workflow_spec._resolve_gaps")
+    @patch.object(WorkflowSpec, "_create_diagram")
     @patch("workflows.workflow.component.Component")
     def test_component_creation_failure_does_not_abort(
         self,
@@ -251,7 +252,6 @@ class TestWorkflowCreate(unittest.TestCase):
         inp = Resource(
             source="Test",
             format="JSON",
-            trigger_conditions="Test",
             dependencies=[],
             validation_criteria="Test",
         )
@@ -260,7 +260,7 @@ class TestWorkflowCreate(unittest.TestCase):
         out = Deliverable(
             name="Test",
             description="Test",
-            consumer="Test",
+            consumer="Test Consumer",
             format="JSON",
             success_criteria="Test",
             integration_points="Test",
@@ -270,26 +270,29 @@ class TestWorkflowCreate(unittest.TestCase):
         mock_analyze.return_value = [out]
 
         reqs = [
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="Good",
                 purpose="Test",
                 scope_description="Test",
                 required_inputs=["A"],
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="Bad",
                 purpose="Test",
                 scope_description="Test",
                 required_inputs=["B"],
                 component_type="value_stream",
+                owner_role="Owner",
             ),
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="AlsoGood",
                 purpose="Test",
                 scope_description="Test",
                 required_inputs=["C"],
                 component_type="artifact_producing",
+                owner_role="Owner",
             ),
         ]
         mock_resolve_gaps.return_value = (
@@ -303,7 +306,7 @@ class TestWorkflowCreate(unittest.TestCase):
             ),
         )
 
-        workflow = Workflow.model_construct(
+        workflow = WorkflowSpec.model_construct(
             name="Test",
             diagram="seq",
             inputs=[inp],
@@ -321,12 +324,12 @@ class TestWorkflowCreate(unittest.TestCase):
         ]
 
         session = self._make_session()
-        result = Workflow.create(
+        result = WorkflowSpec.create(
             process_description="mixed component process",
             session=session,
         )
 
-        self.assertIsInstance(result, Workflow)
+        self.assertIsInstance(result, WorkflowSpec)
         self.assertEqual(mock_component_class.create.call_count, 3)
 
 

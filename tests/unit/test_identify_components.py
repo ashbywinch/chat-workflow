@@ -1,21 +1,21 @@
-"""Tests for ComponentResponsibilities.identify_from_chat, GapAnalysis.analyze_from_chat,
+"""Tests for ComponentSpec.identify_from_chat, GapAnalysis.analyze_from_chat,
 and _resolve_gaps."""
 
 import unittest
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
-from chat_workflow.atomic_workflow import AtomicWorkflow
+from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
 from chat_workflow.models import AgentIntent, AgentResponse
 from workflows.workflow.models import (
-    ComponentResponsibilities,
+    ComponentSpec,
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
     Resource,
 )
 from workflows.workflow.models.gap_analysis import IntegrationGap
-from workflows.workflow.workflow import _resolve_gaps
+from workflows.workflow.workflow_spec import _resolve_gaps
 
 
 class FakeConfig:
@@ -51,7 +51,6 @@ def _make_inputs() -> list[Resource]:
         Resource(
             source="Customer",
             format="JSON",
-            trigger_conditions="Order placed",
             validation_criteria="Must have items",
         )
     ]
@@ -73,34 +72,35 @@ def _make_outputs() -> list[Deliverable]:
 
 class TestIdentifyComponents(unittest.TestCase):
     def test_has_workflow_attribute(self):
-        self.assertTrue(getattr(ComponentResponsibilities.identify_from_chat, "_is_workflow", False))
+        self.assertTrue(getattr(ComponentSpec.identify_from_chat, "_is_workflow_step", False))
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
-            ComponentResponsibilities.identify_from_chat(
+            ComponentSpec.identify_from_chat(
                 analysis=_make_analysis(),
                 inputs=_make_inputs(),
                 outputs=_make_outputs(),
             )
         self.assertIn("session", str(ctx.exception))
 
-    @patch.object(AtomicWorkflow, "_call_llm")
+    @patch.object(AtomicWorkflowStep, "_call_llm")
     def test_returns_component_requirements(self, mock_call_llm):
         expected = [
-            ComponentResponsibilities(
+            ComponentSpec(
                 name="Order",
                 purpose="Manage orders",
                 required_inputs=["Customer details"],
                 scope_description="description", 
                 component_type="artifact_producing",
+                owner_role="Owner",
             )
         ]
-        mock_call_llm.return_value = AgentResponse[list[ComponentResponsibilities]](
+        mock_call_llm.return_value = AgentResponse[list[ComponentSpec]](
             intent=AgentIntent.SUCCESS,
             result=expected,
         )
         session = _make_session()
-        result = ComponentResponsibilities.identify_from_chat(
+        result = ComponentSpec.identify_from_chat(
             analysis=_make_analysis(),
             inputs=_make_inputs(),
             outputs=_make_outputs(),
@@ -108,12 +108,12 @@ class TestIdentifyComponents(unittest.TestCase):
         )
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
-        self.assertIsInstance(result[0], ComponentResponsibilities)
+        self.assertIsInstance(result[0], ComponentSpec)
 
 
 class TestAnalyzeGaps(unittest.TestCase):
     def test_has_workflow_attribute(self):
-        self.assertTrue(getattr(GapAnalysis.analyze_from_chat, "_is_workflow", False))
+        self.assertTrue(getattr(GapAnalysis.analyze_from_chat, "_is_workflow_step", False))
 
     def test_requires_session(self):
         with self.assertRaises(TypeError) as ctx:
@@ -123,7 +123,7 @@ class TestAnalyzeGaps(unittest.TestCase):
             )
         self.assertIn("session", str(ctx.exception))
 
-    @patch.object(AtomicWorkflow, "_call_llm")
+    @patch.object(AtomicWorkflowStep, "_call_llm")
     def test_returns_gap_analysis(self, mock_call_llm):
         expected = GapAnalysis(
             missing_components=[],
@@ -146,16 +146,17 @@ class TestAnalyzeGaps(unittest.TestCase):
 
 
 class TestResolveGaps(unittest.TestCase):
-    @patch("workflows.workflow.workflow._GapAnalysis.analyze_from_chat")
-    @patch("workflows.workflow.workflow.ComponentResponsibilities.identify_from_chat")
+    @patch("workflows.workflow.workflow_spec._GapAnalysis.analyze_from_chat")
+    @patch("workflows.workflow.workflow_spec.ComponentSpec.identify_from_chat")
     def test_loop_terminates_when_clean(self, mock_identify, mock_analyze):
         """When gaps are clean on first try, loop runs once."""
-        component = ComponentResponsibilities(
+        component = ComponentSpec(
             name="Order",
             purpose="Manage orders",
             required_inputs=["Details"],
             scope_description="description", 
             component_type="artifact_producing",
+            owner_role="Owner",
         )
         mock_identify.return_value = [component]
         mock_analyze.return_value = GapAnalysis(
@@ -167,7 +168,7 @@ class TestResolveGaps(unittest.TestCase):
         )
 
         session = _make_session()
-        session.io.prompt.return_value = ""
+        session.raw_io.prompt.return_value = ""
         components, gaps = _resolve_gaps(
             analysis=_make_analysis(),
             inputs=_make_inputs(),
@@ -176,23 +177,24 @@ class TestResolveGaps(unittest.TestCase):
         )
 
         self.assertEqual(len(components), 1)
-        self.assertIsInstance(components[0], ComponentResponsibilities)
+        self.assertIsInstance(components[0], ComponentSpec)
         self.assertEqual(components[0].name, "Order")
-        self.assertEqual(components[0].scope_description, "Manage orders")
+        self.assertEqual(components[0].scope_description, "description")
         self.assertEqual(len(gaps.missing_components), 0)
         mock_identify.assert_called_once()
         mock_analyze.assert_called_once()
 
-    @patch("workflows.workflow.workflow._GapAnalysis.analyze_from_chat")
-    @patch("workflows.workflow.workflow.ComponentResponsibilities.identify_from_chat")
+    @patch("workflows.workflow.workflow_spec._GapAnalysis.analyze_from_chat")
+    @patch("workflows.workflow.workflow_spec.ComponentSpec.identify_from_chat")
     def test_loop_retries_on_gaps(self, mock_identify, mock_analyze):
         """When gaps exist, loop retries until clean."""
-        component = ComponentResponsibilities(
+        component = ComponentSpec(
             name="Order",
             purpose="Manage orders",
             required_inputs=["Details"],
             scope_description="description", 
             component_type="artifact_producing",
+            owner_role="Owner",
         )
         mock_identify.return_value = [component]
 
@@ -217,7 +219,7 @@ class TestResolveGaps(unittest.TestCase):
         ]
 
         session = _make_session()
-        session.io.prompt.return_value = ""
+        session.raw_io.prompt.return_value = ""
         components, gaps = _resolve_gaps(
             analysis=_make_analysis(),
             inputs=_make_inputs(),
@@ -226,7 +228,7 @@ class TestResolveGaps(unittest.TestCase):
         )
 
         self.assertEqual(len(components), 1)
-        self.assertIsInstance(components[0], ComponentResponsibilities)
+        self.assertIsInstance(components[0], ComponentSpec)
         self.assertEqual(len(gaps.missing_components), 0)
         self.assertEqual(mock_identify.call_count, 2)
         self.assertEqual(mock_analyze.call_count, 2)

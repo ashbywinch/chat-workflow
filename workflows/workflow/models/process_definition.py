@@ -1,62 +1,110 @@
 # ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from chat_workflow import atomic_workflow, composite_workflow
-from chat_workflow.conversation_rules import (
-    LISTENS_FIRST,
-    NO_EXECUTOR_MODE,
-    ONE_GUESS,
-    SYNTHESIZES_HONESTLY,
-    WARM_OPEN,
+from chat_workflow import atomic_workflow_step, composite_workflow_step
+from chat_workflow.conversation_rules import WARM_OPEN
+from chat_workflow.mixins import LLMValidated
+
+_NO_EXECUTOR_MODE: tuple[str, str] = (
+    "No executor mode",
+    "The assistant defines what good looks like — it does not generate "
+    "content or execute the process for the user.",
 )
 
 
-class ProcessDefinition(BaseModel):
+class ProcessDefinition(LLMValidated):
     """Output of the process definition workflow."""
 
-    phases: list[str] = Field(..., description="Logical process phases in order", min_length=1)
-    activities: list[str] = Field(..., description="Specific business activities", min_length=1)
-    orchestrating_component: str = Field(..., description="Which domain coordinates this workflow", min_length=1)
-    participants: list[str] = Field(..., description="All roles/systems involved", min_length=1)
+    _validation_rules: ClassVar[list[str]] = [
+        "Phases are broad stages; activities are concrete steps that can be "
+        "assigned to a component.",
+        "Every activity is concrete enough that a component could own it.",
+        "The orchestrating component is the person or role that keeps the "
+        "work moving. The user's own role is valid when they do the work end "
+        "to end (for example 'Freelance Writer' or 'Meal Planner'). It is not "
+        "the name of the overall process ('Meal Planning', 'Content Creation "
+        "Process'), a generic label ('Manager', 'Coordinator'), or a software "
+        "product the user does not use. A separate coordinator is optional.",
+    ]
+
+    phases: list[str] = Field(..., description="The main stages of the work, in order", min_length=1)
+    activities: list[str] = Field(
+        ..., description="The specific things that happen in those stages", min_length=1
+    )
+    orchestrating_component: str = Field(
+        ...,
+        description=(
+            "The person or role that keeps the work moving; the user's own "
+            "role is valid (for example 'Meal Planner'), the process name "
+            "('Meal Planning') is not"
+        ),
+        min_length=1,
+    )
+    participants: list[str] = Field(
+        ..., description="Everyone involved (people, roles, or systems)", min_length=1
+    )
 
 
-@atomic_workflow(conversation_validation_rules=[WARM_OPEN, LISTENS_FIRST, NO_EXECUTOR_MODE])
+@atomic_workflow_step(conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE])
 def _gather_notes(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
-    """Explore what the user does. Ask once, listen, then summarize.
+    """Greet the user, explain that you are going to understand what they do,
+    then ask "What do you do?".
 
-    "What do you do?" — then listen. If they give enough detail,
-    say "Got it, let me summarize what I heard..." and use success.
-    Never ask about the same thing twice. Stay open-ended.
+    Listen. If they give enough detail — what they do, the main steps, who is
+    involved — send a continue message that summarizes what you heard and asks
+    if it is right. Propose the stages you heard as a short list: 'It sounds
+    like the work has these stages: …' This is a reflection of what they said,
+    not a new structure; do not invent stages they did not mention. Ask for
+    confirmation once. When they confirm, return that summary as success
+    immediately; do not summarize or ask again.
+
+    Stay at the level of how the work happens, not its content. When the user
+    describes their domain (articles, dishes, business ideas), acknowledge
+    briefly then redirect: 'That sounds interesting — let's focus on how the
+    work happens. What are the main stages?' Do NOT join them in discussing
+    their domain content.
+
+    Speak in the user's words. Never say "phases" or "activities" to the user;
+    say "the main stages" and "the things that happen". Never repeat a question
+    the user has already answered; build on their answer instead.
+
+    If the user asks for practical tips or resists the process conversation,
+    acknowledge briefly and continue with one concrete question about how the
+    work happens. Never end in failure while they are still describing their
+    work.
     """
     ...  # type: ignore[reportReturnType]
 
 
-@atomic_workflow(conversation_validation_rules=[ONE_GUESS, SYNTHESIZES_HONESTLY, NO_EXECUTOR_MODE])
+@atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
 def _generate_from_notes(
-    notes: Annotated[str, "The raw notes gathered during exploration"],
+    notes: Annotated[str, "What the person told you"],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Propose a process structure based on what the user described.
+    """You help someone turn what they told you into a structured breakdown.
 
-    Start by proposing the complete structure based on their notes.
-    Suggest the main steps and ask for confirmation — don't ask the
-    user to elaborate on each step individually.
+    The notes below are what the user already told you and confirmed; do not
+    ask them to repeat it or to confirm the same stages again. Start by
+    proposing the complete breakdown based on their notes. Ask only about
+    details the notes do not yet cover — don't ask the user to elaborate on
+    each step individually. If the user doesn't know something, suggest ONE
+    possibility and mark it as a suggestion.
 
-    Use plain language: "steps" or "parts", not "stages" or "phases".
-    Once confirmed, propose the rest one thing at a time.
-    If the user doesn't know something, suggest ONE possibility.
-    Never ask the same question twice. Never fabricate values.
+    With the user, never say "phases" or "activities"; say "the main stages"
+    and "the things that happen".
+
+    When the user confirms the breakdown, return success.
     """
     ...  # type: ignore[reportReturnType]
 
 
-@composite_workflow
+@composite_workflow_step
 def generate_from_chat(
     *,
     session: Annotated[Session, "The chat session"],

@@ -8,18 +8,18 @@ from pydantic import ValidationError
 
 from chat_workflow.mixins import get_blob_fields
 from workflows.workflow.component import Component
-from workflows.workflow.component_responsibilities import ComponentResponsibilities
+from workflows.workflow.component_spec import ComponentSpec
 from workflows.workflow.models import (
     Deliverable,
     GapAnalysis,
     Resource,
 )
-from workflows.workflow.workflow import Workflow
+from workflows.workflow.workflow_spec import WorkflowSpec
 
 
 class TestWorkflowModel(unittest.TestCase):
-    def make_valid_workflow(self) -> Workflow:
-        return Workflow.model_construct(
+    def make_valid_workflow(self) -> WorkflowSpec:
+        return WorkflowSpec.model_construct(
             name="Order Processing Workflow",
             diagram=(
                 "sequenceDiagram\n"
@@ -32,7 +32,6 @@ class TestWorkflowModel(unittest.TestCase):
                 Resource(
                     source="Customer",
                     format="JSON",
-                    trigger_conditions="Order placed",
                     validation_criteria="Must include items",
                 )
             ],
@@ -48,12 +47,13 @@ class TestWorkflowModel(unittest.TestCase):
                 )
             ],
             components=[
-                ComponentResponsibilities(
+                ComponentSpec(
                     name="Order",
                     purpose="Manage orders",
                     scope_description="Manage orders",
                     required_inputs=["Customer details"],
                     component_type="artifact_producing",
+                    owner_role="Owner",
                 )
             ],
             gap_analysis=GapAnalysis(
@@ -73,7 +73,7 @@ class TestWorkflowModel(unittest.TestCase):
         self.assertEqual(len(wf.components), 1)
 
     def test_get_blob_fields_finds_diagram(self):
-        blobs = get_blob_fields(Workflow)
+        blobs = get_blob_fields(WorkflowSpec)
         self.assertIn("diagram", blobs)
         self.assertEqual(blobs["diagram"], ".mmd")
 
@@ -87,14 +87,26 @@ class TestWorkflowModel(unittest.TestCase):
             self.assertEqual(path.suffix, ".mmd")
 
     def test_validation_rules_collected(self):
-        rules = Workflow.collect_all_rules()
+        rules = WorkflowSpec.collect_all_rules()
         # Should include per-field Validation rules AND per-model _validation_rules
-        self.assertTrue(any("sequenceDiagram" in r for r in rules))
         self.assertTrue(any("must be nouns" in r for r in rules))
+
+    def test_participant_naming_is_deterministic(self):
+        good = 'sequenceDiagram\n    participant NoteTaker as "Note Taker: Orchestration"'
+        self.assertEqual(WorkflowSpec._validate_diagram_syntax(good), good)
+
+        with self.assertRaises(ValueError):
+            WorkflowSpec._validate_diagram_syntax(
+                'sequenceDiagram\n    participant You as "You: Orchestration"'
+            )
+        with self.assertRaises(ValueError):
+            WorkflowSpec._validate_diagram_syntax(
+                'sequenceDiagram\n    participant A as "Minutes: Capture the whole meeting"'
+            )
 
     def test_missing_required_field(self):
         with self.assertRaises(ValidationError):
-            Workflow()
+            WorkflowSpec()
 
     def test_gap_analysis_optional(self):
         wf = self.make_valid_workflow()
@@ -111,6 +123,7 @@ class TestComponentModel(unittest.TestCase):
             model_class="Order",
             expert_role="Order Management Expert",
             component_type="artifact_producing",
+            owner_role="Owner",
         )
 
     def test_valid_component(self):
@@ -130,6 +143,7 @@ class TestComponentModel(unittest.TestCase):
             model_class="Invoice",
             expert_role="Billing Expert",
             component_type="artifact_producing",
+            owner_role="Owner",
             execution_complexity="complex",
         )
         self.assertEqual(c.execution_complexity, "complex")

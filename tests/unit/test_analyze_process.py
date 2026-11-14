@@ -1,4 +1,4 @@
-"""Tests for generate_from_chat composite workflow."""
+"""Tests for generate_from_chat composite workflow step."""
 
 import unittest
 from unittest.mock import MagicMock, patch
@@ -26,8 +26,8 @@ def _make_session() -> Session:
 class TestGenerateFromChat(unittest.TestCase):
     def test_has_workflow_attribute(self):
         self.assertTrue(
-            getattr(generate_from_chat, "_is_workflow", False),
-            "generate_from_chat should have _is_workflow=True",
+            getattr(generate_from_chat, "_is_workflow_step", False),
+            "generate_from_chat should have _is_workflow_step=True",
         )
 
     def test_requires_session(self):

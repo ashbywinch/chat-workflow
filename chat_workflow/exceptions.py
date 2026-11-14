@@ -56,13 +56,13 @@ class ValidationError(ChatWorkflowError):
     pass
 
 
-class AtomicWorkflowError(ChatWorkflowError):
-    """Atomic workflow errors."""
+class AtomicWorkflowStepError(ChatWorkflowError):
+    """Atomic workflow step errors."""
 
     pass
 
 
-class TurnLimitExceededError(AtomicWorkflowError):
+class TurnLimitExceededError(AtomicWorkflowStepError):
     """Maximum conversation turns exceeded."""
 
     def __init__(self, max_turns: int):
@@ -70,8 +70,8 @@ class TurnLimitExceededError(AtomicWorkflowError):
         super().__init__(message)
 
 
-class AtomicWorkflowFailedError(AtomicWorkflowError):
-    """LLM indicated the atomic workflow should fail."""
+class AtomicWorkflowStepFailedError(AtomicWorkflowStepError):
+    """LLM indicated the atomic workflow step should fail."""
 
     def __init__(self, reason: str):
         message = f"LLM indicated failure: {reason}"
@@ -118,6 +118,9 @@ class InvalidResponseError(ModelError):
 class MaxRetriesExceededError(ModelError):
     """Maximum retries exceeded for LLM call."""
 
-    def __init__(self, max_retries: int):
+    def __init__(self, max_retries: int, reason: str = ""):
         message = f"Maximum retries ({max_retries}) exceeded for LLM call"
+        if reason:
+            message = f"{message}: {reason}"
         super().__init__(message)
+        self.reason = reason

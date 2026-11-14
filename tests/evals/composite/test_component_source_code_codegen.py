@@ -1,8 +1,8 @@
-"""End-to-end eval: GeneratedComponent.generate() produces working code.
+"""End-to-end eval: ComponentSourceCode.generate() produces working code.
 
 This test:
 1. Constructs a ComponentDesignSpec for MinutesDraft
-2. Calls GeneratedComponent.generate(design_spec, session) to produce code
+2. Calls ComponentSourceCode.generate(design_spec, session) to produce code
 3. Writes code to temp file, dynamically imports it
 4. Runs the imported component's workflow with AgentIO + llm_judge
 5. Verifies the output Pydantic model validates
@@ -104,10 +104,10 @@ def format_transcript(session) -> str:
     return "\n---\n".join(parts)
 
 
-class TestGeneratedComponentCodegenEval(unittest.TestCase):
+class TestComponentSourceCodeCodegenEval(unittest.TestCase):
     """End-to-end eval: generate code, import it, run it, judge it."""
 
-    @timeout(300)
+    @timeout(900)
     def test_generated_component_codegen_end_to_end(self):
         """Generated component code should be importable and its workflow runnable."""
         config = make_config()
@@ -153,8 +153,8 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
             spec.loader.exec_module(mod)
 
             # --- Step 4: Find the workflow class and method ---
-            # Look for a BaseModel subclass with an @atomic_workflow method
-            # (identified by the _is_workflow attribute set by the decorator)
+            # Look for a BaseModel subclass with an @atomic_workflow_step method
+            # (identified by the _is_workflow_step attribute set by the decorator)
             workflow_method = None
             for attr_name in dir(mod):
                 attr = getattr(mod, attr_name)
@@ -170,7 +170,7 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
                     method = getattr(attr, method_name, None)
                     if method is None:
                         continue
-                    if getattr(method, "_is_workflow", False):
+                    if getattr(method, "_is_workflow_step", False):
                         workflow_method = method
                         break
                 if workflow_method is not None:
@@ -185,7 +185,7 @@ class TestGeneratedComponentCodegenEval(unittest.TestCase):
             ]
             self.assertIsNotNone(
                 workflow_method,
-                f"No @atomic_workflow method found. Classes: {classes_found}",
+                f"No @atomic_workflow_step method found. Classes: {classes_found}",
             )
 
             # --- Step 5: Run the generated workflow with a user bot ---

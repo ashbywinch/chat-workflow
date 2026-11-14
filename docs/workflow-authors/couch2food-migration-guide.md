@@ -96,24 +96,24 @@ Each playbook assigns a single expert role responsible for execution. Examples i
 |---|---|
 | AGENT.md (bootloader) | AGENTS.md + workflow discovery in `chat_workflow_cli/cli.py` |
 | DQS Document (quality standard) | Pydantic `BaseModel` -- defines structure, types, validation |
-| Playbook (executable process) | Python function with `@atomic_workflow` or `@composite_workflow` decorator |
-| Business Component (folder with DQS + Playbooks) | Python package under `workflows/` with models + workflow functions |
+| Playbook (executable process) | Python function with `@atomic_workflow_step` or `@composite_workflow_step` decorator |
+| Business Component (folder with DQS + Playbooks) | Python package under `workflows/` with models + workflow steps |
 | Playbook Parameters (required/optional) | Function parameters + `Annotated` descriptions |
 | Return Types | Pydantic return type annotation on the function |
-| Expert Role | System prompt in the workflow function's docstring |
-| Steps (numbered process) | Atomic workflow orchestrated by composite workflow |
+| Expert Role | System prompt in the workflow step's docstring |
+| Steps (numbered process) | Atomic workflow step orchestrated by composite workflow step |
 | DQS Compliance Checklist | Pydantic validators (`min_length`, `ge`, `le`, `@model_validator`) |
 | Related Documents section | Cross-references in `docs/` |
-| Component Index File | `__init__.py` that exports workflow functions for CLI discovery |
-| Composability (playbooks calling playbooks) | Composite workflows calling atomic workflows |
+| Component Index File | `__init__.py` that exports workflow steps for CLI discovery |
+| Composability (playbooks calling playbooks) | Composite workflow steps calling atomic workflow steps |
 
 ### What the Mapping Means in Practice
 
 **DQS to Pydantic Model**: A DQS defines what fields an artifact has, what types they are, what valid ranges exist, and what business rules apply. A Pydantic `BaseModel` does the same thing, but with deterministic enforcement. The `description` parameter in `Field()` carries the "what good looks like" guidance that the prototype encoded in DQS sections. The `ge`, `le`, `min_length`, and `@model_validator` checks replace the validation checklist.
 
-**Playbook to Workflow Function**: A playbook has a purpose, parameters, return types, and steps. A Python function with `@atomic_workflow` has the same structure: the docstring is the purpose (and the system prompt), the function signature is the parameter list, the return type annotation is the return type, and the decorator handles the step-by-step conversation loop.
+**Playbook to Workflow Function**: A playbook has a purpose, parameters, return types, and steps. A Python function with `@atomic_workflow_step` has the same structure: the docstring is the purpose (and the system prompt), the function signature is the parameter list, the return type annotation is the return type, and the decorator handles the step-by-step conversation loop.
 
-**Business Component to Python Package**: A component folder contains a DQS and related playbooks. A Python package under `workflows/` contains a Pydantic model file and workflow function files, exported through `__init__.py`. The CLI discovers packages automatically.
+**Business Component to Python Package**: A component folder contains a DQS and related playbooks. A Python package under `workflows/` contains a Pydantic model file and workflow step files, exported through `__init__.py`. The CLI discovers packages automatically.
 
 **Parameters and Return Types**: In the prototype, parameters reference specific DQS document types (e.g., "Business Idea document conforming to Business Idea DQS"). In chat-workflow, parameters have Python types and `Annotated` descriptions. Return types are Pydantic models. The intent is the same: typed inputs produce validated outputs.
 
@@ -131,11 +131,11 @@ Every playbook in the prototype declares its parameters and return types explici
 
 ### Composability via Orchestration
 
-Playbooks calling playbooks is the same pattern as composite workflows calling atomic workflows. The prototype showed that this pattern works for business processes. Chat-workflow makes it explicit in code with two decorator types: one for atomic conversations, one for orchestration logic.
+Playbooks calling playbooks is the same pattern as composite workflow steps calling atomic workflow steps. The prototype showed that this pattern works for business processes. Chat-workflow makes it explicit in code with two decorator types: one for atomic conversations, one for orchestration logic.
 
 ### Expert Role as Prompt
 
-Each playbook assigns an expert role. In chat-workflow, this goes in the atomic workflow's docstring. It tells the LLM how to behave, what perspective to take, and what kind of questions to ask. This is the simplest and most effective way to shape conversation quality.
+Each playbook assigns an expert role. In chat-workflow, this goes in the atomic workflow step's docstring. It tells the LLM how to behave, what perspective to take, and what kind of questions to ask. This is the simplest and most effective way to shape conversation quality.
 
 ### AI as Computer, Not Technical Writer
 
@@ -147,7 +147,7 @@ This mindset informs how we write prompts: be precise, treat the LLM as a reason
 
 ### Dual-Placement Learning
 
-The prototype's architecture standards describe a pattern where process learnings go in playbooks (for prevention) and validation standards go in DQS documents (for detection). This maps to chat-workflow as: prompt guidance goes in workflow function docstrings (preventing mistakes during generation) and validation rules go in Pydantic models (catching mistakes after generation).
+The prototype's architecture standards describe a pattern where process learnings go in playbooks (for prevention) and validation standards go in DQS documents (for detection). This maps to chat-workflow as: prompt guidance goes in workflow step docstrings (preventing mistakes during generation) and validation rules go in Pydantic models (catching mistakes after generation).
 
 ### Compilable Format
 
@@ -162,8 +162,8 @@ The Engagement Playbook DQS includes a section on "Compilable Format Requirement
 | Process definition | Playbook document (numbered steps) | Decorated Python function (atomic or composite) |
 | Unit of organization | Business Component folder | Python package under `workflows/` |
 | Validation | AI agent interprets DQS checklist | Python enforces types + Pydantic validates |
-| Conversation flow | AI agent reads playbook steps, executes them | `@atomic_workflow` decorator manages LLM conversation |
-| Composability | Playbooks call other playbooks via markdown references | Composite workflows call atomic workflows via function calls |
+| Conversation flow | AI agent reads playbook steps, executes them | `@atomic_workflow_step` decorator manages LLM conversation |
+| Composability | Playbooks call other playbooks via markdown references | Composite workflow steps call atomic workflow steps via function calls |
 | CLI discovery | None (agent reads AGENT.md) | Automatic via `chat_workflow_cli/cli.py` scanning `workflows/` packages |
 | Type safety | Document-level (DQS conformance) | Field-level (Python types, Pydantic validators) |
 
