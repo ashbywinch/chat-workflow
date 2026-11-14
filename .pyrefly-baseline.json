@@ -61,9 +61,9 @@
    "severity": "error"
   },
   {
-   "line": 188,
+   "line": 191,
    "column": 17,
-   "stop_line": 188,
+   "stop_line": 191,
    "stop_column": 32,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -73,9 +73,9 @@
    "severity": "error"
   },
   {
-   "line": 263,
+   "line": 266,
    "column": 32,
-   "stop_line": 263,
+   "stop_line": 266,
    "stop_column": 50,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -85,9 +85,9 @@
    "severity": "error"
   },
   {
-   "line": 275,
+   "line": 278,
    "column": 9,
-   "stop_line": 275,
+   "stop_line": 278,
    "stop_column": 34,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -97,9 +97,9 @@
    "severity": "error"
   },
   {
-   "line": 276,
+   "line": 279,
    "column": 9,
-   "stop_line": 276,
+   "stop_line": 279,
    "stop_column": 22,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -109,9 +109,9 @@
    "severity": "error"
   },
   {
-   "line": 277,
+   "line": 280,
    "column": 9,
-   "stop_line": 277,
+   "stop_line": 280,
    "stop_column": 39,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -121,9 +121,9 @@
    "severity": "error"
   },
   {
-   "line": 304,
+   "line": 307,
    "column": 5,
-   "stop_line": 304,
+   "stop_line": 307,
    "stop_column": 30,
    "path": "chat_workflow/decorators.py",
    "code": -2,

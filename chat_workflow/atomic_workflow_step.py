@@ -248,7 +248,10 @@ class AtomicWorkflowStep(Generic[TResult]):
                 )
             )
         correction = _correction_prompt(failure)
-        self.messages.append({"role": "user", "content": correction})
+        # A correction is a framework instruction, not a user turn. Sending it
+        # as a system message keeps the model from answering the previous
+        # question and ignoring the format requirement.
+        self.messages.append({"role": "system", "content": correction})
         self.events.append(
             TranscriptEvent(
                 type="framework",
