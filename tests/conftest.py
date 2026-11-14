@@ -137,6 +137,17 @@ def make_valid_criteria() -> EvaluationCriteria:
     )
 
 
+def invalid_model(model_cls: type[Any], **fields: Any) -> Any:
+    """Instantiate a model that is expected to FAIL validation.
+
+    Tests pass this to ``assertRaises`` with required fields deliberately
+    omitted. A static checker cannot tell that omission from a bug, so the
+    construction goes through an untyped call and the intent stays at the call
+    site.
+    """
+    return model_cls(**fields)
+
+
 def make_atomic_workflow_step_config(
     response_model_override: type | None = None,
     max_turns: int = 10,
@@ -161,8 +172,8 @@ class MockInstructorClient:
     def __init__(self, responses=None):
         self.responses = responses or []
         self.call_count = 0
-        self.last_call_args = None
-        self.last_call_kwargs = None
+        self.last_call_args: tuple[Any, ...] = ()
+        self.last_call_kwargs: dict[str, Any] = {}
         self.chat = self.MockChatCompletions(self)
 
     class MockChatCompletions:

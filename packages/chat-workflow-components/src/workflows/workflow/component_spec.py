@@ -251,7 +251,9 @@ class ComponentSpec(LLMValidated):
           component's `required_inputs`; the component that produces the first
           artifact needs it.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )
 
 
 from .models.deliverable import Deliverable  # noqa: E402

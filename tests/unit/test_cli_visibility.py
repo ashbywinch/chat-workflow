@@ -6,6 +6,7 @@ are CLI-discoverable based on naming conventions and export rules.
 
 import types
 import unittest
+from typing import Any, cast
 
 from chat_workflow_cli.cli import (
     _discover_class_workflow_methods,
@@ -23,9 +24,9 @@ class TestModuleLevelVisibility(unittest.TestCase):
         def public_wf(context: str = "", max_turns: int = 10):
             pass
 
-        public_wf._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, public_wf)._is_workflow_step = True
 
-        mod.public_wf = public_wf  # type: ignore[attr-defined]
+        cast(Any, mod).public_wf = public_wf
 
         result = discover_workflow_functions(mod)
         self.assertIn("public_wf", result)
@@ -38,15 +39,15 @@ class TestModuleLevelVisibility(unittest.TestCase):
         def public_func():
             pass
 
-        public_func._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, public_func)._is_workflow_step = True
 
         def _private_func():
             pass
 
-        _private_func._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, _private_func)._is_workflow_step = True
 
-        mod.public_func = public_func  # type: ignore[attr-defined]
-        mod._private_func = _private_func  # type: ignore[attr-defined]
+        cast(Any, mod).public_func = public_func
+        cast(Any, mod)._private_func = _private_func
 
         result = discover_workflow_functions(mod)
         self.assertIn("public_func", result)
@@ -97,7 +98,7 @@ class TestClassMethodVisibility(unittest.TestCase):
     def test_mock_private_method_not_discovered(self):
         """A mock private method with _is_workflow_step on an exported class is excluded."""
         mod = types.ModuleType("test_mod")
-        mod.__all__ = ["MyClass"]
+        cast(Any, mod).__all__ = ["MyClass"]
 
         class MyClass:
             pass
@@ -105,16 +106,16 @@ class TestClassMethodVisibility(unittest.TestCase):
         def public_method():
             pass
 
-        public_method._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, public_method)._is_workflow_step = True
 
         def _private_method():
             pass
 
-        _private_method._is_workflow_step = True  # type: ignore[attr-defined]
+        cast(Any, _private_method)._is_workflow_step = True
 
-        MyClass.public_method = staticmethod(public_method)  # type: ignore[attr-defined]
-        MyClass._private_method = staticmethod(_private_method)  # type: ignore[attr-defined]
-        mod.MyClass = MyClass  # type: ignore[attr-defined]
+        cast(Any, MyClass).public_method = staticmethod(public_method)
+        cast(Any, MyClass)._private_method = staticmethod(_private_method)
+        cast(Any, mod).MyClass = MyClass
 
         classes = _discover_class_workflow_methods(mod)
         self.assertIn("MyClass", classes)

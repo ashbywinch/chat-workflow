@@ -13,7 +13,7 @@
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: help setup deps uv-sync install-hooks run test test-unit test-verbose test-all check lint lint-check lint-github typecheck typecheck-update-baseline format coverage docs-check evals evals-test evals-verbose evals-smoke evals-incremental clean
+.PHONY: help setup deps uv-sync install-hooks run test test-unit test-verbose test-all check lint lint-check lint-github typecheck format coverage docs-check evals evals-test evals-verbose evals-smoke evals-incremental clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -45,7 +45,7 @@ help:
 	@echo "  ${GREEN}make docs-check${NC}         Every relative markdown link resolves"
 	@echo "  ${GREEN}make lint${NC}               Check code quality with ruff"
 	@echo "  ${GREEN}make format${NC}             Auto-fix linting issues"
-	@echo "  ${GREEN}make typecheck${NC}          Pyrefly, gated on the committed baseline"
+	@echo "  ${GREEN}make typecheck${NC}          Pyrefly — zero diagnostics allowed"
 	@echo "  ${GREEN}make clean${NC}              Clean up generated files (removes .venv)"
 
 setup: deps install-hooks
@@ -108,13 +108,10 @@ lint-check: deps  # Shared with the pre-commit hook — single source of truth f
 lint-github: deps  # CI only: findings surface as PR annotations
 	@$(RUFF) check packages/ tests/ --output-format=github
 
-# pyrefly + BOTH-direction baseline lock (new errors AND stale entries fail)
+# pyrefly — zero-diagnostic gate. There is no baseline file: every diagnostic
+# must be fixed, so the checker can never drift from the code.
 typecheck: deps
-	@$(PYTHON) scripts/pyrefly-lock.py check --pyrefly-config pyrefly.toml
-
-# After a deliberate diagnostic change, commit the refresh
-typecheck-update-baseline: deps
-	@$(PYTHON) scripts/pyrefly-lock.py update-baseline --pyrefly-config pyrefly.toml
+	@$(PYTHON) -m pyrefly check -c pyrefly.toml
 
 # Auto-fix linting issues
 format: setup

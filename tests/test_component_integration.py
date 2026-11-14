@@ -3,6 +3,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import cast
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
@@ -261,7 +262,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.raw_io.echo.assert_any_call("Exploring domain: MeetingMinutes...")
+            cast(MagicMock, session.raw_io).echo.assert_any_call("Exploring domain: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")
@@ -324,7 +325,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.raw_io.echo.assert_any_call("Designing structure: MeetingMinutes...")
+            cast(MagicMock, session.raw_io).echo.assert_any_call("Designing structure: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")
@@ -388,7 +389,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.raw_io.echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
+            cast(MagicMock, session.raw_io).echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")
@@ -457,7 +458,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 output_dir=Path(tmpdir),
             )
 
-            session.raw_io.echo.assert_any_call("Generating component code: MeetingMinutes...")
+            cast(MagicMock, session.raw_io).echo.assert_any_call("Generating component code: MeetingMinutes...")
 
     @patch("workflows.workflow.component.verify_code")
     @patch.object(ComponentSourceCode, "generate")

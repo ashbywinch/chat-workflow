@@ -160,4 +160,6 @@ class Deliverable(LLMValidated):
         PROPOSE one concrete idea from your domain knowledge — do NOT ask more
         questions or say 'how would you like to structure it'.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )

@@ -128,4 +128,6 @@ class GapAnalysis(LLMValidated):
         "what goes in", "what comes out", "one of the steps", or "the things
         you do". Never use those words as labels.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )

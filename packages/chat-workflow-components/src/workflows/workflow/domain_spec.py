@@ -156,4 +156,6 @@ class ComponentDomainSpec(LLMValidated):
         Return "success" with what you have rather than pressing for a
         complete answer.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )

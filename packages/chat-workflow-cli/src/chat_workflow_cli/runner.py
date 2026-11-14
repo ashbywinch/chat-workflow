@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, override
+
 import typer
 
 from chat_workflow.exceptions import (
@@ -19,10 +21,12 @@ from chat_workflow.session import UserIO
 
 
 class TyperUserIO(UserIO):
+    @override
     def echo(self, message: str) -> None:
         typer.echo(message)
 
-    def prompt(self, label: str, **kwargs: object) -> str:
+    @override
+    def prompt(self, label: str, **kwargs: Any) -> str:
         return typer.prompt(label, **kwargs)
 
 

@@ -95,6 +95,15 @@ Phase 1 deviations, recorded so the later phases are not surprised:
   explicitly, because ruff stops at the nearest `pyproject.toml` and would
   otherwise silently drop the project's rule set; ruff's `known-first-party`
   is named explicitly so import grouping is stable across the `src/` layout.
+- **Type checking has no baseline.** The committed `.pyrefly-baseline.json`
+  and `scripts/pyrefly-lock.py` are gone; `make typecheck` requires zero
+  diagnostics, so a package move can never again re-key a suppression file.
+  The 73 baselined diagnostics were fixed instead: `@override` on real
+  overrides, `setattr` for attributes attached to function objects, `cast`
+  where a Pydantic validator already guarantees the invariant, a float timeout
+  type, `Self` on the Pydantic after-validator, and an `invalid_model()` test
+  helper for the tests that construct models with required fields deliberately
+  omitted.
 - The architecture test was rewritten to scan imports directly. archunitpython
   resolves absolute imports only from the project root (and its parent), so
   under `packages/<name>/src/` every cross-package edge resolved as external
@@ -103,8 +112,9 @@ Phase 1 deviations, recorded so the later phases are not surprised:
   imported top-level module to its layer and adds a guard test that fails if
   the expected cross-package edges disappear. archunitpython is no longer a
   dev dependency.
-- Coverage denominator: 2495 statements before, 2516 after (the path-fix code),
-  91% both — the measured module set is unchanged.
+- Coverage denominator: 2495 statements before, 2520 after (the path fixes and
+  the explicit scaffold bodies), 91% both — the measured module set is
+  unchanged.
 
 ### Phase 2 — Extract `chat-workflow-testing` and de-tangle core tests
 

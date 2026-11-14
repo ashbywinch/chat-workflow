@@ -7,7 +7,7 @@ import inspect
 import typing
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import typer
 
@@ -77,7 +77,9 @@ def _register_command(app: typer.Typer, func_name: str, func: Callable[..., Any]
         runner = WorkflowRunner()
         runner.run(_func, workflow_params)
 
-    run_cmd.__signature__ = inspect.Signature(
+    # A function object's __signature__ is outside FunctionType's declared
+    # attributes; the cast is the supported way to attach it.
+    cast(Any, run_cmd).__signature__ = inspect.Signature(
         parameters=sig_params,
         return_annotation=inspect.Parameter.empty,
     )

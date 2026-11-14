@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
-from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow_step
+from chat_workflow import InteractiveEntity, atomic_workflow_step
 
 
 class Letter(InteractiveEntity):
@@ -10,12 +10,6 @@ class Letter(InteractiveEntity):
 
     to: str = Field(..., description="Who is the letter addressed to")
     body: str = Field(..., description="The body of the letter")
-
-    @model_validator(mode="after")
-    def validate_business_rules(self):
-        if not self.The:
-            raise ValidationError("The letter should flow well and achieve the author's aims")
-        return self
 
     @atomic_workflow_step
     @classmethod

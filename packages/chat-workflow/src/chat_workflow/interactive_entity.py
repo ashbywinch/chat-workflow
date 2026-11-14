@@ -9,7 +9,7 @@ methods that are generated dynamically.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, override
 
 import pydantic
 from pydantic import BaseModel
@@ -45,12 +45,13 @@ class InteractiveEntity(BaseModel):
         except pydantic.ValidationError as e:
             raise ValidationError(str(e)) from e
 
+    @override
     def model_post_init(self, __context: Any) -> None:
         """Enforce _validation_rules after initialization."""
         self._enforce_validation_rules()
 
     def _get_validation_rules(self) -> str:
-        return str(self._validation_rules)
+        return self._validation_rules
 
     def _resolve_field_name(self, name_from_rule: str) -> str | None:
         model_fields = type(self).model_fields

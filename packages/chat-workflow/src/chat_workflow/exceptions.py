@@ -2,6 +2,8 @@
 Custom exceptions for chat-workflow with helpful error messages.
 """
 
+from typing import override
+
 
 class ChatWorkflowError(Exception):
     """Base exception for all chat-workflow errors."""
@@ -10,6 +12,7 @@ class ChatWorkflowError(Exception):
         super().__init__(message)
         self.message = message
 
+    @override
     def __str__(self):
         return self.message if self.message else super().__str__()
 

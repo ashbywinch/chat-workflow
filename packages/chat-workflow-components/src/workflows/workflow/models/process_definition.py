@@ -96,7 +96,9 @@ def _gather_notes(
     work happens. Never end in failure while they are still describing their
     work.
     """
-    ...  # type: ignore[reportReturnType]
+    raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+        "This workflow step is implemented by its decorator"
+    )
 
 
 @atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
@@ -120,7 +122,9 @@ def _generate_from_notes(
 
     When the user confirms the breakdown, return success.
     """
-    ...  # type: ignore[reportReturnType]
+    raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+        "This workflow step is implemented by its decorator"
+    )
 
 
 @composite_workflow_step

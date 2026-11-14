@@ -2,12 +2,13 @@ import copy
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, get_args, get_origin
+from typing import Any, Generic, TypeVar, cast, get_args, get_origin
 
 from .annotations import UserLabel, user_labels
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .conversation_rules import FRAMEWORK_TERMS
 from .debug import _DebugTimer
+from .exceptions import AtomicWorkflowStepFailedError
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
 from .session_log import TranscriptEvent
@@ -67,9 +68,17 @@ class AtomicWorkflowStep(Generic[TResult]):
         self._api_key_env: str | None = config.api_key_env
         self.chat = config.chat
         self.response_model = config.response_model
-        self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_continue
-        self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_success
-        self.on_failure: Callable[[AgentResponse[TResult]], Exception] = config.on_failure
+        # The decorator always supplies these callbacks (they are only optional
+        # on the config so a hand-built config can omit them before setup).
+        self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = cast(
+            Callable[[AgentResponse[TResult]], TurnResult[TResult]], config.on_continue
+        )
+        self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = cast(
+            Callable[[AgentResponse[TResult]], TurnResult[TResult]], config.on_success
+        )
+        self.on_failure: Callable[[AgentResponse[TResult]], AtomicWorkflowStepFailedError] = cast(
+            Callable[[AgentResponse[TResult]], AtomicWorkflowStepFailedError], config.on_failure
+        )
         self.debug = config.debug
         # Typed audit log for this step; folded into the session log when the
         # step finishes so the transcript is structured at the source instead
@@ -126,7 +135,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                 )
             )
             error = self.on_failure(response)
-            error.messages = list(self.messages)  # type: ignore[attr-defined]
+            error.messages = list(self.messages)
             transcript = "".join(
                 f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}" for i, m in enumerate(self.messages)
             )

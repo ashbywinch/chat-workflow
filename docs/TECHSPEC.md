@@ -86,7 +86,7 @@ is an atomic or composite workflow step. Further vocabulary:
 | Cloudflare AI Gateway is the eval/CI provider | Direct OpenRouter/OpenCode keys per repo | R5: one credential, failover, analytics |
 | Instructor JSON mode by default | Forced tool calling | R5: DeepSeek V4 thinking mode rejects forced `tool_choice` |
 | `unittest` for the eval harness | pytest | Evals need module discovery and a wall-clock timeout wrapper |
-| Pyrefly with a both-direction baseline lock | basedpyright, mypy | A large existing codebase; the lock catches new and stale diagnostics |
+| Pyrefly, zero-diagnostic gate | basedpyright, mypy, committed baseline files | No baseline to drift or re-key; a diagnostic is fixed in the code |
 | No server or database | Web service | The library runs in the caller's process |
 
 ## Security and operations

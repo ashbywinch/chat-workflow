@@ -132,7 +132,7 @@ make test-verbose  # Same with verbose output per test
 make evals          # Real-API evals through Cloudflare AI Gateway (~90s)
 make evals-verbose  # Same with verbose output
 make lint           # ruff check
-make typecheck      # pyrefly against the committed baseline
+make typecheck      # pyrefly — zero diagnostics allowed
 make coverage       # Unit tests + coverage.xml
 ```
 

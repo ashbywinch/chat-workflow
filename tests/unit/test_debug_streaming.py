@@ -34,7 +34,7 @@ class TestDebugStreaming(unittest.TestCase):
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
         action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What is your budget?")
-        debug.on_response(action, duration_ms=123.45)
+        debug.on_response(action, duration_ms=123)
 
         output = debug_output.getvalue()
         self.assertIn("LLM RESPONSE", output)

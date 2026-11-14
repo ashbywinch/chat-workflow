@@ -352,10 +352,10 @@ without a check is a wish:
   `target-version` tracks it.
 - **ruff** owns lint + format: `select = ["E","F","I","UP","B","SIM","N"]`,
   `line-length = 120`, double quotes.
-- **pyrefly** owns type checking. `make typecheck` runs
-  `scripts/pyrefly-lock.py` against the committed `.pyrefly-baseline.json`:
-  a NEW error and a STALE baseline entry both fail. Refresh after a
-  deliberate diagnostic change with `make typecheck-update-baseline`.
+- **pyrefly** owns type checking. `make typecheck` runs `pyrefly check`
+  against `pyrefly.toml` and requires **zero diagnostics** — there is no
+  baseline file to re-key or refresh. A diagnostic is fixed in the code; a
+  suppression comment is reserved for a deliberate, documented exception.
 - **Tests** are `python -m unittest` for this repo: the eval suite needs
   module-level discovery and a timeout wrapper, which is the documented
   deviation from the pytest default. Unit tests live under `tests/unit/`

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, get_args, get_origin
+from typing import Any, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -215,8 +215,10 @@ def _setup_atomic_workflow_step(
             max_turns=max_turns,
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message or ""),
+            # AgentResponse validates that a SUCCESS turn carries a result, so
+            # the cast only tells the checker what the model already enforces.
             on_success=lambda response: TurnResult[actual_return_type].success(
-                response.result,
+                cast(Any, response.result),
                 message="Completed successfully!",
             ),
             on_failure=lambda response: AtomicWorkflowStepFailedError(response.message or "No reason given"),
@@ -270,16 +272,19 @@ def atomic_workflow_step(
 
             state = session.state
             actual_return_type = resolve_return_type(raw_func, f, args, kwargs)
+            if actual_return_type is None:
+                raise TypeError(
+                    f"@atomic_workflow_step function '{f.__name__}' must declare a Pydantic model return type"
+                )
 
-            if actual_return_type is not None:
-                origin = get_origin(actual_return_type)
-                if origin is list:
-                    inner_type = get_args(actual_return_type)[0]
-                    if not (isinstance(inner_type, type) and issubclass(inner_type, BaseModel)):
-                        raise TypeError(
-                            f"@atomic_workflow_step function '{f.__name__}' list return type "
-                            f"resolves to list[{inner_type}] which is not a Pydantic model subclass"
-                        )
+            origin = get_origin(actual_return_type)
+            if origin is list:
+                inner_type = get_args(actual_return_type)[0]
+                if not (isinstance(inner_type, type) and issubclass(inner_type, BaseModel)):
+                    raise TypeError(
+                        f"@atomic_workflow_step function '{f.__name__}' list return type "
+                        f"resolves to list[{inner_type}] which is not a Pydantic model subclass"
+                    )
 
             system_prompt = _build_system_prompt(
                 raw_func,
@@ -303,9 +308,11 @@ def atomic_workflow_step(
 
             return result.result
 
-        wrapper._is_workflow_step = True  # pyright: ignore[reportAttributeAccessIssue]
-        wrapper._chat = chat  # pyright: ignore[reportAttributeAccessIssue]
-        wrapper.__conversation_rules__ = merged_rules  # pyright: ignore[reportAttributeAccessIssue]
+        # Attribute tagging on a function object: the cast keeps the checker
+        # out of FunctionType's closed attribute set.
+        cast(Any, wrapper)._is_workflow_step = True
+        cast(Any, wrapper)._chat = chat
+        cast(Any, wrapper).__conversation_rules__ = merged_rules
 
         return wrapper
 
@@ -332,7 +339,7 @@ def composite_workflow_step(func: Callable[..., Any]) -> Callable[..., Any]:
 
         raise TypeError(f"Composite workflow step '{raw_func.__name__}' requires 'session' parameter")
 
-    wrapper._is_workflow_step = True  # pyright: ignore[reportAttributeAccessIssue]
+    cast(Any, wrapper)._is_workflow_step = True
 
     if isinstance(func, classmethod):
         return classmethod(wrapper)

@@ -3,6 +3,7 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import override
 from unittest.mock import MagicMock, patch
 
 from chat_workflow import Session, SessionLog
@@ -29,6 +30,7 @@ class FakeConfig:
 class TestWorkflowIntegration(unittest.TestCase):
     """End-to-end integration test: WorkflowSpec.create() → Component.create() → files."""
 
+    @override
     def setUp(self):
         self.session = Session(
             io=MagicMock(),

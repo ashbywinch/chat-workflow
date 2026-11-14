@@ -99,4 +99,6 @@ class ComponentInteractionContext(BaseModel):
         preference. If the user refuses to engage, return failure. Return
         "continue" for steps 1-4. Return "success" at step 5 only.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )

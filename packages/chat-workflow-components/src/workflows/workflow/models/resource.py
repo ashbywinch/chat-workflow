@@ -153,4 +153,6 @@ class Resource(LLMValidated):
         focus on what you start with. What kind of information goes into
         that?' Do NOT join them in discussing their domain content.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )

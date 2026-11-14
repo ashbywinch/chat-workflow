@@ -4,6 +4,7 @@ import unittest
 
 from pydantic import ValidationError
 
+from tests.conftest import invalid_model
 from workflows.workflow.interaction_context import ComponentInteractionContext
 
 
@@ -92,7 +93,8 @@ class TestComponentInteractionContext(unittest.TestCase):
 
     def test_missing_must_prioritize_raises(self):
         with self.assertRaises(ValidationError):
-            ComponentInteractionContext(
+            invalid_model(
+                ComponentInteractionContext,
                 auto_suggest=["Suggest owners"],
                 tone_preference="Professional",
                 user_pain_points=["Forget attendees"],
@@ -100,7 +102,8 @@ class TestComponentInteractionContext(unittest.TestCase):
 
     def test_missing_auto_suggest_raises(self):
         with self.assertRaises(ValidationError):
-            ComponentInteractionContext(
+            invalid_model(
+                ComponentInteractionContext,
                 must_prioritize=["Ask about decisions"],
                 tone_preference="Professional",
                 user_pain_points=["Forget attendees"],
@@ -108,7 +111,8 @@ class TestComponentInteractionContext(unittest.TestCase):
 
     def test_missing_user_pain_points_raises(self):
         with self.assertRaises(ValidationError):
-            ComponentInteractionContext(
+            invalid_model(
+                ComponentInteractionContext,
                 must_prioritize=["Ask about decisions"],
                 auto_suggest=["Suggest owners"],
                 tone_preference="Professional",

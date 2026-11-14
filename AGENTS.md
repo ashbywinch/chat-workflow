@@ -136,7 +136,7 @@ make evals-verbose  # Same with verbose output
 make coverage       # Unit tests + coverage.xml for CI
 make docs-check     # Every relative markdown link resolves
 make lint           # ruff check
-make typecheck      # pyrefly against the committed baseline
+make typecheck      # pyrefly — zero diagnostics allowed
 ```
 
 ### Evals Cost Rule

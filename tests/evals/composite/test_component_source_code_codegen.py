@@ -9,6 +9,7 @@ This test:
 """
 
 import importlib
+import importlib.util
 import os
 import sys
 import tempfile
@@ -147,6 +148,7 @@ class TestComponentSourceCodeCodegenEval(unittest.TestCase):
             module_name = os.path.splitext(os.path.basename(temp_path))[0]
             spec = importlib.util.spec_from_file_location(module_name, temp_path)
             self.assertIsNotNone(spec, f"Could not create spec for {temp_path}")
+            assert spec is not None and spec.loader is not None
             mod = importlib.util.module_from_spec(spec)
             # Add to sys.modules so imports within the module resolve
             sys.modules[module_name] = mod

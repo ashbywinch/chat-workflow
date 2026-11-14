@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Self, override
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -195,6 +195,7 @@ class LLMValidated(BaseModel):
         return rules
 
     @classmethod
+    @override
     def __pydantic_init_subclass__(cls, **kwargs):
         """Inject ``Validation`` rules into field descriptions for JSON schema.
 
@@ -227,7 +228,7 @@ class LLMValidated(BaseModel):
         """
 
     @model_validator(mode="after")
-    def validate_llm_rules(self) -> BaseModel:
+    def validate_llm_rules(self) -> Self:
         """Call the LLM to check all rules against the current instance.
 
         Uses :func:`chat_workflow.llm_interaction.get_client` to obtain

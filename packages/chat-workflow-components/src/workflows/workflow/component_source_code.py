@@ -653,7 +653,7 @@ def _unresolvable_imports(tree: ast.AST) -> list[str]:
         try:
             if importlib.util.find_spec(path) is None:
                 unresolved.append(path)
-        except (ImportError, ModuleNotFoundError, ValueError):
+        except (ImportError, ValueError):
             unresolved.append(path)
     return unresolved
 
@@ -1289,4 +1289,6 @@ class ComponentSourceCode(LLMValidated):
         docstrings. If the design cannot produce a valid module, return
         failure with the reason.
         """
-        ...  # type: ignore[reportReturnType]
+        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
+            "This workflow step is implemented by its decorator"
+        )
