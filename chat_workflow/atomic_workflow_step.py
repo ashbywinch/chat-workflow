@@ -11,6 +11,11 @@ from .session_log import TranscriptEvent
 
 TResult = TypeVar("TResult")
 
+# A step may return a long generated module or a full structured result. The
+# provider default is often small enough to truncate the JSON mid-string, which
+# looks like a syntax error rather than a token limit.
+_DEFAULT_MAX_TOKENS = 16384
+
 
 @dataclass(frozen=True)
 class ValidationFailure:
@@ -207,6 +212,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                 response_model=self.response_model,
                 max_retries=instructor_retries,
                 timeout=self._request_timeout_seconds,
+                max_tokens=_DEFAULT_MAX_TOKENS,
             )
         timer.emit_response(response)
         return response
@@ -311,6 +317,11 @@ _FAILURE_GUIDANCE: tuple[tuple[tuple[str, ...], str], ...] = (
         ("invalid decimal literal", "expected an indented block"),
         " Write plain ASCII Python: remove Markdown fences, full-width "
         "characters, and non-ASCII punctuation.",
+    ),
+    (
+        ("invalid syntax", "unexpected EOF", "was never closed"),
+        " Check the offending line. If the code ends mid-statement, the "
+        "response was cut off; return a shorter complete module.",
     ),
     (
         ("expected value at line 1 column 1",),
