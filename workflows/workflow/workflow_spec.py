@@ -252,6 +252,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
             gap_analysis=gap_analysis,
             session=session,
         )
+        workflow = _ensure_inputs_consumed(workflow, inputs)
 
         workflow.materialize_blobs(Path(tmp_dir))
         diagram_path = workflow.get_blob_path("diagram")
@@ -435,3 +436,37 @@ def _resolve_gaps(
         existing_components=existing,
         session=session,
     )
+
+
+def _ensure_inputs_consumed(
+    workflow: WorkflowSpec, inputs: list[Resource]
+) -> WorkflowSpec:
+    """Attach every workflow input to at least one component.
+
+    The diagram model is told to do this, but the invariant is mechanical:
+    an unconsumed input belongs to the component that first works on it. Use
+    the first artifact-producing component, or the first component when none
+    is artifact-producing.
+    """
+    if not inputs or not workflow.components:
+        return workflow
+    consumed = {
+        name.casefold()
+        for component in workflow.components
+        for name in component.required_inputs
+    }
+    target = next(
+        (
+            component
+            for component in workflow.components
+            if component.component_type == "artifact_producing"
+        ),
+        workflow.components[0],
+    )
+    for resource in inputs:
+        if resource.source.casefold() in consumed or resource.format.casefold() in consumed:
+            continue
+        if resource.source not in target.required_inputs:
+            target.required_inputs.append(resource.source)
+        consumed.add(resource.source.casefold())
+    return workflow

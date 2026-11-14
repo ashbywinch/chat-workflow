@@ -116,11 +116,13 @@ def _generate_from_notes(
     each step individually. If the user doesn't know something, suggest ONE
     possibility and mark it as a suggestion.
 
-    With the user, never say "phases" or "activities"; say "the main stages"
-    and "the things that happen". If the user says the role that keeps the
-    work moving is "you" or "me", accept it; do not ask for a more specific
-    job title after they answer. Use the user's own words for the role; do not
-    replace "me" with a job title like "Meal Planner".
+    With the user, never say "phases", "activities", "participants", or
+    "orchestrating component"; say "the main stages", "the things that
+    happen", "everyone involved", and "who keeps the work moving". If the
+    user says the role that keeps the work moving is "you" or "me", accept it;
+    do not ask for a more specific job title after they answer. Use the user's
+    own words for the role; do not replace "me" with a job title like "Meal
+    Planner".
 
     Phases are broad stages, such as Plan, Shop, and Cook. Activities are the
     concrete steps inside them, such as check the fridge, write a list, and
