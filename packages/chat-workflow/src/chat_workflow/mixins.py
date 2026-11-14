@@ -238,7 +238,7 @@ class LLMValidated(BaseModel):
         Skips silently when infrastructure is unavailable (no config file
         or API key), so models can be constructed in test environments.
         """
-        from .config import Config
+        from .config import Config, default_config_path
         from .llm_interaction import get_client
 
         # Deterministic first: cheap, precise, and no judge tokens wasted on
@@ -253,7 +253,7 @@ class LLMValidated(BaseModel):
             return self
 
         try:
-            config = Config(Path(__file__).parent.parent / "config.json")
+            config = Config(default_config_path())
         except Exception:
             return self
 

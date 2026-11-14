@@ -21,6 +21,7 @@ from tests.evals.helpers import (
 from workflows.workflow.component_source_code import ComponentSourceCode
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+_COMPONENTS_SRC = _PROJECT_ROOT / "packages" / "chat-workflow-components" / "src"
 
 
 class TestComponentValidationRulesEval(unittest.TestCase):
@@ -317,7 +318,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "component.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class Component", gc.code)
 
@@ -327,7 +328,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "workflow_spec.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "workflow_spec.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class WorkflowSpec", gc.code)
 
@@ -337,7 +338,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_source_code.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "component_source_code.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class ComponentSourceCode", gc.code)
 
@@ -347,7 +348,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "resource.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "models" / "resource.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class Resource", gc.code)
 
@@ -357,7 +358,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "deliverable.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "models" / "deliverable.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class Deliverable", gc.code)
 
@@ -367,7 +368,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "gap_analysis.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "models" / "gap_analysis.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class GapAnalysis", gc.code)
 
@@ -377,7 +378,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "models" / "process_definition.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "models" / "process_definition.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class ProcessDefinition", gc.code)
 
@@ -387,7 +388,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         class _GC(ComponentSourceCode):
             _skip_llm_validation = False
 
-        code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_spec.py").read_text()
+        code = (_COMPONENTS_SRC / "workflows" / "workflow" / "component_spec.py").read_text()
         gc = _GC(code=code)
         self.assertIn("class ComponentSpec", gc.code)
 

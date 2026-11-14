@@ -15,6 +15,10 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 
 ## Key Files
 
+Sources live in a `src/` layout under `packages/`; paths below are relative to
+the owning package's `src/` directory and the module names are unchanged by the
+split.
+
 | File | What |
 |------|------|
 | `chat_workflow/decorators.py` | `@atomic_workflow_step`/`@composite_workflow_step` decorators |

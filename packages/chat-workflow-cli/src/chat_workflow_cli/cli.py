@@ -2,6 +2,7 @@
 """CLI entrypoint with automatic workflow discovery."""
 
 import importlib
+import importlib.util
 import inspect
 import typing
 from collections.abc import Callable
@@ -17,10 +18,17 @@ _INTERNAL_PARAMS = frozenset({"session", "debug"})
 
 
 def discover_workflows() -> dict[str, Path]:
-    workflows_dir = Path(__file__).parent.parent / "workflows"
+    """Locate the installed `workflows` package's component directories.
+
+    The component package is not a declared CLI dependency (discovery moves to
+    the component registry in a later phase); when it is absent, discovery
+    finds nothing, exactly as it did when the sibling directory was missing.
+    """
+    spec = importlib.util.find_spec("workflows")
+    if spec is None or spec.origin is None:
+        return {}
+    workflows_dir = Path(spec.origin).parent
     workflows = {}
-    if not workflows_dir.exists():
-        return workflows
     for item in workflows_dir.iterdir():
         if item.is_dir() and (item / "__init__.py").exists():
             workflows[item.name] = item

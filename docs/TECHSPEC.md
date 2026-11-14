@@ -31,17 +31,22 @@ flowchart TD
 
 ### Layer boundaries (enforced)
 
-`tests/unit/test_architecture.py` asserts, with absolute path globs:
+`tests/unit/test_architecture.py` asserts, by scanning production imports:
 
-- `chat_workflow/` (the core) may not import `workflows/` or
-  `chat_workflow_cli/`.
-- `workflows/` may import the core; it may not import the CLI.
-- `chat_workflow_cli/` is the composition root and may import both.
+- `packages/chat-workflow/src/chat_workflow/` (the core) may not import
+  `workflows/` or `chat_workflow_cli/`.
+- `packages/chat-workflow-components/src/workflows/` may import the core; it
+  may not import the CLI.
+- `packages/chat-workflow-cli/src/chat_workflow_cli/` is the composition root
+  and may import both.
 
 The architecture test encodes the layering as designed now; a deliberate
 layering change updates the test in the same commit.
 
 ## Object model
+
+Paths below are relative to the owning package's `src/` directory
+(`packages/<package>/src/`); module names are unchanged by the package split.
 
 | Concept | Owner | Contract |
 |---|---|---|

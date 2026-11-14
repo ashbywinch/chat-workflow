@@ -5,7 +5,7 @@ from typing import Any
 
 import typer
 
-from chat_workflow.config import Config
+from chat_workflow.config import Config, default_config_path
 from chat_workflow.exceptions import AtomicWorkflowStepFailedError, TurnLimitExceededError
 from chat_workflow.session import Session
 from chat_workflow.session_log import SessionLog
@@ -18,7 +18,7 @@ class WorkflowRunner:
     """Runs a workflow function with framework plumbing (IO, state, config, logging)."""
 
     def __init__(self, config_path: Path | None = None):
-        self.config_path = config_path or (Path(__file__).parent.parent / "config.json")
+        self.config_path = config_path or default_config_path()
 
     def run(
         self,

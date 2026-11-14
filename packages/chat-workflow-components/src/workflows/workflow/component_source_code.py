@@ -300,6 +300,21 @@ def _ruff_executable() -> str | None:
     return shutil.which("ruff")
 
 
+def _ruff_config() -> Path | None:
+    """Find the ruff config generated code is held to.
+
+    The package lives under ``packages/<name>/src/``, so the repo root is not a
+    fixed number of parents away. Ruff stops at the nearest ``pyproject.toml``
+    even when it carries no ``[tool.ruff]`` section, which would silently drop
+    the project's rule set — so pass the nearest config that has one.
+    """
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "pyproject.toml"
+        if candidate.is_file() and "[tool.ruff]" in candidate.read_text(encoding="utf-8"):
+            return candidate
+    return None
+
+
 def _ruff_violations(code: str) -> list[str]:
     """Run ``ruff check`` on the generated module and return its diagnostics.
 
@@ -316,21 +331,24 @@ def _ruff_violations(code: str) -> list[str]:
             if len(line) > 120
         ]
 
-    repo_root = Path(__file__).resolve().parents[2]
+    config = _ruff_config()
+    args = [
+        ruff,
+        "check",
+        "--output-format=concise",
+        "--stdin-filename",
+        "generated_component.py",
+        "-",
+    ]
+    if config is not None:
+        args[1:1] = ["--config", str(config)]
     try:
         proc = subprocess.run(
-            [
-                ruff,
-                "check",
-                "--output-format=concise",
-                "--stdin-filename",
-                "generated_component.py",
-                "-",
-            ],
+            args,
             input=code,
             text=True,
             capture_output=True,
-            cwd=repo_root,
+            cwd=config.parent if config else None,
             timeout=10,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
@@ -352,22 +370,25 @@ def _ruff_fix(code: str) -> str:
     if ruff is None:
         return code
 
-    repo_root = Path(__file__).resolve().parents[2]
+    config = _ruff_config()
+    args = [
+        ruff,
+        "check",
+        "--fix",
+        "--output-format=concise",
+        "--stdin-filename",
+        "generated_component.py",
+        "-",
+    ]
+    if config is not None:
+        args[1:1] = ["--config", str(config)]
     try:
         proc = subprocess.run(
-            [
-                ruff,
-                "check",
-                "--fix",
-                "--output-format=concise",
-                "--stdin-filename",
-                "generated_component.py",
-                "-",
-            ],
+            args,
             input=code,
             text=True,
             capture_output=True,
-            cwd=repo_root,
+            cwd=config.parent if config else None,
             timeout=10,
         )
     except (OSError, subprocess.TimeoutExpired):

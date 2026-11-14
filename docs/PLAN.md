@@ -3,6 +3,13 @@
 Each phase delivers a usable capability on its own; no phase depends on a
 later one.
 
+## Packaging — core/components split
+
+The package layout, dependency rules, and delivery order for separating the
+core from the components live in [PLAN/core-split.md](PLAN/core-split.md).
+Phase 1 (the `packages/` + `src/` move) has landed; the test kit, component
+packages, registry, and CI lanes follow.
+
 ## Phase 0 — Framework skeleton (done)
 
 - **Inputs**: a domain model and a prompt.

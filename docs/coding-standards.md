@@ -367,9 +367,14 @@ without a check is a wish:
 - **Semantic types**: use `pint` for quantities (never bare `float` for
   distances, durations, speeds) and a currency-carrying `Money` type for
   money (never bare `float`/`Decimal` in signatures).
-- **Flat layout**: packages at the repo root (`chat_workflow/`,
-  `chat_workflow_cli/`, `workflows/`), wired through
-  `[tool.setuptools.packages.find]`.
+- **Workspace layout**: installable packages live under `packages/`, each with
+  its own `pyproject.toml` and `src/` tree
+  (`packages/chat-workflow/src/chat_workflow/`,
+  `packages/chat-workflow-cli/src/chat_workflow_cli/`,
+  `packages/chat-workflow-components/src/workflows/`), wired through
+  `[tool.setuptools.packages.find]` with `where = ["src"]`. The root
+  `pyproject.toml` is a virtual workspace (no `[project]`) and holds the shared
+  tool config and dev dependency group.
 - Dev tools live in PEP 735 `[dependency-groups] dev` only — never split
   across `[project.optional-dependencies]`.
 
@@ -377,9 +382,9 @@ without a check is a wish:
 
 ### Prefer flat module structure
 
-Keep modules flat in the `chat_workflow/` directory rather than nesting
-them in subdirectories. Deep nesting hides information and makes imports
-harder to follow.
+Keep modules flat in the core package (`chat_workflow/`, under
+`packages/chat-workflow/src/`) rather than nesting them in subdirectories.
+Deep nesting hides information and makes imports harder to follow.
 
 - `metadata.py` not `utils/introspection.py`
 - `prompt_builder.py` not `prompt/prompt_builder.py`

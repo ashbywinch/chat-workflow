@@ -1,0 +1,22 @@
+[project]
+name = "chat-workflow"
+version = "0.1.0"
+description = "Framework for building structured LLM conversation workflows"
+requires-python = ">=3.12"
+dependencies = [
+    "codegen>=0.57.0",
+    "igraph>=1.0.0",
+    "instructor>=1.15.1",
+    "libcst>=1.8.6",
+    "litellm>=1.58.15",
+    "pydantic>=2.13.3",
+    "python-dotenv>=1.2.2",
+]
+
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["chat_workflow*"]

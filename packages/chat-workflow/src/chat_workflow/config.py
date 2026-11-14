@@ -8,6 +8,23 @@ from typing import Any
 from .llm_interaction import ProviderType
 
 
+def default_config_path() -> Path:
+    """Locate the repo's ``config.json`` without assuming the package depth.
+
+    The package lives under ``packages/<name>/src/``, so the number of parents
+    between this module and the repo root changes when packages move. The
+    nearest ancestor directory that actually holds a ``config.json`` is the
+    answer; when none exists, fall back to the parent of the package directory
+    so the error message still names a sensible path.
+    """
+    module_dir = Path(__file__).resolve().parent
+    for parent in module_dir.parents:
+        candidate = parent / "config.json"
+        if candidate.is_file():
+            return candidate
+    return module_dir.parent / "config.json"
+
+
 class Config:
     """Configuration manager for LLM settings.
 
