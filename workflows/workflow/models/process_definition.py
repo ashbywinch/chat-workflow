@@ -79,7 +79,10 @@ def _gather_notes(
     like the work has these stages: …' This is a reflection of what they said,
     not a new structure; do not invent stages they did not mention. Ask for
     confirmation once. When they confirm, return that summary as success
-    immediately; do not summarize or ask again.
+    immediately; do not summarize or ask again. If they say "anything else?"
+    or ask what comes next, treat it as confirmation and return success. Do
+    not ask who keeps the work moving or who the participants are; the next
+    step asks those. Stop after the summary is confirmed.
 
     Stay at the level of how the work happens, not its content. When the user
     describes their domain (articles, dishes, business ideas), acknowledge

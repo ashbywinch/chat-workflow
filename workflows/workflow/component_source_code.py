@@ -1116,7 +1116,8 @@ class ComponentSourceCode(LLMValidated):
         "The primary model inherits LLMValidated and declares _validation_rules "
         "for the domain's non-deterministic quality criteria. Derive them from "
         "the design spec and domain knowledge; add as many as the domain "
-        "needs, and never invent a rule to satisfy a checker. "
+        "needs, and never invent a rule to satisfy a checker. Cover every "
+        "`what_good_looks_like` criterion with a rule or a validator. "
         "A _validation_rules entry is a rule the judge checks against the "
         "artifact's content, not a structural condition: a rule code can "
         "check ('notes are required when conditions were discussed') belongs "
@@ -1238,6 +1239,10 @@ class ComponentSourceCode(LLMValidated):
         rules as the domain genuinely needs. Every rule must be justified from
         the domain; never invent a rule to satisfy a checker. If the design spec
         and your domain knowledge do not support a rule, do not fabricate one.
+        Every entry in `domain_spec.what_good_looks_like` must be represented by
+        a `_validation_rules` entry or a `@model_validator`; do not drop a
+        quality criterion. If it is not mechanically checkable, express it as a
+        domain-quality rule.
 
         A rule that code can check — "notes are required when conditions were
         discussed" — belongs in a @model_validator, not in _validation_rules.

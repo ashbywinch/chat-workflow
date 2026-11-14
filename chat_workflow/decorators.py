@@ -64,6 +64,8 @@ def _build_task_section(return_type: Any, chat: bool) -> str:
             "the user's domain content. "
             "Ask each question once. Once the user has answered it, accept the "
             "answer and move on; never ask the same substantive question again. "
+            "If the user pushes back on a question or says 'you tell me', never "
+            "ask it again; offer a concrete suggestion and move on. "
             "Match the user's register: if they speak plainly, speak plainly; if "
             "they use specialist terms, use theirs. Never introduce a term for the "
             "output shape, a field, or the framework. This includes 'deliverable', "

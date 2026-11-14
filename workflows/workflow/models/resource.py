@@ -107,13 +107,18 @@ class Resource(LLMValidated):
         complete?" — notes are whatever the user wrote. Even when the user trusts a material as
         sent, the field still needs a check: use a check on the material itself,
         such as 'The invite lists the date, time, and attendees' or 'The agenda
-        covers the topics the organiser sent.' Do not write 'I trust it' as the
-        criterion. Ask the completeness question only where there is something
-        to compare against (a checklist, a recording, a prior version). Ask how they know each such material is complete or
-        usable, in their language. The answer must be something they can check
-        as soon as they have the material, not an outcome like 'no one
-        complains'. A criterion describes the finished material, not the
-        action that produces it: convert 'I recall the meals and list them'
+        covers the topics the organiser sent.' For raw notes, use a minimal
+        check such as 'The notes include the meeting date, the attendees, and at
+        least one decision or action item.' Do not write 'I trust...' in any
+        form as the criterion. Ask the completeness question only where there
+        is something to compare against (a checklist, a recording, a prior
+        version). For each material, propose what it looks like and a likely
+        completeness check from domain knowledge, then ask the user to confirm
+        or correct. Do not ask them to describe the format or the check from
+        scratch. The check must be something they can apply as soon as they
+        have the material, not an outcome like 'no one complains'. A criterion
+        describes the finished material, not the action that produces it:
+        convert 'I recall the meals and list them'
         to 'The list includes every meal I have made that fits my equipment
         and restrictions', and 'I check the fridge' to 'The list matches what
         is in the fridge right now'. 'I have looked at every shelf' is an
@@ -122,9 +127,12 @@ class Resource(LLMValidated):
         looks like when it exists — a list, a document, a spreadsheet, a
         recording, a photo — not the action you take to gather it. 'Visual
         and smell inspection' is an action, not a format; the format is the
-        inventory list or condition notes that result. If they give a method
-        or an outcome, propose the converted check and format in their words
-        and ask them to confirm.
+        inventory list or condition notes that result. If the user says
+        'verbal feedback from the sous', the source is 'The sous' and the
+        format is 'Verbal feedback'; the criterion is 'Every piece of feedback
+        is written on a sticky note or in the feedback log', not 'I cross-check
+        with the sous'. If they give a method or an outcome, propose the
+        converted check and format in their words and ask them to confirm.
         If it comes from another part of their work, note that it depends on
         that; otherwise it stands alone. Ask about completeness once per
         resource; if they answer, accept it and move on. If they say they
@@ -140,7 +148,9 @@ class Resource(LLMValidated):
         from, what it looks like, what it needs first, and, where it applies,
         how they know it is complete. When the user confirms the set, return
         success in that same response; do not summarize the same set again or
-        ask for a second confirmation.
+        ask for a second confirmation. If the user has already confirmed the
+        set in their last message, return success immediately; do not send
+        another summary or ask "Is this right?".
 
         When they ask for ideas, or ask 'what do you think?' or 'suggest a
         format', propose one concrete option in that same reply; do not ask

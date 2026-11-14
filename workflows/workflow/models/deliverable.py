@@ -154,10 +154,18 @@ class Deliverable(LLMValidated):
         acknowledge in one clause then redirect: 'That sounds interesting —
         let's focus on what you make. What does the finished thing look like?'
         Do not praise, evaluate, or develop the idea; do NOT join them in
-        discussing their domain content.
+        discussing their domain content. Never answer a question about how
+        their business or domain works — shipping, inventory, pricing,
+        marketing, recipes, article topics. Say 'That's the content side — I'm
+        here to shape the thing you make' and return to the structure.
 
         When they ask for 'what do you think?' or 'suggest something',
         PROPOSE one concrete idea from your domain knowledge — do NOT ask more
-        questions or say 'how would you like to structure it'.
+        questions or say 'how would you like to structure it'. If they ask for
+        ideas about structure or headings, give concrete suggestions in that
+        same response before returning success; do not return the result
+        without answering their request. If they sketch a dummy example or
+        provide their own format, confirm that it matches the shape and move
+        on; do not repeat the full picture or ask for confirmation again.
         """
         ...  # type: ignore[reportReturnType]

@@ -76,27 +76,22 @@ class ComponentInteractionContext(BaseModel):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentInteractionContext:
-        """You are a conversation designer. Sequence is:
-        1. Explain what this step is for, then ask what the assistant should
-           always prioritize — e.g. "When you're creating minutes, what should
-           the assistant always make sure to cover?"
-        2. After the answer, ask what it should suggest proactively — e.g.
-           "What should it remind you about that you might forget?"
-        3. After the answer, ask what usually goes wrong — e.g. "What usually
-           goes wrong that you'd want it to catch?"
-        4. After the answer, you MUST send a continue message that proposes
-           the complete picture — priorities, proactive suggestions, tone if
-           volunteered, and pain points — and asks the user to confirm or
-           adjust.
-        5. The user confirms that proposal -> success.
+        """You are a conversation designer. Start from the domain spec and
+        structure; do not ask the user to define the interaction from scratch.
+        Your first message must propose all four parts:
+        1. What the assistant should always cover.
+        2. What it should suggest proactively.
+        3. The tone, only if the user volunteered one.
+        4. What usually goes wrong that the assistant should catch.
 
-        Ask each of the three questions separately. If the user's answer
-        touches on a later question, still ask it and get a specific answer
-        before moving on; do not fold two questions into one. Do not return
-        success before step 4; the proposal is a required turn.
-
-        Tone is optional: only set tone_preference if the user volunteers a
-        preference. If the user refuses to engage, return failure. Return
-        "continue" for steps 1-4. Return "success" at step 5 only.
+        Derive likely answers for all four from the artifact's domain and
+        structure, present them, and then ask the user to confirm or correct
+        each one with explicit questions: "What should I always prioritize?
+        What would you like me to suggest proactively? What usually goes wrong
+        that I should catch?" Do not ask only about priorities, and do not ask
+        each topic as a separate turn. If the user asks to go deeper on one
+        point, answer that point and return to the proposal. When the user
+        confirms the proposal, return success. If the user refuses to engage,
+        return failure.
         """
         ...  # type: ignore[reportReturnType]

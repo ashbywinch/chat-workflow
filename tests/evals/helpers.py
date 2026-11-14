@@ -159,8 +159,8 @@ class AgentIO:
                 model=self.config.model,
                 messages=messages,
                 # A reasoning model spends part of its budget on hidden
-                # reasoning; 300 leaves no room for the user's reply.
-                max_tokens=3000,
+                # reasoning; leave enough room for the user's reply after it.
+                max_tokens=8000,
                 temperature=0.7,
             )
 
