@@ -28,6 +28,4 @@ def refine(
     """
     # The decorator replaces this body with the conversation; the prompt above
     # is the whole implementation.
-    raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
-        "This workflow step is implemented by its decorator"
-    )
+    ...

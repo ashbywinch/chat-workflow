@@ -220,9 +220,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         - Name the workflow after the main process or artifact and end with
           "Workflow".
         """
-        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
-            "This workflow step is implemented by its decorator"
-        )
+        ...
 
     @classmethod
     def _create_diagram(

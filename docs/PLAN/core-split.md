@@ -99,11 +99,18 @@ Phase 1 deviations, recorded so the later phases are not surprised:
   and `scripts/pyrefly-lock.py` are gone; `make typecheck` requires zero
   diagnostics, so a package move can never again re-key a suppression file.
   The 73 baselined diagnostics were fixed instead: `@override` on real
-  overrides, `setattr` for attributes attached to function objects, `cast`
-  where a Pydantic validator already guarantees the invariant, a float timeout
-  type, `Self` on the Pydantic after-validator, and an `invalid_model()` test
-  helper for the tests that construct models with required fields deliberately
-  omitted.
+  overrides, `cast(Any, f).attr` for attributes attached to function objects,
+  `cast` where a Pydantic validator already guarantees the invariant, a float
+  timeout type, `Self` on the Pydantic after-validator, and an `invalid_model()`
+  test helper for the tests that construct models with required fields
+  deliberately omitted.
+- **Prompt-only bodies stay `...`.** An `@atomic_workflow_step` function is a
+  declaration: its docstring is the conversation and its return annotation is
+  the result model. pyrefly accepts a lone ellipsis as the body and rejects
+  `pass`, a bare docstring, or `...` followed by `pass` — so the 14
+  `# type: ignore[reportReturnType]` comments were unnecessary pyright
+  leftovers and are gone, and `refine.py`'s trailing `pass` was the one real
+  diagnostic. The author guide now teaches `...` instead of `pass`.
 - The architecture test was rewritten to scan imports directly. archunitpython
   resolves absolute imports only from the project root (and its parent), so
   under `packages/<name>/src/` every cross-package edge resolved as external

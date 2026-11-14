@@ -88,9 +88,7 @@ class EvaluationCriteria(LLMValidated):
           confirmation, then return success.
         - If the user refuses to provide useful information, use intent="failure".
         """
-        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
-            "This workflow step is implemented by its decorator"
-        )
+        ...
 
     @model_validator(mode="after")
     def validate_business_rules(self):

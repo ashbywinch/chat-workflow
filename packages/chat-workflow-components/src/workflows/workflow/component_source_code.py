@@ -1289,6 +1289,4 @@ class ComponentSourceCode(LLMValidated):
         docstrings. If the design cannot produce a valid module, return
         failure with the reason.
         """
-        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
-            "This workflow step is implemented by its decorator"
-        )
+        ...

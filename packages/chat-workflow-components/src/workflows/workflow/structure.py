@@ -130,6 +130,4 @@ class ComponentStructure(BaseModel):
         language and restate the pending proposal. Use "continue" to propose,
         "success" when the user confirms all. When confirmed, move on.
         """
-        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
-            "This workflow step is implemented by its decorator"
-        )
+        ...

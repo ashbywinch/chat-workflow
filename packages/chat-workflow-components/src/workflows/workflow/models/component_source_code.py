@@ -90,6 +90,4 @@ class ComponentSourceCode(LLMValidated):
 
         Output format: Return ONLY the Python code as a string in the 'code' field.
         """
-        raise NotImplementedError(  # pragma: no cover - the decorator supplies the body
-            "This workflow step is implemented by its decorator"
-        )
+        ...

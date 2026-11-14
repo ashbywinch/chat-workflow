@@ -8,7 +8,7 @@ The library provides two decorators for authoring workflow steps:
 
 ### `@atomic_workflow_step` - Auto-orchestrated leaf functions
 
-Use `@atomic_workflow_step` on functions that directly interact with the LLM. The function body is a `pass` stub, and the decorator handles everything.
+Use `@atomic_workflow_step` on functions that directly interact with the LLM. The docstring is the conversation prompt and the decorator handles everything: it reads the signature for parameters and the return annotation for the result model, runs the conversation, and returns the validated object. The body is a single `...` (Ellipsis) — never `pass`. The ellipsis is the honest placeholder for a declaration whose implementation is the prompt, and the type checker accepts it as the declared-return body while rejecting `pass`.
 
 ```python
 from chat_workflow import atomic_workflow_step
@@ -18,7 +18,7 @@ def generate_essay_from_topic(
     topic: Topic
 ) -> Essay:
     """You are a helpful essay writing tutor. Facilitate the user in writing a great essay on the given topic. Help them develop their essay writing skills as they go."""
-    pass
+    ...
 ```
 
 **How it works:**
@@ -164,14 +164,14 @@ from chat_workflow import atomic_workflow_step, composite_workflow_step, Session
 @atomic_workflow_step
 def gather_requirements(session: Session) -> Requirements:
     """Help the user articulate their requirements through guided questions."""
-    pass
+    ...
 
 @atomic_workflow_step
 def generate_specification(
     requirements: Requirements, session: Session
 ) -> Specification:
     """Transform requirements into a structured specification."""
-    pass
+    ...
 
 @composite_workflow_step
 def build_specification(
@@ -274,7 +274,7 @@ def refine(
     max_turns: Annotated[int, "Maximum refinement turns"] = 5,
 ) -> ModelType:
     """System prompt for refinement..."""
-    pass
+    ...
 ```
 
 The `@atomic_workflow_step` decorator resolves the `TypeVar` to the concrete type passed as `initial_object` at runtime.
@@ -336,7 +336,7 @@ def generate_data(
     
     Guide them through defining title, description, and priority.
     Use clarifying questions to ensure quality data."""
-    pass
+    ...
 
 # Generic refinement function
 ModelType = TypeVar("ModelType", bound=BaseModel)
@@ -349,7 +349,7 @@ def refine_data(
     """Review and improve the provided object.
     
     Ask questions to help the user enhance clarity, completeness, and quality."""
-    pass
+    ...
 
 # Composite workflow step
 @composite_workflow_step
