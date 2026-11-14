@@ -160,8 +160,10 @@ class AtomicWorkflowStep(Generic[TResult]):
                     self.debug.on_error(exc)
                 raise
 
-            failure = self._language_failure(response) or self._vocabulary_failure(
-                response
+            failure = (
+                self._language_failure(response)
+                or self._vocabulary_failure(response)
+                or self._repetition_failure(response)
             )
             if failure is not None:
                 if attempt >= self._validation_corrections:
@@ -248,6 +250,27 @@ class AtomicWorkflowStep(Generic[TResult]):
             kind="language_correction",
         )
 
+    def _repetition_failure(
+        self, response: AgentResponse[TResult]
+    ) -> ValidationFailure | None:
+        """Reject a confirmation question the user has already answered."""
+        message = response.message or ""
+        last_user = _last_user_message(self.messages)
+        if not _is_confirmation(last_user) or not _is_confirmation_question(message):
+            return None
+        return ValidationFailure(
+            reason=(
+                "The user already confirmed. Do not ask the same confirmation "
+                "question again."
+            ),
+            guidance=(
+                "Return success with the result you have, or ask a genuinely "
+                "new question."
+            ),
+            rejected_text=message,
+            kind="repetition_correction",
+        )
+
     def _vocabulary_failure(
         self, response: AgentResponse[TResult]
     ) -> ValidationFailure | None:
@@ -259,6 +282,8 @@ class AtomicWorkflowStep(Generic[TResult]):
         user_text = _user_text(self.messages)
         candidates: dict[str, UserLabel] = {}
         for name, label in labels.items():
+            if not label.guard:
+                continue
             candidates[name] = label
             for alias in label.aliases:
                 candidates[alias] = label
@@ -383,6 +408,78 @@ def _user_text(messages: list[dict[str, Any]]) -> str:
     )
 
 
+def _last_user_message(messages: list[dict[str, Any]]) -> str:
+    """The last real user turn, excluding framework corrections."""
+    for message in reversed(messages):
+        if message.get("role") != "user":
+            continue
+        content = message.get("content") or ""
+        if not content.lstrip().startswith("[framework]"):
+            return content
+    return ""
+
+
+def _is_confirmation(text: str) -> bool:
+    """True for a short, unqualified yes — not a yes with a caveat."""
+    normalised = re.sub(r"[^a-z0-9' ]+", "", text.strip().lower()).strip()
+    if not normalised:
+        return False
+    caveat = ("but", "however", "except", "actually", "one thing", "although")
+    if any(word in normalised.split() for word in caveat):
+        return False
+    affirmatives = (
+        "yes",
+        "yeah",
+        "yep",
+        "yup",
+        "exactly",
+        "correct",
+        "right",
+        "sure",
+        "perfect",
+        "agreed",
+        "that's right",
+        "that is right",
+        "that's accurate",
+        "that is accurate",
+        "sounds right",
+        "that sounds right",
+        "that's it",
+        "that is it",
+    )
+    if normalised in affirmatives:
+        return True
+    if normalised.startswith(("yes ", "yeah ", "yep ")):
+        return any(
+            phrase in normalised
+            for phrase in ("exactly", "right", "correct", "perfect", "that's it")
+        )
+    return False
+
+
+def _is_confirmation_question(text: str) -> bool:
+    """True when the assistant asks the user to confirm the same picture."""
+    normalised = text.strip().lower()
+    phrases = (
+        "does that match",
+        "does this match",
+        "does that sound",
+        "does this sound",
+        "is that right",
+        "is this right",
+        "does that work",
+        "does this work",
+        "sound right",
+        "sound good",
+        "anything you'd like to adjust",
+        "anything you want to change",
+        "anything you'd change",
+        "shall we",
+        "should we",
+    )
+    return any(phrase in normalised for phrase in phrases)
+
+
 def _mentions(text: str, term: str) -> bool:
     """Match a term across spaces, underscores, and hyphens, on word boundaries."""
     parts = [part for part in re.split(r"[\s_-]+", term) if part]
@@ -461,7 +558,11 @@ def _validation_failure(exc: Exception) -> ValidationFailure | None:
 
 def _correction_prompt(failure: ValidationFailure) -> str:
     """The framework turn that tells the model how to repair its response."""
-    if failure.kind in ("language_correction", "vocabulary_correction"):
+    if failure.kind in (
+        "language_correction",
+        "vocabulary_correction",
+        "repetition_correction",
+    ):
         return f"[framework] {failure.message()}"
     return (
         "[framework] Your previous response was rejected by validation. "

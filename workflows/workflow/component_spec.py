@@ -73,7 +73,7 @@ class ComponentSpec(LLMValidated):
 
     name: Annotated[
         str,
-        UserLabel("what you call it", "name"),
+        UserLabel("what you call it", "name", guard=False),
     ] = Field(
         ...,
         description=(
@@ -84,7 +84,7 @@ class ComponentSpec(LLMValidated):
     )
     purpose: Annotated[
         str,
-        UserLabel("what it is for", "purpose"),
+        UserLabel("what it is for", "purpose", guard=False),
     ] = Field(
         ...,
         description=(
@@ -190,8 +190,9 @@ class ComponentSpec(LLMValidated):
 
         The user has described what they make, what they need to start, and
         how the work happens. Now help them identify the distinct components
-        that make up the work. Start by saying in one sentence what you are
-        doing, for example 'Let me check what I have understood so far.'
+        that make up the work. Begin your first message with one sentence that
+        states what you are doing and why, for example 'Let me check what I
+        have understood so far', before any proposal.
 
         The components in `existing_components` have already been identified.
         Include them in your proposal, and add any component that is needed but
@@ -214,8 +215,12 @@ class ComponentSpec(LLMValidated):
         - For each component, say what it is accountable for end to end, and
           what it covers and does not cover, in the user's words. Name at
           least one thing it does not do; naming the adjacent component's
-          work is enough. Write a short paragraph per component; never a
-          labelled list such as 'Name:', 'Purpose:', 'Type:'.
+          work is enough. Describe the purpose as the work it does from start
+          to end, not as a list of fields. BAD: 'Meeting minutes with title,
+          date, attendees, agenda items...' GOOD: 'Turns raw notes into the
+          final minutes, with decisions and action items'. Write a short
+          paragraph per component; never a labelled list such as 'Name:',
+          'Purpose:', 'Type:'.
         - For each component, propose the role or capacity it belongs to,
           using domain knowledge: a cleaning sign-off sheet usually belongs to
           the Maintenance Manager or Facilities Lead; minutes to the meeting

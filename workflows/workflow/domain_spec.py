@@ -57,13 +57,13 @@ class ComponentDomainSpec(LLMValidated):
         "The expert_role is the agent's domain expertise — the role the agent "
         "acts as when helping with this artifact. It may equal the owner_role "
         "or name a specialist helping the owner. It is not a generic label "
-        "('Reviewer', 'Expert', 'Analyst') and not the person who supplies the "
-        "input unless they are that specialist.",
+        "('Reviewer', 'Expert', 'Analyst', 'Assistant', 'Helper') and not the "
+        "person who supplies the input unless they are that specialist.",
     ]
 
     name: Annotated[
         str,
-        UserLabel("what you call it", "name"),
+        UserLabel("what you call it", "name", guard=False),
     ] = Field(
         ...,
         description="Matches ComponentSpec.name — the artifact name",
@@ -72,7 +72,7 @@ class ComponentDomainSpec(LLMValidated):
 
     description: Annotated[
         str,
-        UserLabel("what it is", "description"),
+        UserLabel("what it is", "description", guard=False),
     ] = Field(
         ...,
         description="What this artifact represents in the user's domain",
@@ -105,7 +105,8 @@ class ComponentDomainSpec(LLMValidated):
         description=(
             "The agent's domain expertise — the role the agent acts as when "
             "helping with this artifact. It may equal the owner_role or be a "
-            "specialist helping the owner."
+            "specialist helping the owner. Name a specific domain role, not "
+            "'Assistant' or 'Helper'."
         ),
         min_length=1,
     )
@@ -139,8 +140,9 @@ class ComponentDomainSpec(LLMValidated):
         Only after the user has responded to the field list, confirm the
         expertise in plain language: "Would it help if I focused on structuring
         the highlights?" The expertise is your choice, inferred from the
-        artifact; never ask the user to choose a job title or ask "what title
-        should I act as?" For meeting minutes, the owner is the meeting
+        artifact; name a specific domain expertise, not "assistant" or
+        "helper", and never ask the user to choose a job title or ask "what
+        title should I act as?" For meeting minutes, the owner is the meeting
         organizer or chair; a scribe records the notes, which is neither the
         owner nor the assistant's expertise. If the user offers a sample or
         moves to the next practical step, accept and follow it; do not divert

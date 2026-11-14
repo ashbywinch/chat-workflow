@@ -119,7 +119,13 @@ def _generate_from_notes(
     With the user, never say "phases" or "activities"; say "the main stages"
     and "the things that happen". If the user says the role that keeps the
     work moving is "you" or "me", accept it; do not ask for a more specific
-    job title after they answer.
+    job title after they answer. Use the user's own words for the role; do not
+    replace "me" with a job title like "Meal Planner".
+
+    Phases are broad stages, such as Plan, Shop, and Cook. Activities are the
+    concrete steps inside them, such as check the fridge, write a list, and
+    buy groceries. Do not use the same concrete step as both a phase and an
+    activity. `participants` is required: the user plus anyone else involved.
 
     When the user confirms the breakdown, return success.
     """

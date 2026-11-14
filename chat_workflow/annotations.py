@@ -54,11 +54,17 @@ class UserLabel:
                 str,
                 UserLabel("where it comes from", "source"),
             ]
+
+    A common English word (``name``, ``format``, ``description``) can set
+    ``guard=False``: the prompt still suggests the phrase, but the guard does
+    not reject the word when it is ordinary language rather than schema
+    leakage.
     """
 
-    def __init__(self, phrase: str, *aliases: str):
+    def __init__(self, phrase: str, *aliases: str, guard: bool = True):
         self.phrase = phrase
         self.aliases = aliases
+        self.guard = guard
 
 
 def user_labels(model: object) -> dict[str, UserLabel]:

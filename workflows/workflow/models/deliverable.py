@@ -35,7 +35,7 @@ class Deliverable(LLMValidated):
 
     name: Annotated[
         str,
-        UserLabel("what you call it", "name"),
+        UserLabel("what you call it", "name", guard=False),
     ] = Field(
         ...,
         description="What the person calls what they make, e.g. 'Meeting Minutes', 'Invoice PDF'",
@@ -43,7 +43,7 @@ class Deliverable(LLMValidated):
     )
     description: Annotated[
         str | None,
-        UserLabel("what it is", "description"),
+        UserLabel("what it is", "description", guard=False),
     ] = Field(
         default=None,
         description="Plain-English description of what it contains — "
@@ -60,7 +60,7 @@ class Deliverable(LLMValidated):
     )
     format: Annotated[
         str,
-        UserLabel("what it looks like", "format"),
+        UserLabel("what it looks like", "format", guard=False),
     ] = Field(
         ...,
         description="Its exact shape or layout (e.g. 'one-page PDF', 'shared spreadsheet')",
@@ -114,10 +114,11 @@ class Deliverable(LLMValidated):
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Deliverable]:
         """Help someone describe what they make. Say in one sentence what you
-        are doing, then reflect back what they said. If they name something
-        common (meeting minutes, invoices), propose its standard shape
-        immediately as a draft for confirmation — do not ask who it is for
-        before offering the shape.
+        are doing, then reflect back what they said. Say "make" or "cook"
+        unless the user uses "produce"; never open with "what do you produce".
+        If they name something common (meeting minutes, invoices), propose its
+        standard shape immediately as a draft for confirmation — do not ask
+        who it is for before offering the shape.
 
         Never use failure because the user says they make nothing. Find the
         artifact in their routine — a plan, a list, a schedule, a document —
@@ -139,7 +140,11 @@ class Deliverable(LLMValidated):
         and due date, the attendee list is complete) and ask them to confirm.
 
         Ask each question once. When the user answers, accept the answer and
-        move on; never ask the same substantive question again.
+        move on; never ask the same substantive question again. Make one pass:
+        once you have the name, who it is for, what it looks like, how they
+        know it is good, who gets it next, and where it is kept, return
+        success. If the user adds a detail, incorporate it and return success;
+        do not ask for another confirmation.
 
         When you summarize or confirm, describe the thing they make in the
         user's words. Never use 'name', 'description', 'consumer', 'format',

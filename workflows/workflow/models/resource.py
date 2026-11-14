@@ -38,13 +38,13 @@ class Resource(LLMValidated):
 
     source: Annotated[
         str,
-        UserLabel("where it comes from", "source"),
+        UserLabel("where it comes from", "source", guard=False),
     ] = Field(
         ..., description="Where it comes from (a person, system, document, or place)", min_length=1
     )
     format: Annotated[
         str,
-        UserLabel("what it looks like", "format"),
+        UserLabel("what it looks like", "format", guard=False),
     ] = Field(
         ...,
         description=(

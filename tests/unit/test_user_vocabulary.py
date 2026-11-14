@@ -86,5 +86,34 @@ class TestVocabularyGuard(unittest.TestCase):
         self.assertIsNone(step._vocabulary_failure(_continue("Let's map your workflow.")))
 
 
+class TestRepetitionGuard(unittest.TestCase):
+    def test_confirmation_question_after_yes_is_rejected(self):
+        step = _step()
+        step.messages.append({"role": "user", "content": "Yes, exactly."})
+
+        failure = step._repetition_failure(
+            _continue("Does that match your picture?")
+        )
+
+        assert failure is not None
+        self.assertIn("already confirmed", failure.reason)
+
+    def test_a_new_question_after_yes_is_allowed(self):
+        step = _step()
+        step.messages.append({"role": "user", "content": "Yes, exactly."})
+
+        self.assertIsNone(
+            step._repetition_failure(_continue("What should I do next?"))
+        )
+
+    def test_yes_with_a_caveat_is_not_a_confirmation(self):
+        step = _step()
+        step.messages.append({"role": "user", "content": "Yes, but I have one change."})
+
+        self.assertIsNone(
+            step._repetition_failure(_continue("Does that match your picture?"))
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
