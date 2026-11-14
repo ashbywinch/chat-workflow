@@ -25,6 +25,8 @@ class AtomicWorkflowStepConfig(Generic[TResult]):
     debug: StreamingDebug | None = None
     model: str = "default-model"
     provider: ProviderType = "openrouter"
+    api_base: str | None = None
+    api_key_env: str | None = None
     max_retries: int = 3
     # How many times to feed a validation failure back to the model and retry
     # the call within one turn. Instructor's own retry loop does not reask for

@@ -114,10 +114,12 @@ class Config:
 
     @property
     def api_base(self) -> str | None:
+        """Custom API base URL (e.g. https://opencode.ai/zen/go/v1). None = provider default."""
         return self._config_data["llm"].get("api_base")
 
     @property
     def api_key_env(self) -> str | None:
+        """Environment variable holding the API key. None = provider default (e.g. OPENAI_API_KEY)."""
         return self._config_data["llm"].get("api_key_env")
 
     @property

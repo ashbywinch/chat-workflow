@@ -38,8 +38,9 @@ def get_client(
     """Get an instructor-patched LLM client for *provider*.
 
     The API key is read from the corresponding environment variable
-    (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``), unless
-    *api_key_env* is given, in which case that env var is used instead.
+    (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``); override with
+    ``api_key_env``. A custom endpoint can be set with ``api_base``
+    (e.g. ``https://opencode.ai/zen/go/v1`` for opencode-go models).
 
     When *api_base* is given it is set as the provider-specific
     ``OPENAI_API_BASE`` (or ``<PROVIDER>_API_BASE``) environment

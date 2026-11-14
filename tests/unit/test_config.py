@@ -92,8 +92,10 @@ class TestConfig(unittest.TestCase):
     def test_all_properties_from_config(self):
         data = {
             "llm": {
-                "provider": "openrouter",
-                "model": "openrouter/google/gemini-2.0-flash-lite-001",
+                "provider": "openai",
+                "model": "openai/deepseek-v4-flash",
+                "api_base": "https://opencode.ai/zen/go/v1",
+                "api_key_env": "OPENCODE_GO_EVALS_API_KEY",
                 "temperature": 0.3,
                 "max_retries": 5,
                 "request_timeout_seconds": 60,
@@ -103,12 +105,23 @@ class TestConfig(unittest.TestCase):
         temp_path = self._write_temp_config(data)
         try:
             cfg = Config(Path(temp_path))
-            self.assertEqual(cfg.provider, "openrouter")
-            self.assertEqual(cfg.model, "openrouter/google/gemini-2.0-flash-lite-001")
+            self.assertEqual(cfg.provider, "openai")
+            self.assertEqual(cfg.model, "openai/deepseek-v4-flash")
+            self.assertEqual(cfg.api_base, "https://opencode.ai/zen/go/v1")
+            self.assertEqual(cfg.api_key_env, "OPENCODE_GO_EVALS_API_KEY")
             self.assertEqual(cfg.temperature, 0.3)
             self.assertEqual(cfg.max_retries, 5)
             self.assertEqual(cfg.request_timeout_seconds, 60)
             self.assertTrue(cfg.model_supports_tools)
+        finally:
+            os.unlink(temp_path)
+
+    def test_api_base_and_key_env_default_to_none(self):
+        temp_path = self._write_temp_config({"llm": {"provider": "openai", "model": "gpt-4"}})
+        try:
+            cfg = Config(Path(temp_path))
+            self.assertIsNone(cfg.api_base)
+            self.assertIsNone(cfg.api_key_env)
         finally:
             os.unlink(temp_path)
 

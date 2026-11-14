@@ -50,6 +50,8 @@ class TestRealAPI(unittest.TestCase):
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
+                api_base=_CONFIG.api_base,
+                api_key_env=_CONFIG.api_key_env,
                 max_retries=_CONFIG.max_retries,
                 request_timeout_seconds=_CONFIG.request_timeout_seconds,
                 initial_messages=[
@@ -139,6 +141,8 @@ class TestRealAPI(unittest.TestCase):
                 max_turns=3,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
+                api_base=_CONFIG.api_base,
+                api_key_env=_CONFIG.api_key_env,
                 max_retries=_CONFIG.max_retries,
                 request_timeout_seconds=_CONFIG.request_timeout_seconds,
                 initial_messages=[
@@ -226,6 +230,8 @@ class TestRealAPI(unittest.TestCase):
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
+                api_base=_CONFIG.api_base,
+                api_key_env=_CONFIG.api_key_env,
                 max_retries=_CONFIG.max_retries,
                 request_timeout_seconds=_CONFIG.request_timeout_seconds,
                 initial_messages=[
