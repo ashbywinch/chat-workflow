@@ -337,69 +337,21 @@
    "severity": "error"
   },
   {
-   "line": 54,
+   "line": 56,
    "column": 41,
-   "stop_line": 54,
+   "stop_line": 56,
    "stop_column": 72,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
    "name": "bad-argument-type",
    "description": "Argument `float` is not assignable to parameter `request_timeout_seconds` with type `int` in function `chat_workflow.atomic_workflow_step_config.AtomicWorkflowStepConfig.__init__`",
    "concise_description": "Argument `float` is not assignable to parameter `request_timeout_seconds` with type `int` in function `chat_workflow.atomic_workflow_step_config.AtomicWorkflowStepConfig.__init__`",
-   "severity": "error"
-  },
-  {
-   "line": 61,
-   "column": 86,
-   "stop_line": 61,
-   "stop_column": 100,
-   "path": "tests/evals/single/test_real_api.py",
-   "code": -2,
-   "name": "bad-argument-type",
-   "description": "Argument `str | None` is not assignable to parameter `message` with type `str` in function `chat_workflow.models.TurnResult.continuing`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
-   "concise_description": "Argument `str | None` is not assignable to parameter `message` with type `str` in function `chat_workflow.models.TurnResult.continuing`",
-   "severity": "error"
-  },
-  {
-   "line": 62,
-   "column": 82,
-   "stop_line": 62,
-   "stop_column": 95,
-   "path": "tests/evals/single/test_real_api.py",
-   "code": -2,
-   "name": "bad-argument-type",
-   "description": "Argument `EvaluationCriteria | None` is not assignable to parameter `result` with type `EvaluationCriteria` in function `chat_workflow.models.TurnResult.success`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
-   "concise_description": "Argument `EvaluationCriteria | None` is not assignable to parameter `result` with type `EvaluationCriteria` in function `chat_workflow.models.TurnResult.success`",
    "severity": "error"
   },
   {
    "line": 63,
-   "column": 73,
+   "column": 86,
    "stop_line": 63,
-   "stop_column": 87,
-   "path": "tests/evals/single/test_real_api.py",
-   "code": -2,
-   "name": "bad-argument-type",
-   "description": "Argument `str | None` is not assignable to parameter `reason` with type `str` in function `chat_workflow.exceptions.AtomicWorkflowStepFailedError.__init__`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
-   "concise_description": "Argument `str | None` is not assignable to parameter `reason` with type `str` in function `chat_workflow.exceptions.AtomicWorkflowStepFailedError.__init__`",
-   "severity": "error"
-  },
-  {
-   "line": 143,
-   "column": 41,
-   "stop_line": 143,
-   "stop_column": 72,
-   "path": "tests/evals/single/test_real_api.py",
-   "code": -2,
-   "name": "bad-argument-type",
-   "description": "Argument `float` is not assignable to parameter `request_timeout_seconds` with type `int` in function `chat_workflow.atomic_workflow_step_config.AtomicWorkflowStepConfig.__init__`",
-   "concise_description": "Argument `float` is not assignable to parameter `request_timeout_seconds` with type `int` in function `chat_workflow.atomic_workflow_step_config.AtomicWorkflowStepConfig.__init__`",
-   "severity": "error"
-  },
-  {
-   "line": 150,
-   "column": 86,
-   "stop_line": 150,
    "stop_column": 100,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
@@ -409,9 +361,9 @@
    "severity": "error"
   },
   {
-   "line": 151,
+   "line": 64,
    "column": 82,
-   "stop_line": 151,
+   "stop_line": 64,
    "stop_column": 95,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
@@ -421,9 +373,9 @@
    "severity": "error"
   },
   {
-   "line": 152,
+   "line": 65,
    "column": 73,
-   "stop_line": 152,
+   "stop_line": 65,
    "stop_column": 87,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
@@ -433,9 +385,9 @@
    "severity": "error"
   },
   {
-   "line": 230,
+   "line": 147,
    "column": 41,
-   "stop_line": 230,
+   "stop_line": 147,
    "stop_column": 72,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
@@ -445,9 +397,9 @@
    "severity": "error"
   },
   {
-   "line": 237,
+   "line": 154,
    "column": 86,
-   "stop_line": 237,
+   "stop_line": 154,
    "stop_column": 100,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
@@ -457,9 +409,9 @@
    "severity": "error"
   },
   {
-   "line": 238,
+   "line": 155,
    "column": 82,
-   "stop_line": 238,
+   "stop_line": 155,
    "stop_column": 95,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,
@@ -469,9 +421,57 @@
    "severity": "error"
   },
   {
-   "line": 239,
+   "line": 156,
    "column": 73,
-   "stop_line": 239,
+   "stop_line": 156,
+   "stop_column": 87,
+   "path": "tests/evals/single/test_real_api.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `str | None` is not assignable to parameter `reason` with type `str` in function `chat_workflow.exceptions.AtomicWorkflowStepFailedError.__init__`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
+   "concise_description": "Argument `str | None` is not assignable to parameter `reason` with type `str` in function `chat_workflow.exceptions.AtomicWorkflowStepFailedError.__init__`",
+   "severity": "error"
+  },
+  {
+   "line": 236,
+   "column": 41,
+   "stop_line": 236,
+   "stop_column": 72,
+   "path": "tests/evals/single/test_real_api.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `float` is not assignable to parameter `request_timeout_seconds` with type `int` in function `chat_workflow.atomic_workflow_step_config.AtomicWorkflowStepConfig.__init__`",
+   "concise_description": "Argument `float` is not assignable to parameter `request_timeout_seconds` with type `int` in function `chat_workflow.atomic_workflow_step_config.AtomicWorkflowStepConfig.__init__`",
+   "severity": "error"
+  },
+  {
+   "line": 243,
+   "column": 86,
+   "stop_line": 243,
+   "stop_column": 100,
+   "path": "tests/evals/single/test_real_api.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `str | None` is not assignable to parameter `message` with type `str` in function `chat_workflow.models.TurnResult.continuing`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
+   "concise_description": "Argument `str | None` is not assignable to parameter `message` with type `str` in function `chat_workflow.models.TurnResult.continuing`",
+   "severity": "error"
+  },
+  {
+   "line": 244,
+   "column": 82,
+   "stop_line": 244,
+   "stop_column": 95,
+   "path": "tests/evals/single/test_real_api.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `EvaluationCriteria | None` is not assignable to parameter `result` with type `EvaluationCriteria` in function `chat_workflow.models.TurnResult.success`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
+   "concise_description": "Argument `EvaluationCriteria | None` is not assignable to parameter `result` with type `EvaluationCriteria` in function `chat_workflow.models.TurnResult.success`",
+   "severity": "error"
+  },
+  {
+   "line": 245,
+   "column": 73,
+   "stop_line": 245,
    "stop_column": 87,
    "path": "tests/evals/single/test_real_api.py",
    "code": -2,

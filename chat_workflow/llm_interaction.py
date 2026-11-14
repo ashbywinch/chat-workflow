@@ -66,9 +66,12 @@ def get_client(
 
     os.environ[provider.upper() + "_API_KEY"] = api_key
 
-    # Custom API base (for OpenAI-compatible endpoints)
+    # Custom API base (for OpenAI-compatible endpoints). litellm reads the
+    # provider-specific env var; the global is kept in sync for callers that
+    # inspect it.
     if api_base:
         os.environ[provider.upper() + "_API_BASE"] = api_base
+        litellm.api_base = api_base
 
     mode = instructor.Mode.TOOLS if model_supports_tools else instructor.Mode.JSON
     return instructor.from_litellm(completion, mode=mode)
