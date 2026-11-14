@@ -57,12 +57,15 @@ class ComponentSpec(LLMValidated):
         "could be a standalone deliverable — only a distinct record or "
         "deliverable of its own belongs in another component.",
         "The owner_role is the capacity the artifact belongs to — the role "
-        "whose job includes it, which may be the user. 'Owner' is correct only "
-        "when the artifact is the owner's own work; if the owner acts as a "
+        "whose job includes it, which may be the user. Use 'Owner' only when "
+        "the artifact is the owner's own work; if the owner acts as a "
         "maintenance manager for a sign-off sheet, the owner role is "
-        "Maintenance Manager. It is not the person who supplies the input "
-        "(the note-taker) unless they are accountable. Propose likely roles "
-        "from domain knowledge and confirm them.",
+        "Maintenance Manager. A person who supplies the input is a valid "
+        "owner when the artifact is their own work: a note-taker's own notes "
+        "belong to the note-taker. They are not the owner only when someone "
+        "else owns the artifact (for example, a scribe's notes become minutes "
+        "owned by the meeting organizer). Propose likely roles from domain "
+        "knowledge and confirm them.",
     ]
 
     name: str = Field(
@@ -189,10 +192,11 @@ class ComponentSpec(LLMValidated):
           the Maintenance Manager or Facilities Lead; minutes to the meeting
           chair or organiser; a business plan to the Owner or Founder. The
           user themselves can hold it. Use 'Owner' only for the owner's own
-          work, not when they act in a specialist capacity. Never name the
-          person who supplies the input (the note-taker or scribe) as the
-          owner unless they are accountable. Offer two or three likely roles
-          and let the user correct them.
+          work, not when they act in a specialist capacity. The notes a
+          note-taker writes are theirs; do not name the input supplier as the
+          owner only when someone else owns the artifact (a scribe's notes
+          become minutes owned by the meeting organizer). Offer two or three
+          likely roles and let the user correct them.
         - A component may be responsible for the whole workflow by relying on
           the other components; its own scope is still the one thing it records.
         - The component that keeps the others moving may be one of them;

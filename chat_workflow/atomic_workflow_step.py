@@ -1,5 +1,6 @@
 import copy
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
@@ -9,6 +10,27 @@ from .models import AgentIntent, AgentResponse, TurnResult
 from .session_log import TranscriptEvent
 
 TResult = TypeVar("TResult")
+
+
+@dataclass(frozen=True)
+class ValidationFailure:
+    """One rejected model response, with the correction to send back.
+
+    ``reason`` is the validator's message; ``guidance`` is the concrete
+    remediation the framework adds for a known failure shape. ``kind`` selects
+    the correction prompt: an ordinary validation retry or a language
+    correction.
+    """
+
+    reason: str
+    guidance: str | None = None
+    rejected_text: str | None = None
+    kind: str = "validation_correction"
+
+    def message(self) -> str:
+        if self.guidance:
+            return f"{self.reason}\n\n{self.guidance}"
+        return self.reason
 
 
 class AtomicWorkflowStep(Generic[TResult]):
@@ -110,140 +132,136 @@ class AtomicWorkflowStep(Generic[TResult]):
     def _call_llm(self) -> AgentResponse[TResult]:
         from instructor.core.exceptions import InstructorRetryException
 
-        from .exceptions import MaxRetriesExceededError, ProviderNotFoundError
+        from .exceptions import MaxRetriesExceededError
+
+        client = self._client()
+        for attempt in range(self._validation_corrections + 1):
+            try:
+                response = self._request(client)
+            except InstructorRetryException as exc:
+                failure = _validation_failure(exc)
+                if failure is None or attempt >= self._validation_corrections:
+                    raise MaxRetriesExceededError(
+                        self._max_retries,
+                        failure.message() if failure else str(exc),
+                    ) from exc
+                self._apply_correction(failure, attempt + 1)
+                continue
+            except Exception as exc:
+                if self.debug:
+                    self.debug.on_error(exc)
+                raise
+
+            failure = self._language_failure(response)
+            if failure is not None:
+                if attempt >= self._validation_corrections:
+                    raise MaxRetriesExceededError(self._max_retries, failure.message())
+                self._apply_correction(failure, attempt + 1)
+                continue
+
+            self._mark_recovered()
+            return response
+
+        raise AssertionError("unreachable")
+
+    def _client(self) -> Any:
+        """Build the provider client, translating a missing provider cleanly."""
+        from .exceptions import ProviderNotFoundError
         from .llm_interaction import get_client
 
         try:
-            client = get_client(
+            return get_client(
                 provider=self._provider,
                 api_key_env=self._api_key_env,
                 api_base=self._api_base,
                 model_supports_tools=self._model_supports_tools,
             )
-        except ImportError as e:
+        except ImportError as exc:
             raise ProviderNotFoundError(
-                f"No LLM providers available. {e}\nInstall litellm for multi-provider LLM support: uv add litellm"
-            ) from e
-        except Exception as e:
+                f"No LLM providers available. {exc}\nInstall litellm for "
+                "multi-provider LLM support: uv add litellm"
+            ) from exc
+        except Exception as exc:
             if self.debug:
-                self.debug.on_error(e)
+                self.debug.on_error(exc)
             raise
 
-        for correction in range(self._validation_corrections + 1):
-            try:
-                timer = _DebugTimer(self.debug, self.messages, self.model)
+    def _request(self, client: Any) -> AgentResponse[TResult]:
+        """One model sample, with the framework owning the correction loop.
 
-                # With corrections enabled we want one sample per call: the
-                # framework feeds validation failures back in context. Letting
-                # Instructor retry blind would repeat the same messages — and a
-                # gateway may answer the identical prompt from cache, so the
-                # model never sees the error. One sample per call makes every
-                # correction an informed retry.
-                instructor_retries = (
-                    1 if self._validation_corrections > 0 else self._max_retries
+        Letting Instructor retry blind would repeat the same messages; a
+        gateway may even answer an identical prompt from cache, so the model
+        never sees the error. One sample per call makes every correction an
+        informed retry.
+        """
+        timer = _DebugTimer(self.debug, self.messages, self.model)
+        instructor_retries = (
+            1 if self._validation_corrections > 0 else self._max_retries
+        )
+        with timer:
+            # Pass a copy: Instructor patches messages in place with the JSON
+            # schema, and the conversation history must stay clean.
+            response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
+                model=self.model,
+                messages=copy.deepcopy(self.messages),  # pyright: ignore[reportArgumentType]
+                response_model=self.response_model,
+                max_retries=instructor_retries,
+                timeout=self._request_timeout_seconds,
+            )
+        timer.emit_response(response)
+        return response
+
+    def _language_failure(
+        self, response: AgentResponse[TResult]
+    ) -> ValidationFailure | None:
+        message = response.message or ""
+        if not _is_wrong_language(_language_reference(self.messages), message):
+            return None
+        return ValidationFailure(
+            reason=(
+                "Reply in the user's language. The user is writing in English; "
+                "write your reply in English and do not switch languages on "
+                "your own."
+            ),
+            rejected_text=message,
+            kind="language_correction",
+        )
+
+    def _apply_correction(self, failure: ValidationFailure, attempt: int) -> None:
+        """Feed one rejected response and its correction back to the model."""
+        self.validation_events.append({
+            "turn": self.turn_count,
+            "attempt": attempt,
+            "reason": failure.message(),
+            "recovered": False,
+        })
+        if failure.rejected_text:
+            self.messages.append(
+                {"role": "assistant", "content": failure.rejected_text}
+            )
+            self.events.append(
+                TranscriptEvent(
+                    type="framework",
+                    content=failure.rejected_text,
+                    turn=self.turn_count,
+                    meta={"kind": "rejected_response"},
                 )
+            )
+        correction = _correction_prompt(failure)
+        self.messages.append({"role": "user", "content": correction})
+        self.events.append(
+            TranscriptEvent(
+                type="framework",
+                content=correction,
+                turn=self.turn_count,
+                meta={"kind": failure.kind},
+            )
+        )
 
-                with timer:
-                    # Pass a copy of messages — Instructor patches messages
-                    # in-place with the JSON schema. Using a copy keeps our
-                    # conversation history clean across turns.
-                    response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
-                        model=self.model,
-                        messages=copy.deepcopy(self.messages),  # pyright: ignore[reportArgumentType]
-                        response_model=self.response_model,
-                        max_retries=instructor_retries,
-                        timeout=self._request_timeout_seconds,
-                    )
-
-                timer.emit_response(response)
-                reference = _language_reference(self.messages)
-                if _is_wrong_language(reference, response.message or ""):
-                    reason = (
-                        "Reply in the user's language. The user is writing in "
-                        "English; write your reply in English and do not switch "
-                        "languages on your own."
-                    )
-                    if correction >= self._validation_corrections:
-                        raise MaxRetriesExceededError(self._max_retries, reason)
-                    self.validation_events.append({
-                        "turn": self.turn_count,
-                        "attempt": correction + 1,
-                        "reason": reason,
-                        "recovered": False,
-                    })
-                    self.messages.append(
-                        {"role": "assistant", "content": response.message or ""}
-                    )
-                    self.messages.append(
-                        {"role": "user", "content": f"[framework] {reason}"}
-                    )
-                    self.events.append(
-                        TranscriptEvent(
-                            type="framework",
-                            content=reason,
-                            turn=self.turn_count,
-                            meta={"kind": "language_correction"},
-                        )
-                    )
-                    continue
-                for event in self.validation_events:
-                    if event["turn"] == self.turn_count:
-                        event["recovered"] = True
-                return response
-            except InstructorRetryException as e:
-                reason = _retry_reason(e)
-                if (
-                    not _is_validation_failure(e)
-                    or correction >= self._validation_corrections
-                ):
-                    raise MaxRetriesExceededError(self._max_retries, reason) from e
-                self.validation_events.append({
-                    "turn": self.turn_count,
-                    "attempt": correction + 1,
-                    "reason": reason,
-                    "recovered": False,
-                })
-                # The failed assistant turn was never appended to the
-                # conversation. Put it back so the model can see the code or
-                # value it must correct, then append the rejection reason.
-                rejected = _completion_text(e)
-                if rejected:
-                    self.messages.append({"role": "assistant", "content": rejected})
-                    self.events.append(
-                        TranscriptEvent(
-                            type="framework",
-                            content=rejected,
-                            turn=self.turn_count,
-                            meta={"kind": "rejected_response"},
-                        )
-                    )
-                correction = (
-                    "[framework] Your previous response was rejected by "
-                    f"validation. Fix exactly these violations:\n\n{reason}\n\n"
-                    "Keep everything that was valid; change only what the "
-                    "violations name. Return the complete structured response "
-                    "again as JSON only: "
-                    '{"intent": "continue", "message": "<your reply to the '
-                    'user>", "result": null} or '
-                    '{"intent": "success", "message": null, "result": {...}}. '
-                    "Put the user-facing text in `message`, never as plain "
-                    "text. Do not reply with a description of the violations."
-                )
-                self.messages.append({"role": "user", "content": correction})
-                self.events.append(
-                    TranscriptEvent(
-                        type="framework",
-                        content=correction,
-                        turn=self.turn_count,
-                        meta={"kind": "validation_correction"},
-                    )
-                )
-            except Exception as e:
-                if self.debug:
-                    self.debug.on_error(e)
-                raise
-
-        raise AssertionError("unreachable")
+    def _mark_recovered(self) -> None:
+        for event in self.validation_events:
+            if event["turn"] == self.turn_count:
+                event["recovered"] = True
 
 
 def _language_reference(messages: list[dict[str, Any]]) -> str:
@@ -279,44 +297,78 @@ def _is_wrong_language(reference: str, response: str) -> bool:
     return reference_cjk == 0
 
 
-def _retry_reason(exc: Exception) -> str:
-    """Extract the last failure message from an Instructor retry exception."""
+_FAILURE_GUIDANCE: tuple[tuple[tuple[str, ...], str], ...] = (
+    (
+        ("invalid escape",),
+        " The JSON string has an invalid escape. Use `\\n` for every newline "
+        "(never a backslash followed by a space), escape a literal backslash "
+        "as `\\\\`, and do not wrap code in Markdown.",
+    ),
+    (
+        ("invalid decimal literal", "expected an indented block"),
+        " Write plain ASCII Python: remove Markdown fences, full-width "
+        "characters, and non-ASCII punctuation.",
+    ),
+    (
+        ("expected value at line 1 column 1",),
+        " You replied with plain text instead of JSON. Return only a JSON "
+        'object: {"intent": "continue", "message": "<your reply to the user>", '
+        '"result": null} or {"intent": "success", "message": null, '
+        '"result": {...}}. Put the user-facing text in `message`.',
+    ),
+    (
+        ("control character", "EOF while parsing", "Invalid JSON"),
+        " Return valid JSON only. Encode every newline inside a string as "
+        "\\n, never a literal line break; escape every double quote inside a "
+        'string as \\"; close every brace and bracket.',
+    ),
+)
+
+
+def _validation_failure(exc: Exception) -> ValidationFailure | None:
+    """Turn Instructor's last failed attempt into a correction, if it is one."""
+    from json import JSONDecodeError
+
+    from pydantic import ValidationError as PydanticValidationError
+
+    from .exceptions import ValidationError
+
     attempts = getattr(exc, "failed_attempts", None) or []
-    if attempts:
-        cause = getattr(attempts[-1], "exception", None)
-        if cause is not None:
-            reason = str(cause).strip()
-            if "invalid escape" in reason:
-                reason += (
-                    " The JSON string has an invalid escape. Use `\\n` for every "
-                    "newline (never a backslash followed by a space), escape a "
-                    "literal backslash as `\\\\`, and do not wrap code in Markdown."
-                )
-            elif "invalid decimal literal" in reason or "expected an indented block" in reason:
-                reason += (
-                    " Write plain ASCII Python: remove Markdown fences, full-width "
-                    "characters, and non-ASCII punctuation."
-                )
-            elif "expected value at line 1 column 1" in reason:
-                reason += (
-                    " You replied with plain text instead of JSON. Return only a "
-                    'JSON object: {"intent": "continue", "message": "<your reply '
-                    'to the user>", "result": null} or {"intent": "success", '
-                    '"message": null, "result": {...}}. Put the user-facing text '
-                    "in `message`."
-                )
-            elif (
-                "control character" in reason
-                or "EOF while parsing" in reason
-                or "Invalid JSON" in reason
-            ):
-                reason += (
-                    " Return valid JSON only. Encode every newline inside a string "
-                    "as \\n, never a literal line break; escape every double quote "
-                    "inside a string as \\\"; close every brace and bracket."
-                )
-            return reason
-    return str(exc).strip()
+    if not attempts:
+        return None
+    cause = getattr(attempts[-1], "exception", None)
+    if not isinstance(cause, (PydanticValidationError, ValidationError, JSONDecodeError)):
+        return None
+    reason = str(cause).strip()
+    guidance = next(
+        (
+            text
+            for needles, text in _FAILURE_GUIDANCE
+            if any(needle in reason for needle in needles)
+        ),
+        None,
+    )
+    return ValidationFailure(
+        reason=reason,
+        guidance=guidance,
+        rejected_text=_completion_text(exc),
+    )
+
+
+def _correction_prompt(failure: ValidationFailure) -> str:
+    """The framework turn that tells the model how to repair its response."""
+    if failure.kind == "language_correction":
+        return f"[framework] {failure.reason}"
+    return (
+        "[framework] Your previous response was rejected by validation. "
+        f"Fix exactly these violations:\n\n{failure.message()}\n\n"
+        "Keep everything that was valid; change only what the violations "
+        "name. Return the complete structured response again as JSON only: "
+        '{"intent": "continue", "message": "<your reply to the user>", '
+        '"result": null} or {"intent": "success", "message": null, '
+        '"result": {...}}. Put the user-facing text in `message`, never as '
+        "plain text. Do not reply with a description of the violations."
+    )
 
 
 def _completion_text(exc: Exception) -> str | None:
@@ -336,16 +388,4 @@ def _completion_text(exc: Exception) -> str | None:
     return None
 
 
-def _is_validation_failure(exc: Exception) -> bool:
-    """True when the last attempt failed validation or produced bad JSON."""
-    from json import JSONDecodeError
 
-    from pydantic import ValidationError as PydanticValidationError
-
-    from .exceptions import ValidationError
-
-    attempts = getattr(exc, "failed_attempts", None) or []
-    if not attempts:
-        return False
-    cause = getattr(attempts[-1], "exception", None)
-    return isinstance(cause, (PydanticValidationError, ValidationError, JSONDecodeError))

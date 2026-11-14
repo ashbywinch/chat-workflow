@@ -165,21 +165,32 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
 
     def test_invalid_escape_reason_has_remediation(self):
+        from json import JSONDecodeError
+
         from instructor.core.exceptions import InstructorRetryException
         from instructor.core.retry import FailedAttempt
 
-        from chat_workflow.atomic_workflow_step import _retry_reason
+        from chat_workflow.atomic_workflow_step import _validation_failure
 
         exc = InstructorRetryException(
             "rejected",
             n_attempts=1,
             total_usage=0,
             failed_attempts=[
-                FailedAttempt(1, ValueError("Invalid JSON: invalid escape at line 5"))
+                FailedAttempt(
+                    1,
+                    JSONDecodeError(
+                        "Invalid JSON: invalid escape at line 5",
+                        '{"x": "\\ "}',
+                        5,
+                    ),
+                )
             ],
         )
 
-        reason = _retry_reason(exc)
+        failure = _validation_failure(exc)
+        assert failure is not None
+        reason = failure.message()
 
         self.assertIn("Use `\\n`", reason)
         self.assertIn("backslash", reason)

@@ -1,9 +1,9 @@
 {
  "errors": [
   {
-   "line": 40,
+   "line": 62,
    "column": 85,
-   "stop_line": 40,
+   "stop_line": 62,
    "stop_column": 103,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -13,9 +13,9 @@
    "severity": "error"
   },
   {
-   "line": 41,
+   "line": 63,
    "column": 84,
-   "stop_line": 41,
+   "stop_line": 63,
    "stop_column": 101,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -25,9 +25,9 @@
    "severity": "error"
   },
   {
-   "line": 42,
+   "line": 64,
    "column": 74,
-   "stop_line": 42,
+   "stop_line": 64,
    "stop_column": 91,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -37,9 +37,9 @@
    "severity": "error"
   },
   {
-   "line": 103,
+   "line": 125,
    "column": 13,
-   "stop_line": 103,
+   "stop_line": 125,
    "stop_column": 26,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 103,
+   "line": 125,
    "column": 32,
-   "stop_line": 103,
+   "stop_line": 125,
    "stop_column": 45,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
