@@ -63,8 +63,10 @@ class ComponentSpec(LLMValidated):
         "Maintenance Manager. A person who supplies the input is a valid "
         "owner when the artifact is their own work: a note-taker's own notes "
         "belong to the note-taker. They are not the owner only when someone "
-        "else owns the artifact (for example, a scribe's notes become minutes "
-        "owned by the meeting organizer). Propose likely roles from domain "
+        "else is accountable for the artifact. If the user does the work and "
+        "is accountable, their role is valid even when another role "
+        "traditionally owns that kind of artifact; do not replace the user's "
+        "role with a domain assumption. Propose likely roles from domain "
         "knowledge and confirm them.",
     ]
 
