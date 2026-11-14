@@ -58,7 +58,14 @@ class TestLLMInteraction(unittest.TestCase):
         model, messages, response_model, max_retries = mock_client.last_call_args
 
         self.assertEqual(model, "default-model")
-        self.assertEqual(messages, orchestrator.messages)
+        self.assertEqual(messages[: len(orchestrator.messages)], orchestrator.messages)
+        self.assertEqual(
+            messages[-1],
+            {
+                "role": "system",
+                "content": "The conversation is in English. Reply in English.",
+            },
+        )
         self.assertEqual(response_model, AgentResponse[EvaluationCriteria])
         # One sample per call: the outer correction loop feeds the rejection
         # reason back, so Instructor must not retry blind.

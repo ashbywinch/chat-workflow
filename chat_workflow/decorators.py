@@ -8,6 +8,7 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
+from .annotations import user_labels
 from .atomic_workflow_step import AtomicWorkflowStep
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
@@ -64,12 +65,13 @@ def _build_task_section(return_type: Any, chat: bool) -> str:
             "answer and move on; never ask the same substantive question again. "
             "Match the user's register: if they speak plainly, speak plainly; if "
             "they use specialist terms, use theirs. Never introduce a term for the "
-            "output shape, a field, or the framework; never say 'deliverable', "
-            "'output', 'field', 'schema', or a model field name to the user. If "
-            "they say a word is confusing, drop it — do not define it and carry "
-            "on — and re-ask in their words. Never present the output's fields as "
-            "a labelled list or template; write a short paragraph in the user's "
-            "words. Use the language the user is using: "
+            "output shape, a field, or the framework. This includes 'deliverable', "
+            "'output', 'field', 'schema', 'workflow', and 'component'. If the user "
+            "uses one of those words, use their word. If they say a word is "
+            "confusing, never use that word again in the conversation — re-ask in "
+            "their words. Never present the output's fields as a labelled list or "
+            "template; write a short paragraph in the user's words. Use the "
+            "language the user is using: "
             "if they write in English, reply in English; never switch languages on "
             "your own. Before the user has named something, "
             "use a plain placeholder ('the thing you make', 'your work'); once they "
@@ -84,7 +86,8 @@ def _build_task_section(return_type: Any, chat: bool) -> str:
             "for the step you are in. When the user asks what you think or asks "
             "for a suggestion, answer with specific ideas and improvements; do "
             "not ask for approval again in that same turn. "
-            "Use failure if the output cannot be produced."
+            "Before using failure, propose the thing in the user's own words; "
+            "use failure only if they reject every concrete proposal."
         )
     return (
         "## Task\n"
@@ -133,6 +136,26 @@ def _output_defs(return_type: Any) -> frozenset[str]:
     return frozenset(schema.get("$defs", {}))
 
 
+def _build_user_vocabulary_section(return_type: Any) -> str:
+    """Map internal field names to the words the user should hear.
+
+    The result schema is the model's vocabulary for the artifact, and it tends
+    to leak field names into ``message``. These labels are declared next to
+    the fields; the user's own word still wins over the phrase.
+    """
+    labels = user_labels(_inner_model(return_type))
+    if not labels:
+        return ""
+    lines = [
+        "## Use the user's words",
+        "These are internal labels for the result. Never use them in `message` "
+        "unless the user used them first. Say the phrase, or the user's own "
+        "word if they have one.",
+    ]
+    lines.extend(f'- `{name}` -> "{label.phrase}"' for name, label in labels.items())
+    return "\n".join(lines)
+
+
 def _build_system_prompt(
     raw_func: Callable[..., Any],
     kwargs: dict[str, Any],
@@ -145,6 +168,10 @@ def _build_system_prompt(
     sections: list[str] = []
 
     sections.append(_build_task_section(return_type, chat))
+
+    vocabulary_section = _build_user_vocabulary_section(return_type)
+    if vocabulary_section:
+        sections.append(vocabulary_section)
 
     docstring = _format_docstring(raw_func.__doc__, **kwargs).strip()
     if docstring:

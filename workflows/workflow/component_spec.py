@@ -7,6 +7,7 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import Field, field_validator
 
 from chat_workflow import atomic_workflow_step
+from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
 # Activity nouns the model reaches for when it should name the artifact.
@@ -70,7 +71,10 @@ class ComponentSpec(LLMValidated):
         "knowledge and confirm them.",
     ]
 
-    name: str = Field(
+    name: Annotated[
+        str,
+        UserLabel("what you call it", "name"),
+    ] = Field(
         ...,
         description=(
             "Artifact-based name (concrete noun), e.g. 'Invoice' not "
@@ -78,7 +82,10 @@ class ComponentSpec(LLMValidated):
         ),
         min_length=1,
     )
-    purpose: str = Field(
+    purpose: Annotated[
+        str,
+        UserLabel("what it is for", "purpose"),
+    ] = Field(
         ...,
         description=(
             "The end-to-end responsibility this component delivers — one "
@@ -87,7 +94,10 @@ class ComponentSpec(LLMValidated):
         ),
         min_length=1,
     )
-    scope_description: str = Field(
+    scope_description: Annotated[
+        str,
+        UserLabel("what it covers", "scope description", "scope"),
+    ] = Field(
         ...,
         description=(
             "What this component itself does, as opposed to other components. "
@@ -99,7 +109,10 @@ class ComponentSpec(LLMValidated):
         ),
         min_length=1,
     )
-    owner_role: str = Field(
+    owner_role: Annotated[
+        str,
+        UserLabel("who it belongs to", "owner role", "owner"),
+    ] = Field(
         ...,
         description=(
             "The capacity the artifact belongs to — the role whose job "
@@ -109,13 +122,24 @@ class ComponentSpec(LLMValidated):
         ),
         min_length=1,
     )
-    required_inputs: list[str] = Field(
+    required_inputs: Annotated[
+        list[str],
+        UserLabel("what it needs to start", "required inputs", "inputs"),
+    ] = Field(
         ...,
         description=(
             "Names of inputs this component needs from other components or from outside the workflow"
         ),
     )
-    component_type: Literal["value_stream", "artifact_producing", "planning_service"] = Field(
+    component_type: Annotated[
+        Literal["value_stream", "artifact_producing", "planning_service"],
+        UserLabel(
+            "what kind of thing it is",
+            "component type",
+            "artifact producing",
+            "produces",
+        ),
+    ] = Field(
         ...,
         description=(
             "One of: value_stream (a continuous outcome or KPI someone is "
@@ -124,7 +148,10 @@ class ComponentSpec(LLMValidated):
             "planning_service (plans or coordinates work)"
         ),
     )
-    incidental_notes: str = Field(
+    incidental_notes: Annotated[
+        str,
+        UserLabel("anything else you mentioned", "incidental notes"),
+    ] = Field(
         "",
         description=("Any incidental details the user mentioned about how the work is done"),
     )

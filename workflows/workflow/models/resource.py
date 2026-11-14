@@ -6,6 +6,7 @@ from typing import Annotated, ClassVar
 from pydantic import Field
 
 from chat_workflow import atomic_workflow_step
+from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
 from .deliverable import Deliverable
@@ -35,10 +36,16 @@ class Resource(LLMValidated):
         "A resource must not list itself as a dependency.",
     ]
 
-    source: str = Field(
+    source: Annotated[
+        str,
+        UserLabel("where it comes from", "source"),
+    ] = Field(
         ..., description="Where it comes from (a person, system, document, or place)", min_length=1
     )
-    format: str = Field(
+    format: Annotated[
+        str,
+        UserLabel("what it looks like", "format"),
+    ] = Field(
         ...,
         description=(
             "Its exact shape when it exists (e.g. 'handwritten list', 'CSV "
@@ -46,11 +53,21 @@ class Resource(LLMValidated):
         ),
         min_length=1,
     )
-    dependencies: list[str] = Field(
+    dependencies: Annotated[
+        list[str],
+        UserLabel("what it needs first", "dependencies"),
+    ] = Field(
         default_factory=list,
         description="Other things it needs first",
     )
-    validation_criteria: str = Field(
+    validation_criteria: Annotated[
+        str,
+        UserLabel(
+            "how you know it is complete",
+            "validation criteria",
+            "criteria",
+        ),
+    ] = Field(
         ...,
         description=(
             "A check the user can apply when the resource is produced to know "
@@ -73,7 +90,7 @@ class Resource(LLMValidated):
     ) -> list[Resource]:
         """Help someone describe what they start with. Open by saying in one
         sentence what you are doing and why, for example: "I want to understand
-        what you start with, so the workflow fits how you actually work."
+        what you start with, so it fits how you actually work."
         Match the user's register: use the words they use, and never introduce
         a term for the output shape, a field, or the framework.
 
@@ -86,9 +103,12 @@ class Resource(LLMValidated):
         Some things people start with are inherently whatever the user wrote
         — raw notes, a rough sketch — or are trusted as sent, like an agenda
         from the organiser. Do not ask how they know those are complete; accept
-        them as they are and say so. Ask the completeness question only where
-        there is something to compare against (a checklist, a recording, a
-        prior version). Ask how they know each such material is complete or
+        them as they are and say so. Even when the user trusts a material as
+        sent, the field still needs a check: use a check on the material itself,
+        such as 'The invite lists the date, time, and attendees' or 'The agenda
+        covers the topics the organiser sent.' Do not write 'I trust it' as the
+        criterion. Ask the completeness question only where there is something
+        to compare against (a checklist, a recording, a prior version). Ask how they know each such material is complete or
         usable, in their language. The answer must be something they can check
         as soon as they have the material, not an outcome like 'no one
         complains'. A criterion describes the finished material, not the
@@ -117,7 +137,9 @@ class Resource(LLMValidated):
         materials' or 'starting materials'; say 'the things you start with'
         or 'what you already have'. Say where it comes
         from, what it looks like, what it needs first, and, where it applies,
-        how they know it is complete.
+        how they know it is complete. When the user confirms the set, return
+        success in that same response; do not summarize the same set again or
+        ask for a second confirmation.
 
         When they ask for ideas, or ask 'what do you think?' or 'suggest a
         format', propose one concrete option in that same reply; do not ask

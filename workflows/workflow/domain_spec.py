@@ -13,6 +13,7 @@ from typing import Annotated, ClassVar
 from pydantic import BaseModel, Field
 
 from chat_workflow import atomic_workflow_step
+from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
 from .component_spec import ComponentSpec
@@ -60,31 +61,46 @@ class ComponentDomainSpec(LLMValidated):
         "input unless they are that specialist.",
     ]
 
-    name: str = Field(
+    name: Annotated[
+        str,
+        UserLabel("what you call it", "name"),
+    ] = Field(
         ...,
         description="Matches ComponentSpec.name — the artifact name",
         min_length=1,
     )
 
-    description: str = Field(
+    description: Annotated[
+        str,
+        UserLabel("what it is", "description"),
+    ] = Field(
         ...,
         description="What this artifact represents in the user's domain",
         min_length=1,
     )
 
-    fields: list[ComponentDomainField] = Field(
+    fields: Annotated[
+        list[ComponentDomainField],
+        UserLabel("the parts of it", "fields"),
+    ] = Field(
         ...,
         description="Fields that make up this artifact, described in domain terms",
         min_length=1,
     )
 
-    what_good_looks_like: list[str] = Field(
+    what_good_looks_like: Annotated[
+        list[str],
+        UserLabel("what makes it good", "what good looks like"),
+    ] = Field(
         ...,
         description="Holistic quality criteria for the artifact as a whole — what makes it excellent",
         min_length=1,
     )
 
-    expert_role: str = Field(
+    expert_role: Annotated[
+        str,
+        UserLabel("the expertise I should bring", "expert role"),
+    ] = Field(
         ...,
         description=(
             "The agent's domain expertise — the role the agent acts as when "
@@ -114,21 +130,22 @@ class ComponentDomainSpec(LLMValidated):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentDomainSpec:
-        """You are a domain analyst. Propose the artifact's fields from
-        its responsibilities. Propose once. The user confirms (maybe
-        with elaboration). If they already described what good looks
-        like in their confirmation, acknowledge and return "success".
-        Otherwise ask about quality once. Then return "success".
+        """You are a domain analyst. Propose the artifact's fields from its
+        responsibilities first, and ask the user to confirm them. Propose
+        once. If they already described what good looks like in their
+        confirmation, acknowledge it and ask about the assistant's expertise
+        separately; otherwise ask about quality once. Then return "success".
 
-        The owner role is already in `responsibilities.owner_role`. Propose
-        the agent's role — "the agent acts as …" — the expertise it needs for
-        this artifact. It may be the same as the owner role or a specialist
-        helping them. Confirm it with the user. For meeting minutes, the agent
-        acts as a "Meeting Minutes Specialist"; the owner is the "Meeting
-        Organizer" or "Meeting Chair". A "Scribe" records the notes; it is
-        neither the owner nor the agent's expertise. A field list derived
-        from the responsibilities is a draft for approval, not a hypothesis
-        dump. Return at least one field and one quality criterion.
+        Only after the user has responded to the field list, ask about the
+        expertise the assistant should bring — in their words, not as a job
+        title: "Would it help if I acted as someone who knows how to structure
+        meeting highlights?" Do not introduce a role title the user has not
+        used; if you propose one, mark it as a suggestion and confirm it
+        separately. For meeting minutes, the owner is the meeting organizer or
+        chair; a scribe records the notes, which is neither the owner nor the
+        assistant's expertise. A field list derived from the responsibilities
+        is a draft for approval, not a hypothesis dump. Return at least one
+        field and one quality criterion.
 
         Use the scope to decide what belongs in the artifact: it is this
         component's own work. Do not add fields for work the scope says

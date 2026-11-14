@@ -6,6 +6,7 @@ from typing import Annotated, ClassVar
 from pydantic import Field, model_validator
 
 from chat_workflow import atomic_workflow_step
+from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
 from .process_definition import ProcessDefinition
@@ -32,28 +33,43 @@ class Deliverable(LLMValidated):
         "deliverable contains.",
     ]
 
-    name: str = Field(
+    name: Annotated[
+        str,
+        UserLabel("what you call it", "name"),
+    ] = Field(
         ...,
         description="What the person calls what they make, e.g. 'Meeting Minutes', 'Invoice PDF'",
         min_length=1,
     )
-    description: str | None = Field(
+    description: Annotated[
+        str | None,
+        UserLabel("what it is", "description"),
+    ] = Field(
         default=None,
         description="Plain-English description of what it contains — "
         "required unless the name alone is unambiguous (e.g. 'Invoice' is clear; "
         "'Widget' is not).",
     )
-    consumer: str = Field(
+    consumer: Annotated[
+        str,
+        UserLabel("who it is for", "consumer"),
+    ] = Field(
         ...,
         description="Who uses or receives it (a person, role, or team)",
         min_length=1,
     )
-    format: str = Field(
+    format: Annotated[
+        str,
+        UserLabel("what it looks like", "format"),
+    ] = Field(
         ...,
         description="Its exact shape or layout (e.g. 'one-page PDF', 'shared spreadsheet')",
         min_length=1,
     )
-    success_criteria: str = Field(
+    success_criteria: Annotated[
+        str,
+        UserLabel("how you know it is good", "success criteria", "criteria"),
+    ] = Field(
         ...,
         description=(
             "A check someone can apply when the deliverable is produced — not "
@@ -61,12 +77,18 @@ class Deliverable(LLMValidated):
         ),
         min_length=1,
     )
-    integration_points: str = Field(
+    integration_points: Annotated[
+        str,
+        UserLabel("who gets it next", "integration points"),
+    ] = Field(
         ...,
         description="Who receives it next, and what they do with it",
         min_length=1,
     )
-    storage_requirements: str = Field(
+    storage_requirements: Annotated[
+        str,
+        UserLabel("where it is kept", "storage requirements"),
+    ] = Field(
         ...,
         description="Where it is kept",
         min_length=1,
@@ -97,6 +119,12 @@ class Deliverable(LLMValidated):
         immediately as a draft for confirmation — do not ask who it is for
         before offering the shape.
 
+        Never use failure because the user says they make nothing. Find the
+        artifact in their routine — a plan, a list, a schedule, a document —
+        and propose it as a draft: 'It sounds like you make a weekly meal
+        plan; does that fit?' Use failure only if they reject every concrete
+        proposal.
+
         Match the user's register: use the words they use, and never introduce
         a term for the output shape, a field, or the framework. Never say
         'deliverable' to the user; say 'the thing you make'. If they speak
@@ -112,12 +140,6 @@ class Deliverable(LLMValidated):
 
         Ask each question once. When the user answers, accept the answer and
         move on; never ask the same substantive question again.
-
-        If the user says they do not make anything, find the artifact in what
-        they do — a plan, a list, a schedule, a document — and name it as a
-        draft: 'It sounds like you make a weekly meal plan; does that fit?'
-        Do not give up while there is something they produce. Use failure only
-        if they reject every concrete proposal.
 
         When you summarize or confirm, describe the thing they make in the
         user's words. Never use 'name', 'description', 'consumer', 'format',

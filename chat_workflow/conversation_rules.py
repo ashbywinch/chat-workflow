@@ -104,6 +104,19 @@ USES_USER_LANGUAGE: tuple[str, str] = (
     "has not used.",
 )
 
+# The framework's own vocabulary. These words describe the machinery, not the
+# user's work, so they stay out of `message` unless the user used them first.
+FRAMEWORK_TERMS: dict[str, str] = {
+    "workflow": "how the work happens",
+    "component": "part of the work",
+    "schema": "the shape of the result",
+    "field": "part",
+    "deliverable": "the thing you make",
+    "output": "the thing you make",
+    "input": "what you start with",
+    "artifact": "the thing you make",
+}
+
 # The framework default. Every chat-on atomic workflow step gets these; an author's
 # ``conversation_validation_rules`` adds to this floor. The tuple preserves the
 # display order in the prompt; UNIVERSAL_RULES keeps the set form for callers

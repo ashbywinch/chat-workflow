@@ -1,9 +1,12 @@
 import copy
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, get_args, get_origin
 
+from .annotations import UserLabel, user_labels
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
+from .conversation_rules import FRAMEWORK_TERMS
 from .debug import _DebugTimer
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
@@ -157,7 +160,9 @@ class AtomicWorkflowStep(Generic[TResult]):
                     self.debug.on_error(exc)
                 raise
 
-            failure = self._language_failure(response)
+            failure = self._language_failure(response) or self._vocabulary_failure(
+                response
+            )
             if failure is not None:
                 if attempt >= self._validation_corrections:
                     raise MaxRetriesExceededError(self._max_retries, failure.message())
@@ -203,12 +208,22 @@ class AtomicWorkflowStep(Generic[TResult]):
         instructor_retries = (
             1 if self._validation_corrections > 0 else self._max_retries
         )
+        messages = copy.deepcopy(self.messages)
+        if not _has_cjk(_language_reference(self.messages)):
+            # The model sometimes drifts into Chinese on long prompts. A final
+            # system instruction is more reliable than the task-section line.
+            messages.append(
+                {
+                    "role": "system",
+                    "content": "The conversation is in English. Reply in English.",
+                }
+            )
         with timer:
             # Pass a copy: Instructor patches messages in place with the JSON
             # schema, and the conversation history must stay clean.
             response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
                 model=self.model,
-                messages=copy.deepcopy(self.messages),  # pyright: ignore[reportArgumentType]
+                messages=messages,  # pyright: ignore[reportArgumentType]
                 response_model=self.response_model,
                 max_retries=instructor_retries,
                 timeout=self._request_timeout_seconds,
@@ -232,6 +247,39 @@ class AtomicWorkflowStep(Generic[TResult]):
             rejected_text=message,
             kind="language_correction",
         )
+
+    def _vocabulary_failure(
+        self, response: AgentResponse[TResult]
+    ) -> ValidationFailure | None:
+        """Reject a message that leaks an internal label the user never used."""
+        labels = user_labels(_inner_result_model(self.response_model))
+        if not labels and not FRAMEWORK_TERMS:
+            return None
+        message = response.message or ""
+        user_text = _user_text(self.messages)
+        candidates: dict[str, UserLabel] = {}
+        for name, label in labels.items():
+            candidates[name] = label
+            for alias in label.aliases:
+                candidates[alias] = label
+        for term, phrase in FRAMEWORK_TERMS.items():
+            candidates.setdefault(term, UserLabel(phrase, term))
+        for term, label in candidates.items():
+            if _mentions(message, term) and not _mentions(user_text, term):
+                return ValidationFailure(
+                    reason=(
+                        f"Your message used the internal label '{term}'. "
+                        "The user has not used that word."
+                    ),
+                    guidance=(
+                        f'Rewrite the message without "{term}". Use the '
+                        f'user\'s own words, or say "{label.phrase}". Keep '
+                        "the result unchanged."
+                    ),
+                    rejected_text=message,
+                    kind="vocabulary_correction",
+                )
+        return None
 
     def _apply_correction(self, failure: ValidationFailure, attempt: int) -> None:
         """Feed one rejected response and its correction back to the model."""
@@ -291,6 +339,11 @@ def _language_reference(messages: list[dict[str, Any]]) -> str:
     return ""
 
 
+def _has_cjk(text: str) -> bool:
+    """True when the text contains any CJK character."""
+    return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
 def _is_wrong_language(reference: str, response: str) -> bool:
     """True when an English conversation gets a Chinese reply.
 
@@ -304,6 +357,43 @@ def _is_wrong_language(reference: str, response: str) -> bool:
         return False
     reference_cjk = sum(1 for char in reference if "\u4e00" <= char <= "\u9fff")
     return reference_cjk == 0
+
+
+def _inner_result_model(response_model: object) -> object:
+    """Unwrap ``AgentResponse[list[Model]]`` to the model that declares labels."""
+    model = response_model
+    generic = getattr(model, "__pydantic_generic_metadata__", None)
+    args = (generic or {}).get("args") or get_args(model)
+    if args:
+        model = args[0]
+    if get_origin(model) is list:
+        inner = get_args(model)
+        if inner:
+            model = inner[0]
+    return model
+
+
+def _user_text(messages: list[dict[str, Any]]) -> str:
+    """Everything the user has actually said, excluding framework turns."""
+    return " ".join(
+        message.get("content") or ""
+        for message in messages
+        if message.get("role") == "user"
+        and not (message.get("content") or "").lstrip().startswith("[framework]")
+    )
+
+
+def _mentions(text: str, term: str) -> bool:
+    """Match a term across spaces, underscores, and hyphens, on word boundaries."""
+    parts = [part for part in re.split(r"[\s_-]+", term) if part]
+    if not parts:
+        return False
+    pattern = (
+        r"(?<![A-Za-z0-9_])"
+        + r"[\s_-]+".join(re.escape(part) for part in parts)
+        + r"(?![A-Za-z0-9_])"
+    )
+    return re.search(pattern, text, re.IGNORECASE) is not None
 
 
 _FAILURE_GUIDANCE: tuple[tuple[tuple[str, ...], str], ...] = (
@@ -371,8 +461,8 @@ def _validation_failure(exc: Exception) -> ValidationFailure | None:
 
 def _correction_prompt(failure: ValidationFailure) -> str:
     """The framework turn that tells the model how to repair its response."""
-    if failure.kind == "language_correction":
-        return f"[framework] {failure.reason}"
+    if failure.kind in ("language_correction", "vocabulary_correction"):
+        return f"[framework] {failure.message()}"
     return (
         "[framework] Your previous response was rejected by validation. "
         f"Fix exactly these violations:\n\n{failure.message()}\n\n"

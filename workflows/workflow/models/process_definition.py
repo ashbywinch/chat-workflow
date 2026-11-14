@@ -6,6 +6,7 @@ from typing import Annotated, ClassVar
 from pydantic import Field
 
 from chat_workflow import atomic_workflow_step, composite_workflow_step
+from chat_workflow.annotations import UserLabel
 from chat_workflow.conversation_rules import WARM_OPEN
 from chat_workflow.mixins import LLMValidated
 
@@ -31,11 +32,24 @@ class ProcessDefinition(LLMValidated):
         "product the user does not use. A separate coordinator is optional.",
     ]
 
-    phases: list[str] = Field(..., description="The main stages of the work, in order", min_length=1)
-    activities: list[str] = Field(
+    phases: Annotated[
+        list[str],
+        UserLabel("the main stages", "phases"),
+    ] = Field(..., description="The main stages of the work, in order", min_length=1)
+    activities: Annotated[
+        list[str],
+        UserLabel("the things you do", "activities"),
+    ] = Field(
         ..., description="The specific things that happen in those stages", min_length=1
     )
-    orchestrating_component: str = Field(
+    orchestrating_component: Annotated[
+        str,
+        UserLabel(
+            "who keeps the work moving",
+            "orchestrating component",
+            "orchestrating",
+        ),
+    ] = Field(
         ...,
         description=(
             "The person or role that keeps the work moving; the user's own "
@@ -44,7 +58,10 @@ class ProcessDefinition(LLMValidated):
         ),
         min_length=1,
     )
-    participants: list[str] = Field(
+    participants: Annotated[
+        list[str],
+        UserLabel("everyone involved", "participants"),
+    ] = Field(
         ..., description="Everyone involved (people, roles, or systems)", min_length=1
     )
 
@@ -97,7 +114,9 @@ def _generate_from_notes(
     possibility and mark it as a suggestion.
 
     With the user, never say "phases" or "activities"; say "the main stages"
-    and "the things that happen".
+    and "the things that happen". If the user says the role that keeps the
+    work moving is "you" or "me", accept it; do not ask for a more specific
+    job title after they answer.
 
     When the user confirms the breakdown, return success.
     """

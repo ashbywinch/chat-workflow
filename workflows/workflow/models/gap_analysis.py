@@ -6,6 +6,7 @@ from typing import Annotated, ClassVar
 from pydantic import Field
 
 from chat_workflow import atomic_workflow_step
+from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
 from .process_definition import ProcessDefinition
@@ -39,25 +40,40 @@ class GapAnalysis(LLMValidated):
         "contracts', not 'address the gap').",
     ]
 
-    missing_components: list[str] = Field(
+    missing_components: Annotated[
+        list[str],
+        UserLabel("parts that are missing", "missing components"),
+    ] = Field(
         default_factory=list,
         description="Parts of the work that are named but not yet designed",
         min_length=0,
     )
-    missing_playbooks: list[str] = Field(
+    missing_playbooks: Annotated[
+        list[str],
+        UserLabel("steps that are not written down", "missing playbooks"),
+    ] = Field(
         default_factory=list,
         description="Named sets of steps that are referred to but not described",
         min_length=0,
     )
-    integration_gaps: list[IntegrationGap] = Field(
+    integration_gaps: Annotated[
+        list[IntegrationGap],
+        UserLabel("unclear handovers", "integration gaps"),
+    ] = Field(
         default_factory=list,
         description="Where one part passes work to another and the connection is unclear",
     )
-    organizational_gaps: list[OwnershipGap] = Field(
+    organizational_gaps: Annotated[
+        list[OwnershipGap],
+        UserLabel("work with no clear owner", "organizational gaps"),
+    ] = Field(
         default_factory=list,
         description="Work that has no clear owner",
     )
-    recommendations: list[str] = Field(
+    recommendations: Annotated[
+        list[str],
+        UserLabel("what to do next", "recommendations"),
+    ] = Field(
         default_factory=list,
         description="Concrete next steps that address each gap",
         min_length=0,

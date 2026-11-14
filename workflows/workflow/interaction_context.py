@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from chat_workflow import atomic_workflow_step
+from chat_workflow.annotations import UserLabel
 
 from .domain_spec import ComponentDomainSpec
 from .structure import ComponentStructure
@@ -20,28 +21,40 @@ class ComponentInteractionContext(BaseModel):
     for — pure domain language, not code or prompt implementation.
     """
 
-    must_prioritize: list[str] = Field(
+    must_prioritize: Annotated[
+        list[str],
+        UserLabel("what I should always cover", "must prioritize"),
+    ] = Field(
         ...,
         description=(
             "What the assistant should always address during the conversation, "
             "e.g. 'Always ask about decisions early in the conversation'"
         ),
     )
-    auto_suggest: list[str] = Field(
+    auto_suggest: Annotated[
+        list[str],
+        UserLabel("what I should suggest", "auto suggest"),
+    ] = Field(
         ...,
         description=(
             "What the assistant should suggest proactively to the user, "
             "e.g. 'Suggest action item owners based on the topic discussed'"
         ),
     )
-    tone_preference: str | None = Field(
+    tone_preference: Annotated[
+        str | None,
+        UserLabel("how I should sound", "tone preference"),
+    ] = Field(
         default=None,
         description=(
             "Tone guidance for the assistant's communication style, "
             "e.g. 'Professional but friendly'. None means no preference."
         ),
     )
-    user_pain_points: list[str] = Field(
+    user_pain_points: Annotated[
+        list[str],
+        UserLabel("what usually goes wrong", "user pain points"),
+    ] = Field(
         ...,
         description=("Common pitfalls the assistant should watch for, e.g. 'Users often forget to list attendees'"),
     )
