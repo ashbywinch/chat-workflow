@@ -415,6 +415,28 @@ class MinutesDraft(BaseModel):
         )
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    def test_long_validation_rule_is_wrapped(self, mock_collect):
+        """A long `_validation_rules` entry is split like a long Field string."""
+        long_rule = (
+            "The raw notes should be sufficiently clear that a person can "
+            "reconstruct the meeting's key points, decisions, and action items "
+            "later the same day without confusion."
+        )
+        code = VALID_COMPONENT_CODE.replace(
+            '"The meeting date is a real date the meeting took place, not a placeholder.",',
+            f'"{long_rule}",',
+        )
+
+        component = ComponentSourceCode(code=code)
+
+        self.assertNotIn(f'"{long_rule}"', component.code)
+        self.assertIn("The raw notes should be sufficiently clear", component.code)
+        self.assertTrue(
+            all(len(line) <= 120 for line in component.code.splitlines()),
+            "every wrapped line must fit the limit",
+        )
+
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_long_string_inside_multiline_field_is_wrapped(self, mock_collect):
         """A long description segment inside a wrapped Field is split too."""
         long_description = (

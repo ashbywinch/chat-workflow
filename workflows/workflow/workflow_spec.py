@@ -186,7 +186,10 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           from one to the next. Include a coordinator participant only when a
           component really does coordinate the others; do not invent one.
         - Use `alt` or `opt` for at least one decision point, and show the
-          return flow.
+          return flow between components. A business role may be a participant,
+          but do not give it a flow unless a component owns that activity; if
+          no component owns the acknowledgement, show it as a step of the
+          component that owns the artifact.
         - Use `<br/>` to split any long message across lines.
         - Show the entry point, every activity from the analysis, and a clear
           outcome.

@@ -245,6 +245,47 @@ def _wrap_long_field_strings(code: str, tree: ast.AST) -> str:
     return code
 
 
+def _wrap_long_list_strings(code: str, tree: ast.AST) -> str:
+    """Wrap long string elements of lists and tuples at word boundaries.
+
+    ``_validation_rules`` entries are list elements, not ``Field`` keyword
+    arguments, so the field wrapper does not reach them. Models keep writing
+    one long rule line; splitting it mechanically avoids a retry.
+    """
+    lines = code.splitlines(keepends=True)
+    replacements: list[tuple[int, int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.List, ast.Tuple)):
+            continue
+        for element in node.elts:
+            if not (
+                isinstance(element, ast.Constant)
+                and isinstance(element.value, str)
+                and element.end_lineno is not None
+                and element.end_col_offset is not None
+            ):
+                continue
+            start_line = element.lineno - 1
+            end_line = element.end_lineno - 1
+            if not any(
+                len(lines[index].rstrip("\n")) > 120
+                for index in range(start_line, end_line + 1)
+            ):
+                continue
+            width = max(20, 120 - element.col_offset - 3)
+            chunks = _split_description(element.value, width)
+            indent = " " * element.col_offset
+            rendered = json.dumps(chunks[0])
+            for chunk in chunks[1:]:
+                rendered += "\n" + indent + json.dumps(chunk)
+            start = sum(len(line) for line in lines[:start_line]) + element.col_offset
+            end = sum(len(line) for line in lines[:end_line]) + element.end_col_offset
+            replacements.append((start, end, rendered))
+    for start, end, rendered in sorted(replacements, reverse=True):
+        code = code[:start] + rendered + code[end:]
+    return code
+
+
 def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
     """Rename a field validator's first argument from ``cls`` to ``self``.
 
@@ -711,6 +752,12 @@ class ComponentSourceCode(LLMValidated):
             tree = ast.parse(code)
 
         wrapped = _wrap_long_field_strings(code, tree)
+        if wrapped != code:
+            self.code = wrapped
+            code = wrapped
+            tree = ast.parse(code)
+
+        wrapped = _wrap_long_list_strings(code, tree)
         if wrapped != code:
             self.code = wrapped
             code = wrapped

@@ -24,6 +24,8 @@ def refine(  # pyright: ignore[reportReturnType]
     - Ask one question at a time.
     - Use only user-provided feedback.
     - Preserve the original object contents exactly unless the user asks to change it.
+    - When the user confirms or says there is nothing to change, return success
+      with the object immediately; do not ask the confirmation question again.
 
     """
     ...
