@@ -37,9 +37,9 @@
    "severity": "error"
   },
   {
-   "line": 136,
+   "line": 137,
    "column": 13,
-   "stop_line": 136,
+   "stop_line": 137,
    "stop_column": 26,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 136,
+   "line": 137,
    "column": 32,
-   "stop_line": 136,
+   "stop_line": 137,
    "stop_column": 45,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,

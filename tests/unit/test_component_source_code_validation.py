@@ -350,6 +350,27 @@ class MinutesDraft(BaseModel):
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
+    def test_a_long_condition_is_wrapped_by_the_formatter(self):
+        """A joined condition is the model's most common ruff failure."""
+        from workflows.workflow.component_source_code import (
+            _ruff_format,
+            _ruff_violations,
+        )
+
+        code = (
+            "def f(self, date):\n"
+            "    if self.next_meeting_date and self.meeting_date and "
+            "date.fromisoformat(self.next_meeting_date) < "
+            "date.fromisoformat(self.meeting_date):\n"
+            "        return 1\n"
+            "    return 0\n"
+        )
+        self.assertTrue(any("E501" in line for line in _ruff_violations(code)))
+
+        formatted = _ruff_format(code)
+
+        self.assertFalse(any("E501" in line for line in _ruff_violations(formatted)))
+
     def test_module_is_exchanged_as_lines(self):
         """The model sends one string per line, so no newline escapes exist."""
         import json

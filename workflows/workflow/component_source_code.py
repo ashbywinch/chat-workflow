@@ -478,6 +478,41 @@ def _ruff_violations(code: str) -> list[str]:
     return [line for line in proc.stdout.splitlines() if line.strip()]
 
 
+def _ruff_format(code: str) -> str:
+    """Format the module the way the repository formats its own code.
+
+    ``ruff format`` wraps long expressions at the line limit, which is what a
+    model gets wrong most often when it joins a condition onto one line. It is
+    deterministic, so running it is cheaper than a retry. Returns the original
+    code when ruff is unavailable or the module does not parse.
+    """
+    ruff = _ruff_executable()
+    if ruff is None:
+        return code
+
+    repo_root = Path(__file__).resolve().parents[2]
+    try:
+        proc = subprocess.run(
+            [
+                ruff,
+                "format",
+                "--stdin-filename",
+                "generated_component.py",
+                "-",
+            ],
+            input=code,
+            text=True,
+            capture_output=True,
+            cwd=repo_root,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return code
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return code
+    return proc.stdout
+
+
 def _ruff_fix(code: str) -> str:
     """Apply ruff's safe automatic fixes and return the rewritten module.
 
@@ -871,8 +906,16 @@ class ComponentSourceCode(LLMValidated):
             code = explicit
             tree = ast.parse(code)
 
-        # Import order, unused imports and modern syntax are mechanical; let
-        # ruff fix them before any judge call.
+        # A long line is the model's most common ruff failure, and formatting
+        # fixes it deterministically. Only format when it is needed, so code
+        # that already fits is left exactly as written.
+        if any("E501" in line for line in _ruff_violations(code)):
+            formatted = _ruff_format(code)
+            if formatted != code:
+                self.code = SourceLines(formatted)
+                code = formatted
+                tree = ast.parse(code)
+
         fixed = _ruff_fix(code)
         if fixed != code:
             self.code = SourceLines(fixed)

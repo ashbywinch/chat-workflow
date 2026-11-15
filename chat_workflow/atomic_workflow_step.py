@@ -79,9 +79,10 @@ class AtomicWorkflowStep(Generic[TResult]):
         # workflow eventually produced a valid result for that turn. This is
         # how we see near-misses (recovered) instead of only hard failures.
         self.validation_events: list[dict[str, Any]] = []
-        # The unanswered-question nudge is spent once per step; repeating it
-        # would spend the turn budget on a conversation nicety.
+        # Each conversation nudge is spent once per step; repeating one would
+        # spend the turn budget on a nicety.
         self._question_nudged = False
+        self._repetition_nudged = False
 
         for message in config.initial_messages or []:
             self.messages.append(message)
@@ -175,10 +176,8 @@ class AtomicWorkflowStep(Generic[TResult]):
                     self.debug.on_error(exc)
                 raise
 
-            failure = (
-                self._language_failure(response)
-                or self._vocabulary_failure(response)
-                or self._repetition_failure(response)
+            failure = self._language_failure(response) or self._vocabulary_failure(
+                response
             )
             if failure is not None:
                 if attempt >= self._validation_corrections:
@@ -186,9 +185,19 @@ class AtomicWorkflowStep(Generic[TResult]):
                 self._apply_correction(failure, attempt + 1)
                 continue
 
-            # A single nudge, not a gate: an unanswered question is a
-            # conversation flaw, not a broken result. It must never fail a step
-            # that would otherwise succeed, and never cost more than one turn.
+            # Conversation nits — a repeated confirmation, an unanswered
+            # question — are nudged once each and never allowed to fail a step
+            # that produced a valid result. They cost at most two turns.
+            repeated = self._repetition_failure(response)
+            if (
+                repeated is not None
+                and not self._repetition_nudged
+                and attempt < self._validation_corrections
+            ):
+                self._repetition_nudged = True
+                self._apply_correction(repeated, attempt + 1)
+                continue
+
             unanswered = self._unanswered_question_failure(response)
             if (
                 unanswered is not None
