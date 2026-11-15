@@ -300,6 +300,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         session.io.echo("\nLet me understand how it all fits together.")
         analysis = generate_from_chat(
             session=session,
+            process_description=process_description,
         )
 
         session.io.echo(

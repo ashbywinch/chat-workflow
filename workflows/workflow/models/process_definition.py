@@ -68,10 +68,18 @@ class ProcessDefinition(LLMValidated):
 
 @atomic_workflow_step(conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE])
 def _gather_notes(
+    process_description: Annotated[
+        str, "What the person already told you about their process"
+    ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
     """Greet the user, explain that you are going to understand what they do,
     then ask "What do you do?".
+
+    If `process_description` is not empty, it is what the user already told
+    you. Start from it, reflect it back, and ask only what it does not cover.
+    Do not ask "what do you do?" or ask them to repeat the output they already
+    described.
 
     Listen. If they give enough detail — what they do, the main steps, who is
     involved — send a continue message that summarizes what you heard and asks
@@ -138,14 +146,25 @@ def _generate_from_notes(
 def generate_from_chat(
     *,
     session: Annotated[Session, "The chat session"],
+    process_description: Annotated[
+        str, "What the person already told you about their process"
+    ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
     """Orchestrate gathering notes and generating a process definition.
 
     First explores the user's process openly, then synthesizes a structured
-    ProcessDefinition from the gathered notes.
+    ProcessDefinition from the gathered notes. When `process_description` is
+    provided, start from it instead of asking the user to repeat it.
     """
-    notes = _gather_notes(session=session, max_turns=max_turns)
+    if process_description:
+        notes = _gather_notes(
+            process_description=process_description,
+            session=session,
+            max_turns=max_turns,
+        )
+    else:
+        notes = _gather_notes(session=session, max_turns=max_turns)
     return _generate_from_notes(notes=notes, session=session, max_turns=max_turns)
 
 
