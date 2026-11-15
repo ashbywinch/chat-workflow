@@ -217,6 +217,90 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         kinds = [event.meta.get("kind") for event in orchestrator.events]
         self.assertIn("repaired_escape", kinds)
 
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    @patch("chat_workflow.llm_interaction.get_client")
+    @patch("chat_workflow.atomic_workflow_step.time.sleep", return_value=None)
+    def test_a_transient_provider_error_resends_the_same_request(
+        self, mock_sleep, mock_get_client, mock_collect
+    ):
+        """A 500 is the provider's problem; the turn must not advance."""
+        from chat_workflow.atomic_workflow_step import _is_transient_provider_error
+
+        class InternalServerError(Exception):
+            status_code = 500
+
+        given = []
+
+        def sometimes_fail(**kwargs):
+            given.append(list(kwargs["messages"]))
+            if len(given) == 1:
+                raise InternalServerError("Error code: 500 - upstream failed")
+            return AgentResponse[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS, result=make_valid_criteria()
+            )
+
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = sometimes_fail
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(max_retries=1, provider_retries=3)
+        )
+
+        result = orchestrator._call_llm()
+
+        self.assertEqual(result.intent, AgentIntent.SUCCESS)
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+        self.assertEqual(given[0], given[1], "the same messages are resent")
+        self.assertTrue(_is_transient_provider_error(InternalServerError("x")))
+        kinds = [event.meta.get("kind") for event in orchestrator.events]
+        self.assertIn("provider_retry", kinds)
+
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    @patch("chat_workflow.llm_interaction.get_client")
+    @patch("chat_workflow.atomic_workflow_step.time.sleep", return_value=None)
+    def test_transient_retries_are_bounded(
+        self, mock_sleep, mock_get_client, mock_collect
+    ):
+        class ServiceUnavailableError(Exception):
+            status_code = 503
+
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = ServiceUnavailableError("down")
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(max_retries=1, provider_retries=2)
+        )
+
+        with self.assertRaises(ServiceUnavailableError):
+            orchestrator._call_llm()
+
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+        self.assertEqual(orchestrator.messages, [{"role": "system", "content": "Test prompt"}])
+
+    def test_a_validation_error_is_not_transient(self):
+        from chat_workflow.atomic_workflow_step import _is_transient_provider_error
+        from chat_workflow.exceptions import MaxRetriesExceededError, ValidationError
+
+        self.assertFalse(_is_transient_provider_error(ValidationError("bad field")))
+        self.assertFalse(_is_transient_provider_error(MaxRetriesExceededError(3, "nope")))
+        self.assertFalse(_is_transient_provider_error(RuntimeError("plain failure")))
+
+    def test_a_wrapped_provider_error_is_still_transient(self):
+        from chat_workflow.atomic_workflow_step import _is_transient_provider_error
+
+        class BadGatewayError(Exception):
+            status_code = 502
+
+        try:
+            try:
+                raise BadGatewayError("bad gateway")
+            except BadGatewayError as inner:
+                raise RuntimeError("client gave up") from inner
+        except RuntimeError as wrapped:
+            self.assertTrue(_is_transient_provider_error(wrapped))
+
     def test_repair_keeps_a_regex_backslash(self):
         """A stray backslash before a letter is a literal, not a newline."""
         from chat_workflow.atomic_workflow_step import _repair_json_escapes

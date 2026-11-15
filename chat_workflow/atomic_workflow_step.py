@@ -1,5 +1,6 @@
 import copy
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, get_args, get_origin
@@ -61,6 +62,7 @@ class AtomicWorkflowStep(Generic[TResult]):
         self._provider: ProviderType = config.provider
         self._max_retries = config.max_retries
         self._validation_corrections = config.validation_corrections
+        self._provider_retries = config.provider_retries
         self._request_timeout_seconds = config.request_timeout_seconds
         self._model_supports_tools = config.model_supports_tools
         self._api_base: str | None = config.api_base
@@ -149,7 +151,7 @@ class AtomicWorkflowStep(Generic[TResult]):
         client = self._client()
         for attempt in range(self._validation_corrections + 1):
             try:
-                response = self._request(client)
+                response = self._request_with_retry(client)
             except InstructorRetryException as exc:
                 response, repaired_failure = _recover_from_mangled_escape(
                     exc, self.response_model
@@ -211,6 +213,36 @@ class AtomicWorkflowStep(Generic[TResult]):
             self._mark_recovered()
             return response
 
+        raise AssertionError("unreachable")
+
+    def _request_with_retry(self, client: Any) -> AgentResponse[TResult]:
+        """Resend the same request when the provider fails transiently.
+
+        A 5xx, a dropped connection or a rate limit says nothing about the
+        conversation: the same messages are sent again, so the turn does not
+        advance and the model never sees the failure. A validation error is
+        not transient and is left to the correction path.
+        """
+        attempts = max(1, self._provider_retries)
+        for attempt in range(attempts):
+            try:
+                return self._request(client)
+            except Exception as exc:
+                if attempt + 1 >= attempts or not _is_transient_provider_error(exc):
+                    raise
+                self.events.append(
+                    TranscriptEvent(
+                        type="framework",
+                        content=None,
+                        turn=self.turn_count,
+                        meta={
+                            "kind": "provider_retry",
+                            "attempt": attempt + 1,
+                            "error": type(exc).__name__,
+                        },
+                    )
+                )
+                time.sleep(min(2**attempt, 8))
         raise AssertionError("unreachable")
 
     def _client(self) -> Any:
@@ -751,6 +783,41 @@ def _repair_json_escapes(text: str) -> str:
         out.append("\\\\")
         index += 1
     return "".join(out)
+
+
+# Provider failures that say nothing about the conversation: sending the same
+# request again is the right response. Everything else (a validation error, a
+# bad request, a missing model) is surfaced.
+_TRANSIENT_PROVIDER_ERRORS = frozenset(
+    {
+        "InternalServerError",
+        "ServiceUnavailableError",
+        "APIConnectionError",
+        "APITimeoutError",
+        "Timeout",
+        "RateLimitError",
+        "TryAgain",
+    }
+)
+
+
+def _is_transient_provider_error(exc: BaseException) -> bool:
+    """True when resending the same request could succeed.
+
+    Walks the cause chain so a wrapped provider error is still recognised, and
+    falls back to the HTTP status when the client does not expose a named type.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ in _TRANSIENT_PROVIDER_ERRORS:
+            return True
+        status = getattr(current, "status_code", None)
+        if isinstance(status, int) and (status == 429 or status >= 500):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 def _recover_from_mangled_escape(

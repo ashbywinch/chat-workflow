@@ -34,6 +34,11 @@ class AtomicWorkflowStepConfig(Generic[TResult]):
     # failures visible to the model. Chat-off generation uses one sample per
     # call, so each correction is an informed retry.
     validation_corrections: int = 2
+    # How many times to resend the same request when the provider fails
+    # transiently (a 5xx, a connection drop, a rate limit). The turn is not
+    # advanced, no message is appended, and the model never sees the failure:
+    # a flaky gateway must not fail a conversation that was going fine.
+    provider_retries: int = 3
     request_timeout_seconds: int = 30
     model_supports_tools: bool = False
     api_base: str | None = None
