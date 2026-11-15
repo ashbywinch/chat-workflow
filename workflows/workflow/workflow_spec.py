@@ -45,11 +45,12 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         Validation(
             "Must show the entry point, the flow of work between participants, "
             "at least one decision point, a return flow, and a clear outcome. "
-            "A decision point is an `alt` block with an `else` branch; an "
-            "`opt` block is a single optional step, not a decision point. A "
-            "return flow is an arrow back to a participant who sent work "
-            "earlier. The outcome is the last message, to whoever receives the "
-            "work. Work may pass directly from one component to another; a "
+            "A decision point is either an `alt` block with `else` branches, "
+            "for a choice between paths, or an `opt` block, for a step that "
+            "may or may not happen; an `opt` needs no else branch. A return "
+            "flow is an arrow back to a participant who sent work earlier. "
+            "The outcome is the last message, to whoever receives the work. "
+            "Work may pass directly from one component to another; a "
             "separate coordinator is optional and must not be invented just to "
             "have one"
         ),
@@ -190,9 +191,10 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         - Show direct handoffs between components when the work simply passes
           from one to the next. Include a coordinator participant only when a
           component really does coordinate the others; do not invent one.
-        - Use `alt` with an `else` branch for the decision point, not `opt`,
-          which has only one branch. Show the return flow as an arrow back to
-          a participant who sent work earlier. A business role may be a participant,
+        - Use `alt` with an `else` branch for a choice between paths, or `opt`
+          for a step that may or may not happen; an `opt` needs no else branch.
+          Show the return flow as an arrow back to a participant who sent work
+          earlier. A business role may be a participant,
           but do not give it a flow unless a component owns that activity; if
           no component owns the acknowledgement, show it as a step of the
           component that owns the artifact.
