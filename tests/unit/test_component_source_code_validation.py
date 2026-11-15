@@ -325,19 +325,32 @@ class MinutesDraft(BaseModel):
         self.assertIn("E501", str(ctx.exception))
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_nonexistent_submodule_import_is_rejected(self, mock_collect):
-        """Resolution checks the full module path, not just the top-level package."""
-        from chat_workflow.exceptions import ValidationError
-
+    def test_legacy_framework_import_is_rewritten(self, mock_collect):
+        """The old path has an exact replacement, so it is fixed, not rejected."""
         code = VALID_COMPONENT_CODE.replace(
             "from chat_workflow import atomic_workflow_step",
             "from chat_workflow.workflow import atomic_workflow_step",
         )
 
+        component = ComponentSourceCode(code=code)
+
+        self.assertIn("from chat_workflow import atomic_workflow_step", component.code)
+        self.assertNotIn("chat_workflow.workflow", component.code)
+
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    def test_an_invented_dependency_is_still_rejected(self, mock_collect):
+        """Rewriting is for known aliases only; a made-up package still fails."""
+        from chat_workflow.exceptions import ValidationError
+
+        code = VALID_COMPONENT_CODE.replace(
+            "from chat_workflow import atomic_workflow_step",
+            "from pydantic_ai import atomic_workflow_step",
+        )
+
         with self.assertRaises(ValidationError) as ctx:
             ComponentSourceCode(code=code)
 
-        self.assertIn("chat_workflow.workflow", str(ctx.exception))
+        self.assertIn("pydantic_ai", str(ctx.exception))
 
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])

@@ -781,6 +781,26 @@ def _words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
+_FRAMEWORK_IMPORT_ALIASES: dict[str, str] = {
+    # The package was reorganised; the old paths still appear in the wild.
+    "chat_workflow.workflow": "chat_workflow",
+    "chat_workflow.workflow.decorators": "chat_workflow",
+}
+
+
+def _canonical_framework_imports(code: str) -> str:
+    """Rewrite a framework import path that has an exact replacement."""
+    for legacy, canonical in _FRAMEWORK_IMPORT_ALIASES.items():
+        if legacy not in code:
+            continue
+        code = re.sub(
+            rf"(from\s+){re.escape(legacy)}\b",
+            lambda match, canonical=canonical: match.group(1) + canonical,
+            code,
+        )
+    return code
+
+
 def _unresolvable_imports(tree: ast.AST) -> list[str]:
     """Return module paths that cannot be resolved in this environment.
 
@@ -904,6 +924,15 @@ class ComponentSourceCode(LLMValidated):
         if explicit != code:
             self.code = SourceLines(explicit)
             code = explicit
+            tree = ast.parse(code)
+
+        # `chat_workflow.workflow` is a legacy path with an exact, known
+        # replacement. Rewriting it is mechanical; rejecting it only spends a
+        # model retry on a spelling the framework can fix itself.
+        canonical = _canonical_framework_imports(code)
+        if canonical != code:
+            self.code = SourceLines(canonical)
+            code = canonical
             tree = ast.parse(code)
 
         # A long line is the model's most common ruff failure, and formatting

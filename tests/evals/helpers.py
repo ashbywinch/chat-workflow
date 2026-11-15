@@ -708,7 +708,7 @@ def make_meeting_minutes_deliverable():
             "Every decision has a reason, every action item has an owner and "
             "a due date, and the attendee list is complete."
         ),
-        integration_points="Emailed to attendees and absentees, who review the decisions and action items.",
+        integration_points="Emailed to attendees and absentees, who review and follow up.",
         storage_requirements="Shared drive, one folder per meeting series",
     )
 

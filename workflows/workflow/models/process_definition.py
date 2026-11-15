@@ -31,7 +31,9 @@ class ProcessDefinition(LLMValidated):
         "Process'), a label that is only generic ('Manager', 'Coordinator'), "
         "or a software product the user does not use. A role that names what "
         "it coordinates is specific ('Meeting Minutes Coordinator'), not "
-        "generic. A separate coordinator is optional.",
+        "generic. When the user names their own role as 'me', 'I', or "
+        "'myself', that is their answer and is accepted; do not demand a job "
+        "title. A separate coordinator is optional.",
     ]
 
     phases: Annotated[

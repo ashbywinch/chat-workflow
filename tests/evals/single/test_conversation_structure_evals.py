@@ -218,7 +218,7 @@ class TestDomainProposalEval(unittest.TestCase):
             success_criteria=(
                 "Every decision is recorded and every action item names an owner."
             ),
-            integration_points="Emailed to attendees, who review the decisions and action items.",
+            integration_points="Emailed to attendees, who review and follow up.",
             storage_requirements="Shared drive, one folder per meeting series",
         )
         result = run_multi_turn_eval(
