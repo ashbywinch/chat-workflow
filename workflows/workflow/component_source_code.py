@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, ClassVar, override
 
@@ -35,6 +36,26 @@ def _basemodel_class_names(tree: ast.AST) -> set[str]:
     return names
 
 
+def _column_to_index(line: str, column: int) -> int:
+    """Convert an AST column offset into a character index in ``line``.
+
+    ``ast`` reports column offsets in UTF-8 bytes. Slicing a ``str`` with them
+    lands in the wrong place as soon as the line holds a non-ASCII character —
+    an em dash in a description is enough to splice code into the next line.
+    """
+    if column <= 0:
+        return 0
+    return len(line.encode("utf-8")[:column].decode("utf-8", errors="ignore"))
+
+
+def _absolute_index(code: str, lineno: int, column: int) -> int:
+    """The character index of an AST position in the whole module."""
+    lines = code.splitlines(keepends=True)
+    return sum(len(line) for line in lines[: lineno - 1]) + _column_to_index(
+        lines[lineno - 1], column
+    )
+
+
 def _ensure_min_length(code: str, tree: ast.AST) -> str:
     """Add ``min_length=1`` to required ``str`` fields that lack it.
 
@@ -47,13 +68,6 @@ def _ensure_min_length(code: str, tree: ast.AST) -> str:
     base_names = _basemodel_class_names(tree)
     if not base_names:
         return code
-
-    line_starts = [0]
-    for line in code.splitlines(keepends=True):
-        line_starts.append(line_starts[-1] + len(line))
-
-    def offset(lineno: int, col: int) -> int:
-        return line_starts[lineno - 1] + col
 
     insertions: list[int] = []
     for cls_node in ast.walk(tree):
@@ -103,14 +117,28 @@ def _ensure_min_length(code: str, tree: ast.AST) -> str:
                 continue
             if last_arg.end_lineno is None or last_arg.end_col_offset is None:
                 continue
-            insertions.append(offset(last_arg.end_lineno, last_arg.end_col_offset))
+            insertions.append(
+                _absolute_index(code, last_arg.end_lineno, last_arg.end_col_offset)
+            )
 
     for pos in sorted(insertions, reverse=True):
         code = code[:pos] + ", min_length=1" + code[pos:]
     return code
 
 
-def _split_description(text: str, width: int) -> list[str]:
+def _escaped_length(text: str) -> int:
+    """The width a string occupies once ``json.dumps`` has escaped it.
+
+    A non-ASCII character costs one character in the source but six in the
+    rendered literal (``\\u2014``), so measuring the raw text overruns the
+    line limit.
+    """
+    return len(json.dumps(text))
+
+
+def _split_description(
+    text: str, width: int, measure: Callable[[str], int] = len
+) -> list[str]:
     """Split a description into lines that fit, preserving spaces at joins."""
     words = text.split()
     if not words:
@@ -119,7 +147,7 @@ def _split_description(text: str, width: int) -> list[str]:
     current = ""
     for word in words:
         candidate = f"{current} {word}".strip()
-        if len(candidate) > width and current:
+        if measure(candidate) > width and current:
             lines.append(current + " ")
             current = word
         else:
@@ -172,7 +200,9 @@ def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
                     arguments.append(single)
                     continue
                 width = max(20, 120 - len(argument_indent) - 4 - 3)
-                chunks = _split_description(argument.value.value, width)
+                chunks = _split_description(
+                    argument.value.value, width, _escaped_length
+                )
                 inner = "\n".join(f"    {json.dumps(chunk)}" for chunk in chunks)
                 arguments.append(f"{argument.arg}=(\n{inner}\n)")
             else:
@@ -193,7 +223,11 @@ def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
         line = lines[line_number]
         newline = "\n" if line.endswith("\n") else ""
         content = line.rstrip("\n")
-        lines[line_number] = content[:start] + wrapped + content[end:] + newline
+        start_index = _column_to_index(content, start)
+        end_index = _column_to_index(content, end)
+        lines[line_number] = (
+            content[:start_index] + wrapped + content[end_index:] + newline
+        )
     return "".join(lines)
 
 
@@ -232,13 +266,13 @@ def _wrap_long_field_strings(code: str, tree: ast.AST) -> str:
             # `_split_description` keeps a trailing space on every line but the
             # last so concatenation preserves the text; leave room for it.
             width = max(20, 120 - value.col_offset - 3)
-            chunks = _split_description(value.value, width)
+            chunks = _split_description(value.value, width, _escaped_length)
             indent = " " * value.col_offset
             rendered = json.dumps(chunks[0])
             for chunk in chunks[1:]:
                 rendered += "\n" + indent + json.dumps(chunk)
-            start = sum(len(line) for line in lines[:start_line]) + value.col_offset
-            end = sum(len(line) for line in lines[:end_line]) + value.end_col_offset
+            start = _absolute_index(code, start_line + 1, value.col_offset)
+            end = _absolute_index(code, end_line + 1, value.end_col_offset)
             replacements.append((start, end, rendered))
     for start, end, rendered in sorted(replacements, reverse=True):
         code = code[:start] + rendered + code[end:]
@@ -273,13 +307,13 @@ def _wrap_long_list_strings(code: str, tree: ast.AST) -> str:
             ):
                 continue
             width = max(20, 120 - element.col_offset - 3)
-            chunks = _split_description(element.value, width)
+            chunks = _split_description(element.value, width, _escaped_length)
             indent = " " * element.col_offset
             rendered = json.dumps(chunks[0])
             for chunk in chunks[1:]:
                 rendered += "\n" + indent + json.dumps(chunk)
-            start = sum(len(line) for line in lines[:start_line]) + element.col_offset
-            end = sum(len(line) for line in lines[:end_line]) + element.end_col_offset
+            start = _absolute_index(code, start_line + 1, element.col_offset)
+            end = _absolute_index(code, end_line + 1, element.end_col_offset)
             replacements.append((start, end, rendered))
     for start, end, rendered in sorted(replacements, reverse=True):
         code = code[:start] + rendered + code[end:]
@@ -339,6 +373,31 @@ def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
     for after_line, text in sorted(insertions, reverse=True):
         lines.insert(after_line, text)
     return "".join(lines)
+
+
+def _add_raise_from_none(code: str, tree: ast.AST) -> str:
+    """Make a bare ``raise`` inside an ``except`` clause explicit.
+
+    Ruff's B904 requires the cause to be stated. A validator that turns one
+    error into another almost always means ``from None``.
+    """
+    insertions: list[int] = []
+    for handler in ast.walk(tree):
+        if not isinstance(handler, ast.ExceptHandler):
+            continue
+        for node in ast.walk(handler):
+            if not isinstance(node, ast.Raise):
+                continue
+            if node.exc is None or node.cause is not None:
+                continue
+            if node.end_lineno is None or node.end_col_offset is None:
+                continue
+            insertions.append(
+                _absolute_index(code, node.end_lineno, node.end_col_offset)
+            )
+    for position in sorted(insertions, reverse=True):
+        code = code[:position] + " from None" + code[position:]
+    return code
 
 
 def _ruff_executable() -> str | None:
@@ -775,6 +834,12 @@ class ComponentSourceCode(LLMValidated):
         if fixed_self != code:
             self.code = fixed_self
             code = fixed_self
+            tree = ast.parse(code)
+
+        explicit = _add_raise_from_none(code, tree)
+        if explicit != code:
+            self.code = explicit
+            code = explicit
             tree = ast.parse(code)
 
         # Import order, unused imports and modern syntax are mechanical; let

@@ -350,6 +350,38 @@ class MinutesDraft(BaseModel):
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
+    def test_non_ascii_line_does_not_shift_the_min_length_insertion(self):
+        """AST columns are UTF-8 bytes; an em dash must not splice the code."""
+        from workflows.workflow.component_source_code import _ensure_min_length
+
+        code = (
+            "from pydantic import BaseModel, Field\n\n\n"
+            "class M(BaseModel):\n"
+            '    summary: str = Field(..., description="Summary — of the meeting")\n'
+        )
+        import ast
+
+        fixed = _ensure_min_length(code, ast.parse(code))
+
+        self.assertIn('"Summary — of the meeting", min_length=1)', fixed)
+        compile(fixed, "generated", "exec")
+
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    def test_wrapped_line_with_a_non_ascii_character_still_fits(self, mock_collect):
+        """A non-ASCII character costs six characters once escaped."""
+        description = "Summary of the meeting — " + "decision " * 20
+        code = VALID_COMPONENT_CODE.replace(
+            '"A short description."', f'"{description.strip()}"'
+        )
+
+        component = ComponentSourceCode(code=code)
+
+        compile(component.code, "generated", "exec")
+        self.assertTrue(
+            all(len(line) <= 120 for line in component.code.splitlines()),
+            "every wrapped line must fit the limit",
+        )
+
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_field_validator_self_is_renamed_to_cls(self, mock_collect):
         """A field validator receives the class; `self` raises at import."""

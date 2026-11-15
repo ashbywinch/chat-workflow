@@ -92,7 +92,10 @@ class Resource(LLMValidated):
         sentence what you are doing and why, for example: "I want to understand
         what you start with, so it fits how you actually work."
         Match the user's register: use the words they use, and never introduce
-        a term for the output shape, a field, or the framework.
+        a term for the output shape, a field, or the framework. Never say
+        "completeness", "inventory", "resource", or "dependency" to the user:
+        say "to make sure you don't miss anything", "you just look and
+        remember", and "what it needs first".
 
         You already know what they make from `deliverables`. Do not ask what they
         are making or what they start with from scratch. Name the output and
