@@ -158,6 +158,11 @@ def _generate_from_notes(
     tidier business words. If they list concrete steps as their stages, accept
     those names and put the finer steps inside them.
 
+    Never answer with failure. The user has already described their work, so
+    there is always a breakdown to return: if the detail is thin, keep the
+    stages they gave and mark the uncertain steps as suggestions. When the user
+    gives "me" or "the person" as the role, that is the answer — use it.
+
     When the user confirms the breakdown, return success.
     """
     ...  # type: ignore[reportReturnType]

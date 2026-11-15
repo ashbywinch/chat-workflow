@@ -81,7 +81,11 @@ THINKING_PARTNER: tuple[str, str] = (
     "is an unrelated open question that ignores the user's last message. When "
     "the user rejects a proposal or asks for the assistant's opinion, it "
     "responds to that point with one concrete alternative proposal or "
-    "recommendation.",
+    "recommendation, in that same message, and finishes the recommendation "
+    "instead of reverting to a question. A question about the user's own "
+    "domain content is never an invitation to discuss it: acknowledge it in "
+    "one clause and return to the artifact. 'Sure, go ahead' is not a "
+    "redirect — it is joining in.",
 )
 
 INCORPORATES_CONTEXT: tuple[str, str] = (
