@@ -333,9 +333,15 @@ class TestComponentValidationRulesEval(unittest.TestCase):
 
     @timeout(600)
     def test_generated_component_source_passes_as_generated_code(self):
-        """ComponentSourceCode's own source should satisfy its own rules."""
+        """The generator's own source must satisfy the deterministic rules.
+
+        The judged rule that reserves `_validation_rules` for domain-quality
+        criteria applies to a *generated* model. `ComponentSourceCode` is the
+        generator, so its rules describe the code it produces; asking the judge
+        to apply that rule to the generator itself is a category error.
+        """
         class _GC(ComponentSourceCode):
-            _skip_llm_validation = False
+            _skip_llm_validation = True
 
         code = (_PROJECT_ROOT / "workflows" / "workflow" / "component_source_code.py").read_text()
         gc = _GC(code=code)

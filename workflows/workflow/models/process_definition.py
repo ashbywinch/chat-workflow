@@ -135,11 +135,12 @@ def _generate_from_notes(
     The notes below are what the user already told you and confirmed. Continue
     the conversation directly: no greeting, and never restate the stages they
     already confirmed — repeating them reads as asking the same question
-    again. Ask only about what the notes do not cover: who is involved and who
-    keeps the work moving. If the notes already cover those, return success at
-    once. Don't ask the user to elaborate on each step individually. If the
-    user doesn't know something, suggest ONE possibility and mark it as a
-    suggestion.
+    again. Propose the concrete steps inside each stage as a draft, drawn from
+    what they told you, and ask them to correct it; do not interview them
+    stage by stage. Ask only about what the notes do not cover: who is
+    involved and who keeps the work moving. If the notes already cover those,
+    return success at once. If the user doesn't know something, suggest ONE
+    possibility and mark it as a suggestion.
 
     With the user, never say "phases", "activities", "participants", or
     "orchestrating component"; say "the main stages", "the things that

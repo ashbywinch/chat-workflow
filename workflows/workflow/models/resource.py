@@ -38,13 +38,13 @@ class Resource(LLMValidated):
 
     source: Annotated[
         str,
-        UserLabel("where it comes from", "source", guard=False),
+        UserLabel("where it comes from", "source"),
     ] = Field(
         ..., description="Where it comes from (a person, system, document, or place)", min_length=1
     )
     format: Annotated[
         str,
-        UserLabel("what it looks like", "format", guard=False),
+        UserLabel("what it looks like", "format"),
     ] = Field(
         ...,
         description=(
@@ -93,9 +93,11 @@ class Resource(LLMValidated):
         what you start with, so it fits how you actually work."
         Match the user's register: use the words they use, and never introduce
         a term for the output shape, a field, or the framework. Never say
-        "completeness", "inventory", "resource", or "dependency" to the user:
-        say "to make sure you don't miss anything", "you just look and
-        remember", and "what it needs first".
+        "completeness", "inventory", "resource", "dependency", "source", or
+        "format" to the user: say "to make sure you don't miss anything",
+        "you just look and remember", "what it needs first", "where it comes
+        from", and "what it looks like". Never narrate what you are doing with
+        the result: no "I'll capture that" or "I'll record that".
 
         You already know what they make from `deliverables`. Do not ask what they
         are making or what they start with from scratch. Name the output and
