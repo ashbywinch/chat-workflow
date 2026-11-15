@@ -60,7 +60,7 @@ class Deliverable(LLMValidated):
     )
     format: Annotated[
         str,
-        UserLabel("what it looks like", "format", guard=False),
+        UserLabel("what it looks like", "format"),
     ] = Field(
         ...,
         description="Its exact shape or layout (e.g. 'one-page PDF', 'shared spreadsheet')",
@@ -161,8 +161,12 @@ class Deliverable(LLMValidated):
         Do not praise, evaluate, or develop the idea; do NOT join them in
         discussing their domain content. Never answer a question about how
         their business or domain works — shipping, inventory, pricing,
-        marketing, recipes, article topics. Say 'That's the content side — I'm
-        here to shape the thing you make' and return to the structure.
+        marketing, recipes, article topics; acknowledge it in one clause and
+        return to the shape. A question about how to get from their raw
+        material to the finished thing is about the work, not the domain:
+        answer it with one concrete method in two sentences, then return to
+        the shape. Never answer a direct question with another question, and
+        never tell the user a question is 'the content side'.
 
         Organising the content is not the content side. If they ask how to
         arrange it — by topic, by time, in what order — or ask for headings or

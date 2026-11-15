@@ -841,6 +841,10 @@ class ComponentSourceCode(LLMValidated):
         "exhaustive. All fields and helpers must serve the one artifact.",
         "REJECT if the class docstring describes the model's fields, "
         "structure, or validation rules.",
+        "The `create` conversation can produce data that satisfies every "
+        "validator in the model: each field a validator requires is asked for "
+        "in the conversation or filled with a stated default, so the model's "
+        "own rules never reject the draft it was told to accept.",
     ]
     _validation_rules_heading: ClassVar[str] = "Generated code validation rules"
 

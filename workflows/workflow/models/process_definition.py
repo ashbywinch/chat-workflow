@@ -28,8 +28,10 @@ class ProcessDefinition(LLMValidated):
         "work moving. The user's own role is valid when they do the work end "
         "to end (for example 'Freelance Writer' or 'Meal Planner'). It is not "
         "the name of the overall process ('Meal Planning', 'Content Creation "
-        "Process'), a generic label ('Manager', 'Coordinator'), or a software "
-        "product the user does not use. A separate coordinator is optional.",
+        "Process'), a label that is only generic ('Manager', 'Coordinator'), "
+        "or a software product the user does not use. A role that names what "
+        "it coordinates is specific ('Meeting Minutes Coordinator'), not "
+        "generic. A separate coordinator is optional.",
     ]
 
     phases: Annotated[
@@ -69,7 +71,9 @@ class ProcessDefinition(LLMValidated):
         description=(
             "The person or role that keeps the work moving; the user's own "
             "role is valid (for example 'Meal Planner'), the process name "
-            "('Meal Planning') is not"
+            "('Meal Planning') is not. A bare 'Coordinator' is too generic; "
+            "'Meeting Minutes Coordinator' names what it coordinates and is "
+            "specific enough."
         ),
         min_length=1,
     )
