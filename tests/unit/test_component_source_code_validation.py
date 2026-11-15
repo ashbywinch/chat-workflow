@@ -363,6 +363,21 @@ class MinutesDraft(BaseModel):
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    def test_a_tuple_description_is_joined(self, mock_collect):
+        """A wrapped description with commas is a tuple, not concatenation."""
+        code = VALID_COMPONENT_CODE.replace(
+            'description="When the meeting took place"',
+            'description=("When the meeting took place", "in local time")',
+        )
+
+        component = ComponentSourceCode(code=code)
+
+        self.assertIn(
+            'description="When the meeting took place in local time"', component.code
+        )
+        self.assertNotIn('("When the meeting took place"', component.code)
+
     def test_a_long_condition_is_wrapped_by_the_formatter(self):
         """A joined condition is the model's most common ruff failure."""
         from workflows.workflow.component_source_code import (

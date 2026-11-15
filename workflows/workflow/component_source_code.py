@@ -801,6 +801,48 @@ def _canonical_framework_imports(code: str) -> str:
     return code
 
 
+def _join_tuple_descriptions(code: str, tree: ast.AST) -> str:
+    """Collapse a tuple of strings in ``description=`` into one string.
+
+    A model that wraps a description across lines sometimes writes
+    ``description=("first part", "second part")``. That is a tuple, not
+    implicit concatenation: pydantic accepts it silently and every reader of
+    the field gets a tuple where a sentence was meant.
+    """
+    replacements: list[tuple[int, int, str]] = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "Field"
+        ):
+            continue
+        for keyword in node.keywords:
+            value = keyword.value
+            if keyword.arg != "description" or not isinstance(value, ast.Tuple):
+                continue
+            parts: list[str] = []
+            for element in value.elts:
+                if not (
+                    isinstance(element, ast.Constant)
+                    and isinstance(element.value, str)
+                ):
+                    parts = []
+                    break
+                parts.append(element.value)
+            if not parts:
+                continue
+            if value.end_lineno is None or value.end_col_offset is None:
+                continue
+            start = _absolute_index(code, value.lineno, value.col_offset)
+            end = _absolute_index(code, value.end_lineno, value.end_col_offset)
+            joined = " ".join(parts)
+            replacements.append((start, end, json.dumps(joined)))
+    for start, end, rendered in sorted(replacements, reverse=True):
+        code = code[:start] + rendered + code[end:]
+    return code
+
+
 def _unresolvable_imports(tree: ast.AST) -> list[str]:
     """Return module paths that cannot be resolved in this environment.
 
@@ -933,6 +975,12 @@ class ComponentSourceCode(LLMValidated):
         if canonical != code:
             self.code = SourceLines(canonical)
             code = canonical
+            tree = ast.parse(code)
+
+        joined = _join_tuple_descriptions(code, tree)
+        if joined != code:
+            self.code = SourceLines(joined)
+            code = joined
             tree = ast.parse(code)
 
         # A long line is the model's most common ruff failure, and formatting
@@ -1179,11 +1227,21 @@ class ComponentSourceCode(LLMValidated):
         else:
             field_names = []
 
-        missing_descriptions = [
-            name
-            for name in field_names
-            if not field_descriptions.get(name, "").strip()
-        ]
+        missing_descriptions = []
+        tuple_descriptions = []
+        for name in field_names:
+            description = field_descriptions.get(name, "")
+            if not isinstance(description, str):
+                tuple_descriptions.append(name)
+                continue
+            if not description.strip():
+                missing_descriptions.append(name)
+        if tuple_descriptions:
+            raise ValidationError(
+                "Field description= must be one string, not a tuple. Wrap the "
+                "text with implicit concatenation (adjacent string literals, "
+                "no commas). Fields: " + ", ".join(tuple_descriptions)
+            )
         if missing_descriptions:
             raise ValidationError(
                 "Every field of the primary Pydantic model must pass a "
