@@ -35,12 +35,26 @@ class ProcessDefinition(LLMValidated):
     phases: Annotated[
         list[str],
         UserLabel("the main stages", "phases", guard=False),
-    ] = Field(..., description="The main stages of the work, in order", min_length=1)
+    ] = Field(
+        ...,
+        description=(
+            "The broad stages of the work, in order, named as the user names "
+            "them (for example 'Plan', 'Shop', 'Cook'). A stage groups several "
+            "concrete steps; it is not itself one of those steps."
+        ),
+        min_length=1,
+    )
     activities: Annotated[
         list[str],
         UserLabel("the things you do", "activities", guard=False),
     ] = Field(
-        ..., description="The specific things that happen in those stages", min_length=1
+        ...,
+        description=(
+            "The concrete steps inside those stages, in the user's words (for "
+            "example 'check the fridge', 'write a list', 'buy groceries'). No "
+            "step may appear both here and as a stage."
+        ),
+        min_length=1,
     )
     orchestrating_component: Annotated[
         str,
@@ -135,10 +149,9 @@ def _generate_from_notes(
     own words for the role; do not replace "me" with a job title like "Meal
     Planner".
 
-    Phases are broad stages, such as Plan, Shop, and Cook. Activities are the
-    concrete steps inside them, such as check the fridge, write a list, and
-    buy groceries. Do not use the same concrete step as both a phase and an
-    activity. `participants` is required: the user plus anyone else involved.
+    Keep the stage names the user already gave you; do not rename them into
+    tidier business words. If they list concrete steps as their stages, accept
+    those names and put the finer steps inside them.
 
     When the user confirms the breakdown, return success.
     """

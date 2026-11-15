@@ -351,15 +351,15 @@ class MinutesDraft(BaseModel):
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_field_validator_cls_is_renamed_to_self(self, mock_collect):
-        """A field validator is an instance method; `cls` is mechanically wrong."""
+    def test_field_validator_self_is_renamed_to_cls(self, mock_collect):
+        """A field validator receives the class; `self` raises at import."""
         code = VALID_COMPONENT_CODE.replace(
             "from pydantic import Field",
             "from pydantic import Field, field_validator",
         ).replace(
             "    @atomic_workflow_step\n",
             '    @field_validator("meeting_date")\n'
-            "    def _check_date(cls, value: str) -> str:\n"
+            "    def _check_date(self, value: str) -> str:\n"
             "        return value.strip()\n\n"
             "    @atomic_workflow_step\n",
             1,
@@ -367,8 +367,9 @@ class MinutesDraft(BaseModel):
 
         component = ComponentSourceCode(code=code)
 
-        self.assertIn("def _check_date(self, value: str)", component.code)
-        self.assertNotIn("def _check_date(cls", component.code)
+        self.assertIn("def _check_date(cls, value: str)", component.code)
+        self.assertNotIn("def _check_date(self", component.code)
+        self.assertIn("@classmethod", component.code)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
     def test_model_validator_with_field_name_is_rejected(self, mock_collect):

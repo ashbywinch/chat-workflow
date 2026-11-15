@@ -287,12 +287,14 @@ def _wrap_long_list_strings(code: str, tree: ast.AST) -> str:
 
 
 def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
-    """Rename a field validator's first argument from ``cls`` to ``self``.
+    """Rename a field validator's first argument from ``self`` to ``cls``.
 
-    ``@field_validator`` methods are instance methods; ``cls`` trips ruff's
-    N805 and confuses readers. The rename is mechanical and safe.
+    Pydantic's ``@field_validator`` is a classmethod: it receives the class,
+    and a validator that takes ``self`` raises at import time. The rename is
+    mechanical and safe.
     """
     replacements: list[tuple[int, int, int]] = []
+    insertions: list[tuple[int, str]] = []
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -304,23 +306,27 @@ def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
         )
         if not is_field_validator:
             continue
-        # A classmethod validator keeps `cls`; only an instance validator
-        # should take `self`.
-        is_classmethod = any(
+        # Ruff only knows why the first argument is not `self` when the
+        # classmethod decorator is visible, so make it explicit.
+        has_classmethod = any(
             isinstance(decorator, ast.Name) and decorator.id == "classmethod"
             for decorator in node.decorator_list
         )
-        if is_classmethod:
-            continue
+        if not has_classmethod and node.decorator_list:
+            last = max(
+                decorator.end_lineno or decorator.lineno
+                for decorator in node.decorator_list
+            )
+            insertions.append((last, " " * node.col_offset + "@classmethod\n"))
         for argument in [*node.args.args, *node.args.kwonlyargs]:
-            if argument.arg == "cls" and argument.end_col_offset is not None:
+            if argument.arg == "self" and argument.end_col_offset is not None:
                 replacements.append(
                     (argument.lineno, argument.col_offset, argument.end_col_offset)
                 )
         for child in ast.walk(node):
             if (
                 isinstance(child, ast.Name)
-                and child.id == "cls"
+                and child.id == "self"
                 and child.end_col_offset is not None
             ):
                 replacements.append(
@@ -329,7 +335,9 @@ def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
     lines = code.splitlines(keepends=True)
     for lineno, start, end in sorted(replacements, reverse=True):
         line = lines[lineno - 1]
-        lines[lineno - 1] = line[:start] + "self" + line[end:]
+        lines[lineno - 1] = line[:start] + "cls" + line[end:]
+    for after_line, text in sorted(insertions, reverse=True):
+        lines.insert(after_line, text)
     return "".join(lines)
 
 
@@ -1198,10 +1206,10 @@ class ComponentSourceCode(LLMValidated):
         "`draft: \"MinutesDraft\"`. Use `@field_validator(\"field_name\")` for "
         "a single-field check and `@model_validator(mode=\"after\")` for a "
         "check across fields; `@model_validator` never takes a field name. "
-        "A field validator takes `self` and the value — "
-        "`def _check(self, value: str) -> str` — never `cls` and never "
-        "`@classmethod`. Use `@model_validator(mode=\"after\")` and return "
-        "`self`.",
+        "A field validator is a classmethod: it takes `cls` and the value — "
+        "`def _check(cls, value: str) -> str` — never `self`, and it needs no "
+        "extra `@classmethod`. A model validator takes `self`: use "
+        "`@model_validator(mode=\"after\")` and return `self`.",
         min_length=1,
     )
 

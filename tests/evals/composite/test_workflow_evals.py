@@ -162,7 +162,9 @@ class TestResourceEval(unittest.TestCase):
             method_kwargs=dict(
                 analysis=None,
                 deliverables=[make_weekly_menu_deliverable()],
-                max_turns=10,
+                # Five materials, one confirmed at a time: the rambling persona
+                # needs a couple of turns per material before it settles.
+                max_turns=14,
             ),
             user_persona=user_persona,
             judge_rules=REDIRECT_JUDGE_RULES,

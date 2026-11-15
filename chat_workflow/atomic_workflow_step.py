@@ -78,6 +78,9 @@ class AtomicWorkflowStep(Generic[TResult]):
         # workflow eventually produced a valid result for that turn. This is
         # how we see near-misses (recovered) instead of only hard failures.
         self.validation_events: list[dict[str, Any]] = []
+        # The unanswered-question nudge is spent once per step; repeating it
+        # would spend the turn budget on a conversation nicety.
+        self._question_nudged = False
 
         for message in config.initial_messages or []:
             self.messages.append(message)
@@ -182,11 +185,16 @@ class AtomicWorkflowStep(Generic[TResult]):
                 self._apply_correction(failure, attempt + 1)
                 continue
 
-            # A nudge, not a gate: an unanswered question is a conversation
-            # flaw, not a broken result, so it must never fail a step that
-            # would otherwise succeed.
+            # A single nudge, not a gate: an unanswered question is a
+            # conversation flaw, not a broken result. It must never fail a step
+            # that would otherwise succeed, and never cost more than one turn.
             unanswered = self._unanswered_question_failure(response)
-            if unanswered is not None and attempt < self._validation_corrections:
+            if (
+                unanswered is not None
+                and not self._question_nudged
+                and attempt < self._validation_corrections
+            ):
+                self._question_nudged = True
                 self._apply_correction(unanswered, attempt + 1)
                 continue
 
@@ -614,10 +622,16 @@ def _validation_failure(exc: Exception) -> ValidationFailure | None:
         ),
         None,
     )
+    rejected_text = _completion_text(exc)
+    if rejected_text is not None and not rejected_text.lstrip().startswith("{"):
+        # A plain-text reply is not a turn in this protocol. Echoing it back
+        # as an assistant message invites the model to keep chatting instead
+        # of returning the envelope.
+        rejected_text = None
     return ValidationFailure(
         reason=reason,
         guidance=guidance,
-        rejected_text=_completion_text(exc),
+        rejected_text=rejected_text,
     )
 
 
