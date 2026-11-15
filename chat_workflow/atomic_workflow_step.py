@@ -11,7 +11,7 @@ from .conversation_rules import FRAMEWORK_TERMS
 from .debug import _DebugTimer
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
-from .session_log import TranscriptEvent
+from .session_log import CorrectionKind, TranscriptEvent
 
 TResult = TypeVar("TResult")
 
@@ -34,7 +34,7 @@ class ValidationFailure:
     reason: str
     guidance: str | None = None
     rejected_text: str | None = None
-    kind: str = "validation_correction"
+    kind: CorrectionKind = "validation_correction"
 
     def message(self) -> str:
         if self.guidance:
@@ -98,7 +98,12 @@ class AtomicWorkflowStep(Generic[TResult]):
         if user_input.strip():
             self.messages.append({"role": "user", "content": user_input})
             self.events.append(
-                TranscriptEvent(type="user", content=user_input, turn=self.turn_count + 1)
+                TranscriptEvent(
+                    type="user",
+                    content=user_input,
+                    turn=self.turn_count + 1,
+                    audience="user",
+                )
             )
 
         self.turn_count += 1
@@ -108,7 +113,12 @@ class AtomicWorkflowStep(Generic[TResult]):
         if message and response.intent != AgentIntent.SUCCESS:
             self.messages.append({"role": "assistant", "content": message})
             self.events.append(
-                TranscriptEvent(type="assistant", content=message, turn=self.turn_count)
+                TranscriptEvent(
+                    type="assistant",
+                    content=message,
+                    turn=self.turn_count,
+                    audience="user",
+                )
             )
 
         if response.intent == AgentIntent.CONTINUE:
@@ -170,7 +180,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                         type="framework",
                         content=None,
                         turn=self.turn_count,
-                        meta={"kind": "repaired_escape"},
+                        kind="repaired_escape",
                     )
                 )
             except Exception as exc:
@@ -235,11 +245,8 @@ class AtomicWorkflowStep(Generic[TResult]):
                         type="framework",
                         content=None,
                         turn=self.turn_count,
-                        meta={
-                            "kind": "provider_retry",
-                            "attempt": attempt + 1,
-                            "error": type(exc).__name__,
-                        },
+                        kind="provider_retry",
+                        meta={"attempt": attempt + 1, "error": type(exc).__name__},
                     )
                 )
                 time.sleep(min(2**attempt, 8))
@@ -424,7 +431,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                     type="framework",
                     content=failure.rejected_text,
                     turn=self.turn_count,
-                    meta={"kind": "rejected_response"},
+                    kind="rejected_response",
                 )
             )
         correction = _correction_prompt(failure)
@@ -437,7 +444,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                 type="framework",
                 content=correction,
                 turn=self.turn_count,
-                meta={"kind": failure.kind},
+                kind=failure.kind,
             )
         )
 

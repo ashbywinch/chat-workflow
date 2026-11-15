@@ -240,7 +240,7 @@ class TestStructuredTranscript(unittest.TestCase):
     def test_judge_transcript_is_conversation_only(self):
         session = self._session()
 
-        text = format_transcript(session, result={"x": 1}, for_judge=True)
+        text = format_transcript(session, result={"x": 1}, audience="user")
 
         self.assertIn("[user]\nhello", text)
         self.assertIn("[assistant]\nhi", text)
@@ -265,7 +265,7 @@ class TestStructuredTranscript(unittest.TestCase):
         text = format_transcript(
             session,
             result={"x": 1},
-            for_judge=True,
+            audience="user",
             given={"name": "Meeting Minutes", "owner_role": "Meeting Coordinator"},
         )
 
@@ -273,13 +273,38 @@ class TestStructuredTranscript(unittest.TestCase):
         self.assertIn("Meeting Coordinator", text)
         self.assertLess(text.index("[given]"), text.index("[user]"))
 
+    def test_a_composite_echo_reaches_the_judge(self):
+        """`session.io.echo` prints to the user's screen, so the judge sees it."""
+        from chat_workflow.session_log import TranscriptEvent
+
+        session = Session(io=self._FakeIO(), state=SessionLog())
+        session.state.events = [
+            TranscriptEvent(type="user", content="write my minutes"),
+            TranscriptEvent(
+                type="framework",
+                content="Diagram saved to: /tmp/diagram.mmd",
+                kind="composite_echo",
+                audience="user",
+            ),
+            TranscriptEvent(
+                type="framework",
+                content="[framework] The user already confirmed.",
+                kind="repetition_correction",
+            ),
+        ]
+
+        judge_text = format_transcript(session, audience="user")
+
+        self.assertIn("Diagram saved to", judge_text)
+        self.assertNotIn("already confirmed", judge_text)
+
     def test_rejected_pretty_printed_envelope_is_framework(self):
         session = Session(io=self._FakeIO(), state=SessionLog())
         session.state.messages = [
             {"role": "assistant", "content": '{\n  "intent": "success"\n}'}
         ]
 
-        judge_text = format_transcript(session, for_judge=True)
+        judge_text = format_transcript(session, audience="user")
         human_text = format_transcript(session)
 
         self.assertNotIn("intent", judge_text)

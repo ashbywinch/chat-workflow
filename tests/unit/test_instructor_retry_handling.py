@@ -214,7 +214,7 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         self.assertEqual(mock_client.chat.completions.create.call_count, 1)
         # No correction was fed back: the repaired response was accepted.
         self.assertEqual([m["role"] for m in orchestrator.messages], ["system"])
-        kinds = [event.meta.get("kind") for event in orchestrator.events]
+        kinds = [event.kind for event in orchestrator.events]
         self.assertIn("repaired_escape", kinds)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
@@ -253,7 +253,7 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
         self.assertEqual(given[0], given[1], "the same messages are resent")
         self.assertTrue(_is_transient_provider_error(InternalServerError("x")))
-        kinds = [event.meta.get("kind") for event in orchestrator.events]
+        kinds = [event.kind for event in orchestrator.events]
         self.assertIn("provider_retry", kinds)
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])

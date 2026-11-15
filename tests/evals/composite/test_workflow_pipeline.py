@@ -104,7 +104,7 @@ class TestWorkflowPipelineEval(unittest.TestCase):
             # LLM judge on the conversation the user actually had. Framework
             # corrections and validation feedback are harness text, and feeding
             # them to the judge biases it towards agreeing with them.
-            transcript = format_transcript(session, for_judge=True)
+            transcript = format_transcript(session, audience="user")
             judge_result = llm_judge(judge_rules, transcript, config)
             failures = [v for v in judge_result.verdicts if not v.passed]
             assert not failures, (

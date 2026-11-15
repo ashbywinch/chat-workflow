@@ -36,16 +36,22 @@ class _RecordingIO(UserIO):
         clean = message.removeprefix("\nAssistant: ").strip()
         if clean:
             self._log.messages.append({"role": "assistant", "content": clean})
-            self._log.record("framework", clean, kind="composite_echo")
+            self._log.record(
+                "framework", clean, kind="composite_echo", audience="user"
+            )
         self._io.echo(message)
 
     @override
     def prompt(self, label: str, **kwargs: Any) -> str:
         self._log.messages.append({"role": "assistant", "content": label})
-        self._log.record("assistant", label, kind="composite_prompt")
+        self._log.record(
+            "assistant", label, kind="composite_prompt", audience="user"
+        )
         answer = self._io.prompt(label, **kwargs)
         self._log.messages.append({"role": "user", "content": answer})
-        self._log.record("user", answer, kind="composite_prompt")
+        self._log.record(
+            "user", answer, kind="composite_prompt", audience="user"
+        )
         return answer
 
 

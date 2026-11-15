@@ -314,15 +314,19 @@ def format_transcript(
     session: Session,
     result: Any = None,
     *,
-    for_judge: bool = False,
+    audience: str | None = None,
     given: dict[str, Any] | None = None,
 ) -> str:
     """Render the canonical event log as text.
 
-    ``for_judge`` produces the conversation-only projection: user and
-    assistant turns, plus a completion marker. Harness events, rejected
-    responses, validation feedback, and the result JSON are intentionally
-    excluded — the judge must not see text the user never saw.
+    ``audience="user"`` keeps only the entries the user saw: their turns, the
+    assistant's replies, and anything the harness echoed to the screen.
+    Corrections, validation feedback and the result JSON are internal, so they
+    stay out — a proofreader must not see text the user never saw. ``None``
+    keeps everything, for the audit view.
+
+    The audience is recorded on each event, so the projection is a property of
+    the data rather than of who is asking for it.
 
     ``given`` is the non-session context the method already received (the
     inputs from earlier phases). The judge needs it to tell "you already told
@@ -345,17 +349,16 @@ def format_transcript(
 
     if events:
         for event in events:
-            if event.type in ("user", "assistant"):
-                parts.append(f"[{event.type}]\n{event.content}")
-            elif event.type == "framework" and not for_judge:
-                parts.append(f"[framework]\n{event.content}")
-            elif event.type == "validation" and not for_judge:
+            if event.type == "result":
+                has_result = True
+                continue
+            if audience is not None and event.audience != audience:
+                continue
+            if event.type == "validation":
                 status = "recovered" if event.meta.get("recovered") else "unrecovered"
                 validation.append(f"[{status}] turn {event.turn}: {str(event.content or '')[:800]}")
-            elif event.type == "result":
-                has_result = True
-            elif event.type == "failure" and not for_judge:
-                parts.append(f"[failure]\n{event.content}")
+                continue
+            parts.append(f"[{event.type}]\n{event.content}")
     else:
         for message in session.state.messages:
             role = message.get("role", "?")
@@ -364,27 +367,21 @@ def format_transcript(
                 continue
             stripped = content.lstrip()
             if stripped.startswith("[framework]"):
-                if not for_judge:
+                if audience is None:
                     parts.append(f"[framework]\n{content}")
             elif role == "assistant" and stripped.startswith("{") and '"intent"' in stripped:
                 # A rejected completion envelope; never conversation.
-                if not for_judge:
+                if audience is None:
                     parts.append(f"[framework]\n{content}")
             else:
                 parts.append(f"[{role}]\n{content}")
 
-    if not for_judge and not events:
-        for event in getattr(session.state, "validation_events", None) or []:
-            status = "recovered" if event.get("recovered") else "unrecovered"
-            validation.append(
-                f"[{status}] turn {event.get('turn')}: {str(event.get('reason', ''))[:800]}"
-            )
     if validation:
         parts.append("[validation events]\n" + "\n".join(validation))
 
     has_result = has_result or result is not None
     if has_result:
-        if for_judge:
+        if audience is not None:
             parts.append("[structured-result]\n(workflow produced its validated result)")
         else:
             rendered = (
@@ -626,8 +623,11 @@ def run_multi_turn_eval(
         ):
             raise AssertionError("[no typed result] workflow returned None")
 
-    events = getattr(session.state, "validation_events", None) or []
-    recovered = [event for event in events if event.get("recovered")]
+    recovered = [
+        event
+        for event in session.state.events
+        if event.type == "validation" and event.meta.get("recovered")
+    ]
     if recovered:
         line = (
             f"  [recovered] {test_name or 'conversation'}: "
@@ -655,7 +655,7 @@ def run_multi_turn_eval(
 
     transcript = format_transcript(session, result=result, given=given)
     judge_transcript = format_transcript(
-        session, result=result, for_judge=True, given=given
+        session, result=result, audience="user", given=given
     )
 
     # The judge runs only after the workflow produced a typed result and a
