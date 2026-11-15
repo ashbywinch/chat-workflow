@@ -34,11 +34,11 @@ class ProcessDefinition(LLMValidated):
 
     phases: Annotated[
         list[str],
-        UserLabel("the main stages", "phases"),
+        UserLabel("the main stages", "phases", guard=False),
     ] = Field(..., description="The main stages of the work, in order", min_length=1)
     activities: Annotated[
         list[str],
-        UserLabel("the things you do", "activities"),
+        UserLabel("the things you do", "activities", guard=False),
     ] = Field(
         ..., description="The specific things that happen in those stages", min_length=1
     )
@@ -48,6 +48,7 @@ class ProcessDefinition(LLMValidated):
             "who keeps the work moving",
             "orchestrating component",
             "orchestrating",
+            guard=False,
         ),
     ] = Field(
         ...,
@@ -60,7 +61,7 @@ class ProcessDefinition(LLMValidated):
     )
     participants: Annotated[
         list[str],
-        UserLabel("everyone involved", "participants"),
+        UserLabel("everyone involved", "participants", guard=False),
     ] = Field(
         ..., description="Everyone involved (people, roles, or systems)", min_length=1
     )
