@@ -6,7 +6,6 @@ from typing import Any, Generic, TypeVar, get_args, get_origin
 
 from .annotations import UserLabel, user_labels
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
-from .conversation_rules import FRAMEWORK_TERMS
 from .debug import _DebugTimer
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
@@ -276,7 +275,7 @@ class AtomicWorkflowStep(Generic[TResult]):
     ) -> ValidationFailure | None:
         """Reject a message that leaks an internal label the user never used."""
         labels = user_labels(_inner_result_model(self.response_model))
-        if not labels and not FRAMEWORK_TERMS:
+        if not labels:
             return None
         message = response.message or ""
         user_text = _user_text(self.messages)
@@ -287,8 +286,6 @@ class AtomicWorkflowStep(Generic[TResult]):
             candidates[name] = label
             for alias in label.aliases:
                 candidates[alias] = label
-        for term, phrase in FRAMEWORK_TERMS.items():
-            candidates.setdefault(term, UserLabel(phrase, term))
         for term, label in candidates.items():
             if _mentions(message, term) and not _mentions(user_text, term):
                 return ValidationFailure(

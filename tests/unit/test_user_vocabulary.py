@@ -71,21 +71,6 @@ class TestVocabularyGuard(unittest.TestCase):
             step._vocabulary_failure(_continue("Tell me how you know it is good."))
         )
 
-    def test_framework_word_is_rejected_before_the_user_uses_it(self):
-        step = _step()
-
-        failure = step._vocabulary_failure(_continue("Let's map your workflow."))
-
-        assert failure is not None
-        self.assertIn("internal label 'workflow'", failure.reason)
-
-    def test_framework_word_is_allowed_when_the_user_uses_it(self):
-        step = _step()
-        step.messages.append({"role": "user", "content": "I run a workflow."})
-
-        self.assertIsNone(step._vocabulary_failure(_continue("Let's map your workflow.")))
-
-
 class TestRepetitionGuard(unittest.TestCase):
     def test_confirmation_question_after_yes_is_rejected(self):
         step = _step()
