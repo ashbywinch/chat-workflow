@@ -643,6 +643,45 @@ _FAILURE_GUIDANCE: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 
+def _describe_model_errors(error: Any) -> str:
+    """The model's broken rules, as the rules themselves state them.
+
+    Pydantic's ``str()`` buries the rule inside a truncated copy of the whole
+    input followed by a documentation link, and labels a model-level failure
+    with the envelope name rather than the model that rejected it. The model
+    needs two things: which rule it broke, and where that rule applies.
+    """
+    lines = []
+    for detail in error.errors():
+        where = ".".join(
+            str(part) for part in detail.get("loc", ()) if part != "result"
+        )
+        rule = _rule_text(str(detail.get("msg", "")).strip())
+        lines.append(f"- {where}: {rule}" if where else f"- {rule}")
+
+    name = _result_model_name(str(getattr(error, "title", "") or "the result"))
+    count = len(lines)
+    if count == 0:
+        return f"{name} rejected this result"
+    if count == 1:
+        return f"{name} rejected this result:\n{lines[0]}"
+    return f"{name} rejected this result on {count} rules:\n" + "\n".join(lines)
+
+
+def _result_model_name(title: str) -> str:
+    """`AgentResponse[MinutesDraft]` is the envelope; the model is `MinutesDraft`."""
+    match = re.search(r"\[(.+)\]$", title)
+    return match.group(1) if match else title
+
+
+def _rule_text(message: str) -> str:
+    """Drop Pydantic's error-type prefix, which carries no information."""
+    for prefix in ("Value error, ", "Assertion failed, "):
+        if message.startswith(prefix):
+            return message[len(prefix):]
+    return message
+
+
 def _validation_failure(exc: Exception) -> ValidationFailure | None:
     """Turn Instructor's last failed attempt into a correction, if it is one."""
     from json import JSONDecodeError
@@ -657,7 +696,11 @@ def _validation_failure(exc: Exception) -> ValidationFailure | None:
     cause = getattr(attempts[-1], "exception", None)
     if not isinstance(cause, (PydanticValidationError, ValidationError, JSONDecodeError)):
         return None
-    reason = str(cause).strip()
+    reason = (
+        _describe_model_errors(cause)
+        if isinstance(cause, PydanticValidationError)
+        else str(cause).strip()
+    )
     guidance = next(
         (
             text

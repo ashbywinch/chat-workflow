@@ -279,6 +279,69 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
         self.assertEqual(orchestrator.messages, [{"role": "system", "content": "Test prompt"}])
 
+    def test_a_model_rule_failure_names_the_rule_and_drops_the_noise(self):
+        """Pydantic's str() buries the rule; the model needs the rule itself."""
+        from pydantic import BaseModel, Field, ValidationError, model_validator
+
+        from chat_workflow.atomic_workflow_step import _describe_model_errors
+
+        class MinutesDraft(BaseModel):
+            decisions: list[str] = Field(...)
+
+            @model_validator(mode="after")
+            def _check(self):
+                if not self.decisions:
+                    raise ValueError("Every decision needs a stated rationale")
+                return self
+
+        with self.assertRaises(ValidationError) as ctx:
+            MinutesDraft(decisions=[])
+
+        described = _describe_model_errors(ctx.exception)
+
+        self.assertIn("MinutesDraft rejected this result", described)
+        self.assertIn("Every decision needs a stated rationale", described)
+        self.assertNotIn("input_value", described)
+        self.assertNotIn("errors.pydantic.dev", described)
+        self.assertNotIn("Value error,", described)
+
+    def test_a_field_rule_failure_names_the_field(self):
+        from pydantic import BaseModel, Field, ValidationError, field_validator
+
+        from chat_workflow.atomic_workflow_step import _describe_model_errors
+
+        class Draft(BaseModel):
+            meeting_date: str = Field(...)
+
+            @field_validator("meeting_date")
+            @classmethod
+            def _check(cls, value: str) -> str:
+                raise ValueError("meeting_date must be an ISO date")
+
+        with self.assertRaises(ValidationError) as ctx:
+            Draft(meeting_date="x")
+
+        described = _describe_model_errors(ctx.exception)
+
+        self.assertIn("- meeting_date: meeting_date must be an ISO date", described)
+
+    def test_the_envelope_name_is_not_shown_as_the_model(self):
+        from pydantic import BaseModel, ValidationError
+
+        from chat_workflow.atomic_workflow_step import _describe_model_errors
+        from chat_workflow.models import AgentResponse
+
+        class Inner(BaseModel):
+            value: int
+
+        with self.assertRaises(ValidationError) as ctx:
+            AgentResponse[Inner].model_validate({"intent": "success", "result": {}})
+
+        described = _describe_model_errors(ctx.exception)
+
+        self.assertIn("Inner rejected this result", described)
+        self.assertNotIn("AgentResponse", described)
+
     def test_a_validation_error_is_not_transient(self):
         from chat_workflow.atomic_workflow_step import _is_transient_provider_error
         from chat_workflow.exceptions import MaxRetriesExceededError, ValidationError
