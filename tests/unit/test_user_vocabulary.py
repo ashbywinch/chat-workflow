@@ -71,6 +71,40 @@ class TestVocabularyGuard(unittest.TestCase):
             step._vocabulary_failure(_continue("Tell me how you know it is good."))
         )
 
+def _success() -> AgentResponse[LabelledResult]:
+    return AgentResponse[LabelledResult](
+        intent="success",
+        result=LabelledResult(success_criteria="It works"),
+    )
+
+
+class TestUnansweredQuestionGuard(unittest.TestCase):
+    def test_success_after_a_question_is_rejected(self):
+        step = _step()
+        step.messages.append(
+            {"role": "user", "content": "Does that align with what you're thinking?"}
+        )
+
+        failure = step._unanswered_question_failure(_success())
+
+        assert failure is not None
+        self.assertIn("did not answer", failure.reason)
+
+    def test_success_after_anything_else_is_allowed(self):
+        step = _step()
+        step.messages.append({"role": "user", "content": "Anything else?"})
+
+        self.assertIsNone(step._unanswered_question_failure(_success()))
+
+    def test_continue_is_never_blocked(self):
+        step = _step()
+        step.messages.append({"role": "user", "content": "What do you think?"})
+
+        self.assertIsNone(
+            step._unanswered_question_failure(_continue("I would keep it short."))
+        )
+
+
 class TestRepetitionGuard(unittest.TestCase):
     def test_confirmation_question_after_yes_is_rejected(self):
         step = _step()

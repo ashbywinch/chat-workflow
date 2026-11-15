@@ -115,7 +115,9 @@ class Resource(LLMValidated):
         version). For each material, propose what it looks like and a likely
         completeness check from domain knowledge, then ask the user to confirm
         or correct. Do not ask them to describe the format or the check from
-        scratch. The check must be something they can apply as soon as they
+        scratch. Work through one material at a time: confirm the first
+        material before you describe the next, and never put completeness
+        checks for several materials in one message. The check must be something they can apply as soon as they
         have the material, not an outcome like 'no one complains'. A criterion
         describes the finished material, not the action that produces it:
         convert 'I recall the meals and list them'

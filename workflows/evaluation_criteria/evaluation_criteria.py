@@ -76,17 +76,21 @@ class EvaluationCriteria(LLMValidated):
         - Use the context to frame the criteria.
         - Ask one question at a time.
         - Start broad, then ask specific follow-ups.
-        - Base output only on information explicitly provided by the user.
+        - Base the criteria on what the user tells you. The one thing you
+          infer is their relative importance.
         - If the user is vague, ask clarifying questions.
         - The criteria must include one named "budget". If the user has not
-          mentioned cost, ask about it in plain language; do not invent a number.
-        - Ask which criteria matter most, or infer the ranking from the use
-          case the user describes, and set the weights from that ranking.
-          Never give every criterion the same default weight unless the user
-          says they matter equally; state an inferred ranking for confirmation.
-        - When you have enough, propose the complete set of criteria for
-          confirmation, then return success.
-        - If the user refuses to provide useful information, use intent="failure".
+          mentioned cost, ask about it once in plain language; do not invent a
+          number.
+        - Infer the ranking from the use case they describe and state it in
+          one sentence for confirmation. Never ask the user to rank the
+          criteria one by one. Never give every criterion the same default
+          weight unless the user says they matter equally.
+        - When you have enough, or the user asks you to finalize, propose the
+          complete set of criteria and return success in that same turn.
+        - Use intent="failure" only if the user refuses to take part at all. A
+          missing ranking, weight, or number is never a reason to fail: infer
+          it and say what you assumed.
         """
         ...  # type: ignore[reportReturnType]
 

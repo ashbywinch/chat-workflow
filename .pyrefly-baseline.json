@@ -313,9 +313,9 @@
    "severity": "error"
   },
   {
-   "line": 129,
+   "line": 130,
    "column": 17,
-   "stop_line": 129,
+   "stop_line": 130,
    "stop_column": 40,
    "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
    "code": -2,

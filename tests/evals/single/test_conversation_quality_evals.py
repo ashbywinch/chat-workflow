@@ -168,8 +168,8 @@ class TestJargonFreeEval(unittest.TestCase):
         )
         inputs = [
             Resource(
-                source="Dietary preferences",
-                format="List",
+                source="Family members",
+                format="List of dietary preferences",
                 dependencies=[],
                 validation_criteria=(
                     "Lists every dietary restriction for each family member by name."

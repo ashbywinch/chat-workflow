@@ -37,9 +37,10 @@ def make_minutes_draft_responsibilities() -> ComponentSpec:
             "and action items assigned — for the meeting attendees."
         ),
         scope_description=(
-            "Represents the formal written record of a meeting, including what was discussed, "
-            "decisions made, and action items assigned. Does NOT represent the meeting agenda, "
-            "pre-meeting materials, or follow-up communications."
+            "Produces and maintains the formal written record of a meeting: it turns the "
+            "meeting notes and attendee list into a record of what was discussed, the "
+            "decisions made, and the action items assigned. It does NOT produce the meeting "
+            "agenda, pre-meeting materials, or follow-up communications."
         ),
         required_inputs=["meeting_notes", "attendee_list"],
         component_type="artifact_producing",

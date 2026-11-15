@@ -175,6 +175,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                 self._language_failure(response)
                 or self._vocabulary_failure(response)
                 or self._repetition_failure(response)
+                or self._unanswered_question_failure(response)
             )
             if failure is not None:
                 if attempt >= self._validation_corrections:
@@ -280,6 +281,31 @@ class AtomicWorkflowStep(Generic[TResult]):
             ),
             rejected_text=message,
             kind="repetition_correction",
+        )
+
+    def _unanswered_question_failure(
+        self, response: AgentResponse[TResult]
+    ) -> ValidationFailure | None:
+        """Reject finishing a step while the user's last message asks a question.
+
+        A success turn carries no user-facing message, so returning success
+        straight after a question leaves the user unanswered.
+        """
+        if response.intent != AgentIntent.SUCCESS:
+            return None
+        if not _asks_the_assistant(_last_user_message(self.messages)):
+            return None
+        return ValidationFailure(
+            reason=(
+                "The user asked you a question in their last message and you "
+                "did not answer it."
+            ),
+            guidance=(
+                "Reply with intent 'continue' and a one-sentence answer, then "
+                "return the result after their next turn."
+            ),
+            rejected_text=response.message,
+            kind="unanswered_question_correction",
         )
 
     def _vocabulary_failure(
@@ -428,6 +454,29 @@ def _last_user_message(messages: list[dict[str, Any]]) -> str:
     return ""
 
 
+# A question about the next step is a confirmation in disguise; the step may
+# finish on it. Any other question is addressed to the agent and needs an
+# answer first.
+_NEXT_STEP_QUESTIONS = (
+    "anything else",
+    "what next",
+    "what's next",
+    "what now",
+    "shall we",
+    "should we",
+    "anything you'd like",
+    "anything you want to change",
+)
+
+
+def _asks_the_assistant(text: str) -> bool:
+    """True when the user's message asks the agent something."""
+    if "?" not in text:
+        return False
+    normalised = text.casefold()
+    return not any(phrase in normalised for phrase in _NEXT_STEP_QUESTIONS)
+
+
 def _is_confirmation(text: str) -> bool:
     """True for a short, unqualified yes — not a yes with a caveat."""
     normalised = re.sub(r"[^a-z0-9' ]+", "", text.strip().lower()).strip()
@@ -571,6 +620,7 @@ def _correction_prompt(failure: ValidationFailure) -> str:
         "language_correction",
         "vocabulary_correction",
         "repetition_correction",
+        "unanswered_question_correction",
     ):
         return f"[framework] {failure.message()}"
     return (

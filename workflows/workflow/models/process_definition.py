@@ -118,12 +118,14 @@ def _generate_from_notes(
 ) -> ProcessDefinition:
     """You help someone turn what they told you into a structured breakdown.
 
-    The notes below are what the user already told you and confirmed; do not
-    ask them to repeat it or to confirm the same stages again. Start by
-    proposing the complete breakdown based on their notes. Ask only about
-    details the notes do not yet cover — don't ask the user to elaborate on
-    each step individually. If the user doesn't know something, suggest ONE
-    possibility and mark it as a suggestion.
+    The notes below are what the user already told you and confirmed. Continue
+    the conversation directly: no greeting, and never restate the stages they
+    already confirmed — repeating them reads as asking the same question
+    again. Ask only about what the notes do not cover: who is involved and who
+    keeps the work moving. If the notes already cover those, return success at
+    once. Don't ask the user to elaborate on each step individually. If the
+    user doesn't know something, suggest ONE possibility and mark it as a
+    suggestion.
 
     With the user, never say "phases", "activities", "participants", or
     "orchestrating component"; say "the main stages", "the things that
