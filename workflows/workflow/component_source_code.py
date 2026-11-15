@@ -9,7 +9,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated, ClassVar, override
+from typing import Annotated, Any, ClassVar, override
 
 from pydantic import Field
 
@@ -34,6 +34,35 @@ def _basemodel_class_names(tree: ast.AST) -> set[str]:
                 if alias.name in _BASE_MODEL_SOURCES:
                     names.add(alias.asname or alias.name.rsplit(".", 1)[-1])
     return names
+
+
+def _join_source_lines(value: Any) -> Any:
+    """Accept the module as lines or as one string."""
+    if isinstance(value, list):
+        return "\n".join(str(line) for line in value)
+    return value
+
+
+class SourceLines(str):
+    """A module stored as text but exchanged with the model as lines.
+
+    A long module full of escaped newlines is where the provider's escape
+    corruption bites: a dropped character after a backslash silently merges
+    two lines. Asking for one string per line removes the escapes entirely,
+    while every consumer still sees ordinary source text.
+    """
+
+    @classmethod
+    def __get_pydantic_core_schema__(cls, source_type: Any, handler: Any) -> Any:
+        from pydantic_core import core_schema
+
+        return core_schema.no_info_before_validator_function(
+            _join_source_lines, core_schema.str_schema()
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> Any:
+        return {"type": "array", "items": {"type": "string"}}
 
 
 def _column_to_index(line: str, column: int) -> int:
@@ -808,37 +837,37 @@ class ComponentSourceCode(LLMValidated):
         # express this, so fill it in rather than spending judge retries on it.
         normalised = _ensure_min_length(code, tree)
         if normalised != code:
-            self.code = normalised
+            self.code = SourceLines(normalised)
             code = normalised
             tree = ast.parse(code)
 
         wrapped = _wrap_long_field_calls(code, tree)
         if wrapped != code:
-            self.code = wrapped
+            self.code = SourceLines(wrapped)
             code = wrapped
             tree = ast.parse(code)
 
         wrapped = _wrap_long_field_strings(code, tree)
         if wrapped != code:
-            self.code = wrapped
+            self.code = SourceLines(wrapped)
             code = wrapped
             tree = ast.parse(code)
 
         wrapped = _wrap_long_list_strings(code, tree)
         if wrapped != code:
-            self.code = wrapped
+            self.code = SourceLines(wrapped)
             code = wrapped
             tree = ast.parse(code)
 
         fixed_self = _fix_field_validator_self(code, tree)
         if fixed_self != code:
-            self.code = fixed_self
+            self.code = SourceLines(fixed_self)
             code = fixed_self
             tree = ast.parse(code)
 
         explicit = _add_raise_from_none(code, tree)
         if explicit != code:
-            self.code = explicit
+            self.code = SourceLines(explicit)
             code = explicit
             tree = ast.parse(code)
 
@@ -846,7 +875,7 @@ class ComponentSourceCode(LLMValidated):
         # ruff fix them before any judge call.
         fixed = _ruff_fix(code)
         if fixed != code:
-            self.code = fixed
+            self.code = SourceLines(fixed)
             code = fixed
             tree = ast.parse(code)
 
@@ -1221,9 +1250,11 @@ class ComponentSourceCode(LLMValidated):
                 + "\n".join(details)
             )
 
-    code: str = Field(
+    code: SourceLines = Field(
         ...,
-        description="Complete Python source code defining the component: "
+        description="The complete module as a JSON array of lines — one string "
+        "per line, in order, with no newline escapes inside a line. "
+        "It is Python source code defining the component: "
         "an LLMValidated class with one or more @atomic_workflow_step classmethods "
         "whose docstrings are good system prompts (proposes and synthesizes, "
         "includes a dialogue example), field definitions with clear business "
@@ -1262,8 +1293,8 @@ class ComponentSourceCode(LLMValidated):
         "imports. The code is valid Python and passes `ruff check`: sorted "
         "imports (a blank line between third-party and chat_workflow), no "
         "unused imports, modern type syntax (`str | None`, `list[str]`), and "
-        "plain ASCII Python. Use `\\n` for every newline (never a backslash "
-        "followed by a space), escape a literal backslash as `\\\\`, use "
+        "plain ASCII Python. Each array element is one line; do not put a "
+        "newline inside an element. Escape a literal backslash as `\\\\`, use "
         "English identifiers, and never wrap the code in Markdown fences. "
         "Keep every line at most 120 characters — wrap long docstrings. "
         "Start the module with `from __future__ import annotations` so type "

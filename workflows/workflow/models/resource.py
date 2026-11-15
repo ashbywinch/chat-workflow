@@ -128,7 +128,12 @@ class Resource(LLMValidated):
         a check as a state of mind — 'I know…', 'I've thought of…', 'I
         remember…' — because that cannot be checked; write what is true of the
         material itself: 'Every item on every shelf is listed', not 'I know
-        what is on every shelf'. A criterion
+        what is on every shelf', and not the act of checking — 'Every shelf
+        has been checked and items noted' is the process, while 'The list
+        includes every item on every shelf, flagged if it is near expiry' is
+        the check. The source is a place, person, system, or document, never
+        the act of looking: 'The fridge and freezer', not 'Looking in the
+        fridge'. A criterion
         describes the finished material, not the action that produces it:
         convert 'I recall the meals and list them'
         to 'The list includes every meal I have made that fits my equipment

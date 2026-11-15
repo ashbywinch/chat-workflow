@@ -350,6 +350,24 @@ class MinutesDraft(BaseModel):
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
+    def test_module_is_exchanged_as_lines(self):
+        """The model sends one string per line, so no newline escapes exist."""
+        import json
+
+        payload = json.dumps({"code": VALID_COMPONENT_CODE.splitlines()})
+
+        component = ComponentSourceCode.model_validate_json(payload)
+
+        self.assertEqual(
+            component.code.splitlines(), VALID_COMPONENT_CODE.splitlines()
+        )
+
+    def test_schema_asks_for_an_array_of_lines(self):
+        schema = ComponentSourceCode.model_json_schema()["properties"]["code"]
+
+        self.assertEqual(schema["type"], "array")
+        self.assertEqual(schema["items"]["type"], "string")
+
     def test_non_ascii_line_does_not_shift_the_min_length_insertion(self):
         """AST columns are UTF-8 bytes; an em dash must not splice the code."""
         from workflows.workflow.component_source_code import _ensure_min_length
