@@ -322,10 +322,17 @@ class AtomicWorkflowStep(Generic[TResult]):
     def _repetition_failure(
         self, response: AgentResponse[TResult]
     ) -> ValidationFailure | None:
-        """Reject a confirmation question the user has already answered."""
+        """Reject the *same* confirmation question the user has answered.
+
+        Confirming a second, different item right after the first is normal
+        work, so the new question must repeat the one that was just answered:
+        otherwise it is a new question and is allowed.
+        """
         message = response.message or ""
         last_user = _last_user_message(self.messages)
         if not _is_confirmation(last_user) or not _is_confirmation_question(message):
+            return None
+        if not _repeats(_previous_assistant_message(self.messages), message):
             return None
         return ValidationFailure(
             reason=(
@@ -500,6 +507,50 @@ def _user_text(messages: list[dict[str, Any]]) -> str:
         if message.get("role") == "user"
         and not (message.get("content") or "").lstrip().startswith("[framework]")
     )
+
+
+_STOPWORDS = frozenset(
+    [
+        "a", "an", "and", "are", "as", "at", "be", "but", "by", "do", "does",
+        "for", "from", "has", "have", "i", "if", "in", "is", "it", "its", "me",
+        "my", "no", "not", "of", "on", "or", "our", "so", "that", "the",
+        "their", "them", "then", "there", "these", "they", "this", "to", "was",
+        "we", "were", "what", "when", "where", "which", "who", "will", "with",
+        "you", "your",
+    ]
+)
+
+
+def _content_words(text: str) -> set[str]:
+    return {
+        word for word in re.findall(r"[a-z0-9']+", text.casefold()) if word not in _STOPWORDS
+    }
+
+
+def _repeats(previous: str, message: str) -> bool:
+    """True when ``message`` restates ``previous`` rather than asking anew."""
+    before = _content_words(previous)
+    after = _content_words(message)
+    if not before or not after:
+        return False
+    shared = len(before & after) / min(len(before), len(after))
+    return shared >= 0.6
+
+
+def _previous_assistant_message(messages: list[dict[str, Any]]) -> str:
+    """The assistant turn the user was answering, if there is one."""
+    seen_user = False
+    for message in reversed(messages):
+        role = message.get("role")
+        content = message.get("content") or ""
+        if role == "user" and not content.lstrip().startswith("[framework]"):
+            if seen_user:
+                break
+            seen_user = True
+            continue
+        if seen_user and role == "assistant":
+            return content
+    return ""
 
 
 def _last_user_message(messages: list[dict[str, Any]]) -> str:

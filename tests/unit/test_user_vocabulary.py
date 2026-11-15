@@ -137,20 +137,38 @@ class TestUnansweredQuestionGuard(unittest.TestCase):
 
 
 class TestRepetitionGuard(unittest.TestCase):
-    def test_confirmation_question_after_yes_is_rejected(self):
+    def _confirmed(self, summary: str) -> AtomicWorkflowStep:
         step = _step()
+        step.messages.append({"role": "assistant", "content": summary})
         step.messages.append({"role": "user", "content": "Yes, exactly."})
+        return step
 
-        failure = step._repetition_failure(
-            _continue("Does that match your picture?")
-        )
+    def test_the_same_confirmation_question_is_rejected(self):
+        summary = "Research, drafting, editing. Does that match your picture?"
+        step = self._confirmed(summary)
+
+        failure = step._repetition_failure(_continue(summary))
 
         assert failure is not None
         self.assertIn("already confirmed", failure.reason)
 
+    def test_confirming_a_different_item_is_allowed(self):
+        """The next item after a confirmation is new work, not a repeat."""
+        step = self._confirmed(
+            "You start with your handwritten notes. Does that sound right?"
+        )
+
+        self.assertIsNone(
+            step._repetition_failure(
+                _continue(
+                    "You also mentioned the invite with the agenda, which comes "
+                    "from the organiser. Does that sound right?"
+                )
+            )
+        )
+
     def test_a_new_question_after_yes_is_allowed(self):
-        step = _step()
-        step.messages.append({"role": "user", "content": "Yes, exactly."})
+        step = self._confirmed("Research, drafting, editing. Sound right?")
 
         self.assertIsNone(
             step._repetition_failure(_continue("What should I do next?"))
@@ -158,6 +176,9 @@ class TestRepetitionGuard(unittest.TestCase):
 
     def test_yes_with_a_caveat_is_not_a_confirmation(self):
         step = _step()
+        step.messages.append(
+            {"role": "assistant", "content": "Does that match your picture?"}
+        )
         step.messages.append({"role": "user", "content": "Yes, but I have one change."})
 
         self.assertIsNone(

@@ -260,9 +260,12 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
             session.io.echo(f"Diagram saved to: {diagram_path}")
 
         for _ in range(max_refinements):
+            # A rejected diagram costs turns: the model has to explain what it
+            # is changing and ask when the user's answer left a rule unmet. Five
+            # turns ran out mid-repair, so give the conversation room to finish.
             refined = refine(
                 initial_object=workflow,
-                max_turns=5,
+                max_turns=8,
                 session=session,
             )
 

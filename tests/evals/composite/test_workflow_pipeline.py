@@ -101,8 +101,10 @@ class TestWorkflowPipelineEval(unittest.TestCase):
                 # incidental_notes is a string (may be empty)
                 self.assertIsInstance(comp.incidental_notes, str)
 
-            # LLM judge on the full conversation
-            transcript = format_transcript(session)
+            # LLM judge on the conversation the user actually had. Framework
+            # corrections and validation feedback are harness text, and feeding
+            # them to the judge biases it towards agreeing with them.
+            transcript = format_transcript(session, for_judge=True)
             judge_result = llm_judge(judge_rules, transcript, config)
             failures = [v for v in judge_result.verdicts if not v.passed]
             assert not failures, (
