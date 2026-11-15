@@ -44,9 +44,14 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         Validation("Must use <br/> tags for splitting long text across lines"),
         Validation(
             "Must show the entry point, the flow of work between participants, "
-            "decision points, return flows, and clear outcomes. Work may pass "
-            "directly from one component to another; a separate coordinator is "
-            "optional and must not be invented just to have one"
+            "at least one decision point, a return flow, and a clear outcome. "
+            "A decision point is an `alt` block with an `else` branch; an "
+            "`opt` block is a single optional step, not a decision point. A "
+            "return flow is an arrow back to a participant who sent work "
+            "earlier. The outcome is the last message, to whoever receives the "
+            "work. Work may pass directly from one component to another; a "
+            "separate coordinator is optional and must not be invented just to "
+            "have one"
         ),
         Validation("Every activity in the process should be represented in the sequence flow"),
         Validation(
@@ -185,8 +190,9 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         - Show direct handoffs between components when the work simply passes
           from one to the next. Include a coordinator participant only when a
           component really does coordinate the others; do not invent one.
-        - Use `alt` or `opt` for at least one decision point, and show the
-          return flow between components. A business role may be a participant,
+        - Use `alt` with an `else` branch for the decision point, not `opt`,
+          which has only one branch. Show the return flow as an arrow back to
+          a participant who sent work earlier. A business role may be a participant,
           but do not give it a flow unless a component owns that activity; if
           no component owns the acknowledgement, show it as a step of the
           component that owns the artifact.
