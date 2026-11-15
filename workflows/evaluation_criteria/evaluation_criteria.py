@@ -31,6 +31,14 @@ class Criterion(BaseModel):
         default=None,
         description="Ideal or target value for this criterion (e.g., 'High quality materials', 'Under $50')",
     )
+    priority_basis: str | None = Field(
+        default=None,
+        description=(
+            "Why this weight: the user's own words or the use case that set "
+            "this criterion's importance (e.g. 'works all day on a plane'). "
+            "Not a restatement of the criterion."
+        ),
+    )
 
 
 class EvaluationCriteria(LLMValidated):
@@ -47,7 +55,10 @@ class EvaluationCriteria(LLMValidated):
     _validation_rules: ClassVar[list[str]] = [
         "Each criterion is specific to the user's context, not a generic "
         "criterion that could apply to any decision.",
-        "The weights reflect the user's stated priorities, not arbitrary defaults.",
+        "The weights reflect the user's stated priorities, not arbitrary "
+        "defaults: every criterion carries a `priority_basis` grounded in what "
+        "the user said, and the heaviest weight is the criterion they said "
+        "matters most.",
         "The criteria cover the trade-offs the user actually faces.",
     ]
 
@@ -86,6 +97,8 @@ class EvaluationCriteria(LLMValidated):
           one sentence for confirmation. Never ask the user to rank the
           criteria one by one. Never give every criterion the same default
           weight unless the user says they matter equally.
+        - Record why each weight is what it is in `priority_basis`, using the
+          user's words or the use case they described.
         - When you have enough, or the user asks you to finalize, propose the
           complete set of criteria and return success in that same turn.
         - Use intent="failure" only if the user refuses to take part at all. A

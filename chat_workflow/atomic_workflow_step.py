@@ -175,12 +175,19 @@ class AtomicWorkflowStep(Generic[TResult]):
                 self._language_failure(response)
                 or self._vocabulary_failure(response)
                 or self._repetition_failure(response)
-                or self._unanswered_question_failure(response)
             )
             if failure is not None:
                 if attempt >= self._validation_corrections:
                     raise MaxRetriesExceededError(self._max_retries, failure.message())
                 self._apply_correction(failure, attempt + 1)
+                continue
+
+            # A nudge, not a gate: an unanswered question is a conversation
+            # flaw, not a broken result, so it must never fail a step that
+            # would otherwise succeed.
+            unanswered = self._unanswered_question_failure(response)
+            if unanswered is not None and attempt < self._validation_corrections:
+                self._apply_correction(unanswered, attempt + 1)
                 continue
 
             self._mark_recovered()
