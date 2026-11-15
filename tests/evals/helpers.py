@@ -729,7 +729,7 @@ def make_weekly_meal_plan_deliverable():
             "Every day has a meal that fits every dietary restriction, and the "
             "grocery list covers every ingredient the plan uses."
         ),
-        integration_points="Posted in the kitchen, where the family reads it to plan meals and shopping.",
+        integration_points="The family reads it to plan meals and shopping.",
         storage_requirements="Kitchen wall or fridge",
     )
 
@@ -751,8 +751,8 @@ def make_weekly_menu_deliverable():
             "ingredients, and each dish names the station that prepares it."
         ),
         integration_points=(
-            "Posted in the kitchen for the chefs, who use it to prepare dishes; "
-            "a printed copy goes to front of house for guest questions."
+            "The chefs use it to prepare dishes; a printed copy goes to front "
+            "of house for guest questions."
         ),
         storage_requirements="Kitchen binder and the shared drive",
     )

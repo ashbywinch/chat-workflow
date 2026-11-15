@@ -38,7 +38,7 @@ class TestDomainExplorationEval(unittest.TestCase):
             ),
             required_inputs=["Raw meeting notes", "Attendee list"],
             component_type="artifact_producing",
-            owner_role="Meeting Coordinator",
+            owner_role="Note Taker",
             incidental_notes="",
         )
 

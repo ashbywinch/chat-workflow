@@ -190,8 +190,7 @@ class TestJargonFreeEval(unittest.TestCase):
                     "and every meal fits their dietary restrictions."
                 ),
                 integration_points=(
-                    "Posted in the kitchen, where the family reads it before "
-                    "shopping and cooking."
+                    "The family reads it before shopping and cooking."
                 ),
                 storage_requirements="Kitchen wall / fridge",
             ),

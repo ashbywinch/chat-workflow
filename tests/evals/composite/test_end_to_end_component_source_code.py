@@ -44,7 +44,7 @@ def make_minutes_draft_responsibilities() -> ComponentSpec:
         ),
         required_inputs=["meeting_notes", "attendee_list"],
         component_type="artifact_producing",
-        owner_role="Meeting Coordinator",
+        owner_role="Note Taker",
         incidental_notes=(
             "The user typically takes sketchy notes during meetings and needs help "
             "turning them into proper structured minutes. They want the assistant to "

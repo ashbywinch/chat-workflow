@@ -93,8 +93,9 @@ class Resource(LLMValidated):
         what you start with, so it fits how you actually work."
         Match the user's register: use the words they use, and never introduce
         a term for the output shape, a field, or the framework. Never say
-        "completeness", "inventory", "resource", "dependency", "source", or
-        "format" to the user: say "to make sure you don't miss anything",
+        "completeness", "completeness check", "inventory", "resource",
+        "dependency", "source", or "format" to the user: say "to make sure you
+        don't miss anything",
         "you just look and remember", "what it needs first", "where it comes
         from", and "what it looks like". Never narrate what you are doing with
         the result: no "I'll capture that" or "I'll record that".
