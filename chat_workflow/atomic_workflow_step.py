@@ -146,14 +146,26 @@ class AtomicWorkflowStep(Generic[TResult]):
             try:
                 response = self._request(client)
             except InstructorRetryException as exc:
-                failure = _validation_failure(exc)
-                if failure is None or attempt >= self._validation_corrections:
-                    raise MaxRetriesExceededError(
-                        self._max_retries,
-                        failure.message() if failure else str(exc),
-                    ) from exc
-                self._apply_correction(failure, attempt + 1)
-                continue
+                response, repaired_failure = _recover_from_mangled_escape(
+                    exc, self.response_model
+                )
+                if response is None:
+                    failure = repaired_failure or _validation_failure(exc)
+                    if failure is None or attempt >= self._validation_corrections:
+                        raise MaxRetriesExceededError(
+                            self._max_retries,
+                            failure.message() if failure else str(exc),
+                        ) from exc
+                    self._apply_correction(failure, attempt + 1)
+                    continue
+                self.events.append(
+                    TranscriptEvent(
+                        type="framework",
+                        content=None,
+                        turn=self.turn_count,
+                        meta={"kind": "repaired_escape"},
+                    )
+                )
             except Exception as exc:
                 if self.debug:
                     self.debug.on_error(exc)
@@ -580,6 +592,21 @@ def _completion_text(exc: Exception) -> str | None:
         attempts = getattr(exc, "failed_attempts", None) or []
         if attempts:
             completion = getattr(attempts[-1], "completion", None)
+    return _message_content(completion)
+
+
+def _failed_attempt_text(exc: Exception) -> str | None:
+    """The content of the attempt that actually failed to parse."""
+    attempts = getattr(exc, "failed_attempts", None) or []
+    if attempts:
+        text = _message_content(getattr(attempts[-1], "completion", None))
+        if text is not None:
+            return text
+    return _completion_text(exc)
+
+
+def _message_content(completion: Any) -> str | None:
+    """The assistant text inside one chat completion, if there is any."""
     choices = getattr(completion, "choices", None)
     if not choices:
         return None
@@ -588,6 +615,38 @@ def _completion_text(exc: Exception) -> str | None:
     if isinstance(content, str) and content.strip():
         return content
     return None
+
+
+# The provider occasionally returns `\1` where the model wrote `\n` inside a
+# long string — a Mermaid diagram or a generated module. It is not a valid
+# JSON escape, so the whole response fails to parse even though it is complete
+# and every other character is correct.
+_MANGLED_NEWLINE = re.compile(r"\\[0-9]")
+
+
+def _recover_from_mangled_escape(
+    exc: Exception, response_model: Any
+) -> tuple[Any | None, ValidationFailure | None]:
+    """Repair a mangled escape, then parse the response or report its errors.
+
+    A backslash followed by a digit is never valid JSON, so replacing it with
+    ``\\n`` cannot hide a real error. When the repaired text still does not
+    validate, the field errors are returned so the model is told what is
+    actually wrong instead of being sent back to fix an escape it cannot see.
+    """
+    content = _failed_attempt_text(exc)
+    if content is None:
+        return None, None
+    repaired = _MANGLED_NEWLINE.sub(r"\\n", content)
+    if repaired == content:
+        return None, None
+    try:
+        return response_model.model_validate_json(repaired), None
+    except Exception as validation_error:
+        return None, ValidationFailure(
+            reason=str(validation_error).strip(),
+            rejected_text=repaired,
+        )
 
 
 

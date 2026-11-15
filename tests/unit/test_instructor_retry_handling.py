@@ -164,6 +164,122 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         self.assertIn("still wrong", str(ctx.exception))
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
 
+    @patch("chat_workflow.llm_interaction.get_client")
+    def test_mangled_newline_escape_is_repaired_without_a_retry(self, mock_get_client):
+        """A `\\1` where the model wrote `\\n` is repaired, not rejected."""
+        from json import JSONDecodeError
+        from types import SimpleNamespace
+
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+        from pydantic import BaseModel
+
+        class Note(BaseModel):
+            text: str
+
+        # The provider returns `\1` in place of `\n` inside a long string.
+        content = '{"intent": "success", "result": {"text": "line one\\1line two"}}'
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        )
+        rejected = InstructorRetryException(
+            "rejected",
+            n_attempts=1,
+            total_usage=0,
+            last_completion=completion,
+            failed_attempts=[
+                FailedAttempt(
+                    1,
+                    JSONDecodeError("Invalid \\escape", content, 1),
+                    completion,
+                )
+            ],
+        )
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = rejected
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(
+                max_retries=1, validation_corrections=1
+            )
+        )
+        # Point the step at the tiny model under test.
+        orchestrator.response_model = AgentResponse[Note]
+
+        result = orchestrator._call_llm()
+
+        assert result.result is not None
+        self.assertEqual(result.result.text, "line one\nline two")
+        self.assertEqual(mock_client.chat.completions.create.call_count, 1)
+        # No correction was fed back: the repaired response was accepted.
+        self.assertEqual([m["role"] for m in orchestrator.messages], ["system"])
+        kinds = [event.meta.get("kind") for event in orchestrator.events]
+        self.assertIn("repaired_escape", kinds)
+
+    def test_repair_leaves_valid_json_alone(self):
+        """Without a mangled escape the normal correction path still runs."""
+        from types import SimpleNamespace
+
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+
+        from chat_workflow.atomic_workflow_step import _recover_from_mangled_escape
+
+        content = '{"intent": "success", "result": {"text": "ok"}}'
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        )
+        exc = InstructorRetryException(
+            "rejected",
+            n_attempts=1,
+            total_usage=0,
+            last_completion=completion,
+            failed_attempts=[
+                FailedAttempt(1, RuntimeError("some other failure"), completion)
+            ],
+        )
+
+        response, failure = _recover_from_mangled_escape(
+            exc, AgentResponse[EvaluationCriteria]
+        )
+        self.assertIsNone(response)
+        self.assertIsNone(failure)
+
+    def test_repair_gives_up_when_the_result_still_does_not_validate(self):
+        """A repaired response that still fails validation reports the fields."""
+        from types import SimpleNamespace
+
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+
+        from chat_workflow.atomic_workflow_step import _recover_from_mangled_escape
+
+        content = '{"intent": "success", "result": {"text": "line one\\1line two"}}'
+        completion = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
+        )
+        exc = InstructorRetryException(
+            "rejected",
+            n_attempts=1,
+            total_usage=0,
+            last_completion=completion,
+            failed_attempts=[
+                FailedAttempt(1, RuntimeError("some other failure"), completion)
+            ],
+        )
+
+        # EvaluationCriteria has no `text` field, so the repaired JSON is still
+        # not a valid response: the field error is what the model must see.
+        response, failure = _recover_from_mangled_escape(
+            exc, AgentResponse[EvaluationCriteria]
+        )
+        self.assertIsNone(response)
+        assert failure is not None
+        # The model's own rule, not the unreadable JSON-escape complaint.
+        self.assertIn("budget", failure.reason)
+        self.assertNotIn("escape", failure.reason)
+
     def test_invalid_escape_reason_has_remediation(self):
         from json import JSONDecodeError
 
