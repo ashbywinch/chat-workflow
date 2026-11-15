@@ -364,6 +364,16 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         except RuntimeError as wrapped:
             self.assertTrue(_is_transient_provider_error(wrapped))
 
+    def test_a_truncated_response_is_resent_unchanged(self):
+        """Nothing to correct when the provider stopped mid-response."""
+        from chat_workflow.atomic_workflow_step import _is_transient_provider_error
+
+        error = RuntimeError(
+            "The output is incomplete due to a max_tokens length limit."
+        )
+
+        self.assertTrue(_is_transient_provider_error(error))
+
     def test_repair_keeps_a_regex_backslash(self):
         """A stray backslash before a letter is a literal, not a newline."""
         from chat_workflow.atomic_workflow_step import _repair_json_escapes

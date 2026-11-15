@@ -898,8 +898,13 @@ _TRANSIENT_PROVIDER_ERRORS = frozenset(
         "Timeout",
         "RateLimitError",
         "TryAgain",
+        # The provider stopped mid-response; the sample is unusable and there
+        # is nothing for the model to correct, so the request is resent.
+        "IncompleteOutputException",
     }
 )
+
+_TRUNCATED_OUTPUT = "incomplete due to a max_tokens length limit"
 
 
 def _is_transient_provider_error(exc: BaseException) -> bool:
@@ -913,6 +918,8 @@ def _is_transient_provider_error(exc: BaseException) -> bool:
     while current is not None and id(current) not in seen:
         seen.add(id(current))
         if type(current).__name__ in _TRANSIENT_PROVIDER_ERRORS:
+            return True
+        if _TRUNCATED_OUTPUT in str(current).lower():
             return True
         status = getattr(current, "status_code", None)
         if isinstance(status, int) and (status == 429 or status >= 500):

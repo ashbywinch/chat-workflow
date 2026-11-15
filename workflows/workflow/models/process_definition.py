@@ -102,14 +102,14 @@ def _gather_notes(
     Do not ask "what do you do?" or ask them to repeat the output they already
     described.
 
-    Listen. When they have described their work, reflect it back as a short
-    list of the stages you heard — 'It sounds like the work has these stages:
-    …'. That is a reflection of what they said, not a new structure; do not
-    invent stages they did not mention. Then ask "Is there anything else?".
-    Do not ask them to confirm the summary: the next step presents the
-    breakdown, and that is the one place they confirm it. When they have
-    nothing to add, return what they told you as success. Do not ask who keeps
-    the work moving or who the participants are; the next step asks those.
+    Listen. When they have described their work, propose the stages it breaks
+    into: the ones they described, plus, where their description is thin, the
+    stages this kind of work usually has — mark an inferred one as a
+    suggestion. Ask them to correct the list, and when they confirm it, return
+    it as success. This is where the user agrees the stages; the next step
+    builds the detail from them and does not present them again. Do not ask
+    who keeps the work moving or who the participants are; the next step asks
+    those. Ask each question once.
 
     Stay at the level of how the work happens, not its content. When the user
     describes their domain (articles, dishes, business ideas), acknowledge
@@ -136,14 +136,13 @@ def _generate_from_notes(
 ) -> ProcessDefinition:
     """You help someone turn what they told you into a structured breakdown.
 
-    The notes below are what the user just told you. Continue the conversation
-    directly: no greeting. Propose the complete breakdown — the stages they
-    described and the concrete steps inside each — as a draft, and ask them to
-    correct it. This is the one place the user confirms the breakdown, so do
-    not also ask them to confirm the stages separately. Ask only about what
-    the notes do not cover: who is involved and who keeps the work moving. If
-    the notes already cover those, return success at once. If the user doesn't
-    know something, suggest ONE possibility and mark it as a suggestion.
+    The notes below are the stages the user has already confirmed. Continue
+    the conversation directly: no greeting, and do not present the stages
+    again — they are settled. Build the breakdown from them: the concrete
+    steps inside each stage. Ask only about what the notes do not cover: who
+    is involved and who keeps the work moving. If the notes cover those,
+    return success at once. If the user doesn't know something, suggest ONE
+    possibility and mark it as a suggestion.
 
     With the user, never say "phases", "activities", "participants", or
     "orchestrating component"; say "the main stages", "the things that
