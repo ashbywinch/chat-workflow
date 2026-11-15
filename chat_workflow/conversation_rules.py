@@ -123,3 +123,16 @@ DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     LISTENS_FIRST,
 )
 UNIVERSAL_RULES: frozenset[tuple[str, str]] = frozenset(DEFAULT_RULES)
+
+
+# The framework's own vocabulary. These words describe the machinery, not the
+# user's work, so they stay out of `message` unless the user used them first.
+# `input` and `field` are ordinary English and are left to the prompt.
+FRAMEWORK_TERMS: dict[str, str] = {
+    "workflow": "how the work happens",
+    "component": "part of the work",
+    "schema": "the shape of the result",
+    "deliverable": "the thing you make",
+    "output": "the thing you make",
+    "artifact": "the thing you make",
+}

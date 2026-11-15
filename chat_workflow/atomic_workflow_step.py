@@ -6,6 +6,7 @@ from typing import Any, Generic, TypeVar, get_args, get_origin
 
 from .annotations import UserLabel, user_labels
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
+from .conversation_rules import FRAMEWORK_TERMS
 from .debug import _DebugTimer
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
@@ -328,8 +329,6 @@ class AtomicWorkflowStep(Generic[TResult]):
     ) -> ValidationFailure | None:
         """Reject a message that leaks an internal label the user never used."""
         labels = user_labels(_inner_result_model(self.response_model))
-        if not labels:
-            return None
         message = response.message or ""
         user_text = _user_text(self.messages)
         candidates: dict[str, UserLabel] = {}
@@ -339,6 +338,10 @@ class AtomicWorkflowStep(Generic[TResult]):
             candidates[name] = label
             for alias in label.aliases:
                 candidates[alias] = label
+        for term, phrase in FRAMEWORK_TERMS.items():
+            candidates.setdefault(term, UserLabel(phrase, term))
+        if not candidates:
+            return None
         for term, label in candidates.items():
             if _mentions(message, term) and not _mentions(user_text, term):
                 return ValidationFailure(
@@ -688,11 +691,57 @@ def _message_content(completion: Any) -> str | None:
     return None
 
 
-# The provider occasionally returns `\1` where the model wrote `\n` inside a
-# long string — a Mermaid diagram or a generated module. It is not a valid
-# JSON escape, so the whole response fails to parse even though it is complete
-# and every other character is correct.
-_MANGLED_NEWLINE = re.compile(r"\\[0-9]")
+_JSON_ESCAPES = '"\\/bfnrt'
+
+
+def _repair_json_escapes(text: str) -> str:
+    """Repair the escape corruption a provider introduces in long strings.
+
+    Inside a long string (a Mermaid diagram, a generated module) the provider
+    sometimes drops the character after a backslash: ``\\n`` arrives as ``\\1``
+    or as a bare backslash followed by the line's indentation. Neither is a
+    valid JSON escape, so a complete response fails to parse.
+
+    A backslash before a digit or whitespace is always that mangling. Any
+    other stray backslash is a literal the model forgot to escape — a regex
+    ``\\d`` — so it is doubled instead, which preserves it.
+    """
+    out: list[str] = []
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char != "\\":
+            out.append(char)
+            index += 1
+            continue
+        following = text[index + 1] if index + 1 < length else ""
+        if following in _JSON_ESCAPES:
+            out.append(char)
+            out.append(following)
+            index += 2
+            continue
+        if following == "u" and re.fullmatch(r"[0-9a-fA-F]{4}", text[index + 2 : index + 6]):
+            out.append(text[index : index + 6])
+            index += 6
+            continue
+        if following.isspace():
+            # The backslash replaced the `n`; the whitespace after it is the
+            # line's own indentation and must survive.
+            end = index + 1
+            while end < length and text[end] in " \t":
+                end += 1
+            out.append("\\n")
+            out.append(text[index + 1 : end])
+            index = end
+            continue
+        if following.isdigit():
+            out.append("\\n")
+            index += 2
+            continue
+        out.append("\\\\")
+        index += 1
+    return "".join(out)
 
 
 def _recover_from_mangled_escape(
@@ -700,15 +749,14 @@ def _recover_from_mangled_escape(
 ) -> tuple[Any | None, ValidationFailure | None]:
     """Repair a mangled escape, then parse the response or report its errors.
 
-    A backslash followed by a digit is never valid JSON, so replacing it with
-    ``\\n`` cannot hide a real error. When the repaired text still does not
-    validate, the field errors are returned so the model is told what is
-    actually wrong instead of being sent back to fix an escape it cannot see.
+    When the repaired text still does not validate, the field errors are
+    returned so the model is told what is actually wrong instead of being
+    sent back to fix an escape it cannot see.
     """
     content = _failed_attempt_text(exc)
     if content is None:
         return None, None
-    repaired = _MANGLED_NEWLINE.sub(r"\\n", content)
+    repaired = _repair_json_escapes(content)
     if repaired == content:
         return None, None
     try:

@@ -217,6 +217,22 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         kinds = [event.meta.get("kind") for event in orchestrator.events]
         self.assertIn("repaired_escape", kinds)
 
+    def test_repair_keeps_a_regex_backslash(self):
+        """A stray backslash before a letter is a literal, not a newline."""
+        from chat_workflow.atomic_workflow_step import _repair_json_escapes
+
+        repaired = _repair_json_escapes('{"code": "re.sub(r\'\\\\d+\', ...)"}')
+
+        self.assertIn(r"\\d", repaired)
+
+    def test_repair_keeps_the_indentation_after_a_mangled_newline(self):
+        """`\\n` that arrives as a bare backslash keeps the line's indentation."""
+        from chat_workflow.atomic_workflow_step import _repair_json_escapes
+
+        repaired = _repair_json_escapes('{"code": "class A:\\    x: int"}')
+
+        self.assertIn("\\n    x: int", repaired)
+
     def test_repair_leaves_valid_json_alone(self):
         """Without a mangled escape the normal correction path still runs."""
         from types import SimpleNamespace

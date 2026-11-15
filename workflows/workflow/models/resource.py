@@ -121,7 +121,11 @@ class Resource(LLMValidated):
         return needs all four parts — where it comes from, what it looks
         like, what it needs first, and the check that it is complete — so
         when you revise one part, keep the other three. The check must be something they can apply as soon as they
-        have the material, not an outcome like 'no one complains'. A criterion
+        have the material, not an outcome like 'no one complains'. Never phrase
+        a check as a state of mind — 'I know…', 'I've thought of…', 'I
+        remember…' — because that cannot be checked; write what is true of the
+        material itself: 'Every item on every shelf is listed', not 'I know
+        what is on every shelf'. A criterion
         describes the finished material, not the action that produces it:
         convert 'I recall the meals and list them'
         to 'The list includes every meal I have made that fits my equipment

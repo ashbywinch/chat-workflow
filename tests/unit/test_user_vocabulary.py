@@ -78,6 +78,37 @@ def _success() -> AgentResponse[LabelledResult]:
     )
 
 
+class TestFrameworkVocabularyGuard(unittest.TestCase):
+    def test_framework_word_is_rejected_before_the_user_uses_it(self):
+        step = _step()
+
+        failure = step._vocabulary_failure(
+            _continue("One component here is the meal plan.")
+        )
+
+        assert failure is not None
+        self.assertIn("internal label 'component'", failure.reason)
+        self.assertIn("part of the work", failure.message())
+
+    def test_framework_word_is_allowed_once_the_user_uses_it(self):
+        step = _step()
+        step.messages.append({"role": "user", "content": "I run a workflow."})
+
+        self.assertIsNone(
+            step._vocabulary_failure(_continue("Let's map your workflow."))
+        )
+
+    def test_ordinary_words_are_not_guarded(self):
+        """`input` and `field` are ordinary English; the prompt owns them."""
+        step = _step()
+
+        self.assertIsNone(
+            step._vocabulary_failure(
+                _continue("What do you put into the field, and what is the input?")
+            )
+        )
+
+
 class TestUnansweredQuestionGuard(unittest.TestCase):
     def test_success_after_a_question_is_rejected(self):
         step = _step()

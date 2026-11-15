@@ -206,7 +206,8 @@ class ComponentSpec(LLMValidated):
           this?" When you refer to the process analysis, say "the steps you
           take" or "the things you do"; never say "activities" or "phases".
           Say "the thing you make" or "what you produce", never "the output",
-          "the deliverable", "the component", or "the workflow".
+          "the deliverable", "the component", or "the workflow". Never say a
+          part "owns" something; say it is "the part that produces" it.
         - Propose what you can based on what the user told you: "Based on what
           you've described, the main parts might be: the raw notes, the
           transcribed notes, the organized draft, the final minutes, and the
