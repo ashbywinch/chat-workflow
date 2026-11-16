@@ -12,6 +12,7 @@ from .debug import _DebugTimer
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
 from .session_log import CorrectionKind, TranscriptEvent
+from .transcript import Transcript
 
 TResult = TypeVar("TResult")
 
@@ -705,59 +706,18 @@ _FAILURE_GUIDANCE: tuple[tuple[tuple[str, ...], str], ...] = (
 
 
 def _request_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    """Put the transcript in the one shape every provider accepts.
+    """Shape the transcript for the wire, or raise on an invalid one.
 
-    A chat transcript is stricter than it looks. The rules below are what the
-    providers document, plus one we measured on the configured model:
-
-    - **Roles are what they say.** ``system`` is an instruction *to* the model
-      from the application, ``user`` is a turn from the person, ``assistant``
-      is the model's own output. Putting an instruction in ``assistant``
-      makes the model believe it said it; putting a turn in ``system`` makes
-      the model read it as part of its standing brief.
-    - **The system instruction belongs at the top.** A system message after
-      the conversation starts is handled inconsistently across providers.
-      Measured on this model: the same conversation with the instruction last
-      came back with an empty completion 4 times in 6, and 0 times in 6 with
-      it first. Empty content then looks like a validation error and costs the
-      step its whole retry budget.
-    - **The last message must be the user's turn.** "To trigger a response,
-      end with a user message." Ending on ``assistant`` is a prefill, which
-      current models reject outright; ending on ``system`` leaves nothing for
-      the model to answer.
-    - **Roles must alternate.** Some providers merge consecutive same-role
-      turns, others reject them (Bedrock/Vertex paths, Gemini). Merging here
-      keeps the request portable.
-    - **Content must be non-empty.** An empty block is rejected by several
-      providers.
-
-    The conversation history itself is left alone; this only shapes the copy
-    that goes on the wire.
+    The rules and their sources live in :class:`chat_workflow.transcript.Transcript`.
+    This is the single place the model-facing request is assembled, so a
+    malformed history fails here rather than as an empty completion later.
     """
-    instructions: list[str] = []
-    turns: list[dict[str, str]] = []
-    for message in messages:
-        role = message.get("role")
-        content = str(message.get("content") or "")
-        if not content.strip():
-            continue
-        if role == "system":
-            instructions.append(content)
-            continue
-        if role not in ("user", "assistant"):
-            continue
-        if turns and turns[-1]["role"] == role:
-            turns[-1]["content"] = f"{turns[-1]['content']}\n\n{content}"
-            continue
-        turns.append({"role": role, "content": content})
-
-    request: list[dict[str, str]] = []
-    if instructions:
-        request.append({"role": "system", "content": "\n\n".join(instructions)})
-    request.extend(turns)
-    if not request or request[-1]["role"] != "user":
-        request.append({"role": "user", "content": "Start the conversation."})
-    return request
+    transcript = Transcript.from_messages(messages)
+    if not transcript.turns:
+        # The step opens the conversation; a chat request needs a turn to
+        # answer, and a system-only request comes back empty.
+        transcript.user("Start the conversation.")
+    return transcript.wire()
 
 
 def _describe_model_errors(error: Any) -> str:

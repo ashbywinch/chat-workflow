@@ -1,9 +1,9 @@
 {
  "errors": [
   {
-   "line": 72,
+   "line": 73,
    "column": 85,
-   "stop_line": 72,
+   "stop_line": 73,
    "stop_column": 103,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -13,9 +13,9 @@
    "severity": "error"
   },
   {
-   "line": 73,
+   "line": 74,
    "column": 84,
-   "stop_line": 73,
+   "stop_line": 74,
    "stop_column": 101,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -25,9 +25,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 75,
    "column": 74,
-   "stop_line": 74,
+   "stop_line": 75,
    "stop_column": 91,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -37,9 +37,9 @@
    "severity": "error"
   },
   {
-   "line": 149,
+   "line": 150,
    "column": 13,
-   "stop_line": 149,
+   "stop_line": 150,
    "stop_column": 26,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 149,
+   "line": 150,
    "column": 32,
-   "stop_line": 149,
+   "stop_line": 150,
    "stop_column": 45,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -853,9 +853,9 @@
    "severity": "error"
   },
   {
-   "line": 79,
+   "line": 81,
    "column": 9,
-   "stop_line": 79,
+   "stop_line": 81,
    "stop_column": 53,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,
@@ -865,9 +865,9 @@
    "severity": "error"
   },
   {
-   "line": 99,
+   "line": 101,
    "column": 13,
-   "stop_line": 99,
+   "stop_line": 101,
    "stop_column": 45,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,
@@ -877,9 +877,9 @@
    "severity": "error"
   },
   {
-   "line": 122,
+   "line": 124,
    "column": 9,
-   "stop_line": 122,
+   "stop_line": 124,
    "stop_column": 42,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,

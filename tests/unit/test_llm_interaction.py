@@ -54,15 +54,17 @@ class TestLLMInteraction(unittest.TestCase):
                 {"role": "user", "content": "hello"},
                 {"role": "user", "content": "anyone there?"},
                 {"role": "assistant", "content": "yes"},
-                {"role": "assistant", "content": ""},
+                {"role": "user", "content": "good"},
             ]
         )
 
-        self.assertEqual([m["role"] for m in shaped], ["system", "user", "assistant", "user"])
+        self.assertEqual(
+            [m["role"] for m in shaped], ["system", "user", "assistant", "user"]
+        )
         self.assertIn("You help.", shaped[0]["content"])
         self.assertIn("Reply in English.", shaped[0]["content"])
         self.assertEqual(shaped[1]["content"], "hello\n\nanyone there?")
-        self.assertEqual(shaped[-1]["content"], "Start the conversation.")
+        self.assertEqual(shaped[-1]["content"], "good")
 
     @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_passes_correct_parameters(self, mock_get_client):
