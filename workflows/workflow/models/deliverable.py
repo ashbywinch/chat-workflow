@@ -113,79 +113,17 @@ class Deliverable(LLMValidated):
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[Deliverable]:
-        """Help someone describe what they make. Say in one sentence what you
-        are doing, then reflect back what they said. Say "make" or "cook"
-        unless the user uses "produce"; never open with "what do you produce".
-        If they name something common (meeting minutes, invoices), propose its
-        standard shape immediately as a draft for confirmation — do not ask
-        who it is for before offering the shape.
+        """Describe the one thing the user makes.
 
-        Never use failure because the user says they make nothing. Find the
-        artifact in their routine — a plan, a list, a schedule, a document —
-        and propose it as a draft: 'It sounds like you make a weekly meal
-        plan; does that fit?' Use failure only if they reject every concrete
-        proposal.
+    Open with one sentence on what you are doing, then reflect back what they said. If they name something common (meeting minutes, invoices), propose its standard shape at once as a draft to confirm.
 
-        Match the user's register: use the words they use, and never introduce
-        a term for the output shape, a field, or the framework. Never say
-        'deliverable' to the user; say 'the thing you make'. If they speak
-        plainly, speak plainly; if they use specialist terms, use theirs. Ask
-        who it is for, what it looks like, how they know it is good enough,
-        who it is handed to next and what happens then, and where it is kept —
-        in whatever words fit the user. Make sure the criterion can be checked
-        the moment the thing exists, rather than waiting for an outcome like
-        'no one complains' or 'everyone is happy'. If the user gives an
-        outcome, propose a concrete check from your domain knowledge (for
-        minutes: every decision has a reason, every action item has an owner
-        and due date, the attendee list is complete) and ask them to confirm.
+    Then fill in, in their words: who it is for; what it looks like; how they know it is good enough; who gets it next and what they do with it; where it is kept. Ask each once and accept the answer.
 
-        Ask each question once. When the user answers, accept the answer and
-        move on; never ask the same substantive question again. Make one pass:
-        once you have the name, who it is for, what it looks like, how they
-        know it is good, who gets it next, and where it is kept, return
-        success. If the user adds a detail, incorporate it and return success;
-        do not ask for another confirmation.
+    Ask for a check they can apply the moment the thing exists, not an outcome: "Every action item has an owner and a due date", not "Everyone is happy". If they give an outcome, propose a concrete check from your domain knowledge and ask them to confirm.
 
-        When you summarize or confirm, describe the thing they make in the
-        user's words. Never use 'name', 'description', 'consumer', 'format',
-        'success criteria', 'integration points', or 'storage requirements' —
-        those are your labels, not theirs. Say what it is, who it is for, what
-        it looks like, how they know it is good, who gets it next, and where
-        it is kept. Write a short paragraph; never a labelled list. Do not
-        make them fill in a form.
+    A question about how to organise the thing, or what headings it should have, is part of its shape: answer with one concrete recommendation. If they ask what you think, give a concrete suggestion in that reply. If they ask you to write the thing itself, say in one sentence that you are helping them pin down its shape, then return the result.
 
-        Stay at the level of the thing they make, not its content. When the
-        user describes their domain (business ideas, dishes, articles),
-        acknowledge in one clause then redirect: 'That sounds interesting —
-        let's focus on what you make. What does the finished thing look like?'
-        Do not praise, evaluate, or develop the idea; do NOT join them in
-        discussing their domain content. Never answer a question about how
-        their business or domain works — shipping, inventory, pricing,
-        marketing, recipes, article topics; acknowledge it in one clause and
-        return to the shape. A question about how to get from their raw
-        material to the finished thing is about the work, not the domain:
-        answer it with one concrete method in two sentences, then return to
-        the shape. Never answer a direct question with another question, and
-        never tell the user a question is 'the content side'.
+    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to the shape; never call their work "content creation". Do not use the field names in this schema with the user.
 
-        Organising the content is not the content side. If they ask how to
-        arrange it — by topic, by time, in what order — or ask for headings or
-        a template, answer with one concrete recommendation and give the
-        headings. That is the shape, and answering it is your job.
-
-        If they ask you to write the thing itself, say in one sentence that you
-        are helping them pin down what it looks like, then return the result.
-        Never call their work 'content creation', never say 'description', and
-        never refuse the conversation: the definition you build together is
-        the result.
-
-        When they ask for 'what do you think?' or 'suggest something',
-        PROPOSE one concrete idea from your domain knowledge — do NOT ask more
-        questions or say 'how would you like to structure it'. If they ask for
-        ideas about structure or headings, give concrete suggestions in that
-        same response before returning success; do not return the result
-        without answering their request. If they sketch a dummy example or
-        provide their own format, confirm that it matches the shape and move
-        on; do not repeat the full picture or ask for confirmation again.
-        """
+    When they confirm, return the result in that same response. Do not summarise it again or ask for a second approval."""
         ...  # type: ignore[reportReturnType]

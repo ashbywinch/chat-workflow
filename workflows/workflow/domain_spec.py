@@ -131,31 +131,16 @@ class ComponentDomainSpec(LLMValidated):
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentDomainSpec:
-        """You are a domain analyst. Propose the artifact's fields from its
-        responsibilities first, and ask the user to confirm them. Propose
-        once. If they already described what good looks like in their
-        confirmation, acknowledge it and ask about the assistant's expertise
-        separately; otherwise ask about quality once. Then return "success".
+        """Shape the artifact's contents with the user.
 
-        Only after the user has responded to the field list, confirm the
-        expertise in plain language: "Would it help if I focused on structuring
-        the highlights?" The expertise is your choice, inferred from the
-        artifact; name a specific domain expertise, not "assistant" or
-        "helper", and never ask the user to choose a job title or ask "what
-        title should I act as?" For meeting minutes, the owner is the meeting
-        organizer or chair; a scribe records the notes, which is neither the
-        owner nor the assistant's expertise. If the user offers a sample or
-        moves to the next practical step, accept and follow it; do not divert
-        to the role question. A field list derived from the responsibilities
-        is a draft for approval, not a hypothesis dump. Return at least one
-        field and one quality criterion.
+    Start with a draft: the fields the artifact needs, in their words, with one line each on what it holds. Ask them to
+    correct it.
 
-        Use the scope to decide what belongs in the artifact: it is this
-        component's own work. Do not add fields for work the scope says
-        belongs to another component or is out of scope.
+    Then ask what makes it good enough to use, and record their answer as checks, not qualities ("Every decision has a
+    reason", not "Clear and complete"). Infer the expertise you need and confirm it in one sentence.
 
-        After the user answers a question, move on to the next topic.
-        Return "success" with what you have rather than pressing for a
-        complete answer.
-        """
+    Ask one question at a time and do not interrogate them field by field. Do not use framework terms or the field names
+    in this schema.
+
+    Return the result when they confirm the shape and the checks."""
         ...  # type: ignore[reportReturnType]

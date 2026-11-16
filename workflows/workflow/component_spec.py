@@ -184,81 +184,19 @@ class ComponentSpec(LLMValidated):
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[ComponentSpec]:
-        """You help someone find the main components of their work.
+        """Find the distinct components of the user's work.
 
-        Use the language the user is using; never switch languages on your own.
+    Each component owns one artifact: the thing itself, and the work of producing and changing it. A stage that merely
+    drafts, reviews or sends another component's artifact belongs to that component.
 
-        The user has described what they make, what they need to start, and
-        how the work happens. Now help them identify the distinct components
-        that make up the work. Begin your first message with one sentence that
-        states what you are doing and why, for example 'Let me check what I
-        have understood so far', before any proposal.
+    Start with one sentence on what you are doing, then propose the components you can already see, including the ones
+    in `existing_components`. Name each after its artifact ("Approval Record", not "Approval"). For each, say what it
+    does end to end and at least one thing it does not do. Propose the role the artifact belongs to, and the expertise
+    you will act as; confirm both rather than asking the user to choose a job title.
 
-        The components in `existing_components` have already been identified.
-        Include them in your proposal, and add any component that is needed but
-        missing. They are what was said earlier, not a fixed list: if one turns
-        out to be a stage of another component's artifact (drafted, reviewed,
-        sent), merge it into that component and say so.
+    Ask about gaps one at a time, in plain words. Do not use framework terms, or the field names in this schema.
 
-        IMPORTANT RULES:
-        - Never use technical or framework terms with the user. Ask: "what are
-          the main things that happen?" or "what are the distinct parts of
-          this?" When you refer to the process analysis, say "the steps you
-          take" or "the things you do"; never say "activities" or "phases".
-          Say "the thing you make" or "what you produce", never "the output",
-          "the deliverable", "the component", or "the workflow". Never say a
-          part "owns" something; say it is "the part that produces" it.
-        - Propose what you can based on what the user told you: "Based on what
-          you've described, the main parts might be: the raw notes, the
-          transcribed notes, the organized draft, the final minutes, and the
-          follow-up items — does that capture it?"
-        - Name each component after the concrete artifact it owns (an 'Approval
-          Record', not 'Approval'; a 'Distribution Record', not
-          'Distribution').
-        - For each component, say what it is accountable for end to end, and
-          what it covers and does not cover, in the user's words. Name at
-          least one thing it does not do; naming the adjacent component's
-          work is enough. Describe the purpose as the work it does from start
-          to end, not as a list of fields. BAD: 'Meeting minutes with title,
-          date, attendees, agenda items...' GOOD: 'Turns raw notes into the
-          final minutes, with decisions and action items'. Write a short
-          paragraph per component; never a labelled list such as 'Name:',
-          'Purpose:', 'Type:'.
-        - For each component, propose the role or capacity it belongs to,
-          using domain knowledge: a cleaning sign-off sheet usually belongs to
-          the Maintenance Manager or Facilities Lead; minutes to the meeting
-          chair or organiser; a business plan to the Owner or Founder. The
-          user themselves can hold it. Use 'Owner' only for the owner's own
-          work, not when they act in a specialist capacity. The notes a
-          note-taker writes are theirs; do not name the input supplier as the
-          owner only when someone else owns the artifact (a scribe's notes
-          become minutes owned by the meeting organizer). Offer two or three
-          likely roles and let the user correct them.
-        - A component may be responsible for the whole workflow by relying on
-          the other components; its own scope is still the one thing it records.
-        - The component that keeps the others moving may be one of them;
-          include it if it does real work. A separate coordinator is optional:
-          a simple flow may just hand each result to the next component.
-        - If one component coordinates the others, it still owns its own
-          artifact: the finished thing the other components' work feeds into —
-          a plan, a report, the final minutes. It assembles and checks that
-          artifact; it does not do their work. Taking notes, extracting
-          actions, or writing a section belongs to the component that owns it.
-          Sending is its own component when it keeps its own record of what
-          went out; otherwise it is a workflow step on the artifact.
-        - One component per artifact. The artifact is what the component
-          records — the fields of the thing it produces. A piece of work that
-          produces its own record (an approval, a distribution log, a tracker)
-          belongs to its own component. A state of the same record (draft,
-          reviewed, final) or a workflow step on it (create, update, approve,
-          send) is not a new component: one component may have as many
-          workflow steps on its one artifact as the work needs.
-        - Converge: after one proposal and the user's corrections, return the
-          components. Do not keep refining names or re-confirming the same list.
-        - Every input the workflow starts with must appear in at least one
-          component's `required_inputs`; the component that produces the first
-          artifact needs it.
-        """
+    When the user confirms the set, return it."""
         ...  # type: ignore[reportReturnType]
 
 

@@ -94,37 +94,19 @@ def _gather_notes(
     ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
-    """Greet the user, explain that you are going to understand what they do,
-    then ask "What do you do?".
+    """Find out how the user's work happens.
 
-    If `process_description` is not empty, it is what the user already told
-    you. Start from it, reflect it back, and ask only what it does not cover.
-    Do not ask "what do you do?" or ask them to repeat the output they already
-    described.
+    Greet them, say what you are doing, and ask "What do you do?". If
+    `process_description` already holds their answer, start from it instead.
 
-    Listen. When they have described their work, propose the stages it breaks
-    into: the ones they described, plus, where their description is thin, the
-    stages this kind of work usually has — mark an inferred one as a
-    suggestion. Ask them to correct the list, and when they confirm it, return
-    it as success. This is where the user agrees the stages; the next step
-    builds the detail from them and does not present them again. Do not ask
-    who keeps the work moving or who the participants are; the next step asks
-    those. Ask each question once.
+    When they answer, name the stages their work breaks into: the ones they
+    described, plus the stage this kind of work usually has when theirs is
+    thin, marked as a suggestion. Ask them to correct the list, and return it
+    once they confirm it.
 
-    Stay at the level of how the work happens, not its content. When the user
-    describes their domain (articles, dishes, business ideas), acknowledge
-    briefly then redirect: 'That sounds interesting — let's focus on how the
-    work happens. What are the main stages?' Do NOT join them in discussing
-    their domain content.
-
-    Speak in the user's words. Never say "phases" or "activities" to the user;
-    say "the main stages" and "the things that happen". Never repeat a question
-    the user has already answered; build on their answer instead.
-
-    If the user asks for practical tips or resists the process conversation,
-    acknowledge briefly and continue with one concrete question about how the
-    work happens. Never end in failure while they are still describing their
-    work.
+    Ask one question at a time, about the work rather than its content. If they
+    describe their domain, acknowledge it in a clause and return to the stages.
+    Do not ask who is involved or who keeps the work moving: the next step does.
     """
     ...  # type: ignore[reportReturnType]
 
@@ -134,34 +116,18 @@ def _generate_from_notes(
     notes: Annotated[str, "What the person told you"],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """You help someone turn what they told you into a structured breakdown.
+    """Build the breakdown from the stages the user confirmed.
 
-    The notes below are the stages the user has already confirmed. Continue
-    the conversation directly: no greeting, and do not present the stages
-    again — they are settled. Build the breakdown from them: the concrete
-    steps inside each stage. Ask only about what the notes do not cover: who
-    is involved and who keeps the work moving. If the notes cover those,
-    return success at once. If the user doesn't know something, suggest ONE
-    possibility and mark it as a suggestion.
+    The notes hold those stages. Do not present them again.
 
-    With the user, never say "phases", "activities", "participants", or
-    "orchestrating component"; say "the main stages", "the things that
-    happen", "everyone involved", and "who keeps the work moving". If the
-    user says the role that keeps the work moving is "you" or "me", accept it;
-    do not ask for a more specific job title after they answer. Use the user's
-    own words for the role; do not replace "me" with a job title like "Meal
-    Planner".
+    Work out the concrete steps inside each stage and their order, keeping the
+    names the user used. Ask only for what the notes do not cover: who is
+    involved and who keeps the work moving. If they are already clear, return
+    at once. If the user does not know something, suggest one possibility and
+    mark it as a suggestion. When the user gives "me" or "the person" as the
+    role, that is the answer.
 
-    Keep the stage names the user already gave you; do not rename them into
-    tidier business words. If they list concrete steps as their stages, accept
-    those names and put the finer steps inside them.
-
-    Never answer with failure. The user has already described their work, so
-    there is always a breakdown to return: if the detail is thin, keep the
-    stages they gave and mark the uncertain steps as suggestions. When the user
-    gives "me" or "the person" as the role, that is the answer — use it.
-
-    When the user confirms the breakdown, return success.
+    When they confirm the breakdown, return it.
     """
     ...  # type: ignore[reportReturnType]
 
