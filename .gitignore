@@ -67,3 +67,5 @@ Thumbs.db
 *.log
 evaluation_criteria.json
 test-results/
+
+.lexicon

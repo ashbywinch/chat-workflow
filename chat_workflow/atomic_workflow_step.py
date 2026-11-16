@@ -291,13 +291,15 @@ class AtomicWorkflowStep(Generic[TResult]):
         )
         messages = copy.deepcopy(self.messages)
         if not _has_cjk(_language_reference(self.messages)):
-            # The model sometimes drifts into Chinese on long prompts. A final
-            # system instruction is more reliable than the task-section line.
-            messages.append(
+            # Insert directly after the leading system prompt. Appending it
+            # last makes the request end on a system turn, and the provider
+            # answers that with an empty completion most of the time.
+            messages.insert(
+                1,
                 {
                     "role": "system",
                     "content": "The conversation is in English. Reply in English.",
-                }
+                },
             )
         if not any(message.get("role") == "user" for message in messages):
             # A step that opens the conversation has no user turn yet, and some
@@ -443,10 +445,10 @@ class AtomicWorkflowStep(Generic[TResult]):
                 )
             )
         correction = _correction_prompt(failure)
-        # A correction is a framework instruction, not a user turn. Sending it
-        # as a system message keeps the model from answering the previous
-        # question and ignoring the format requirement.
-        self.messages.append({"role": "system", "content": correction})
+        # The correction is the next turn in the exchange. It carries the
+        # `[framework]` prefix, so it is never mistaken for something the user
+        # said, and the request still ends on a user turn.
+        self.messages.append({"role": "user", "content": correction})
         self.events.append(
             TranscriptEvent(
                 type="framework",
