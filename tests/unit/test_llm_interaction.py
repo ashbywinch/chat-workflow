@@ -60,11 +60,17 @@ class TestLLMInteraction(unittest.TestCase):
         self.assertEqual(model, "default-model")
         self.assertEqual(messages[: len(orchestrator.messages)], orchestrator.messages)
         self.assertEqual(
-            messages[-1],
+            messages[-2],
             {
                 "role": "system",
                 "content": "The conversation is in English. Reply in English.",
             },
+        )
+        # The step opens the conversation, so the request carries a user turn:
+        # a system-only request gets an empty completion from some providers.
+        self.assertEqual(
+            messages[-1],
+            {"role": "user", "content": "Start the conversation."},
         )
         self.assertEqual(response_model, AgentResponse[EvaluationCriteria])
         # One sample per call: the outer correction loop feeds the rejection

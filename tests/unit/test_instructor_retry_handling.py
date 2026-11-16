@@ -364,6 +364,33 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         except RuntimeError as wrapped:
             self.assertTrue(_is_transient_provider_error(wrapped))
 
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    @patch("chat_workflow.llm_interaction.get_client")
+    def test_an_opening_turn_gets_a_user_message(self, mock_get_client, mock_collect):
+        """Some providers answer a system-only request with an empty completion."""
+        given = []
+
+        def capture(**kwargs):
+            given.append(list(kwargs["messages"]))
+            return AgentResponse[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS, result=make_valid_criteria()
+            )
+
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = capture
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(max_retries=1)
+        )
+        orchestrator._call_llm()
+
+        roles = [message["role"] for message in given[0]]
+        self.assertEqual(roles[-1], "user")
+        self.assertIn("Start the conversation", given[0][-1]["content"])
+        # The history the model sees next turn is unchanged.
+        self.assertNotIn("Start the conversation", [m["content"] for m in orchestrator.messages])
+
     def test_a_truncated_response_is_resent_unchanged(self):
         """Nothing to correct when the provider stopped mid-response."""
         from chat_workflow.atomic_workflow_step import _is_transient_provider_error

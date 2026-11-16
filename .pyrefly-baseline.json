@@ -865,9 +865,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 80,
    "column": 13,
-   "stop_line": 74,
+   "stop_line": 80,
    "stop_column": 45,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,
@@ -877,9 +877,9 @@
    "severity": "error"
   },
   {
-   "line": 97,
+   "line": 103,
    "column": 9,
-   "stop_line": 97,
+   "stop_line": 103,
    "stop_column": 42,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,

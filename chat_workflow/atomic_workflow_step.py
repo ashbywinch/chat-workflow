@@ -296,6 +296,11 @@ class AtomicWorkflowStep(Generic[TResult]):
                     "content": "The conversation is in English. Reply in English.",
                 }
             )
+        if not any(message.get("role") == "user" for message in messages):
+            # A step that opens the conversation has no user turn yet, and some
+            # providers answer a system-only request with an empty completion.
+            # Give the API the turn it needs to reply to.
+            messages.append({"role": "user", "content": "Start the conversation."})
         with timer:
             # Pass a copy: Instructor patches messages in place with the JSON
             # schema, and the conversation history must stay clean.
