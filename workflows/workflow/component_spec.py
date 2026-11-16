@@ -194,7 +194,9 @@ class ComponentSpec(LLMValidated):
     does end to end and at least one thing it does not do. Propose the role the artifact belongs to, and the expertise
     you will act as; confirm both rather than asking the user to choose a job title.
 
-    Ask about gaps one at a time, in plain words. Do not use framework terms, or the field names in this schema.
+    Ask about gaps one at a time, in plain words. Say "part of the work",
+    never "component" or "workflow", and never use a field name from this
+    schema.
 
     When the user confirms the set, return it."""
         ...  # type: ignore[reportReturnType]
