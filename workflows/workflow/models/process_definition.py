@@ -120,12 +120,13 @@ def _generate_from_notes(
 
     The notes hold those stages. Do not present them again.
 
-    Work out the concrete steps inside each stage and their order, keeping the
-    names the user used. Ask only for what the notes do not cover: who is
-    involved and who keeps the work moving. If they are already clear, return
-    at once. If the user does not know something, suggest one possibility and
-    mark it as a suggestion. When the user gives "me" or "the person" as the
-    role, that is the answer.
+    Work out the concrete steps inside each stage from what they told you, and
+    their order, keeping the names the user used. Ask about a stage only when
+    they gave no detail for it at all. Ask who is involved and who keeps things
+    moving if the notes do not say; if they are clear, return at once. If the
+    user does not know something, suggest one possibility and mark it as a
+    suggestion. When the user gives "me" or "the person" as the role, that is
+    the answer.
 
     When they confirm the breakdown, return it.
     """
