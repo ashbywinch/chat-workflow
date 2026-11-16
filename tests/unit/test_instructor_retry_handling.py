@@ -391,6 +391,55 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         # The history the model sees next turn is unchanged.
         self.assertNotIn("Start the conversation", [m["content"] for m in orchestrator.messages])
 
+    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
+    @patch("chat_workflow.llm_interaction.get_client")
+    @patch("chat_workflow.atomic_workflow_step.time.sleep", return_value=None)
+    def test_a_completion_with_no_content_is_replaced(
+        self, mock_sleep, mock_get_client, mock_collect
+    ):
+        """Some upstreams spend the response on reasoning and emit nothing."""
+        from types import SimpleNamespace
+
+        from instructor.core.exceptions import InstructorRetryException
+        from instructor.core.retry import FailedAttempt
+
+        from chat_workflow.exceptions import ValidationError
+
+        empty = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=""))]
+        )
+        rejected = InstructorRetryException(
+            "rejected",
+            n_attempts=1,
+            total_usage=0,
+            last_completion=empty,
+            failed_attempts=[FailedAttempt(1, ValidationError("empty"), empty)],
+        )
+        given = []
+
+        def respond(**kwargs):
+            given.append(1)
+            if len(given) == 1:
+                raise rejected
+            return AgentResponse[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS, result=make_valid_criteria()
+            )
+
+        mock_client = Mock()
+        mock_client.chat.completions.create.side_effect = respond
+        mock_get_client.return_value = mock_client
+
+        orchestrator = AtomicWorkflowStep(
+            config=make_atomic_workflow_step_config(max_retries=1, provider_retries=3)
+        )
+
+        result = orchestrator._call_llm()
+
+        self.assertEqual(result.intent, AgentIntent.SUCCESS)
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+        kinds = [event.kind for event in orchestrator.events]
+        self.assertIn("provider_retry", kinds)
+
     def test_a_truncated_response_is_resent_unchanged(self):
         """Nothing to correct when the provider stopped mid-response."""
         from chat_workflow.atomic_workflow_step import _is_transient_provider_error

@@ -238,7 +238,10 @@ class AtomicWorkflowStep(Generic[TResult]):
             try:
                 return self._request(client)
             except Exception as exc:
-                if attempt + 1 >= attempts or not _is_transient_provider_error(exc):
+                retryable = _is_transient_provider_error(
+                    exc
+                ) or _returned_no_content(exc)
+                if attempt + 1 >= attempts or not retryable:
                     raise
                 self.events.append(
                     TranscriptEvent(
@@ -806,14 +809,19 @@ def _correction_prompt(failure: ValidationFailure) -> str:
     )
 
 
-def _completion_text(exc: Exception) -> str | None:
-    """Return the assistant content from the last rejected completion."""
+def _completion_object(exc: Exception) -> Any:
+    """The completion that was rejected, if the provider returned one."""
     completion = getattr(exc, "last_completion", None)
     if completion is None:
         attempts = getattr(exc, "failed_attempts", None) or []
         if attempts:
             completion = getattr(attempts[-1], "completion", None)
-    return _message_content(completion)
+    return completion
+
+
+def _completion_text(exc: Exception) -> str | None:
+    """Return the assistant content from the last rejected completion."""
+    return _message_content(_completion_object(exc))
 
 
 def _failed_attempt_text(exc: Exception) -> str | None:
@@ -910,6 +918,23 @@ _TRANSIENT_PROVIDER_ERRORS = frozenset(
 )
 
 _TRUNCATED_OUTPUT = "incomplete due to a max_tokens length limit"
+
+
+def _returned_no_content(exc: BaseException) -> bool:
+    """True when the provider answered with no content at all.
+
+    Some upstreams spend the whole response on reasoning and emit nothing, or
+    stop after a single token. There is nothing for the model to correct, so
+    the sample is replaced rather than fed back.
+    """
+    from instructor.core.exceptions import InstructorRetryException
+
+    if not isinstance(exc, InstructorRetryException):
+        return False
+    completion = _completion_object(exc)
+    if completion is None:
+        return False
+    return _message_content(completion) is None
 
 
 def _is_transient_provider_error(exc: BaseException) -> bool:
