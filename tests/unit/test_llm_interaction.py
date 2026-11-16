@@ -43,6 +43,27 @@ class TestLLMInteraction(unittest.TestCase):
 
         self.assertIn("API error", str(context.exception))
 
+    def test_transcript_is_shaped_for_the_provider(self):
+        """One system message at the top, alternating turns, a user turn last."""
+        from chat_workflow.atomic_workflow_step import _request_messages
+
+        shaped = _request_messages(
+            [
+                {"role": "system", "content": "You help."},
+                {"role": "system", "content": "Reply in English."},
+                {"role": "user", "content": "hello"},
+                {"role": "user", "content": "anyone there?"},
+                {"role": "assistant", "content": "yes"},
+                {"role": "assistant", "content": ""},
+            ]
+        )
+
+        self.assertEqual([m["role"] for m in shaped], ["system", "user", "assistant", "user"])
+        self.assertIn("You help.", shaped[0]["content"])
+        self.assertIn("Reply in English.", shaped[0]["content"])
+        self.assertEqual(shaped[1]["content"], "hello\n\nanyone there?")
+        self.assertEqual(shaped[-1]["content"], "Start the conversation.")
+
     @patch("chat_workflow.llm_interaction.get_client")
     def test_call_llm_passes_correct_parameters(self, mock_get_client):
         mock_client = tests.conftest.MockInstructorClient()
@@ -58,16 +79,14 @@ class TestLLMInteraction(unittest.TestCase):
         model, messages, response_model, max_retries = mock_client.last_call_args
 
         self.assertEqual(model, "default-model")
-        self.assertEqual(messages[: len(orchestrator.messages)], orchestrator.messages)
-        self.assertEqual(
-            messages[-2],
-            {
-                "role": "system",
-                "content": "The conversation is in English. Reply in English.",
-            },
-        )
-        # The step opens the conversation, so the request carries a user turn:
-        # a system-only request gets an empty completion from some providers.
+        # One system message, at the top, carrying the step prompt and the
+        # language instruction.
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertTrue(messages[0]["content"].startswith("Test prompt"))
+        self.assertIn("The conversation is in English", messages[0]["content"])
+        self.assertEqual(sum(1 for m in messages if m["role"] == "system"), 1)
+        # The step opens the conversation, so the request ends with a user
+        # turn: ending on a system message gets an empty completion.
         self.assertEqual(
             messages[-1],
             {"role": "user", "content": "Start the conversation."},

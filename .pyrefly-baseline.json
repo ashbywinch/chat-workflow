@@ -853,9 +853,9 @@
    "severity": "error"
   },
   {
-   "line": 58,
+   "line": 79,
    "column": 9,
-   "stop_line": 58,
+   "stop_line": 79,
    "stop_column": 53,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,
@@ -865,9 +865,9 @@
    "severity": "error"
   },
   {
-   "line": 80,
+   "line": 99,
    "column": 13,
-   "stop_line": 80,
+   "stop_line": 99,
    "stop_column": 45,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,
@@ -877,9 +877,9 @@
    "severity": "error"
   },
   {
-   "line": 103,
+   "line": 122,
    "column": 9,
-   "stop_line": 103,
+   "stop_line": 122,
    "stop_column": 42,
    "path": "tests/unit/test_llm_interaction.py",
    "code": -2,
