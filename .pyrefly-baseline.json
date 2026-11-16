@@ -1,9 +1,9 @@
 {
  "errors": [
   {
-   "line": 73,
+   "line": 71,
    "column": 85,
-   "stop_line": 73,
+   "stop_line": 71,
    "stop_column": 103,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -13,9 +13,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 72,
    "column": 84,
-   "stop_line": 74,
+   "stop_line": 72,
    "stop_column": 101,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -25,9 +25,9 @@
    "severity": "error"
   },
   {
-   "line": 75,
+   "line": 73,
    "column": 74,
-   "stop_line": 75,
+   "stop_line": 73,
    "stop_column": 91,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -37,9 +37,9 @@
    "severity": "error"
   },
   {
-   "line": 150,
+   "line": 144,
    "column": 13,
-   "stop_line": 150,
+   "stop_line": 144,
    "stop_column": 26,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 150,
+   "line": 144,
    "column": 32,
-   "stop_line": 150,
+   "stop_line": 144,
    "stop_column": 45,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -778,6 +778,18 @@
    "name": "missing-argument",
    "description": "Missing argument `name` in function `workflows.workflow.domain_spec.ComponentDomainSpec.__init__`",
    "concise_description": "Missing argument `name` in function `workflows.workflow.domain_spec.ComponentDomainSpec.__init__`",
+   "severity": "error"
+  },
+  {
+   "line": 292,
+   "column": 22,
+   "stop_line": 292,
+   "stop_column": 45,
+   "path": "tests/unit/test_eval_harness.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
+   "concise_description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
    "severity": "error"
   },
   {

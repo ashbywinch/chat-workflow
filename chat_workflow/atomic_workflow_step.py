@@ -5,9 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, get_args, get_origin
 
-from .annotations import UserLabel, user_labels
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
-from .conversation_rules import FRAMEWORK_TERMS
 from .debug import _DebugTimer
 from .llm_interaction import ProviderType
 from .models import AgentIntent, AgentResponse, TurnResult
@@ -82,10 +80,6 @@ class AtomicWorkflowStep(Generic[TResult]):
         # workflow eventually produced a valid result for that turn. This is
         # how we see near-misses (recovered) instead of only hard failures.
         self.validation_events: list[dict[str, Any]] = []
-        # Each conversation nudge is spent once per step; repeating one would
-        # spend the turn budget on a nicety.
-        self._question_nudged = False
-        self._repetition_nudged = False
 
         for message in config.initial_messages or []:
             self.messages.append(message)
@@ -189,38 +183,10 @@ class AtomicWorkflowStep(Generic[TResult]):
                     self.debug.on_error(exc)
                 raise
 
-            failure = self._language_failure(response) or self._vocabulary_failure(
-                response
-            )
-            if failure is not None:
-                if attempt >= self._validation_corrections:
-                    raise MaxRetriesExceededError(self._max_retries, failure.message())
-                self._apply_correction(failure, attempt + 1)
-                continue
-
-            # Conversation nits — a repeated confirmation, an unanswered
-            # question — are nudged once each and never allowed to fail a step
-            # that produced a valid result. They cost at most two turns.
-            repeated = self._repetition_failure(response)
-            if (
-                repeated is not None
-                and not self._repetition_nudged
-                and attempt < self._validation_corrections
-            ):
-                self._repetition_nudged = True
-                self._apply_correction(repeated, attempt + 1)
-                continue
-
-            unanswered = self._unanswered_question_failure(response)
-            if (
-                unanswered is not None
-                and not self._question_nudged
-                and attempt < self._validation_corrections
-            ):
-                self._question_nudged = True
-                self._apply_correction(unanswered, attempt + 1)
-                continue
-
+            # The returned value is validated, by Pydantic and by the model's
+            # own rules. The message is not: what the agent said to the user is
+            # a matter of conversation quality, which the eval judges. Nothing
+            # here inspects it.
             self._mark_recovered()
             return response
 
@@ -314,110 +280,6 @@ class AtomicWorkflowStep(Generic[TResult]):
         timer.emit_response(response)
         return response
 
-    def _language_failure(
-        self, response: AgentResponse[TResult]
-    ) -> ValidationFailure | None:
-        message = response.message or ""
-        if not _is_wrong_language(_language_reference(self.messages), message):
-            return None
-        return ValidationFailure(
-            reason=(
-                "Reply in the user's language. The user is writing in English; "
-                "write your reply in English and do not switch languages on "
-                "your own."
-            ),
-            rejected_text=message,
-            kind="language_correction",
-        )
-
-    def _repetition_failure(
-        self, response: AgentResponse[TResult]
-    ) -> ValidationFailure | None:
-        """Reject the *same* confirmation question the user has answered.
-
-        Confirming a second, different item right after the first is normal
-        work, so the new question must repeat the one that was just answered:
-        otherwise it is a new question and is allowed.
-        """
-        message = response.message or ""
-        last_user = _last_user_message(self.messages)
-        if not _is_confirmation(last_user) or not _is_confirmation_question(message):
-            return None
-        if not _repeats(_previous_assistant_message(self.messages), message):
-            return None
-        return ValidationFailure(
-            reason=(
-                "The user already confirmed. Do not ask the same confirmation "
-                "question again."
-            ),
-            guidance=(
-                "Return success with the result you have, or ask a genuinely "
-                "new question."
-            ),
-            rejected_text=message,
-            kind="repetition_correction",
-        )
-
-    def _unanswered_question_failure(
-        self, response: AgentResponse[TResult]
-    ) -> ValidationFailure | None:
-        """Reject finishing a step while the user's last message asks a question.
-
-        A success turn carries no user-facing message, so returning success
-        straight after a question leaves the user unanswered.
-        """
-        if response.intent != AgentIntent.SUCCESS:
-            return None
-        if not _asks_the_assistant(_last_user_message(self.messages)):
-            return None
-        return ValidationFailure(
-            reason=(
-                "The user asked you a question in their last message and you "
-                "did not answer it."
-            ),
-            guidance=(
-                "Reply with intent 'continue' and a one-sentence answer, then "
-                "return the result after their next turn."
-            ),
-            rejected_text=response.message,
-            kind="unanswered_question_correction",
-        )
-
-    def _vocabulary_failure(
-        self, response: AgentResponse[TResult]
-    ) -> ValidationFailure | None:
-        """Reject a message that leaks an internal label the user never used."""
-        labels = user_labels(_inner_result_model(self.response_model))
-        message = response.message or ""
-        user_text = _user_text(self.messages)
-        candidates: dict[str, UserLabel] = {}
-        for name, label in labels.items():
-            if not label.guard:
-                continue
-            candidates[name] = label
-            for alias in label.aliases:
-                candidates[alias] = label
-        for term, phrase in FRAMEWORK_TERMS.items():
-            candidates.setdefault(term, UserLabel(phrase, term))
-        if not candidates:
-            return None
-        for term, label in candidates.items():
-            if _mentions(message, term) and not _mentions(user_text, term):
-                return ValidationFailure(
-                    reason=(
-                        f"Your message used the internal label '{term}'. "
-                        "The user has not used that word."
-                    ),
-                    guidance=(
-                        f'Rewrite the message without "{term}". Use the '
-                        f'user\'s own words, or say "{label.phrase}". Keep '
-                        "the result unchanged."
-                    ),
-                    rejected_text=message,
-                    kind="vocabulary_correction",
-                )
-        return None
-
     def _apply_correction(self, failure: ValidationFailure, attempt: int) -> None:
         """Feed one rejected response and its correction back to the model."""
         self.validation_events.append({
@@ -481,21 +343,6 @@ def _has_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in text)
 
 
-def _is_wrong_language(reference: str, response: str) -> bool:
-    """True when an English conversation gets a Chinese reply.
-
-    Only CJK drift is detected. A handful of characters is allowed (a name or
-    a quoted term); five or more means the model switched languages. A user
-    who writes in Chinese makes the reference Chinese, so the guard stays out
-    of the way.
-    """
-    cjk = sum(1 for char in response if "\u4e00" <= char <= "\u9fff")
-    if cjk < 5:
-        return False
-    reference_cjk = sum(1 for char in reference if "\u4e00" <= char <= "\u9fff")
-    return reference_cjk == 0
-
-
 def _inner_result_model(response_model: object) -> object:
     """Unwrap ``AgentResponse[list[Model]]`` to the model that declares labels."""
     model = response_model
@@ -519,144 +366,6 @@ def _user_text(messages: list[dict[str, Any]]) -> str:
         and not (message.get("content") or "").lstrip().startswith("[framework]")
     )
 
-
-_STOPWORDS = frozenset(
-    [
-        "a", "an", "and", "are", "as", "at", "be", "but", "by", "do", "does",
-        "for", "from", "has", "have", "i", "if", "in", "is", "it", "its", "me",
-        "my", "no", "not", "of", "on", "or", "our", "so", "that", "the",
-        "their", "them", "then", "there", "these", "they", "this", "to", "was",
-        "we", "were", "what", "when", "where", "which", "who", "will", "with",
-        "you", "your",
-    ]
-)
-
-
-def _content_words(text: str) -> set[str]:
-    return {
-        word for word in re.findall(r"[a-z0-9']+", text.casefold()) if word not in _STOPWORDS
-    }
-
-
-def _repeats(previous: str, message: str) -> bool:
-    """True when ``message`` restates ``previous`` rather than asking anew."""
-    before = _content_words(previous)
-    after = _content_words(message)
-    if not before or not after:
-        return False
-    shared = len(before & after) / min(len(before), len(after))
-    return shared >= 0.6
-
-
-def _previous_assistant_message(messages: list[dict[str, Any]]) -> str:
-    """The assistant turn the user was answering, if there is one."""
-    seen_user = False
-    for message in reversed(messages):
-        role = message.get("role")
-        content = message.get("content") or ""
-        if role == "user" and not content.lstrip().startswith("[framework]"):
-            if seen_user:
-                break
-            seen_user = True
-            continue
-        if seen_user and role == "assistant":
-            return content
-    return ""
-
-
-def _last_user_message(messages: list[dict[str, Any]]) -> str:
-    """The last real user turn, excluding framework corrections."""
-    for message in reversed(messages):
-        if message.get("role") != "user":
-            continue
-        content = message.get("content") or ""
-        if not content.lstrip().startswith("[framework]"):
-            return content
-    return ""
-
-
-# A question about the next step is a confirmation in disguise; the step may
-# finish on it. Any other question is addressed to the agent and needs an
-# answer first.
-_NEXT_STEP_QUESTIONS = (
-    "anything else",
-    "what next",
-    "what's next",
-    "what now",
-    "shall we",
-    "should we",
-    "anything you'd like",
-    "anything you want to change",
-)
-
-
-def _asks_the_assistant(text: str) -> bool:
-    """True when the user's message asks the agent something."""
-    if "?" not in text:
-        return False
-    normalised = text.casefold()
-    return not any(phrase in normalised for phrase in _NEXT_STEP_QUESTIONS)
-
-
-def _is_confirmation(text: str) -> bool:
-    """True for a short, unqualified yes — not a yes with a caveat."""
-    normalised = re.sub(r"[^a-z0-9' ]+", "", text.strip().lower()).strip()
-    if not normalised:
-        return False
-    caveat = ("but", "however", "except", "actually", "one thing", "although")
-    if any(word in normalised.split() for word in caveat):
-        return False
-    affirmatives = (
-        "yes",
-        "yeah",
-        "yep",
-        "yup",
-        "exactly",
-        "correct",
-        "right",
-        "sure",
-        "perfect",
-        "agreed",
-        "that's right",
-        "that is right",
-        "that's accurate",
-        "that is accurate",
-        "sounds right",
-        "that sounds right",
-        "that's it",
-        "that is it",
-    )
-    if normalised in affirmatives:
-        return True
-    if normalised.startswith(("yes ", "yeah ", "yep ")):
-        return any(
-            phrase in normalised
-            for phrase in ("exactly", "right", "correct", "perfect", "that's it")
-        )
-    return False
-
-
-def _is_confirmation_question(text: str) -> bool:
-    """True when the assistant asks the user to confirm the same picture."""
-    normalised = text.strip().lower()
-    phrases = (
-        "does that match",
-        "does this match",
-        "does that sound",
-        "does this sound",
-        "is that right",
-        "is this right",
-        "does that work",
-        "does this work",
-        "sound right",
-        "sound good",
-        "anything you'd like to adjust",
-        "anything you want to change",
-        "anything you'd change",
-        "shall we",
-        "should we",
-    )
-    return any(phrase in normalised for phrase in phrases)
 
 
 def _mentions(text: str, term: str) -> bool:
@@ -801,13 +510,6 @@ def _validation_failure(exc: Exception) -> ValidationFailure | None:
 
 def _correction_prompt(failure: ValidationFailure) -> str:
     """The framework turn that tells the model how to repair its response."""
-    if failure.kind in (
-        "language_correction",
-        "vocabulary_correction",
-        "repetition_correction",
-        "unanswered_question_correction",
-    ):
-        return f"[framework] {failure.message()}"
     return (
         "[framework] Your previous response was rejected by validation. "
         f"Fix exactly these violations:\n\n{failure.message()}\n\n"

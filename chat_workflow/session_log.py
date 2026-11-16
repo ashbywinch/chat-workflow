@@ -23,13 +23,9 @@ Audience = Literal["user", "internal"]
 
 # Why a rejected response was rejected. These also appear as event kinds, so
 # the same name describes the failure and its correction.
-CorrectionKind = Literal[
-    "validation_correction",
-    "language_correction",
-    "vocabulary_correction",
-    "repetition_correction",
-    "unanswered_question_correction",
-]
+# A returned value failed validation. Nothing else is corrected: the message
+# is not checked at runtime, only the value the step returns.
+CorrectionKind = Literal["validation_correction"]
 
 # Harness activity that has no user-facing content of its own.
 HarnessEventKind = Literal[

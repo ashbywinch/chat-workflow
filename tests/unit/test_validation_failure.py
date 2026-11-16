@@ -66,16 +66,14 @@ class TestValidationFailureClassifier(unittest.TestCase):
 
         self.assertIsNone(_validation_failure(exc))
 
-    def test_language_correction_uses_its_own_prompt(self):
-        failure = ValidationFailure(
-            reason="Reply in the user's language.",
-            kind="language_correction",
-        )
+    def test_the_only_correction_is_for_a_rejected_value(self):
+        """Nothing checks the message, so there is one correction path."""
+        failure = ValidationFailure(reason="the result is missing a date")
 
         prompt = _correction_prompt(failure)
 
-        self.assertEqual(prompt, "[framework] Reply in the user's language.")
-        self.assertNotIn("Fix exactly these violations", prompt)
+        self.assertIn("Fix exactly these violations", prompt)
+        self.assertIn("the result is missing a date", prompt)
 
 
 if __name__ == "__main__":
