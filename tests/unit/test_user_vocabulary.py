@@ -45,7 +45,7 @@ class TestVocabularyPrompt(unittest.TestCase):
 
         self.assertIn("success_criteria", section)
         self.assertIn("how you know it is good", section)
-        self.assertIn("user used them first", section)
+        self.assertIn("unless the user used it first", section)
 
 
 if __name__ == "__main__":

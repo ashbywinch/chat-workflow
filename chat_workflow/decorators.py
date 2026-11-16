@@ -151,9 +151,9 @@ def _build_user_vocabulary_section(return_type: Any) -> str:
         return ""
     lines = [
         "## Use the user's words",
-        "These are internal labels for the result. Never use them in `message` "
-        "unless the user used them first. Say the phrase, or the user's own "
-        "word if they have one.",
+        "These are internal labels for the result. Never use a label, its "
+        "singular, or a variant of it in `message` unless the user used it "
+        "first. Say the phrase, or the user's own word if they have one.",
     ]
     lines.extend(f'- `{name}` -> "{label.phrase}"' for name, label in labels.items())
     return "\n".join(lines)

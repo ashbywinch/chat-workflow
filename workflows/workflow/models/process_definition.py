@@ -63,7 +63,7 @@ class ProcessDefinition(LLMValidated):
     orchestrating_component: Annotated[
         str,
         UserLabel(
-            "who keeps the work moving",
+            "who keeps things moving",
             "orchestrating component",
             "orchestrating",
             guard=False,
