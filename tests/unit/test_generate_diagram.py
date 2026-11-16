@@ -1,7 +1,10 @@
 """Tests for WorkflowSpec._generate_diagram and _create_diagram."""
 
 import unittest
+from typing import override
 from unittest.mock import MagicMock, patch
+
+from pyfakefs.fake_filesystem_unittest import TestCase
 
 from chat_workflow import Session, SessionLog
 from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
@@ -123,7 +126,17 @@ class TestGenerateDiagram(unittest.TestCase):
         self.assertIn("sequenceDiagram", result.diagram)
 
 
-class TestCreateDiagram(unittest.TestCase):
+class TestCreateDiagram(TestCase):
+    """`_create_diagram` writes blobs to a temp directory.
+
+    The directory it creates is not removed, so these tests run on a fake
+    filesystem: a unit test must not leave anything in /tmp.
+    """
+
+    @override
+    def setUp(self) -> None:
+        self.setUpPyfakefs()
+
     @patch("workflows.evaluation_criteria.refine.refine")
     @patch.object(WorkflowSpec, "_generate_diagram")
     def test_materializes_blobs(self, mock_generate, mock_refine):

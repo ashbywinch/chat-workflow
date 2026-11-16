@@ -52,6 +52,7 @@ dev = [
     "archunitpython>=1.5.0",
     "code-review-graph>=2.3.3",
     "coverage>=7.0.0",
+    "pyfakefs>=6.3.2",
     "pyrefly>=1.4.1",
     "python-lsp-server>=1.12.0",
     "ruff>=0.11.0",

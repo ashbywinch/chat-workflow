@@ -427,6 +427,7 @@ dev = [
     { name = "archunitpython" },
     { name = "code-review-graph" },
     { name = "coverage" },
+    { name = "pyfakefs" },
     { name = "pyrefly" },
     { name = "python-lsp-server" },
     { name = "ruff" },
@@ -449,6 +450,7 @@ dev = [
     { name = "archunitpython", specifier = ">=1.5.0" },
     { name = "code-review-graph", specifier = ">=2.3.3" },
     { name = "coverage", specifier = ">=7.0.0" },
+    { name = "pyfakefs", specifier = ">=6.3.2" },
     { name = "pyrefly", specifier = ">=1.4.1" },
     { name = "python-lsp-server", specifier = ">=1.12.0" },
     { name = "ruff", specifier = ">=0.11.0" },
@@ -2346,6 +2348,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/07/60/1d1e59c9c90d54591469ada7d268251f71c24bdb765f1a8a832cee8c6653/pydantic_settings-2.14.1.tar.gz", hash = "sha256:e874d3bec7e787b0c9958277956ed9b4dd5de6a80e162188fdaff7c5e26fd5fa", size = 235551, upload-time = "2026-05-08T13:40:06.542Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ae/8d/f1af3832f5e6eb13ba94ee809e72b8ecb5eef226d27ee0bef7d963d943c7/pydantic_settings-2.14.1-py3-none-any.whl", hash = "sha256:6e3c7edfd8277687cdc598f56e5cff0e9bfff0910a3749deaa8d4401c3a2b9de", size = 60964, upload-time = "2026-05-08T13:40:04.958Z" },
+]
+
+[[package]]
+name = "pyfakefs"
+version = "6.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/8b/285a3ff923b81488a831536f8ca44305223df6d6169a0c58ba756de5e7e9/pyfakefs-6.3.2.tar.gz", hash = "sha256:7c67bdf4c11b42903c7cb6c74fa63432485afc697ad6f89ecce6fb0a4e4f24ed", size = 235667, upload-time = "2026-11-03T18:24:02.739Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/9e/429d92eeb61de5c726fd3a522b28553cd69139fa63ed789eaaa29e006c90/pyfakefs-6.3.2-py3-none-any.whl", hash = "sha256:20b9889981459dde1fe1548b0e6c298a72c373951f9bd81a3c397ddda8591c55", size = 247941, upload-time = "2026-11-03T18:24:01.007Z" },
 ]
 
 [[package]]
