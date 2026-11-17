@@ -42,6 +42,50 @@ class TestEvalStats(unittest.TestCase):
         self.assertEqual(stats.report(), "  [test_bar] 0s  0 agent tok  0 judge tok  0 tot")
 
 
+class TestEvalCacheBypass(unittest.TestCase):
+    """Every eval call bypasses the gateway cache, including the user bot."""
+
+    def test_user_bot_passes_gateway_headers(self):
+        config = MagicMock()
+        config.model = "openai/dynamic/fallback2"
+        config.extra_headers = {"cf-aig-skip-cache": "true"}
+        reply = MagicMock()
+        reply.choices[0].message.content = "hello"
+        reply.choices[0].message.reasoning_content = None
+        reply.choices[0].finish_reason = "stop"
+
+        with patch("tests.evals.helpers.litellm.completion", return_value=reply) as completion:
+            bot = helpers.AgentIO("persona", config)
+            self.assertEqual(bot.prompt("\nYou"), "hello")
+
+        self.assertEqual(
+            completion.call_args.kwargs["extra_headers"],
+            {"cf-aig-skip-cache": "true"},
+        )
+
+    def test_judge_passes_gateway_headers(self):
+        from tests.evals.helpers import llm_judge
+
+        config = MagicMock()
+        config.provider = "openai"
+        config.api_key_env = "OPENAI_API_KEY"
+        config.api_base = None
+        config.model_supports_tools = False
+        config.model = "openai/dynamic/fallback2"
+        config.max_retries = 3
+        config.request_timeout_seconds = 30
+        config.extra_headers = {"cf-aig-skip-cache": "true"}
+        client = MagicMock()
+
+        with patch("chat_workflow.get_client", return_value=client):
+            llm_judge({"Rule": "Description"}, "transcript", config)
+
+        self.assertEqual(
+            client.chat.completions.create.call_args.kwargs["extra_headers"],
+            {"cf-aig-skip-cache": "true"},
+        )
+
+
 class TestEvalGatewayConfig(unittest.TestCase):
     """Evals must fail loudly when the gateway endpoint is missing/placeholder."""
 

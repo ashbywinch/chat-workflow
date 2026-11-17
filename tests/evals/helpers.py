@@ -162,6 +162,10 @@ class AgentIO:
                 # reasoning; leave enough room for the user's reply after it.
                 max_tokens=8000,
                 temperature=0.7,
+                # The gateway cache must be bypassed on every call, including
+                # the user bot. A cached user reply replays an earlier
+                # conversation and makes a green run meaningless.
+                extra_headers=getattr(self.config, "extra_headers", None),
             )
 
             choice = response.choices[0]
@@ -293,6 +297,7 @@ def llm_judge(
         max_retries=config.max_retries,
         timeout=config.request_timeout_seconds,
         temperature=0.0,
+        extra_headers=getattr(config, "extra_headers", None),
     )
     return result
 
