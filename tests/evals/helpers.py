@@ -729,7 +729,9 @@ def make_weekly_meal_plan_deliverable():
             "Every day has a meal that fits every dietary restriction, and the "
             "grocery list covers every ingredient the plan uses."
         ),
-        integration_points="The family reads it to plan meals and shopping.",
+        integration_points=(
+        "The family receives the plan and reads it before shopping and cooking."
+    ),
         storage_requirements="Kitchen wall or fridge",
     )
 
