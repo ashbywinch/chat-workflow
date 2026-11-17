@@ -14,7 +14,7 @@ from .process_definition import ProcessDefinition
 
 @dataclass
 class IntegrationGap:
-    """An unclear handoff or incomplete interface between components."""
+    """Where one step passes to the next and the connection is unclear."""
 
     between: str
     description: str
@@ -58,7 +58,7 @@ class GapAnalysis(LLMValidated):
     )
     integration_gaps: Annotated[
         list[IntegrationGap],
-        UserLabel("unclear handovers", "integration gaps"),
+        UserLabel("connections between steps", "integration gaps"),
     ] = Field(
         default_factory=list,
         description="Where one part passes work to another and the connection is unclear",
@@ -95,29 +95,28 @@ class GapAnalysis(LLMValidated):
     ) -> GapAnalysis:
         """You help someone spot what is missing from their work.
 
-        Start from the parts and the picture they already described; do not
-        ask them to repeat it. Do the check yourself; do not ask "are there any
-        gaps?" as your only method.
+        The parts and the picture are already given. Do not introduce them,
+        restate them, or read them back — the user gave you that. Compare the
+        steps with the parts yourself, report only what is missing, in one
+        short turn, and ask the user to confirm. If nothing is missing, say
+        that in one sentence and return empty lists, including recommendations.
 
         Check every step in the work against the parts. A step that acts on a
         thing an existing part already produces — reviewing, approving, sending
-        the same document — is a step of that part, not a gap and not a new
-        part. A gap is a step that produces its own thing (a distinct record or
-        document) that no part produces. Name the missing part after that thing
-        (for example a "Distribution Record" for a send that keeps its own
-        log), not after the step. Also check unclear handovers between parts,
-        and which ideas they mentioned have no part or step. If everything is
-        covered, say so and return no gaps.
+        the same document — is a step of that part, not something missing and
+        not a new part. Something is missing only when a step produces its own
+        thing (a distinct written record) that no part produces. Name the
+        missing part after that thing (for example a "Distribution Record" for
+        a send that keeps its own note), not after the step. Also check where
+        one step passes to the next, and which ideas they mentioned have no
+        part or step.
 
-        Make one pass: name the gaps, summarize them, and ask the user to
-        confirm. When they confirm, return success. Converge rather than
-        exploring further; once the gaps are named, do not keep asking about
-        new parts of the work. The user may believe nothing is missing; your
-        job is to report what the work and the parts actually show.
-
-        Sending is its own part only when it keeps its own record of what went
-        out (a distribution log); otherwise it is a step of the part that owns
-        the thing. Parsing and file handling are technical work: give them
-        their own part only if they produce their own record.
+        Converge rather than exploring further; once the missing pieces are
+        named, do not keep asking about new parts of the work. The user may
+        believe nothing is missing; your job is to report what the work and the
+        parts actually show. Sending is its own part only when it keeps its own
+        written record of what went out; otherwise it is a step of the part
+        that produces the thing. Parsing and file handling are technical work:
+        give them their own part only if they produce their own record.
         """
         ...  # type: ignore[reportReturnType]
