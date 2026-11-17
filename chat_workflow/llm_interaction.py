@@ -32,13 +32,17 @@ def get_client(
     provider: str,
     api_base: str | None = None,
     api_key_env: str | None = None,
+    model_supports_tools: bool = False,
 ):
     """Get an instructor-patched LLM client for *provider*.
 
     The API key is read from the corresponding environment variable
     (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``); override with
     ``api_key_env``. A custom endpoint can be set with ``api_base``
-    (e.g. ``https://opencode.ai/zen/go/v1`` for opencode-go models).
+    (e.g. ``https://opencode.ai/zen/go/v1`` for opencode-go models). Pass
+    ``model_supports_tools=True`` when the model can call tools: the client
+    then uses instructor's ``Mode.TOOLS``, so a step may call tools and still
+    return its structured result.
     """
     provider = provider.lower()
 
@@ -57,7 +61,10 @@ def get_client(
     os.environ[provider.upper() + "_API_KEY"] = api_key
     if api_base:
         litellm.api_base = api_base
-    mode = instructor.Mode.JSON
+    # Native tool calling when the model supports it: instructor's TOOLS mode
+    # lets a step call tools and still return the structured result, instead of
+    # encoding tool calls as a hand-written JSON protocol.
+    mode = instructor.Mode.TOOLS if model_supports_tools else instructor.Mode.JSON
     return instructor.from_litellm(completion, mode=mode)
 
 
