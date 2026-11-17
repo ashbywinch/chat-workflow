@@ -74,6 +74,31 @@ class TestBuildSystemPrompt(unittest.TestCase):
         self.assertNotIn("## Conversation checklist", prompt)
 
 
+class TestChatTaskSection(unittest.TestCase):
+    """The Task section states the protocol; the checklist states the rules."""
+
+    def task(self) -> str:
+        from chat_workflow.decorators import _build_task_section
+
+        return _build_task_section(InnerShape, chat=True)
+
+    def test_answering_comes_before_success(self):
+        """A success turn carries no message, so the answer is its own turn."""
+        task = self.task()
+
+        self.assertIn("answer it in a continue turn", task)
+        self.assertIn("after their next turn", task)
+        self.assertNotIn("then return the result in the same response", task)
+
+    def test_rules_are_not_restated(self):
+        """Each conversation rule has one statement: the checklist."""
+        task = self.task()
+
+        self.assertNotIn("Ask each question once", task)
+        self.assertNotIn("thinking partner", task.lower())
+        self.assertNotIn("Your input parameters", task)
+
+
 class TestValidationSchema(unittest.TestCase):
     def test_validation_rule_reaches_json_schema(self):
         class Validated(LLMValidated):
