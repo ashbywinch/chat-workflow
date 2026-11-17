@@ -15,8 +15,14 @@ from __future__ import annotations
 
 import sys
 import traceback
+from pathlib import Path
 
-from tests.evals import fixtures
+# Running a script puts its own directory on sys.path, not the repository root.
+# The fixtures import `tests` and `workflows`, so make the checkout importable
+# the same way `python -m unittest` does.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from tests.evals import fixtures  # noqa: E402
 
 FACTORIES = [
     "meeting_minutes_deliverable",
