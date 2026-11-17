@@ -107,6 +107,10 @@ def _gather_notes(
     Ask one question at a time, about the work rather than its content. If they
     describe their domain, acknowledge it in a clause and return to the stages.
     Do not ask who is involved or who keeps the work moving: the next step does.
+
+    Return what they told you about the work together with the stages they
+    confirmed. The next step works the concrete steps out from that description,
+    and cannot if all it receives is the list of stage names.
     """
     ...  # type: ignore[reportReturnType]
 
@@ -118,11 +122,12 @@ def _generate_from_notes(
 ) -> ProcessDefinition:
     """Build the breakdown from the stages the user confirmed.
 
-    The notes hold those stages. Do not present them again.
+    The notes hold those stages and what the user said about them. Do not
+    present the stages again.
 
-    Work out the concrete steps inside each stage from what they told you, and
+    Work out the concrete steps inside each stage from what the notes say, and
     their order, keeping the names the user used. Ask about a stage only when
-    they gave no detail for it at all. Ask who is involved and who keeps things
+    the notes say nothing about it. Ask who is involved and who keeps things
     moving if the notes do not say; if they are clear, return at once. If the
     user does not know something, suggest one possibility and mark it as a
     suggestion. When the user gives "me" or "the person" as the role, that is
