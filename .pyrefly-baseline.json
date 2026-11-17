@@ -157,9 +157,9 @@
    "severity": "error"
   },
   {
-   "line": 215,
+   "line": 217,
    "column": 9,
-   "stop_line": 215,
+   "stop_line": 217,
    "stop_column": 35,
    "path": "chat_workflow/mixins.py",
    "code": -2,
@@ -169,9 +169,9 @@
    "severity": "error"
   },
   {
-   "line": 246,
+   "line": 248,
    "column": 5,
-   "stop_line": 246,
+   "stop_line": 248,
    "stop_column": 35,
    "path": "chat_workflow/mixins.py",
    "code": -2,
@@ -346,6 +346,18 @@
    "name": "bad-argument-type",
    "description": "Argument `Any | None` is not assignable to parameter `model_method` with type `(...) -> Any` in function `tests.evals.helpers.run_multi_turn_eval`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
    "concise_description": "Argument `Any | None` is not assignable to parameter `model_method` with type `(...) -> Any` in function `tests.evals.helpers.run_multi_turn_eval`",
+   "severity": "error"
+  },
+  {
+   "line": 424,
+   "column": 44,
+   "stop_line": 424,
+   "stop_column": 51,
+   "path": "tests/evals/helpers.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `JudgeVerdict` is not assignable to parameter `verdict` with type `RuleVerdict` in function `chat_workflow.mixins._verdict_claims_the_rule_passes`",
+   "concise_description": "Argument `JudgeVerdict` is not assignable to parameter `verdict` with type `RuleVerdict` in function `chat_workflow.mixins._verdict_claims_the_rule_passes`",
    "severity": "error"
   },
   {

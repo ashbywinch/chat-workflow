@@ -86,6 +86,31 @@ class TestEvalCacheBypass(unittest.TestCase):
         )
 
 
+class TestConversationJudgeCoherence(unittest.TestCase):
+    def test_a_verdict_that_finds_no_violation_is_not_a_failure(self):
+        from tests.evals.helpers import JudgeVerdict, _judge_says_it_passes
+
+        verdict = JudgeVerdict(
+            rule="No question after pushback",
+            passed=False,
+            explanation=(
+                "The assistant changed approach and asked a different question. "
+                "No violation found."
+            ),
+        )
+        self.assertTrue(_judge_says_it_passes(verdict))
+
+    def test_a_real_failure_is_kept(self):
+        from tests.evals.helpers import JudgeVerdict, _judge_says_it_passes
+
+        verdict = JudgeVerdict(
+            rule="No question after pushback",
+            passed=False,
+            explanation="The assistant asked the same question again, so it fails.",
+        )
+        self.assertFalse(_judge_says_it_passes(verdict))
+
+
 class TestEvalGatewayConfig(unittest.TestCase):
     """Evals must fail loudly when the gateway endpoint is missing/placeholder."""
 

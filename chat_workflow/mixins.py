@@ -130,6 +130,8 @@ def _verdict_claims_the_rule_passes(verdict: RuleVerdict) -> bool:
         "meets the rule",
         "not violated",
         "does not violate",
+        "no violation",
+        "not a violation",
         "is unambiguous",
         "no fix needed",
         "is acceptable",

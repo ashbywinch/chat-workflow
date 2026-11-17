@@ -412,6 +412,18 @@ def _has_conversation(session: Session) -> bool:
     )
 
 
+def _judge_says_it_passes(verdict: JudgeVerdict) -> bool:
+    """True when a failed verdict's own conclusion says there was no violation.
+
+    The judge occasionally sets ``passed=False`` while its explanation ends
+    "No violation found" or "does not violate the rule". That is a malformed
+    verdict, not a failure; discard it exactly as the object-rule judge does.
+    """
+    from chat_workflow.mixins import _verdict_claims_the_rule_passes
+
+    return _verdict_claims_the_rule_passes(verdict)
+
+
 @dataclass
 class RunRecord:
     """One eval run, stored as JSON and rendered as text."""
@@ -671,7 +683,11 @@ def run_multi_turn_eval(
     if judge is not None:
         judged = judge(judge_rules, judge_transcript, config)
         judge_result = judged
-        failures = [v for v in judged.verdicts if not v.passed]
+        failures = [
+            verdict
+            for verdict in judged.verdicts
+            if not verdict.passed and not _judge_says_it_passes(verdict)
+        ]
 
     # Save the human transcript on success too when env var is set
     if os.environ.get("CHAT_WORKFLOW_SAVE_TRANSCRIPT"):
