@@ -94,17 +94,13 @@ def _gather_notes(
     ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
-    """Find out how the user's work happens.
+    """Collect the user's description of how their work happens.
 
 Greet them, say what you are doing, and ask "What do you do?". If `process_description` already holds their answer, start from it instead.
 
-When they answer, name the stages their work breaks into: the ones they described, plus the stage this kind of work usually has when theirs is thin, marked as a suggestion. Then ask "Is there anything else?".
+Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in their words.
 
-Do not ask them to confirm the stages. This step does not produce the breakdown, so it does not ask for it to be confirmed; the next step presents it and that is where the user confirms it.
-
-Ask one question at a time, about the work rather than its content. If they describe their domain, acknowledge it in a clause and return to the stages. Do not ask who is involved or who keeps things moving: the next step does.
-
-Return what they told you about the work together with the stages you named."""
+Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -113,11 +109,11 @@ def _generate_from_notes(
     notes: Annotated[str, "What the person told you"],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Build the process definition, and confirm it with the user.
+    """Turn the user's description into a process definition, and confirm it.
 
-The notes hold the stages and what the user said about them. Present the complete breakdown — the stages and the concrete steps inside them — and ask the user to confirm it. This is the only place the breakdown is confirmed: the previous step did not ask.
+The notes hold what the user told you. Derive the breakdown from them: the stages their work breaks into, the concrete steps inside each, everyone involved, and who keeps things moving. Keep the user's own names for stages and steps.
 
-Work the concrete steps out from what the notes say, keeping the user's names. Ask about a stage only when the notes say nothing about it. Ask who is involved and who keeps things moving if the notes do not say. If the user does not know something, suggest one possibility and mark it as a suggestion. When the user gives "me" or "the person" as the role, that is the answer.
+Present the complete breakdown and ask the user to confirm it. Ask about a stage only when the notes say nothing about it. If the user does not know something, suggest one possibility and mark it as a suggestion. When they give "me" or "the person" as the role, that is the answer.
 
 When they confirm, return it."""
     ...  # type: ignore[reportReturnType]
