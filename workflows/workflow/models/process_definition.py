@@ -96,9 +96,11 @@ def _gather_notes(
 ) -> str:
     """Collect the user's description of how their work happens.
 
-Greet them, say what you are doing, and ask "What do you do?". If `process_description` already holds their answer, start from it instead.
+Greet them, say what you are doing, and ask "What do you do?". If `process_description` already holds their answer,
+start from it instead.
 
-Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in their words.
+Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in
+their words.
 
 Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown."""
     ...  # type: ignore[reportReturnType]
@@ -111,9 +113,13 @@ def _generate_from_notes(
 ) -> ProcessDefinition:
     """Turn the user's description into a process definition, and confirm it.
 
-The notes hold what the user told you. Derive the breakdown from them: the stages their work breaks into, the concrete steps inside each, everyone involved, and who keeps things moving. Keep the user's own names for stages and steps.
+The notes hold what the user told you. Derive the breakdown from them yourself: the stages, the concrete steps inside
+each, everyone involved, and who keeps things moving. Do not walk the user through the stages asking what happens in
+each — work it out from their description and present the result as a draft, keeping their own names.
 
-Present the complete breakdown and ask the user to confirm it. Ask about a stage only when the notes say nothing about it. If the user does not know something, suggest one possibility and mark it as a suggestion. When they give "me" or "the person" as the role, that is the answer.
+Present the complete breakdown and ask them to confirm it. Ask only for what the description does not contain at all:
+who is involved, and who keeps things moving. If the user does not know something, suggest one possibility and mark it
+as a suggestion. When they give "me" or "the person" as the role, that is the answer.
 
 When they confirm, return it."""
     ...  # type: ignore[reportReturnType]

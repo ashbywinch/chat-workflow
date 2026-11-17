@@ -114,8 +114,8 @@ class Resource(LLMValidated):
     they confirm the set, return it in that same response without summarising it again.
 
     Describe each in the user's words. Never say "input", "material",
-    "inventory", "completeness", "source", "format", or "dependency": say "what
-    you start with". Stay at the level of what they start with, not its
+    "inventory", "completeness", "source", "format", "dependency", "resource",
+    or "resources": say "what you start with". Stay at the level of what they start with, not its
     contents: if they describe their domain, acknowledge it in a clause and
     return to them."""
         ...  # type: ignore[reportReturnType]
