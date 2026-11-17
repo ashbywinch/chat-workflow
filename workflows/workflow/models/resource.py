@@ -99,9 +99,11 @@ class Resource(LLMValidated):
     - what it looks like when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
     feedback", not "Chatting to the sous");
     - what it needs first, if anything;
-    - how they know it is complete: something true of the finished thing, not an action, a state of mind, or an outcome.
-    "The list includes every item on every shelf, flagged if it is near expiry" - not "I know what is on every shelf",
-    not "Every shelf has been checked", not "No one complains".
+    - how they know it is complete: something true of the finished thing, not
+    an action, not an outcome, and never a state of mind. "The list includes
+    every item on every shelf, flagged if it is near expiry" - not "I know what
+    is on every shelf", not "I can list every item", not "Every shelf has been
+    checked", not "No one complains".
 
     Work through one at a time: propose its shape and check, ask the user to confirm or correct, and only then move to
     the next. Do not put checks for several in one message. Raw notes, and anything the user trusts as sent, still get a
