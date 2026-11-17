@@ -67,6 +67,12 @@ coverage: setup
 lint: setup
 	.venv/bin/ruff check chat_workflow/ workflows/ tests/ chat_workflow_cli/
 
+# The gates the hooks and CI call. Neither target existed while the hooks
+# called them, so every commit and push failed after the tests had passed.
+# This repo has no separate typecheck step.
+lint-check: lint
+check: lint
+
 # Auto-fix linting issues
 format: setup
 	.venv/bin/ruff check --fix chat_workflow/ workflows/ tests/ chat_workflow_cli/
