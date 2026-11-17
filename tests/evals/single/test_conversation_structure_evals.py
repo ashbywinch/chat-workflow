@@ -14,10 +14,8 @@ from __future__ import annotations
 import unittest
 
 from tests.conftest import timeout
-from tests.evals.helpers import (
-    make_meeting_minutes_deliverable,
-    run_multi_turn_eval,
-)
+from tests.evals import fixtures
+from tests.evals.helpers import run_multi_turn_eval
 from workflows.workflow.models import Deliverable, Resource
 
 SKEPTICAL_FIRST_TIME_PERSONA = (
@@ -240,7 +238,7 @@ class TestAdaptiveConversationEval(unittest.TestCase):
             model_method=Resource.generate_from_chat,
             method_kwargs={
                 "max_turns": 10,
-                "deliverables": [make_meeting_minutes_deliverable()],
+                "deliverables": [fixtures.meeting_minutes_deliverable()],
             },
             user_persona=PARTICIPATORY_RESOURCE_PERSONA,
             judge_rules=ADAPTIVE_CONVERSATION_RULES,

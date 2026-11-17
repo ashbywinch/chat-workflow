@@ -230,6 +230,7 @@ def _setup_atomic_workflow_step(
             max_retries=session.config.max_retries,
             request_timeout_seconds=session.config.request_timeout_seconds,
             model_supports_tools=session.config.model_supports_tools,
+            extra_headers=getattr(session.config, "extra_headers", None),
             conversation_validation_rules=conversation_validation_rules,
             chat=chat,
         )

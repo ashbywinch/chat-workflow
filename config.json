@@ -6,7 +6,10 @@
         "provider": "openai",
         "model": "openai/dynamic/fallback2",
         "api_key_env": "OPENAI_API_KEY",
-        "model_supports_tools": false
+        "model_supports_tools": false,
+        "extra_headers": {
+          "cf-aig-skip-cache": "true"
+        }
       },
       "openrouter": {
         "provider": "openrouter",

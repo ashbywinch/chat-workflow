@@ -5,10 +5,8 @@ from __future__ import annotations
 import unittest
 
 from tests.conftest import timeout
-from tests.evals.helpers import (
-    make_weekly_meal_plan_deliverable,
-    run_multi_turn_eval,
-)
+from tests.evals import fixtures
+from tests.evals.helpers import run_multi_turn_eval
 from workflows.workflow.component_spec import ComponentSpec
 from workflows.workflow.models import (
     Deliverable,
@@ -103,7 +101,7 @@ class TestConfusionHandlingEval(unittest.TestCase):
             model_method=Resource.generate_from_chat,
             method_kwargs={
                 "max_turns": 14,
-                "deliverables": [make_weekly_meal_plan_deliverable()],
+                "deliverables": [fixtures.weekly_meal_plan_deliverable()],
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=CONFUSION_JUDGE_RULES,
@@ -135,7 +133,7 @@ class TestJargonFreeEval(unittest.TestCase):
             model_method=Resource.generate_from_chat,
             method_kwargs={
                 "max_turns": 10,
-                "deliverables": [make_weekly_meal_plan_deliverable()],
+                "deliverables": [fixtures.weekly_meal_plan_deliverable()],
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,

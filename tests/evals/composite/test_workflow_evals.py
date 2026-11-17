@@ -110,11 +110,8 @@ class TestResourceEval(unittest.TestCase):
     @timeout(900)
     def test_multi_turn_resource_generation(self):
         """Resource.generate_from_chat should complete efficiently with a user bot."""
-        from tests.evals.helpers import (
-            make_meeting_analysis,
-            make_meeting_minutes_deliverable,
-            run_multi_turn_eval,
-        )
+        from tests.evals import fixtures
+        from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow.models import Resource
 
         user_persona = (
@@ -128,8 +125,8 @@ class TestResourceEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
             method_kwargs=dict(
-                analysis=make_meeting_analysis(),
-                deliverables=[make_meeting_minutes_deliverable()],
+                analysis=fixtures.meeting_analysis(),
+                deliverables=[fixtures.meeting_minutes_deliverable()],
                 max_turns=10,
             ),
             user_persona=user_persona,
@@ -140,10 +137,8 @@ class TestResourceEval(unittest.TestCase):
     @timeout(900)
     def test_resource_with_adhd_chef(self):
         """Resource should stay at meta-level with an ADHD chef who keeps describing dishes."""
-        from tests.evals.helpers import (
-            make_weekly_menu_deliverable,
-            run_multi_turn_eval,
-        )
+        from tests.evals import fixtures
+        from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow.models import Resource
 
         user_persona = (
@@ -161,7 +156,7 @@ class TestResourceEval(unittest.TestCase):
             model_method=Resource.generate_from_chat,
             method_kwargs=dict(
                 analysis=None,
-                deliverables=[make_weekly_menu_deliverable()],
+                deliverables=[fixtures.weekly_menu_deliverable()],
                 # Five materials, one confirmed at a time: the rambling persona
                 # needs a couple of turns per material before it settles.
                 max_turns=14,
@@ -179,7 +174,8 @@ class TestOutputEval(unittest.TestCase):
     @timeout(900)
     def test_multi_turn_output_generation(self):
         """Deliverable.generate_from_chat should complete efficiently with a user bot."""
-        from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
+        from tests.evals import fixtures
+        from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow.models import Deliverable
 
         user_persona = (
@@ -193,7 +189,7 @@ class TestOutputEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
             method_kwargs=dict(
-                analysis=make_meeting_analysis(),
+                analysis=fixtures.meeting_analysis(),
                 max_turns=10,
             ),
             user_persona=user_persona,
@@ -235,12 +231,13 @@ class TestComponentSpecEval(unittest.TestCase):
     @timeout(900)
     def test_multi_turn_component_identification(self):
         """ComponentSpec.identify_from_chat should complete efficiently."""
-        from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
+        from tests.evals import fixtures
+        from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow.models import (
             ComponentSpec,
         )
 
-        analysis = make_meeting_analysis()
+        analysis = fixtures.meeting_analysis()
         from tests.evals import fixtures
 
         inputs = [fixtures.meeting_notes_resource()]

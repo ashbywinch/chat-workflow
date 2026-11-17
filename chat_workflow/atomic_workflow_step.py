@@ -64,6 +64,7 @@ class AtomicWorkflowStep(Generic[TResult]):
         self._provider_retries = config.provider_retries
         self._request_timeout_seconds = config.request_timeout_seconds
         self._model_supports_tools = config.model_supports_tools
+        self._extra_headers = config.extra_headers or None
         self._api_base: str | None = config.api_base
         self._api_key_env: str | None = config.api_key_env
         self.chat = config.chat
@@ -276,6 +277,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                 max_retries=instructor_retries,
                 timeout=self._request_timeout_seconds,
                 max_tokens=_DEFAULT_MAX_TOKENS,
+                extra_headers=self._extra_headers,
             )
         timer.emit_response(response)
         return response

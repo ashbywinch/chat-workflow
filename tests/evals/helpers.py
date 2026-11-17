@@ -690,31 +690,3 @@ def run_multi_turn_eval(
             )
 
     return result
-
-
-def make_meeting_minutes_deliverable():
-    """A Meeting Minutes deliverable for Resource evals."""
-    from tests.evals import fixtures
-
-    return fixtures.meeting_minutes_deliverable()
-
-
-def make_weekly_meal_plan_deliverable():
-    """A Weekly Meal Plan deliverable for Resource evals."""
-    from tests.evals import fixtures
-
-    return fixtures.weekly_meal_plan_deliverable()
-
-
-def make_weekly_menu_deliverable():
-    """A Weekly Menu deliverable for Resource evals."""
-    from tests.evals import fixtures
-
-    return fixtures.weekly_menu_deliverable()
-
-
-def make_meeting_analysis():
-    """A ProcessDefinition for Resource evals."""
-    from tests.evals import fixtures
-
-    return fixtures.meeting_analysis()

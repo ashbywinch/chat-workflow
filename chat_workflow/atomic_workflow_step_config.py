@@ -41,5 +41,7 @@ class AtomicWorkflowStepConfig(Generic[TResult]):
     provider_retries: int = 3
     request_timeout_seconds: int = 30
     model_supports_tools: bool = False
+    # Sent with every request; used to bypass a gateway cache.
+    extra_headers: dict[str, str] | None = None
     api_base: str | None = None
     api_key_env: str | None = None

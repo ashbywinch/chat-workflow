@@ -109,6 +109,17 @@ class Config:
         return self._config_data["llm"]["request_timeout_seconds"]
 
     @property
+    def extra_headers(self) -> dict[str, str]:
+        """Headers for every model request.
+
+        A gateway in front of the provider may cache responses, which makes an
+        eval replay an old reply instead of testing the current prompt. Set
+        ``"extra_headers": {"cf-aig-skip-cache": "true"}`` on the eval preset
+        to bypass it.
+        """
+        return dict(self._config_data["llm"].get("extra_headers") or {})
+
+    @property
     def model_supports_tools(self) -> bool:
         return self._config_data["llm"].get("model_supports_tools", False)
 
