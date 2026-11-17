@@ -16,7 +16,6 @@ import unittest
 from contextlib import suppress
 from pathlib import Path
 
-from tests.conftest import timeout
 from tests.evals.helpers import (
     AgentIO,
     capture_on_failure,
@@ -29,35 +28,13 @@ from workflows.workflow.component_spec import ComponentSpec
 
 
 def make_minutes_draft_responsibilities() -> ComponentSpec:
-    """Create a realistic ComponentSpec for a MinutesDraft artifact."""
-    return ComponentSpec(
-        name="MinutesDraft",
-        purpose=(
-            "Produces the formal written record of a meeting — decisions made "
-            "and action items assigned — for the meeting attendees."
-        ),
-        scope_description=(
-            "Produces and maintains the formal written record of a meeting: it turns the "
-            "meeting notes and attendee list into a record of what was discussed, the "
-            "decisions made, and the action items assigned. It does NOT produce the meeting "
-            "agenda, pre-meeting materials, or follow-up communications."
-        ),
-        required_inputs=["meeting_notes", "attendee_list"],
-        component_type="artifact_producing",
-        owner_role="Note Taker",
-        incidental_notes=(
-            "The user typically takes sketchy notes during meetings and needs help "
-            "turning them into proper structured minutes. They want the assistant to "
-            "ask clarifying questions and fill in gaps."
-        ),
-    )
+    """The component spec this eval generates code for."""
+    from tests.evals import fixtures
+
+    return fixtures.minutes_draft_spec()
 
 
-class TestEndToEndComponentSourceCodeEval(unittest.TestCase):
-    """End-to-end eval: full pipeline from responsibilities to running generated component."""
-
-    @timeout(1200)
-    def test_end_to_end_generated_component(self):
+def test_end_to_end_generated_component(self):
         """Full pipeline: ComponentSpec → Component.create() → import → run → judge."""
         config = make_config()
         responsibilities = make_minutes_draft_responsibilities()

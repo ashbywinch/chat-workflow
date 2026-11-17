@@ -97,6 +97,9 @@ coverage: deps
 	@$(COVERAGE) html
 	@echo "${GREEN}Coverage report generated: htmlcov/index.html${NC}"
 
+fixtures-check: deps
+	@$(PYTHON) scripts/check_eval_fixtures.py
+
 docs-check: deps  # every relative markdown link resolves (house standard)
 	@$(UNITTEST) tests.unit.test_docs_links
 

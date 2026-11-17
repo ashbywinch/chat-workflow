@@ -207,20 +207,9 @@ class TestDomainProposalEval(unittest.TestCase):
         # In the real flow, resources are identified after the deliverables, so
         # the assistant already knows the domain. Mirror that here: without it,
         # the first turn has no context and cannot propose starting materials.
-        meeting_minutes = Deliverable(
-            name="Meeting Minutes",
-            description=(
-                "The written record of the meeting: decisions made, action items "
-                "assigned, and key discussion points."
-            ),
-            consumer="Meeting Attendees",
-            format="Formatted document (PDF or shared doc)",
-            success_criteria=(
-                "Every decision is recorded and every action item names an owner."
-            ),
-            integration_points="Emailed to attendees, who review and follow up.",
-            storage_requirements="Shared drive, one folder per meeting series",
-        )
+        from tests.evals import fixtures
+
+        meeting_minutes = fixtures.meeting_minutes_deliverable()
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
             method_kwargs={"max_turns": 10, "deliverables": [meeting_minutes]},

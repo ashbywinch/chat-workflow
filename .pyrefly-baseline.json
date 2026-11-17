@@ -313,15 +313,39 @@
    "severity": "error"
   },
   {
-   "line": 130,
+   "line": 105,
+   "column": 55,
+   "stop_line": 105,
+   "stop_column": 59,
+   "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `ModuleSpec | None` is not assignable to parameter `spec` with type `ModuleSpec` in function `_frozen_importlib.module_from_spec`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
+   "concise_description": "Argument `ModuleSpec | None` is not assignable to parameter `spec` with type `ModuleSpec` in function `_frozen_importlib.module_from_spec`",
+   "severity": "error"
+  },
+  {
+   "line": 107,
    "column": 17,
-   "stop_line": 130,
-   "stop_column": 40,
+   "stop_line": 107,
+   "stop_column": 28,
    "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
    "code": -2,
    "name": "missing-attribute",
-   "description": "Object of class `NoneType` has no attribute `exec_module`",
-   "concise_description": "Object of class `NoneType` has no attribute `exec_module`",
+   "description": "Object of class `NoneType` has no attribute `loader`",
+   "concise_description": "Object of class `NoneType` has no attribute `loader`",
+   "severity": "error"
+  },
+  {
+   "line": 179,
+   "column": 34,
+   "stop_line": 179,
+   "stop_column": 49,
+   "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
+   "code": -2,
+   "name": "bad-argument-type",
+   "description": "Argument `Any | None` is not assignable to parameter `model_method` with type `(...) -> Any` in function `tests.evals.helpers.run_multi_turn_eval`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
+   "concise_description": "Argument `Any | None` is not assignable to parameter `model_method` with type `(...) -> Any` in function `tests.evals.helpers.run_multi_turn_eval`",
    "severity": "error"
   },
   {

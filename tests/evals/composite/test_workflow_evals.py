@@ -238,38 +238,13 @@ class TestComponentSpecEval(unittest.TestCase):
         from tests.evals.helpers import make_meeting_analysis, run_multi_turn_eval
         from workflows.workflow.models import (
             ComponentSpec,
-            Deliverable,
-            Resource,
         )
 
         analysis = make_meeting_analysis()
-        inputs = [
-            Resource(
-                source="Note Taker",
-                format="Free-text notes",
-                validation_criteria=(
-                    "Contains the meeting date, the attendee list, and at least "
-                    "one discussion topic."
-                ),
-            ),
-        ]
-        outputs = [
-            Deliverable(
-                name="Meeting Minutes",
-                description=(
-                    "The written record of the meeting: decisions made, action "
-                    "items assigned, and key discussion points."
-                ),
-                consumer="Meeting Attendees",
-                format="Formatted document (PDF or shared doc)",
-                success_criteria=(
-                    "Every decision is recorded and every action item names "
-                    "an owner."
-                ),
-                integration_points="Emailed to attendees, who review and follow up.",
-                storage_requirements="Shared drive, one folder per meeting series",
-            ),
-        ]
+        from tests.evals import fixtures
+
+        inputs = [fixtures.meeting_notes_resource()]
+        outputs = [fixtures.meeting_minutes_deliverable()]
         user_persona = (
             "You are a busy professional. You know your meeting workflow "
             "well but know nothing about 'component architecture'. Describe "

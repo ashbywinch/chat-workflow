@@ -166,36 +166,10 @@ class TestJargonFreeEval(unittest.TestCase):
             orchestrating_component="Meal Planner",
             participants=["Cook", "Family Members"],
         )
-        inputs = [
-            Resource(
-                source="Family members",
-                format="List of dietary preferences",
-                dependencies=[],
-                validation_criteria=(
-                    "Lists every dietary restriction for each family member by name."
-                ),
-            ),
-        ]
-        outputs = [
-            Deliverable(
-                name="Weekly Meal Plan",
-                description=(
-                    "Seven days of meals for the family, with each day's dinner "
-                    "and the groceries it needs."
-                ),
-                consumer="Family",
-                format="One-page plan",
-                success_criteria=(
-                    "Each day of the week lists a dinner, and every ingredient "
-                    "in it is on the family's allowed list."
-                ),
-                integration_points=(
-                    "The family receives the plan and reads it before shopping "
-                    "and cooking."
-                ),
-                storage_requirements="Kitchen wall / fridge",
-            ),
-        ]
+        from tests.evals import fixtures
+
+        inputs = [fixtures.family_dietary_preferences()]
+        outputs = [fixtures.weekly_meal_plan_deliverable()]
         result = run_multi_turn_eval(
             model_method=ComponentSpec.identify_from_chat,
             method_kwargs={
@@ -218,23 +192,9 @@ class TestJargonFreeEval(unittest.TestCase):
             orchestrating_component="Meal Planner",
             participants=["Cook", "Family Members"],
         )
-        requirements = [
-            ComponentSpec(
-                name="Weekly Meal Plan",
-                purpose=(
-                    "Produces the weekly meal plan — which meals are cooked on "
-                    "which days and the groceries they require — for the family."
-                ),
-                required_inputs=["Dietary preferences"],
-                scope_description=(
-                    "Creates and updates the weekly meal plan (including the "
-                    "associated grocery list) for one week. Does not include "
-                    "shopping, cooking, or reviewing the plan."
-                ),
-                component_type="artifact_producing",
-                owner_role="Home Cook",
-            ),
-        ]
+        from tests.evals import fixtures
+
+        requirements = [fixtures.weekly_meal_plan_spec()]
         result = run_multi_turn_eval(
             model_method=GapAnalysis.analyze_from_chat,
             method_kwargs={

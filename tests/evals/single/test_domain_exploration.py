@@ -19,28 +19,11 @@ class TestDomainExplorationEval(unittest.TestCase):
     @timeout(900)
     def test_domain_exploration_with_user_bot(self):
         """ComponentDomainSpec.explore() should complete efficiently with a user bot."""
+        from tests.evals import fixtures
         from tests.evals.helpers import run_multi_turn_eval
         from workflows.workflow import ComponentDomainSpec
-        from workflows.workflow.component_spec import (
-            ComponentSpec,
-        )
 
-        responsibilities = ComponentSpec(
-            name="MeetingMinutes",
-            purpose=(
-                "Produces meeting minutes that capture decisions made, action "
-                "items assigned, and key discussion points for meeting attendees."
-            ),
-            scope_description=(
-                "Captures what happened in a meeting: decisions made, "
-                "action items assigned, key discussion points. Does NOT "
-                "include pre-meeting preparation or post-meeting follow-up tracking."
-            ),
-            required_inputs=["Raw meeting notes", "Attendee list"],
-            component_type="artifact_producing",
-            owner_role="Note Taker",
-            incidental_notes="",
-        )
+        responsibilities = fixtures.meeting_minutes_spec()
 
         user_persona = (
             "You are a busy team lead who runs weekly project meetings. "

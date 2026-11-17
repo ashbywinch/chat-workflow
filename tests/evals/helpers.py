@@ -694,92 +694,27 @@ def run_multi_turn_eval(
 
 def make_meeting_minutes_deliverable():
     """A Meeting Minutes deliverable for Resource evals."""
-    from workflows.workflow.models import Deliverable
+    from tests.evals import fixtures
 
-    return Deliverable(
-        name="Meeting Minutes",
-        description=(
-            "The written record of a meeting: decisions made, action items "
-            "assigned, and key discussion points."
-        ),
-        consumer="Meeting attendees and absent colleagues",
-        format="A shared document, exported to PDF for distribution",
-        success_criteria=(
-            "Every decision has a reason, every action item has an owner and "
-            "a due date, and the attendee list is complete."
-        ),
-        integration_points="Emailed to attendees and absentees, who review and follow up.",
-        storage_requirements="Shared drive, one folder per meeting series",
-    )
+    return fixtures.meeting_minutes_deliverable()
 
 
 def make_weekly_meal_plan_deliverable():
     """A Weekly Meal Plan deliverable for Resource evals."""
-    from workflows.workflow.models import Deliverable
+    from tests.evals import fixtures
 
-    return Deliverable(
-        name="Weekly Meal Plan",
-        description=(
-            "Seven days of meals that fit the family's dietary restrictions, "
-            "with the groceries each meal needs."
-        ),
-        consumer="The family",
-        format="A one-page plan posted in the kitchen",
-        success_criteria=(
-            "Every day has a meal that fits every dietary restriction, and the "
-            "grocery list covers every ingredient the plan uses."
-        ),
-        integration_points=(
-        "The family receives the plan and reads it before shopping and cooking."
-    ),
-        storage_requirements="Kitchen wall or fridge",
-    )
+    return fixtures.weekly_meal_plan_deliverable()
 
 
 def make_weekly_menu_deliverable():
     """A Weekly Menu deliverable for Resource evals."""
-    from workflows.workflow.models import Deliverable
+    from tests.evals import fixtures
 
-    return Deliverable(
-        name="Weekly Menu",
-        description=(
-            "The restaurant's menu for one week, with each dish and the "
-            "station that prepares it."
-        ),
-        consumer="The kitchen team and diners",
-        format="A printed menu and a kitchen prep sheet",
-        success_criteria=(
-            "Every day of the week has a menu, each dish lists its "
-            "ingredients, and each dish names the station that prepares it."
-        ),
-        integration_points=(
-            "The chefs use it to prepare dishes; a printed copy goes to front "
-            "of house for guest questions."
-        ),
-        storage_requirements="Kitchen binder and the shared drive",
-    )
+    return fixtures.weekly_menu_deliverable()
 
 
 def make_meeting_analysis():
-    """Create a standard meeting-minutes ProcessDefinition for eval tests."""
-    from workflows.workflow.models import ProcessDefinition
+    """A ProcessDefinition for Resource evals."""
+    from tests.evals import fixtures
 
-    return ProcessDefinition(
-        phases=["Note-taking", "Review & Clarify", "Draft Minutes", "Review & Approve"],
-        activities=[
-            "Take meeting notes",
-            "Review notes for clarity",
-            "Identify action items",
-            "Write minutes draft",
-            "Circulate for review",
-            "Incorporate feedback",
-            "Distribute final minutes",
-        ],
-        orchestrating_component="Meeting Minutes Coordinator",
-        participants=[
-            "Meeting Attendees",
-            "Note Taker",
-            "Reviewers",
-            "Meeting Minutes Coordinator",
-        ],
-    )
+    return fixtures.meeting_analysis()
