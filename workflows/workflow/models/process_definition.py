@@ -26,7 +26,9 @@ class ProcessDefinition(LLMValidated):
         "Every activity is concrete enough that a component could own it.",
         "The orchestrating component is the person or role that keeps the "
         "work moving. The user's own role is valid when they do the work end "
-        "to end (for example 'Freelance Writer' or 'Meal Planner'). It is not "
+        "to end (for example 'Freelance Writer' or 'Meal Planner'); a job "
+        "title the user states, such as 'Project Manager', is their own role "
+        "and is accepted. It is not "
         "the name of the work as a whole ('Meal Planning', 'Content Creation'), "
         "a label that is only generic ('Manager', 'Coordinator'), "
         "or a software product the user does not use. A role that names what "
@@ -111,11 +113,13 @@ def _generate_from_notes(
     notes: Annotated[str, "What the person told you"],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Turn the user's description into the stages and steps of their work, and confirm it.
+    """Turn the notes into the stages and steps of the user's work, and confirm it.
 
-The notes hold what the user told you. Derive the breakdown from them yourself: the stages, the concrete steps inside
-each, everyone involved, and who keeps things moving. Do not walk the user through the stages asking what happens in
-each — work it out from their description and present the result as a draft, keeping their own names.
+The notes hold what the user told you, and they are complete. Open with the draft itself: do not greet, do not ask
+what they do, and do not ask again for anything the notes already say. Derive the breakdown from the notes yourself:
+the stages, the concrete steps inside each, everyone involved, and who keeps things moving. Do not walk the user
+through the stages asking what happens in each — work it out from their description and present the result as a
+draft, keeping their own names.
 
 Present the complete breakdown and ask them to confirm it. Ask only for what the description does not contain at all:
 who is involved, and who keeps things moving. If the user does not know something, suggest one possibility and mark it
