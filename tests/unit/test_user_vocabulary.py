@@ -19,6 +19,17 @@ class LabelledResult(BaseModel):
     ]
 
 
+class LabelledInput(BaseModel):
+    orchestrating_component: Annotated[
+        str,
+        UserLabel("who keeps things moving", "orchestrating component", "orchestrating"),
+    ]
+    phases: Annotated[
+        list[str],
+        UserLabel("the main stages", "phases", guard=False),
+    ]
+
+
 def _step() -> AtomicWorkflowStep:
     config = make_atomic_workflow_step_config(
         response_model_override=AgentResponse[LabelledResult],
@@ -46,6 +57,26 @@ class TestVocabularyPrompt(unittest.TestCase):
         self.assertIn("success_criteria", section)
         self.assertIn("how you know it is good", section)
         self.assertIn("unless the user used it first", section)
+
+    def test_input_labels_get_the_same_phrases(self):
+        """Input objects reach the model as shapes, so their labels must too."""
+        section = _build_user_vocabulary_section(LabelledResult, (LabelledInput,))
+
+        self.assertIn("orchestrating_component", section)
+        self.assertIn("who keeps things moving", section)
+        self.assertIn("the main stages", section)
+        self.assertIn("for the context and the result", section)
+
+    def test_input_models_are_read_from_the_signature(self):
+        from chat_workflow.prompt_builder import input_models
+
+        def step(
+            analysis: Annotated[LabelledInput, "What the person told you"],
+            max_turns: int = 10,
+        ) -> LabelledResult:
+            ...
+
+        self.assertEqual(input_models(step), (LabelledInput,))
 
 
 if __name__ == "__main__":

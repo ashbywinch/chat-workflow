@@ -13,7 +13,7 @@ from .atomic_workflow_step import AtomicWorkflowStep
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
 from .models import AgentResponse, TurnResult
-from .prompt_builder import _build_params_section, _format_docstring
+from .prompt_builder import _build_params_section, _format_docstring, input_models
 from .types_meta import resolve_return_type
 
 
@@ -141,21 +141,29 @@ def _output_defs(return_type: Any) -> frozenset[str]:
     return frozenset(schema.get("$defs", {}))
 
 
-def _build_user_vocabulary_section(return_type: Any) -> str:
+def _build_user_vocabulary_section(
+    return_type: Any,
+    inputs: tuple[type[BaseModel], ...] = (),
+) -> str:
     """Map internal field names to the words the user should hear.
 
-    The result schema is the model's vocabulary for the artifact, and it tends
-    to leak field names into ``message``. These labels are declared next to
-    the fields; the user's own word still wins over the phrase.
+    The schemas are the model's vocabulary for the context and the artifact,
+    and they tend to leak field names into ``message``: an input's
+    ``orchestrating_component`` becomes "the orchestrator", a result's
+    ``success_criteria`` becomes "success criteria". These labels are declared
+    next to the fields; the user's own word still wins over the phrase.
     """
-    labels = user_labels(_inner_model(return_type))
+    labels: dict[str, Any] = {}
+    for model in (*inputs, _inner_model(return_type)):
+        for name, label in user_labels(model).items():
+            labels.setdefault(name, label)
     if not labels:
         return ""
     lines = [
         "## Use the user's words",
-        "These are internal labels for the result. Never use a label, its "
-        "singular, or a variant of it in `message` unless the user used it "
-        "first. Say the phrase, or the user's own word if they have one.",
+        "These are internal labels for the context and the result. Never use a "
+        "label, its singular, or a variant of it in `message` unless the user "
+        "used it first. Say the phrase, or the user's own word if they have one.",
     ]
     lines.extend(f'- `{name}` -> "{label.phrase}"' for name, label in labels.items())
     return "\n".join(lines)
@@ -174,7 +182,9 @@ def _build_system_prompt(
 
     sections.append(_build_task_section(return_type, chat))
 
-    vocabulary_section = _build_user_vocabulary_section(return_type)
+    vocabulary_section = _build_user_vocabulary_section(
+        return_type, input_models(raw_func)
+    )
     if vocabulary_section:
         sections.append(vocabulary_section)
 

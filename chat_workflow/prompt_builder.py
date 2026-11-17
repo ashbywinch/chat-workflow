@@ -110,6 +110,24 @@ def _model_for_hint(hint: Any) -> type[BaseModel] | None:
     return None
 
 
+def input_models(func: Callable[..., Any]) -> tuple[type[BaseModel], ...]:
+    """The Pydantic models behind the user-visible parameters, in order.
+
+    Input objects are part of the prompt's vocabulary: their field names and
+    descriptions reach the model through the parameter shapes, so the model
+    needs the user-facing phrase for each of them for the same reason it needs
+    one for the result.
+    """
+    models: list[type[BaseModel]] = []
+    for name in inspect.signature(func).parameters:
+        if name in _INTERNAL_PARAMS:
+            continue
+        model = _model_for_hint(_get_typed_hint(func, name))
+        if model is not None and model not in models:
+            models.append(model)
+    return tuple(models)
+
+
 def _build_params_section(
     func: Callable[..., Any],
     runtime_kwargs: dict[str, Any],
