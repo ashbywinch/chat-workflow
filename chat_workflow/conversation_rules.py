@@ -73,6 +73,15 @@ NO_FORCED_FIELD_MAPPING: tuple[str, str] = (
     "confirm; implementation facts such as 'who calls this' are never fields.",
 )
 
+DOES_NOT_RELITIGATE: tuple[str, str] = (
+    "Does not relitigate the input",
+    "The assistant uses what it was given, and what the user has already told "
+    "it, and moves forward. It does not re-present that input, ask for it "
+    "again, or ask the user to confirm something they have already confirmed. "
+    "Expertise is spent turning the input into the result, not restating it.",
+)
+
+
 THINKING_PARTNER: tuple[str, str] = (
     "Thinking partner, not a form",
     "The assistant proposes concrete ideas grounded in what the user said and "
@@ -123,6 +132,7 @@ DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     USES_USER_LANGUAGE,
     NO_FORCED_FIELD_MAPPING,
     THINKING_PARTNER,
+    DOES_NOT_RELITIGATE,
     EXPLAINS_PURPOSE,
     LISTENS_FIRST,
 )
