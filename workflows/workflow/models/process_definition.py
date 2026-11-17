@@ -13,12 +13,12 @@ from chat_workflow.mixins import LLMValidated
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
     "The assistant defines what good looks like — it does not generate "
-    "content or execute the process for the user.",
+    "content or execute the work for the user.",
 )
 
 
 class ProcessDefinition(LLMValidated):
-    """Output of the process definition workflow."""
+    """The stages and concrete steps of the user's work."""
 
     _validation_rules: ClassVar[list[str]] = [
         "Phases are broad stages; activities are concrete steps that can be "
@@ -27,8 +27,8 @@ class ProcessDefinition(LLMValidated):
         "The orchestrating component is the person or role that keeps the "
         "work moving. The user's own role is valid when they do the work end "
         "to end (for example 'Freelance Writer' or 'Meal Planner'). It is not "
-        "the name of the overall process ('Meal Planning', 'Content Creation "
-        "Process'), a label that is only generic ('Manager', 'Coordinator'), "
+        "the name of the work as a whole ('Meal Planning', 'Content Creation'), "
+        "a label that is only generic ('Manager', 'Coordinator'), "
         "or a software product the user does not use. A role that names what "
         "it coordinates is specific ('Meeting Minutes Coordinator'), not "
         "generic. When the user names their own role as 'me', 'I', or "
@@ -72,10 +72,10 @@ class ProcessDefinition(LLMValidated):
         ...,
         description=(
             "The person or role that keeps the work moving; the user's own "
-            "role is valid (for example 'Meal Planner'), the process name "
-            "('Meal Planning') is not. A bare 'Coordinator' is too generic; "
-            "'Meeting Minutes Coordinator' names what it coordinates and is "
-            "specific enough."
+            "role is valid (for example 'Meal Planner'), the name of the work "
+            "as a whole ('Meal Planning') is not. A bare 'Coordinator' is too "
+            "generic; 'Meeting Minutes Coordinator' names what it coordinates "
+            "and is specific enough."
         ),
         min_length=1,
     )
@@ -90,13 +90,13 @@ class ProcessDefinition(LLMValidated):
 @atomic_workflow_step(conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE])
 def _gather_notes(
     process_description: Annotated[
-        str, "What the person already told you about their process"
+        str, "What the person already told you about how their work happens"
     ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> str:
     """Collect the user's description of how their work happens.
 
-Greet them, say what you are doing, and ask "What do you do?". If `process_description` already holds their answer,
+Greet them, say what you are doing, and ask "What do you do?". If the description parameter already holds their answer,
 start from it instead.
 
 Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in
@@ -111,7 +111,7 @@ def _generate_from_notes(
     notes: Annotated[str, "What the person told you"],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Turn the user's description into a process definition, and confirm it.
+    """Turn the user's description into the stages and steps of their work, and confirm it.
 
 The notes hold what the user told you. Derive the breakdown from them yourself: the stages, the concrete steps inside
 each, everyone involved, and who keeps things moving. Do not walk the user through the stages asking what happens in
@@ -130,13 +130,13 @@ def generate_from_chat(
     *,
     session: Annotated[Session, "The chat session"],
     process_description: Annotated[
-        str, "What the person already told you about their process"
+        str, "What the person already told you about how their work happens"
     ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Orchestrate gathering notes and generating a process definition.
+    """Orchestrate gathering notes and generating the stages and steps of the work.
 
-    First explores the user's process openly, then synthesizes a structured
+    First explores how the user works openly, then synthesizes a structured
     ProcessDefinition from the gathered notes. When `process_description` is
     provided, start from it instead of asking the user to repeat it.
     """

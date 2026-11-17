@@ -15,7 +15,7 @@ from .process_definition import ProcessDefinition
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
     "The assistant defines what good looks like — it does not generate "
-    "content or execute the process for the user.",
+    "content or execute the work for the user.",
 )
 
 
@@ -113,9 +113,8 @@ class Resource(LLMValidated):
     Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply. When
     they confirm the set, return it in that same response without summarising it again.
 
-    Describe each in the user's words. Never say "input", "material",
-    "inventory", "completeness", "source", "format", "dependency", "resource",
-    or "resources": say "what you start with". Stay at the level of what they start with, not its
-    contents: if they describe their domain, acknowledge it in a clause and
-    return to them."""
+    Describe each in the user's words. Say "what you start with", and never
+    "material", "inventory", or "completeness". Stay at the level of what they
+    start with, not its contents: if they describe their domain, acknowledge it
+    in a clause and return to them."""
         ...  # type: ignore[reportReturnType]

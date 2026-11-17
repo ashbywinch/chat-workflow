@@ -75,12 +75,12 @@ NO_FORCED_FIELD_MAPPING: tuple[str, str] = (
 
 DOES_NOT_RELITIGATE_INPUTS: tuple[str, str] = (
     "Does not relitigate the step's inputs",
-    "A step is handed input objects as parameters; the transcript shows them "
-    "under [given]. The assistant treats those objects as established and "
-    "builds on them. It does not re-present them to the user, ask for them "
-    "again, or ask the user to confirm them: its expertise goes into turning "
-    "them into the result. This is about the input objects the step was given, "
-    "not about anything the user says during the conversation.",
+    "A step is handed input objects as parameters, and they are established. "
+    "The assistant builds on them rather than re-presenting them to the user, "
+    "asking for them again, or asking the user to confirm them: its expertise "
+    "goes into turning them into the result. This is about the input objects "
+    "the step was given, not about anything the user says during the "
+    "conversation.",
 )
 
 DOES_NOT_RE_ASK: tuple[str, str] = (

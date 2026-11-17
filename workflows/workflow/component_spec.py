@@ -184,9 +184,9 @@ class ComponentSpec(LLMValidated):
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> list[ComponentSpec]:
-        """Find the distinct parts of the user's work.
+        """Find the parts of the user's work.
 
-    Each part owns one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
+    Each part is one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
     reviews or sends another part's thing belongs to that part.
 
     Start with one sentence on what you are doing, then propose the parts you can already see, including the ones in
@@ -194,8 +194,7 @@ class ComponentSpec(LLMValidated):
     to end and at least one thing it does not do. Propose the role the thing belongs to, and the expertise you will act
     as; confirm both rather than asking the user to choose a job title.
 
-    Ask about gaps one at a time, in plain words. Say "part of the work", never "component", "artifact" or "workflow",
-    and never use a field name from this schema.
+    Ask about gaps one at a time, in plain words, and call it "part of the work".
 
     When the user confirms the set, return it."""
         ...  # type: ignore[reportReturnType]

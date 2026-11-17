@@ -33,7 +33,7 @@ class GapAnalysis(LLMValidated):
 
     _validation_rules: ClassVar[list[str]] = [
         "Entries in missing_components and missing_playbooks must reference "
-        "specific domain concepts from the user's business or process, not "
+        "specific domain concepts from the user's work, not "
         "generic labels (e.g. 'InvoiceManager', not 'missing component').",
         "Recommendations must be concrete, actionable next steps, not vague "
         "suggestions (e.g. 'Create an InvoiceManager component with input/output "
@@ -99,33 +99,25 @@ class GapAnalysis(LLMValidated):
         ask them to repeat it. Do the check yourself; do not ask "are there any
         gaps?" as your only method.
 
-        Check every activity in the process against the parts. An activity
-        that acts on an artifact a part already owns — reviewing, approving,
-        sending the same document — is a workflow step of that part, not a
-        gap and not a new part. A gap is an activity that produces its own
-        artifact (a distinct record or deliverable) that no part owns. Name
-        the missing part after that artifact (for example a "Distribution
-        Record" for a send that keeps its own log), not after the activity.
-        Also check unclear handoffs between parts, and which ideas they
-        mentioned have no part or step. If everything is covered, say so and
-        return no gaps.
+        Check every step in the work against the parts. A step that acts on a
+        thing an existing part already produces — reviewing, approving, sending
+        the same document — is a step of that part, not a gap and not a new
+        part. A gap is a step that produces its own thing (a distinct record or
+        document) that no part produces. Name the missing part after that thing
+        (for example a "Distribution Record" for a send that keeps its own
+        log), not after the step. Also check unclear handovers between parts,
+        and which ideas they mentioned have no part or step. If everything is
+        covered, say so and return no gaps.
 
         Make one pass: name the gaps, summarize them, and ask the user to
         confirm. When they confirm, return success. Converge rather than
         exploring further; once the gaps are named, do not keep asking about
         new parts of the work. The user may believe nothing is missing; your
-        job is to report what the process and the parts actually show.
+        job is to report what the work and the parts actually show.
 
-        Sending is its own part only when it keeps its own record of what
-        went out (a distribution log); otherwise it is a workflow step of the
-        part that owns the artifact. Parsing and file handling are technical
-        work: give them their own part only if they produce their own record.
-
-        Speak in plain language. Say "place" or "thing" rather than "part",
-        "who is responsible" rather than "owner", and "what it covers" rather
-        than "scope". Never say "component", "input", "output", "workflow
-        step", "activities", or "phases" to the user; say "part of the work",
-        "what goes in", "what comes out", "one of the steps", or "the things
-        you do". Never use those words as labels.
+        Sending is its own part only when it keeps its own record of what went
+        out (a distribution log); otherwise it is a step of the part that owns
+        the thing. Parsing and file handling are technical work: give them
+        their own part only if they produce their own record.
         """
         ...  # type: ignore[reportReturnType]
