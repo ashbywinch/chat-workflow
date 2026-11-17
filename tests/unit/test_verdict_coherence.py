@@ -83,6 +83,22 @@ class TestVerdictCoherence(unittest.TestCase):
 
         self.assertFalse(_is_actionable_failure(verdict))
 
+    def test_rule_says_not_violated_but_passed_is_false(self):
+        """The judge wrote a pass conclusion and a 'no fix needed' correction."""
+        verdict = RuleVerdict(
+            rule="If the name alone is ambiguous, the description explains what it contains",
+            passed=False,
+            explanation=(
+                "The name 'Meeting Minutes' is not ambiguous. Since the name is "
+                "unambiguous, the rule is not violated."
+            ),
+            evidence="description: null",
+            fix="No fix needed; the name is unambiguous.",
+        )
+
+        self.assertTrue(_verdict_claims_the_rule_passes(verdict))
+        self.assertFalse(_is_actionable_failure(verdict))
+
     def test_substantive_failure_is_actionable(self):
         verdict = RuleVerdict(
             rule="The name is a noun naming a concrete artifact",

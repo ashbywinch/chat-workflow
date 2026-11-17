@@ -123,7 +123,17 @@ def _verdict_claims_the_rule_passes(verdict: RuleVerdict) -> bool:
     text = (verdict.explanation or "").strip().lower()
     sentences = re.split(r"(?<=[.!?])\s+", text)
     conclusion = sentences[-1] if sentences else text
-    positive = ("passes", "satisfied", "is valid", "meets the rule")
+    positive = (
+        "passes",
+        "satisfied",
+        "is valid",
+        "meets the rule",
+        "not violated",
+        "does not violate",
+        "is unambiguous",
+        "no fix needed",
+        "is acceptable",
+    )
     negative = (
         "does not",
         "doesn't",
@@ -133,8 +143,15 @@ def _verdict_claims_the_rule_passes(verdict: RuleVerdict) -> bool:
         "is not valid",
         "not satisfied",
     )
-    return any(phrase in conclusion for phrase in positive) and not any(
+    if any(phrase in conclusion for phrase in positive) and not any(
         phrase in conclusion for phrase in negative
+    ):
+        return True
+    # A fix that says there is nothing to fix is a pass in disguise, whatever
+    # the explanation's last sentence says.
+    fix = (verdict.fix or "").strip().lower()
+    return fix.startswith(
+        ("no fix", "no change", "nothing to fix", "none needed", "not needed", "n/a")
     )
 
 
