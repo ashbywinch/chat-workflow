@@ -111,7 +111,7 @@ class Resource(LLMValidated):
     not ask for more.
 
     Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply. When
-    they confirm the set, return it in that same response without summarising it again.
+    they confirm the set, return it without summarising it again.
 
     Describe each in the user's words. Say "what you start with", and never
     "material", "inventory", or "completeness". Stay at the level of what they

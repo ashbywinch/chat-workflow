@@ -125,5 +125,5 @@ class Deliverable(LLMValidated):
 
     Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to the shape; never call their work "content creation".
 
-    When they confirm, return the result in that same response. Do not summarise it again or ask for a second approval."""
+    When they confirm, return the result. Do not summarise it again or ask for a second approval."""
         ...  # type: ignore[reportReturnType]
