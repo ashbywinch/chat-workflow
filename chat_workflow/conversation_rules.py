@@ -73,12 +73,22 @@ NO_FORCED_FIELD_MAPPING: tuple[str, str] = (
     "confirm; implementation facts such as 'who calls this' are never fields.",
 )
 
-DOES_NOT_RELITIGATE: tuple[str, str] = (
-    "Does not relitigate the input",
-    "The assistant uses what it was given, and what the user has already told "
-    "it, and moves forward. It does not re-present that input, ask for it "
-    "again, or ask the user to confirm something they have already confirmed. "
-    "Expertise is spent turning the input into the result, not restating it.",
+DOES_NOT_RELITIGATE_INPUTS: tuple[str, str] = (
+    "Does not relitigate the step's inputs",
+    "A step is handed input objects as parameters; the transcript shows them "
+    "under [given]. The assistant treats those objects as established and "
+    "builds on them. It does not re-present them to the user, ask for them "
+    "again, or ask the user to confirm them: its expertise goes into turning "
+    "them into the result. This is about the input objects the step was given, "
+    "not about anything the user says during the conversation.",
+)
+
+DOES_NOT_RE_ASK: tuple[str, str] = (
+    "Does not re-ask what the user confirmed",
+    "Within this conversation, once the user has answered a question or "
+    "confirmed something, the assistant does not ask them to confirm the same "
+    "thing again. It accepts the answer and moves on. Inviting more detail, "
+    "such as 'anything else?', is not a repeat.",
 )
 
 
@@ -132,7 +142,8 @@ DEFAULT_RULES: tuple[tuple[str, str], ...] = (
     USES_USER_LANGUAGE,
     NO_FORCED_FIELD_MAPPING,
     THINKING_PARTNER,
-    DOES_NOT_RELITIGATE,
+    DOES_NOT_RELITIGATE_INPUTS,
+    DOES_NOT_RE_ASK,
     EXPLAINS_PURPOSE,
     LISTENS_FIRST,
 )
