@@ -90,17 +90,26 @@ class Resource(LLMValidated):
     ) -> list[Resource]:
         """List what the user starts with before they make the thing they make.
 
-    Open with one sentence on what you are doing, name the output from `deliverables`, and propose the materials people usually start with for that kind of work; ask which of them they have.
+    Open with one sentence on what you are doing, name the output from `deliverables`, and propose the things people
+    usually start with for that kind of work; ask which of them they have.
 
-    For each material, in the user's words:
-    - where it comes from: a person, place, system, or document, not the act of getting it ("The fridge and freezer", not "Looking in the fridge");
-    - what it looks like when it exists: a list, a document, a recording, not the act of gathering it ("Verbal feedback", not "Chatting to the sous");
+    For each one, in the user's words:
+    - where it comes from: a person, place, system, or document, not the act of getting it ("The fridge and freezer",
+    not "Looking in the fridge");
+    - what it looks like when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
+    feedback", not "Chatting to the sous");
     - what it needs first, if anything;
-    - how they know it is complete: something true of the finished material, not an action, a state of mind, or an outcome. "The list includes every item on every shelf, flagged if it is near expiry" - not "I know what is on every shelf", not "Every shelf has been checked", not "No one complains".
+    - how they know it is complete: something true of the finished thing, not an action, a state of mind, or an outcome.
+    "The list includes every item on every shelf, flagged if it is near expiry" - not "I know what is on every shelf",
+    not "Every shelf has been checked", not "No one complains".
 
-    Work through one material at a time: propose its shape and check, ask the user to confirm or correct, and only then move to the next. Do not put checks for several materials in one message. Raw notes, and material the user trusts as sent, still get a minimal check on the material itself; do not ask how they know their own notes are complete. If they have only one material, do not ask for more.
+    Work through one at a time: propose its shape and check, ask the user to confirm or correct, and only then move to
+    the next. Do not put checks for several in one message. Raw notes, and anything the user trusts as sent, still get a
+    minimal check on the thing itself; do not ask how they know their own notes are complete. If they have only one, do
+    not ask for more.
 
-    Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply. When they confirm the set, return it in that same response without summarising it again.
+    Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply. When
+    they confirm the set, return it in that same response without summarising it again.
 
-    Describe each material in the user's words. Never say "inventory", "completeness", "source", "format", or "dependency". Stay at the level of what they start with, not its contents: if they describe their domain, acknowledge it in a clause and return to the materials."""
+    Describe each in the user's words. Never say "material", "inventory", "completeness", "source", "format", or "dependency". Stay at the level of what they start with, not its contents: if they describe their domain, acknowledge it in a clause and return to them."""
         ...  # type: ignore[reportReturnType]

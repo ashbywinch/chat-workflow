@@ -133,7 +133,7 @@ def _generate_from_notes(
     suggestion. When the user gives "me" or "the person" as the role, that is
     the answer.
 
-    When they confirm the breakdown, return it.
+    Ask the user to confirm the breakdown once. When they confirm, return it; do not ask them to confirm the same stages again.
     """
     ...  # type: ignore[reportReturnType]
 
