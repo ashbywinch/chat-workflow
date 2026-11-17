@@ -128,6 +128,23 @@ def input_models(func: Callable[..., Any]) -> tuple[type[BaseModel], ...]:
     return tuple(models)
 
 
+def user_parameter_labels(func: Callable[..., Any]) -> dict[str, str]:
+    """``{parameter name: its user-facing description}``, in signature order.
+
+    A parameter name is internal; the author already wrote the phrase to use
+    in the ``Annotated`` description, so the vocabulary section can map one to
+    the other without the step prompt restating it.
+    """
+    labels: dict[str, str] = {}
+    for name in inspect.signature(func).parameters:
+        if name in _INTERNAL_PARAMS:
+            continue
+        description = _get_param_description(func, name)
+        if description:
+            labels[name] = description
+    return labels
+
+
 def _build_params_section(
     func: Callable[..., Any],
     runtime_kwargs: dict[str, Any],

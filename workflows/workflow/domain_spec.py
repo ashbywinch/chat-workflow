@@ -127,20 +127,19 @@ class ComponentDomainSpec(LLMValidated):
         cls,
         responsibilities: Annotated[
             ComponentSpec,
-            "What this component is responsible for — its name, purpose, scope, and any incidental notes",
+            "What this part of the work is responsible for, in the user's words",
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentDomainSpec:
-        """Shape the artifact's contents with the user.
+        """Shape what the thing contains with the user.
 
-    Start with a draft: the fields the artifact needs, in their words, with one line each on what it holds. Ask them to
+    Start with a draft: the parts the thing needs, in their words, with one line each on what it holds. Ask them to
     correct it.
 
     Then ask what makes it good enough to use, and record their answer as checks, not qualities ("Every decision has a
     reason", not "Clear and complete"). Infer the expertise you need and confirm it in one sentence.
 
-    Ask one question at a time and do not interrogate them field by field. Do not use framework terms or the field names
-    in this schema.
+    Ask one question at a time and do not interrogate them.
 
     Return the result when they confirm the shape and the checks."""
         ...  # type: ignore[reportReturnType]

@@ -158,13 +158,7 @@ class TestJargonFreeEval(unittest.TestCase):
     @timeout(900)
     def test_component_requirement_jargon_free(self):
         """ComponentSpec conversation uses plain language, not field names."""
-        analysis = ProcessDefinition(
-            phases=["Planning", "Execution"],
-            activities=["Plan meals", "Shop", "Cook", "Review"],
-            orchestrating_component="Meal Planner",
-            participants=["Cook", "Family Members"],
-        )
-        from tests.evals import fixtures
+        analysis = fixtures.meal_planning_analysis()
 
         inputs = [fixtures.family_dietary_preferences()]
         outputs = [fixtures.weekly_meal_plan_deliverable()]
@@ -184,13 +178,7 @@ class TestJargonFreeEval(unittest.TestCase):
     @timeout(900)
     def test_gap_analysis_jargon_free(self):
         """GapAnalysis conversation uses plain language, not field names."""
-        analysis = ProcessDefinition(
-            phases=["Planning", "Execution"],
-            activities=["Plan meals", "Shop", "Cook", "Review"],
-            orchestrating_component="Meal Planner",
-            participants=["Cook", "Family Members"],
-        )
-        from tests.evals import fixtures
+        analysis = fixtures.meal_planning_analysis()
 
         requirements = [fixtures.weekly_meal_plan_spec()]
         result = run_multi_turn_eval(

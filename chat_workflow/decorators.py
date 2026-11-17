@@ -13,7 +13,12 @@ from .atomic_workflow_step import AtomicWorkflowStep
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
 from .models import AgentResponse, TurnResult
-from .prompt_builder import _build_params_section, _format_docstring, input_models
+from .prompt_builder import (
+    _build_params_section,
+    _format_docstring,
+    input_models,
+    user_parameter_labels,
+)
 from .types_meta import resolve_return_type
 
 
@@ -51,9 +56,9 @@ def _build_task_section(return_type: Any, chat: bool) -> str:
             "sentence on what you are here to help with, then ask your first "
             "question; never return success before the user has said anything.\n\n"
             "Never introduce a term for the output shape, a field, or the "
-            "framework. This includes 'deliverable', 'output', 'input', 'artifact', "
-            "'resource', 'field', 'schema', 'workflow', 'process', and 'component'. "
-            "If the user uses one of those words, use their word; if they say a "
+            "framework. This includes 'deliverable', 'output', 'input', 'result', "
+            "'artifact', 'resource', 'field', 'schema', 'workflow', 'process', and "
+            "'component'. If the user uses one of those words, use their word; if they say a "
             "word is confusing, never use it again. Describe the picture in their "
             "words, not as a list of field names or the schema. Acknowledge an "
             "off-topic remark in one clause without praising it, then return to "
@@ -118,28 +123,51 @@ def _output_defs(return_type: Any) -> frozenset[str]:
 def _build_user_vocabulary_section(
     return_type: Any,
     inputs: tuple[type[BaseModel], ...] = (),
+    parameter_labels: dict[str, str] | None = None,
 ) -> str:
-    """Map internal field names to the words the user should hear.
+    """Map every internal name the prompt exposes to the user's words.
 
-    The schemas are the model's vocabulary for the context and the artifact,
-    and they tend to leak field names into ``message``: an input's
-    ``orchestrating_component`` becomes "the orchestrator", a result's
-    ``success_criteria`` becomes "success criteria". These labels are declared
-    next to the fields; the user's own word still wins over the phrase.
+    The prompt contains four kinds of internal vocabulary: result fields,
+    input fields, parameter names, and model type names. All of them leak into
+    ``message`` in their own way — an input's ``orchestrating_component``
+    becomes "the orchestrator", ``required_inputs`` becomes "inputs", the
+    ``Resource`` type becomes "resources". The phrases are declared next to
+    the fields and parameters; the user's own word still wins.
     """
     labels: dict[str, Any] = {}
     for model in (*inputs, _inner_model(return_type)):
         for name, label in user_labels(model).items():
             labels.setdefault(name, label)
-    if not labels:
+    parameter_labels = parameter_labels or {}
+    type_names = [
+        model.__name__
+        for model in (*inputs, _inner_model(return_type))
+        if isinstance(model, type)
+        and issubclass(model, BaseModel)
+    ]
+    if not labels and not parameter_labels and not type_names:
         return ""
     lines = [
         "## Use the user's words",
-        "These are internal labels for the context and the result. Never use a "
-        "label, its singular, or a variant of it in `message` unless the user "
-        "used it first. Say the phrase, or the user's own word if they have one.",
+        "The JSON keys, type names, parameter names, their descriptions and the "
+        "rule text above are internal engineering text, not words for the user. "
+        "Never say one in `message` unless the user used it first. Translate an "
+        "internal label to its phrase, or use the user's own word if they have "
+        "one.",
     ]
     lines.extend(f'- `{name}` -> "{label.phrase}"' for name, label in labels.items())
+    if parameter_labels:
+        lines.append(
+            "Parameters are how the step receives what it was given; never name "
+            "one to the user. Refer to it by its description:"
+        )
+        lines.extend(
+            f'- `{name}` -> "{description}"'
+            for name, description in parameter_labels.items()
+        )
+    if type_names:
+        names = ", ".join(f"`{name}`" for name in type_names)
+        lines.append(f"The names {names} are internal; never use them with the user.")
     return "\n".join(lines)
 
 
@@ -155,12 +183,6 @@ def _build_system_prompt(
     sections: list[str] = []
 
     sections.append(_build_task_section(return_type, chat))
-
-    vocabulary_section = _build_user_vocabulary_section(
-        return_type, input_models(raw_func)
-    )
-    if vocabulary_section:
-        sections.append(vocabulary_section)
 
     docstring = _format_docstring(raw_func.__doc__, **kwargs).strip()
     if docstring:
@@ -180,6 +202,17 @@ def _build_system_prompt(
     validation_section = _build_validation_rules_section(return_type)
     if validation_section:
         sections.append(validation_section)
+
+    # Last, because the schemas and rules above are full of the internal words
+    # the model must not say. The instruction to translate them has to be the
+    # most recent thing it reads, not the thing it read before the schema.
+    vocabulary_section = _build_user_vocabulary_section(
+        return_type,
+        input_models(raw_func),
+        user_parameter_labels(raw_func),
+    )
+    if vocabulary_section:
+        sections.append(vocabulary_section)
 
     return "\n\n".join(sections)
 
