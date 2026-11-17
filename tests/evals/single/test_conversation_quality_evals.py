@@ -186,11 +186,12 @@ class TestJargonFreeEval(unittest.TestCase):
                 consumer="Family",
                 format="One-page plan",
                 success_criteria=(
-                    "Every family member can see what is for dinner each night, "
-                    "and every meal fits their dietary restrictions."
+                    "Each day of the week lists a dinner, and every ingredient "
+                    "in it is on the family's allowed list."
                 ),
                 integration_points=(
-                    "The family reads it before shopping and cooking."
+                    "The family receives the plan and reads it before shopping "
+                    "and cooking."
                 ),
                 storage_requirements="Kitchen wall / fridge",
             ),
