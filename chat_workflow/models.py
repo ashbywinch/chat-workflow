@@ -18,6 +18,28 @@ class AgentIntent(StrEnum):
     FAILURE = "failure"
 
 
+# Domain fields that a model returns directly when it forgets the envelope.
+# Kept at module level so the runtime can tell a correctable envelope mistake
+# from a response that is not an answer at all.
+KNOWN_RESULT_FIELDS: frozenset[str] = frozenset(
+    {
+        "consumer",
+        "format",
+        "success_criteria",
+        "integration_points",
+        "storage_requirements",
+        "source",
+        "trigger_conditions",
+        "dependencies",
+        "validation_criteria",
+        "phases",
+        "activities",
+        "outputs",
+        "inputs",
+    }
+)
+
+
 class AgentResponse(BaseModel, Generic[TResult]):
     """The structured response from an LLM agent after one turn.
 
@@ -63,21 +85,7 @@ class AgentResponse(BaseModel, Generic[TResult]):
                 '  {"intent": "success", "result": {"field1": "value1", ...}}'
             )
         if isinstance(data, dict):
-            known_inner_fields = {
-                "consumer",
-                "format",
-                "success_criteria",
-                "integration_points",
-                "storage_requirements",
-                "source",
-                "trigger_conditions",
-                "dependencies",
-                "validation_criteria",
-                "phases",
-                "activities",
-                "outputs",
-                "inputs",
-            }
+            known_inner_fields = KNOWN_RESULT_FIELDS
             if known_inner_fields & data.keys() and "intent" not in data and "result" not in data:
                 raise ValueError(
                     "Missing required 'intent' and 'result' wrapper. "

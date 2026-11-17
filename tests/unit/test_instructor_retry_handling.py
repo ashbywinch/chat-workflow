@@ -279,6 +279,51 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
         self.assertEqual(mock_client.chat.completions.create.call_count, 2)
         self.assertEqual(orchestrator.messages, [{"role": "system", "content": "Test prompt"}])
 
+    def test_a_response_from_another_api_is_retried_not_corrected(self):
+        """A chat-request object is not an answer; resending can reach a healthy model."""
+        from types import SimpleNamespace
+
+        from instructor.core.exceptions import InstructorRetryException
+
+        from chat_workflow.atomic_workflow_step import _returned_no_envelope
+
+        def rejected(content: str) -> InstructorRetryException:
+            return InstructorRetryException(
+                "rejected",
+                n_attempts=1,
+                total_usage=0,
+                last_completion=SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(message=SimpleNamespace(content=content))
+                    ]
+                ),
+            )
+
+        # The provider echoed a chat request at us.
+        self.assertTrue(
+            _returned_no_envelope(
+                rejected('{"model": "gpt-4o-mini", "messages": []}'),
+                frozenset({"name", "description"}),
+            )
+        )
+        # The result's own fields without the envelope is a correctable mistake.
+        self.assertFalse(
+            _returned_no_envelope(
+                rejected('{"name": "Meeting Minutes"}'),
+                frozenset({"name", "description"}),
+            )
+        )
+        # A real envelope, even a wrong intent, is content.
+        self.assertFalse(
+            _returned_no_envelope(
+                rejected('{"intent": "continue", "message": "hi"}'),
+                frozenset({"name"}),
+            )
+        )
+        self.assertFalse(
+            _returned_no_envelope(rejected("plain text"), frozenset({"name"}))
+        )
+
     def test_a_model_rule_failure_names_the_rule_and_drops_the_noise(self):
         """Pydantic's str() buries the rule; the model needs the rule itself."""
         from pydantic import BaseModel, Field, ValidationError, model_validator

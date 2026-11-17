@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 import time
 from collections.abc import Callable
@@ -202,13 +203,16 @@ class AtomicWorkflowStep(Generic[TResult]):
         not transient and is left to the correction path.
         """
         attempts = max(1, self._provider_retries)
+        result_fields = _result_field_names(self.response_model)
         for attempt in range(attempts):
             try:
                 return self._request(client)
             except Exception as exc:
-                retryable = _is_transient_provider_error(
-                    exc
-                ) or _returned_no_content(exc)
+                retryable = (
+                    _is_transient_provider_error(exc)
+                    or _returned_no_content(exc)
+                    or _returned_no_envelope(exc, result_fields)
+                )
                 if attempt + 1 >= attempts or not retryable:
                     raise
                 self.events.append(
@@ -357,6 +361,12 @@ def _inner_result_model(response_model: object) -> object:
         if inner:
             model = inner[0]
     return model
+
+
+def _result_field_names(response_model: object) -> frozenset[str]:
+    """The result model's field names, for telling a domain object from a non-answer."""
+    fields = getattr(_inner_result_model(response_model), "model_fields", None)
+    return frozenset(fields) if fields else frozenset()
 
 
 def _user_text(messages: list[dict[str, Any]]) -> str:
@@ -650,6 +660,35 @@ def _returned_no_content(exc: BaseException) -> bool:
     if completion is None:
         return False
     return _message_content(completion) is None
+
+
+def _returned_no_envelope(exc: BaseException, result_fields: frozenset[str]) -> bool:
+    """True when the provider answered with JSON that is not this protocol's.
+
+    A model occasionally returns an object from some other API — a chat
+    request, a wrapper around the conversation — instead of the response
+    envelope. That is not a content mistake to correct: the model was not
+    answering the question at all, so resend the request and let the gateway
+    route to a healthy upstream. A response that carries the result's own
+    fields is different; it is a correctable envelope mistake.
+    """
+    from instructor.core.exceptions import InstructorRetryException
+
+    if not isinstance(exc, InstructorRetryException):
+        return False
+    text = _failed_attempt_text(exc)
+    if text is None:
+        return False
+    stripped = text.lstrip()
+    if not stripped.startswith("{"):
+        return False
+    try:
+        data = json.loads(stripped)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    return "intent" not in data and not (set(data) & result_fields)
 
 
 def _is_transient_provider_error(exc: BaseException) -> bool:

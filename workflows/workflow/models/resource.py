@@ -103,7 +103,8 @@ class Resource(LLMValidated):
     an action, not an outcome, and never a state of mind. "The list includes
     every item on every shelf, flagged if it is near expiry" - not "I know what
     is on every shelf", not "I can list every item", not "Every shelf has been
-    checked", not "No one complains".
+    checked", not "No one complains". If they answer with a state of mind or
+    an outcome, propose the concrete check yourself and ask them to confirm it.
 
     Work through one at a time: propose its shape and check, ask the user to confirm or correct, and only then move to
     the next. Do not put checks for several in one message. Raw notes, and anything the user trusts as sent, still get a
