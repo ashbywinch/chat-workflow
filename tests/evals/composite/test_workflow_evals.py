@@ -157,9 +157,10 @@ class TestResourceEval(unittest.TestCase):
             method_kwargs=dict(
                 analysis=None,
                 deliverables=[fixtures.weekly_menu_deliverable()],
-                # Five materials, one confirmed at a time: the rambling persona
-                # needs a couple of turns per material before it settles.
-                max_turns=14,
+                # One material confirmed at a time; this persona names seven
+                # across the conversation, so the cap must cover the initial
+                # proposal, two turns per material, and the final confirmation.
+                max_turns=20,
             ),
             user_persona=user_persona,
             judge_rules=REDIRECT_JUDGE_RULES,

@@ -177,7 +177,9 @@ def test_end_to_end_generated_component(self):
 
                 result = run_multi_turn_eval(
                     model_method=workflow_method,
-                    method_kwargs=dict(max_turns=5),
+                    # Questions, a draft, its confirmation and the success
+                    # turn; this is a runaway guard, not a question count.
+                    method_kwargs=dict(max_turns=10),
                     user_persona=user_persona,
                     judge_rules=judge_rules,
                     config=config,
