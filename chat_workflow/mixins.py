@@ -13,7 +13,7 @@ from typing import ClassVar, Protocol
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
-from .annotations import Blob, Validation
+from .annotations import Blob, Validation, user_labels
 from .exceptions import ValidationError
 
 
@@ -222,13 +222,18 @@ class LLMValidated(BaseModel):
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs):
-        """Inject ``Validation`` rules into field descriptions for JSON schema.
+        """Put the user-facing phrase next to the field in the JSON schema.
 
-        Appends each ``Validation`` rule as a bullet point to the field's
-        ``description`` attribute, so the rules are visible in generated
-        JSON schemas and LLM prompts.
+        ``UserLabel`` is the one place a field's phrase is declared. The
+        schema is where the model sees the field while it writes the result,
+        so the phrase becomes the schema title; a key and its phrase then sit
+        together at the point of generation instead of in a separate list the
+        model can drift away from. ``Validation`` rules are appended to the
+        description for the same reason.
         """
         super().__pydantic_init_subclass__(**kwargs)
+        for name, label in user_labels(cls).items():
+            cls.model_fields[name].title = label.phrase
         per_field = cls.collect_per_field_rules()
         for name, field_rules in per_field.items():
             field = cls.model_fields[name]
@@ -239,8 +244,8 @@ class LLMValidated(BaseModel):
             else:
                 field.description = bullets
         # Pydantic builds its core schema before this hook runs. Without a
-        # rebuild, model_json_schema() keeps the pre-mutation description and
-        # the Validation rules never reach the prompt.
+        # rebuild, model_json_schema() keeps the pre-mutation title and
+        # description and neither reaches the prompt.
         cls.model_rebuild(force=True)
 
     def validate_deterministic_rules(self) -> None:

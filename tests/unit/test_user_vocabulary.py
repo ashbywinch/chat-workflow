@@ -3,23 +3,22 @@
 import unittest
 from typing import Annotated
 
-from pydantic import BaseModel
-
 from chat_workflow.annotations import UserLabel, user_labels
 from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
 from chat_workflow.decorators import _build_user_vocabulary_section
+from chat_workflow.mixins import LLMValidated
 from chat_workflow.models import AgentResponse
 from tests.conftest import make_atomic_workflow_step_config
 
 
-class LabelledResult(BaseModel):
+class LabelledResult(LLMValidated):
     success_criteria: Annotated[
         str,
         UserLabel("how you know it is good", "success criteria", "criteria"),
     ]
 
 
-class LabelledInput(BaseModel):
+class LabelledInput(LLMValidated):
     orchestrating_component: Annotated[
         str,
         UserLabel("who keeps things moving", "orchestrating component", "orchestrating"),
@@ -51,21 +50,24 @@ class TestUserLabelExtraction(unittest.TestCase):
 
 
 class TestVocabularyPrompt(unittest.TestCase):
-    def test_section_maps_internal_label_to_user_phrase(self):
+    def test_the_phrase_is_the_schema_title_of_the_result_field(self):
+        """The label lives on the class and is rendered where the model writes."""
+        title = LabelledResult.model_json_schema()["properties"]["success_criteria"]["title"]
+
+        self.assertEqual(title, "how you know it is good")
+
+    def test_the_phrase_is_the_schema_title_of_an_input_field(self):
+        titles = LabelledInput.model_json_schema()["properties"]
+
+        self.assertEqual(titles["orchestrating_component"]["title"], "who keeps things moving")
+        self.assertEqual(titles["phases"]["title"], "the main stages")
+
+    def test_the_section_points_at_the_schema_title(self):
         section = _build_user_vocabulary_section(LabelledResult)
 
-        self.assertIn("success_criteria", section)
-        self.assertIn("how you know it is good", section)
-        self.assertIn("use the phrase below", section)
-
-    def test_input_labels_get_the_same_phrases(self):
-        """Input objects reach the model as shapes, so their labels must too."""
-        section = _build_user_vocabulary_section(LabelledResult, (LabelledInput,))
-
-        self.assertIn("orchestrating_component", section)
-        self.assertIn("who keeps things moving", section)
-        self.assertIn("the main stages", section)
+        self.assertIn("its schema title", section)
         self.assertIn("internal engineering text", section)
+        self.assertNotIn("success_criteria", section)
 
     def test_parameter_and_type_names_get_the_same_treatment(self):
         """A parameter name and a model name are internal too, not user words."""

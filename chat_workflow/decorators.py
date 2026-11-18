@@ -8,7 +8,6 @@ from typing import Any, get_args, get_origin
 
 from pydantic import BaseModel
 
-from .annotations import user_labels
 from .atomic_workflow_step import AtomicWorkflowStep
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
@@ -125,19 +124,14 @@ def _build_user_vocabulary_section(
     inputs: tuple[type[BaseModel], ...] = (),
     parameter_labels: dict[str, str] | None = None,
 ) -> str:
-    """Map every internal name the prompt exposes to the user's words.
+    """Tell the model which names are internal and where each phrase lives.
 
-    The prompt contains four kinds of internal vocabulary: result fields,
-    input fields, parameter names, and model type names. All of them leak into
-    ``message`` in their own way — an input's ``orchestrating_component``
-    becomes "the orchestrator", ``required_inputs`` becomes "inputs", the
-    ``Resource`` type becomes "resources". The phrases are declared next to
-    the fields and parameters; the user's own word still wins.
+    Result and input fields already carry their phrase as the field's schema
+    title (``UserLabel`` is the one declaration; ``LLMValidated`` puts it in
+    the schema). The two names that have no field to live on are a parameter
+    name and a model type name; this section maps the first to the parameter
+    description and points at the thing itself for the second.
     """
-    labels: dict[str, Any] = {}
-    for model in (*inputs, _inner_model(return_type)):
-        for name, label in user_labels(model).items():
-            labels.setdefault(name, label)
     parameter_labels = parameter_labels or {}
     type_names = [
         model.__name__
@@ -145,22 +139,18 @@ def _build_user_vocabulary_section(
         if isinstance(model, type)
         and issubclass(model, BaseModel)
     ]
-    if not labels and not parameter_labels and not type_names:
+    if not parameter_labels and not type_names:
         return ""
     lines = [
         "## Use the user's words",
         "The JSON keys, type names, parameter names, their descriptions and the "
         "rule text above are internal engineering text. In `message`, use the "
-        "phrase below for each label, or the user's own word if they have one. "
-        "A parameter or type name is internal too: refer to it by its "
-        "description.",
+        "phrase shown beside each field (its schema title), or the user's own "
+        "word if they have one. Refer to a parameter by its description, and to "
+        "a type by the thing itself.",
     ]
-    lines.extend(f'- `{name}` -> "{label.phrase}"' for name, label in labels.items())
     if parameter_labels:
-        lines.append(
-            "Parameters are how the step receives what it was given; never name "
-            "one to the user. Refer to it by its description:"
-        )
+        lines.append("Parameters are how the step receives what it was given:")
         lines.extend(
             f'- `{name}` -> "{description}"'
             for name, description in parameter_labels.items()
