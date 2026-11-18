@@ -314,13 +314,11 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           component really does coordinate the others; do not invent one.
         - When the components list contains only artifact-producing components,
           use those components as the participants; do not add the owner role as
-          a separate participant when it is a pronoun such as "You". With one
-          component and the consumer "Meeting attendees", for example:
-          `participant MeetingMinutes as "Meeting Minutes: Produce"` and
-          `participant Attendees as "Meeting attendees: Receive"`; the work is
-          `MeetingMinutes->>MeetingMinutes: ...`, the outcome
-          `MeetingMinutes->>Attendees: ...`, and the return flow
-          `Attendees-->>MeetingMinutes: ...`.
+          a separate participant when it is a pronoun such as "You". The
+          receiving participant is the output's consumer, copied from `outputs`;
+          do not substitute a synonym. The work is the component's own step,
+          the outcome goes to that consumer, and the return flow comes back to
+          the component.
         - Use `alt` with an `else` branch for a choice between paths, or `opt`
           for a step that may or may not happen; an `opt` needs no else branch.
           Show the return flow as an arrow back to a participant who sent work
