@@ -54,14 +54,14 @@ def _build_task_section(return_type: Any, chat: bool) -> str:
             "If the conversation is empty, open with one short greeting and one "
             "sentence on what you are here to help with, then ask your first "
             "question; never return success before the user has said anything.\n\n"
-            "Talk about the user's own work in their words. If you need a name "
-            "for the thing, ask what they call it. Never use a word for our "
-            "machinery or for the shape of the answer; if the user uses such a "
-            "word, use theirs, and if they say a word is confusing, never use it "
-            "again. Describe the picture in their words, not as a list of field "
-            "names or a schema. Acknowledge an off-topic remark in one clause "
-            "without praising it, then return to the question; never develop "
-            "their domain content.\n\n"
+            "Talk about the user's own work in their words. Write `message` as "
+            "you would say it out loud: short sentences and their everyday "
+            "words. If you need a name for the thing, ask what they call it. If "
+            "the user uses a word, use theirs; if they say a word is confusing, "
+            "use their word for it instead. Describe the picture in their words, "
+            "not as a list of field names or a schema. Acknowledge an off-topic "
+            "remark in one clause without praising it, then return to the "
+            "question; never develop their domain content.\n\n"
             "Use continue only while you still need something from the user. When "
             "they agree with the picture you described, return the result in that "
             "same response — never re-present an unchanged draft or ask for a "
@@ -156,8 +156,7 @@ def _build_user_vocabulary_section(
             for name, description in parameter_labels.items()
         )
     if type_names:
-        names = ", ".join(f"`{name}`" for name in type_names)
-        lines.append(f"Describe the thing itself; {names} are internal names for it.")
+        lines.append("Describe the thing itself; the type names above are internal.")
     return "\n".join(lines)
 
 

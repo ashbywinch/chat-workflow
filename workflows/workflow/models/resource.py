@@ -29,10 +29,9 @@ class Resource(LLMValidated):
         "thing is itself the material (for example handwritten notes), its "
         "shape must describe the same kind of material, not a contradictory "
         "one such as a database.",
-        "The completeness check is one the user can apply when the thing is "
-        "produced — specific enough to tell whether it is complete, not an "
-        "after-the-fact outcome like 'no one complains', and not a "
-        "restatement of how they gather it.",
+        "The check is one the user can apply to the finished thing — it says "
+        "what must be there, not how they gather it, and not an after-the-fact "
+        "outcome like 'no one complains'.",
         "A thing must not depend on itself.",
     ]
 
@@ -100,7 +99,7 @@ class Resource(LLMValidated):
     - what it looks like when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
     feedback", not "Chatting to the sous");
     - what it needs first, if anything;
-    - how they know it is complete: something true of the finished thing, not
+    - the check they apply: something true of the finished thing, not
     an action, not an outcome, and never a state of mind. "The list includes
     every item on every shelf, flagged if it is near expiry" - not "I know what
     is on every shelf", not "I can list every item", not "Every shelf has been
