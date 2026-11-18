@@ -688,7 +688,9 @@ class TestWhatGetsSentToTheLLM(unittest.TestCase):
         _litellm.completion = capturing_completion
 
         # Patch get_client to return instructor client with our patched litellm
-        def patched_get_client(provider, **kwargs):
+        def patched_get_client(
+            provider, api_base=None, api_key_env=None, model_supports_tools=False, **kwargs
+        ):
             import instructor
 
             mode = instructor.Mode.TOOLS if kwargs.get("model_supports_tools") else instructor.Mode.JSON

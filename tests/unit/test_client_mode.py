@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from typing import override
 from unittest.mock import patch
 
 import instructor
@@ -12,10 +13,12 @@ from chat_workflow.llm_interaction import get_client
 
 
 class TestClientMode(unittest.TestCase):
+    @override
     def setUp(self) -> None:
         self.env = patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"})
         self.env.start()
 
+    @override
     def tearDown(self) -> None:
         self.env.stop()
 
