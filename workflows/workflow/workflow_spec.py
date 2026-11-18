@@ -36,7 +36,11 @@ def _matches_known(path: str, known: set[str]) -> bool:
     words = _normalise_name(path).split()
     for name in known:
         name_words = name.split()
-        if words and name_words[: len(words)] == words:
+        if words == name_words:
+            return True
+        # A shortened party keeps at least two words; one generic word is not
+        # a participant, even when it starts a record phrase.
+        if len(words) >= 2 and name_words[: len(words)] == words:
             return True
     return False
 
