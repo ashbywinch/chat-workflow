@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from chat_workflow import Config
 
@@ -119,9 +120,10 @@ class TestConfig(unittest.TestCase):
     def test_api_base_and_key_env_default_to_none(self):
         temp_path = self._write_temp_config({"llm": {"provider": "openai", "model": "gpt-4"}})
         try:
-            cfg = Config(Path(temp_path))
-            self.assertIsNone(cfg.api_base)
-            self.assertIsNone(cfg.api_key_env)
+            with patch.dict(os.environ, {"OPENAI_BASE_URL": ""}):
+                cfg = Config(Path(temp_path))
+                self.assertIsNone(cfg.api_base)
+                self.assertIsNone(cfg.api_key_env)
         finally:
             os.unlink(temp_path)
 

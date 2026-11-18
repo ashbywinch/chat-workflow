@@ -80,7 +80,7 @@ def make_config() -> Config:
     """
     config = Config(_CONFIG_PATH)
     base_url = os.getenv("OPENAI_BASE_URL", "")
-    if config.provider == "openai" and not config.api_base and (not base_url or "{" in base_url):
+    if config.provider == "openai" and (not base_url or "{" in base_url):
         raise RuntimeError(
             "OPENAI_BASE_URL is not set (or still contains the .env.example "
             "placeholder). Evals must route through Cloudflare AI Gateway — run "
