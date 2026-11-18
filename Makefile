@@ -119,11 +119,6 @@ typecheck: deps
 typecheck-update-baseline: deps
 	@$(PYTHON) scripts/pyrefly-lock.py update-baseline --pyrefly-config pyrefly.toml
 
-# The gates the git hooks call. Neither target existed while the hooks called
-# them, so every commit and push failed after the tests had passed.
-lint-check: lint
-check: lint
-
 # Auto-fix linting issues
 format: setup
 	@$(RUFF) check --fix chat_workflow/ workflows/ tests/ chat_workflow_cli/
