@@ -60,7 +60,7 @@ def _validate_diagram_structure(
     return flow and the outcome are decided here.
     """
     participants: dict[str, str] = {}
-    arrows: list[tuple[str, str]] = []
+    arrows: list[tuple[str, str, str]] = []
     blocks: list[str] = []
     for line in diagram.splitlines():
         stripped = line.strip()
@@ -75,14 +75,14 @@ def _validate_diagram_structure(
             continue
         arrow = _ARROW_LINE.match(stripped)
         if arrow:
-            arrows.append((arrow.group(1), arrow.group(3)))
+            arrows.append((arrow.group(1), arrow.group(3), arrow.group(4)))
 
     if not participants:
         raise ValidationError(
             'The diagram declares no participants. Declare each one as '
             '`participant <Path> as "<Component Path>: <Playbook>"`.'
         )
-    undeclared = sorted({name for pair in arrows for name in pair} - set(participants))
+    undeclared = sorted({name for source, target, _ in arrows for name in (source, target)} - set(participants))
     if undeclared:
         raise ValidationError(
             "The diagram uses participant(s) that are not declared: "
@@ -94,7 +94,7 @@ def _validate_diagram_structure(
             "The diagram has no messages. Show the work as arrows from one "
             "participant to another, starting at the entry point."
         )
-    if not any(source != target for source, target in arrows):
+    if not any(source != target for source, target, _ in arrows):
         raise ValidationError(
             "Every message is a self-loop; the diagram shows no hand-off "
             "between participants. Show at least one message from one "
@@ -106,6 +106,13 @@ def _validate_diagram_structure(
             "`else` branch for a choice, or an `opt` block for a step that may "
             "or may not happen."
         )
+    for _, _, message in arrows:
+        if len(message) > 40 and "<br/>" not in message:
+            raise ValidationError(
+                f"The message '{message[:60]}' is long; split it with `<br/>` "
+                "at a natural break."
+            )
+
     known = (
         {_normalise_name(component.name) for component in components}
         | {_normalise_name(component.owner_role) for component in components}
@@ -123,12 +130,13 @@ def _validate_diagram_structure(
                 + "."
             )
 
-    if len(participants) > 1 and not any((target, source) in arrows for source, target in arrows):
+    pairs = {(source, target) for source, target, _ in arrows}
+    if len(participants) > 1 and not any((target, source) in pairs for source, target, _ in arrows):
         raise ValidationError(
             "With more than one participant, the diagram needs a return flow: "
             "an arrow back to a participant who sent work earlier."
         )
-    source, target = arrows[-1]
+    source, target, _ = arrows[-1]
     if source == target:
         raise ValidationError(
             "The last message is a self-loop. Send the outcome to the "
@@ -165,7 +173,6 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
     diagram: Annotated[
         str,
         Blob(".mmd"),
-        Validation("Must use <br/> tags for splitting long text across lines"),
         Validation("Every activity in the process should be represented in the sequence flow"),
     ] = Field(
         ...,

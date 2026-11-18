@@ -153,6 +153,22 @@ class TestDiagramStructure(unittest.TestCase):
             "Order->>Inventory: outcome"
         )
 
+    def test_a_long_message_needs_a_break(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                'participant Inventory as "Inventory: Receive"\n'
+                "Order->>Inventory: a message that is clearly too long for one line\n"
+                "Inventory-->>Order: ack\n"
+                "opt may happen\n"
+                "Order->>Inventory: more\n"
+                "end\n"
+                "Order->>Inventory: outcome"
+            )
+
+        self.assertIn("<br/>", str(ctx.exception))
+
     def test_a_missing_return_flow_names_the_repair(self):
         with self.assertRaises(ValidationError) as ctx:
             self._check(
