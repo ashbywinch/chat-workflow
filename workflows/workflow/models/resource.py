@@ -116,7 +116,7 @@ class Resource(LLMValidated):
     they confirm the set, return it without summarising it again.
 
     Describe each in the user's words. Say "what you start with", and never
-    "material", "inventory", or "completeness". Stay at the level of what they
+    "resource", "material", "inventory", or "completeness". Stay at the level of what they
     start with, not its contents: if they describe their domain, acknowledge it
     in a clause and return to them."""
         ...  # type: ignore[reportReturnType]

@@ -35,12 +35,12 @@ class ComponentSpec(LLMValidated):
         # validator: it is a structural check, not a domain-quality rule.
         # Q1 — overall responsibility. May span subcomponents, because those
         # are other components; it is one coherent reason to change.
-        "The purpose states the end-to-end responsibility this component "
+        "The overall responsibility states the end-to-end responsibility this part of the work "
         "delivers: one coherent outcome for one group of people who would ask "
         "for it to change. It may include work this component delegates to "
         "other components; it must not combine unrelated responsibilities.",
         # Q2 — own responsibility. No subcomponents, existing or latent.
-        "The scope description states what this component itself does, as "
+        "The scope states what this part of the work itself does, as "
         "opposed to other components. It describes exactly one artifact — the "
         "data members of the model this component defines — and the work that "
         "produces and changes it. Several operations on that artifact "
@@ -57,18 +57,17 @@ class ComponentSpec(LLMValidated):
         "is in scope; do not treat it as a separate artifact merely because it "
         "could be a standalone deliverable — only a distinct record or "
         "deliverable of its own belongs in another component.",
-        "The owner_role is the capacity the artifact belongs to — the role "
-        "whose job includes it, which may be the user. Use 'Owner' only when "
-        "the artifact is the owner's own work; if the owner acts as a "
-        "maintenance manager for a sign-off sheet, the owner role is "
-        "Maintenance Manager. A person who supplies the input is a valid "
-        "owner when the artifact is their own work: a note-taker's own notes "
-        "belong to the note-taker. They are not the owner only when someone "
-        "else is accountable for the artifact. If the user does the work and "
-        "is accountable, their role is valid even when another role "
-        "traditionally owns that kind of artifact; do not replace the user's "
-        "role with a domain assumption. Propose likely roles from domain "
-        "knowledge and confirm them.",
+        "The thing belongs to the capacity whose job includes it, which may "
+        "be the user. Use 'the person it belongs to' only when the thing is "
+        "that person's own work; for a maintenance manager's sign-off sheet, "
+        "it is the maintenance manager. A person who supplies the input is "
+        "valid when the thing is their own work: a note-taker's own notes "
+        "belong to the note-taker. They are not the person only when someone "
+        "else is accountable for the thing. If the user does the work and is "
+        "accountable, that is valid even when another person traditionally "
+        "keeps that kind of thing; do not replace the user with a domain "
+        "assumption. Propose likely people from domain knowledge and confirm "
+        "them.",
     ]
 
     name: Annotated[
@@ -191,8 +190,8 @@ class ComponentSpec(LLMValidated):
 
     Start with one sentence on what you are doing, then propose the parts you can already see, including the ones in
     `existing_components`. Name each after its thing ("Approval Record", not "Approval"). For each, say what it does end
-    to end and at least one thing it does not do. Propose the role the thing belongs to, and the expertise you will act
-    as; confirm both rather than asking the user to choose a job title.
+    to end and at least one thing it does not do. Say who it is for — "you" or the person who does this — and what you
+    will help with; confirm both; do not ask for a job title or talk about their role.
 
     Ask about gaps one at a time, in plain words, and call it "part of the work".
 

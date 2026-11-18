@@ -21,8 +21,8 @@ class ProcessDefinition(LLMValidated):
     """The stages and concrete steps of the user's work."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "The stages are broad; the concrete steps inside them can be "
-        "assigned to a part of the work.",
+        "The stages are broad; the steps are concrete and can be assigned "
+        "to a part of the work.",
         "Every step is concrete enough that one part of the work could "
         "produce it.",
         "The person who keeps things moving is the person or role that keeps "

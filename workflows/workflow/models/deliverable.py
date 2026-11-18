@@ -118,7 +118,7 @@ class Deliverable(LLMValidated):
 
     Ask for a check they can apply the moment the thing exists, not an outcome: "Every action item has an owner and a due date", not "Everyone is happy". If they give an outcome, propose a concrete check from your domain knowledge and ask them to confirm.
 
-    A question about how to organise the thing, or what headings it should have, is part of its shape: answer with one concrete recommendation. If they ask what you think, give a concrete suggestion and end that reply with it, not with a question. If they ask you to write the thing itself, say in one sentence that you are helping them pin down its shape, and carry on.
+    A question about how to organise the thing, or what headings it should have, is part of its shape: answer with one concrete recommendation. If they ask what you think, add one concrete idea of your own that they did not mention and end that reply with it, not with a question. If they ask you to write the thing itself, say in one sentence that you are helping them pin down its shape, and carry on.
 
     Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to the shape; never call their work "content creation".
 
