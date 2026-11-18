@@ -226,6 +226,26 @@ class TestDiagramStructure(unittest.TestCase):
         self.assertIn("Ghost", str(ctx.exception))
         self.assertIn("not declared", str(ctx.exception))
 
+    def test_a_consumer_may_be_shortened(self):
+        outputs = _make_outputs()
+        outputs[0] = outputs[0].model_copy(
+            update={"consumer": "Meeting attendees and absent invitees"}
+        )
+        _validate_diagram_structure(
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant Attendees as "Meeting attendees: Receive"\n'
+            "Order->>Attendees: start\n"
+            "Attendees-->>Order: ack\n"
+            "opt may happen\n"
+            "Order->>Attendees: more\n"
+            "end\n"
+            "Order->>Attendees: outcome",
+            _make_components(),
+            outputs,
+            _make_inputs(),
+        )
+
     def test_a_participant_outside_the_record_names_the_known_ones(self):
         with self.assertRaises(ValidationError) as ctx:
             self._check(

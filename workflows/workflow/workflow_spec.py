@@ -31,6 +31,16 @@ def _normalise_name(name: str) -> str:
     return re.sub(r"[\s_-]+", " ", name.strip().casefold())
 
 
+def _matches_known(path: str, known: set[str]) -> bool:
+    """A participant may shorten a record phrase, not invent a new one."""
+    words = _normalise_name(path).split()
+    for name in known:
+        name_words = name.split()
+        if words and name_words[: len(words)] == words:
+            return True
+    return False
+
+
 def _validate_diagram_structure(
     diagram: str,
     components: list[ComponentSpec],
@@ -101,7 +111,7 @@ def _validate_diagram_structure(
     )
     for label in participants.values():
         path = label.split(":", 1)[0].strip()
-        if _normalise_name(path) not in known:
+        if not _matches_known(path, known):
             raise ValidationError(
                 f"The participant '{path}' is not a component, a component's "
                 "owner, an input, or an output in this workflow. Use one of: "
@@ -122,7 +132,7 @@ def _validate_diagram_structure(
         )
     consumers = {_normalise_name(output.consumer) for output in outputs}
     target_path = participants[target].split(":", 1)[0].strip()
-    if consumers and _normalise_name(target_path) not in consumers:
+    if consumers and not any(_matches_known(target_path, {consumer}) for consumer in consumers):
         raise ValidationError(
             f"The last message goes to '{target_path}', not to the output's "
             "consumer. Send the outcome to one of: "
