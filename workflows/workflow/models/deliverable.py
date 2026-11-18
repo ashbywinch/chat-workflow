@@ -120,7 +120,7 @@ class Deliverable(LLMValidated):
 
     A question about how to organise the thing, or what headings it should have, is part of its shape: answer with one concrete recommendation. If they ask what you think, add one concrete idea of your own that they did not mention and end that reply with it, not with a question. If they ask you to write the thing itself, say in one sentence that you are helping them pin down its shape; if every part is settled, return the result then, and never come back to a point they already confirmed.
 
-    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to the shape; never call their work "content creation".
+    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to the shape, using their word for it.
 
     When they confirm, return the result. Do not summarise it again or ask for a second approval."""
         ...  # type: ignore[reportReturnType]

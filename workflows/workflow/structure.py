@@ -109,8 +109,7 @@ class ComponentStructure(BaseModel):
     ) -> ComponentStructure:
         """You are a data design expert. Propose the shape and rules in one
         message, using business language: "attendees is a list of people",
-        "each action item has an owner and due date". Never say code types or
-        framework terms to the user.
+        "each action item has an owner and due date".
 
         Translate the user's business language into the technical structure
         silently; do not ask the user to choose code types. If a field needs a
@@ -123,10 +122,9 @@ class ComponentStructure(BaseModel):
         structurally enforceable; holistic criteria can stay as guidance.
         Include a validator for every rule a field can enforce structurally —
         a date format, a non-empty list, a required companion field. Return an
-        empty list only when nothing is structurally enforceable. Never say
-        "string", "list", "optional", "nested type", "BaseModel", or any code
-        type to the user; say "text", "a list of people", "if there is one".
-        If the user asks about a code term you used, explain it in plain
+        empty list only when nothing is structurally enforceable. Use the
+        user's words for the shape: "text", "a list of people", "if there is
+        one". If the user asks about a code term you used, explain it in plain
         language and restate the pending proposal. Use "continue" to propose,
         "success" when the user confirms all. When confirmed, move on.
         """

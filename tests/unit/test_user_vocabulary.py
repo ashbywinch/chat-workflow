@@ -56,7 +56,7 @@ class TestVocabularyPrompt(unittest.TestCase):
 
         self.assertIn("success_criteria", section)
         self.assertIn("how you know it is good", section)
-        self.assertIn("unless the user used it first", section)
+        self.assertIn("use the phrase below", section)
 
     def test_input_labels_get_the_same_phrases(self):
         """Input objects reach the model as shapes, so their labels must too."""
@@ -78,7 +78,7 @@ class TestVocabularyPrompt(unittest.TestCase):
         self.assertIn("`analysis` -> \"What the person already told you\"", section)
         self.assertIn("`LabelledInput`", section)
         self.assertIn("`LabelledResult`", section)
-        self.assertIn("never use them with the user", section)
+        self.assertIn("are internal names for it", section)
 
     def test_input_models_are_read_from_the_signature(self):
         from chat_workflow.prompt_builder import input_models, user_parameter_labels

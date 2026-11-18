@@ -150,10 +150,10 @@ def _build_user_vocabulary_section(
     lines = [
         "## Use the user's words",
         "The JSON keys, type names, parameter names, their descriptions and the "
-        "rule text above are internal engineering text, not words for the user. "
-        "Never say one in `message` unless the user used it first. Translate an "
-        "internal label to its phrase, or use the user's own word if they have "
-        "one.",
+        "rule text above are internal engineering text. In `message`, use the "
+        "phrase below for each label, or the user's own word if they have one. "
+        "A parameter or type name is internal too: refer to it by its "
+        "description.",
     ]
     lines.extend(f'- `{name}` -> "{label.phrase}"' for name, label in labels.items())
     if parameter_labels:
@@ -167,7 +167,7 @@ def _build_user_vocabulary_section(
         )
     if type_names:
         names = ", ".join(f"`{name}`" for name in type_names)
-        lines.append(f"The names {names} are internal; never use them with the user.")
+        lines.append(f"Describe the thing itself; {names} are internal names for it.")
     return "\n".join(lines)
 
 
