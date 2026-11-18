@@ -297,10 +297,11 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         Diagram:
         - Start with `sequenceDiagram`.
         - Declare every participant as `<Path> as "<Component Path>: <Playbook
-          Name>"`: a noun for the component or artifact, then a short label for
-          the playbook it acts in (for example `participant MinutesDraft as
-          "Minutes Draft: Draft"`). Never use an action sentence or a
-          description of the component as the playbook name.
+          Name>"`: the path is one word with no spaces (`MeetingMinutes`, not
+          `Meeting Minutes`); the quoted display name carries the spaces. Then a
+          short label for the playbook it acts in (for example `participant
+          MinutesDraft as "Minutes Draft: Draft"`). Never use an action sentence
+          or a description of the component as the playbook name.
         - Show direct handoffs between components when the work simply passes
           from one to the next. Include a coordinator participant only when a
           component really does coordinate the others; do not invent one.
