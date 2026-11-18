@@ -62,7 +62,7 @@ class Deliverable(LLMValidated):
         UserLabel("what it looks like", "format"),
     ] = Field(
         ...,
-        description="Its exact shape or layout (e.g. 'one-page PDF', 'shared spreadsheet')",
+        description="What it looks like: its exact layout (e.g. 'one-page PDF', 'shared spreadsheet')",
         min_length=1,
     )
     success_criteria: Annotated[
@@ -114,13 +114,13 @@ class Deliverable(LLMValidated):
     ) -> list[Deliverable]:
         """Describe the one thing the user makes.
 
-    Open with a short greeting and the question "What do you make?"; do not name the thing before they do. Then reflect back what they said and propose the shape you can already infer. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), propose its standard shape in that same turn, before asking anything else. Ask only for what is still missing or uncertain, once each.
+    Open with a short greeting and the question "What do you make?"; do not name the thing before they do. Then reflect back what they said and propose what it looks like and what it holds. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), propose its standard shape in that same turn, before asking anything else. Ask only for what is still missing or uncertain, once each.
 
     Ask for a check they can apply the moment the thing exists, not an outcome: "Every action item has an owner and a due date", not "Everyone is happy". If they give an outcome, propose a concrete check from your domain knowledge and ask them to confirm. Keep the user's own words for a check: if they say "10 minutes of standing", say that, not the standard cooking term for it.
 
-    A question about how to organise the thing, or what headings it should have, is part of its shape: answer with one concrete recommendation. If they ask what you think, add one concrete idea of your own that they did not mention and end that reply with it, not with a question. If they ask you to write the thing itself, say in one sentence that you are helping them pin down its shape; if every part is settled, return the result then, and never come back to a point they already confirmed.
+    A question about how to organise the thing, or what headings it should have, is part of what it looks like: answer with one concrete recommendation. If they ask what you think, add one concrete idea of your own that they did not mention and end that reply with it, not with a question. If they ask you to write the thing itself, say in one sentence that you are helping them decide what it looks like; if every part is decided, finish and return the result then, and never come back to a point they already confirmed.
 
-    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to the shape, using their word for it.
+    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to what it looks like, using their word for it.
 
     When they confirm, return the result. Do not summarise it again or ask for a second approval."""
         ...  # type: ignore[reportReturnType]
