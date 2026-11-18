@@ -143,24 +143,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         str,
         Blob(".mmd"),
         Validation("Must use <br/> tags for splitting long text across lines"),
-        Validation(
-            "Must show the entry point, the flow of work between participants, "
-            "at least one decision point, a return flow when there is more than "
-            "one participant, and a clear outcome. "
-            "A decision point is either an `alt` block with `else` branches, "
-            "for a choice between paths, or an `opt` block, for a step that "
-            "may or may not happen; an `opt` needs no else branch. A return "
-            "flow is an arrow back to a participant who sent work earlier. "
-            "The outcome is the last message, to whoever receives the work. "
-            "Work may pass directly from one component to another; a "
-            "separate coordinator is optional and must not be invented just to "
-            "have one"
-        ),
         Validation("Every activity in the process should be represented in the sequence flow"),
-        Validation(
-            "Participants must be components, artifacts, or real business roles — "
-            "not pronouns, placeholders, or generic labels such as 'System' or 'User'"
-        ),
     ] = Field(
         ...,
         description=(
