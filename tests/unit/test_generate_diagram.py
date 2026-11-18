@@ -185,6 +185,22 @@ class TestDiagramStructure(unittest.TestCase):
 
         self.assertIn("return flow", str(ctx.exception))
 
+    def test_a_return_flow_after_the_outcome_names_the_order(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                'participant Inventory as "Inventory: Receive"\n'
+                "Order->>Inventory: outcome\n"
+                "Inventory-->>Order: ack\n"
+                "opt may happen\n"
+                "Order->>Inventory: more\n"
+                "end\n"
+                "Inventory-->>Order: ack again"
+            )
+
+        self.assertIn("before the outcome", str(ctx.exception))
+
     def test_a_self_loop_outcome_names_the_repair(self):
         with self.assertRaises(ValidationError) as ctx:
             self._check(

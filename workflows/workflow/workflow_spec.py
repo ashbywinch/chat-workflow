@@ -144,7 +144,18 @@ def _validate_diagram_structure(
         )
     consumers = {_normalise_name(output.consumer) for output in outputs}
     target_path = participants[target].split(":", 1)[0].strip()
-    if consumers and not any(_matches_known(target_path, {consumer}) for consumer in consumers):
+    if consumers and any(
+        _matches_known(target_path, {consumer}) for consumer in consumers
+    ):
+        return
+    if (target, source) in pairs:
+        raise ValidationError(
+            "The last message is the return flow. Put the return flow before "
+            "the outcome; the final message must be the send to the output's "
+            "consumer"
+            + (f" ({', '.join(sorted(consumers))})." if consumers else ".")
+        )
+    if consumers:
         raise ValidationError(
             f"The last message goes to '{target_path}', not to the output's "
             "consumer. Send the outcome to one of: "
