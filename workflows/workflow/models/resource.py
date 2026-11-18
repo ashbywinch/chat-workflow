@@ -63,7 +63,7 @@ class Resource(LLMValidated):
     validation_criteria: Annotated[
         str,
         UserLabel(
-            "how you know it is complete",
+            "how you know you have everything",
             "validation criteria",
             "criteria",
         ),
@@ -71,8 +71,8 @@ class Resource(LLMValidated):
         ...,
         description=(
             "A check the user can apply when the resource is produced to know "
-            "it is complete — not a restatement of how they gather it and not "
-            "an after-the-fact outcome"
+            "nothing is missing — not a restatement of how they gather it and "
+            "not an after-the-fact outcome"
         ),
         min_length=1,
     )
