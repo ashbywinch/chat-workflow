@@ -154,19 +154,32 @@ class AgentIO:
         last_finish: str | None = None
         last_content = ""
         last_reasoning = ""
-        for _ in range(3):
-            response = litellm.completion(
-                model=self.config.model,
-                messages=messages,
-                # A reasoning model spends part of its budget on hidden
-                # reasoning; leave enough room for the user's reply after it.
-                max_tokens=8000,
-                temperature=0.7,
-                # The gateway cache must be bypassed on every call, including
-                # the user bot. A cached user reply replays an earlier
-                # conversation and makes a green run meaningless.
-                extra_headers=getattr(self.config, "extra_headers", None),
-            )
+        for attempt in range(3):
+            try:
+                response = litellm.completion(
+                    model=self.config.model,
+                    messages=messages,
+                    # A reasoning model spends part of its budget on hidden
+                    # reasoning; leave enough room for the user's reply after it.
+                    max_tokens=8000,
+                    temperature=0.7,
+                    # The gateway cache must be bypassed on every call, including
+                    # the user bot. A cached user reply replays an earlier
+                    # conversation and makes a green run meaningless.
+                    extra_headers=getattr(self.config, "extra_headers", None),
+                )
+            except Exception as exc:
+                # A 5xx or a malformed gateway response says nothing about the
+                # conversation. Resend; do not let infrastructure look like a
+                # failed user turn.
+                from chat_workflow.atomic_workflow_step import (
+                    _is_transient_provider_error,
+                )
+
+                if attempt == 2 or not _is_transient_provider_error(exc):
+                    raise
+                time.sleep(2**attempt)
+                continue
 
             choice = response.choices[0]
             last_finish = getattr(choice, "finish_reason", None)

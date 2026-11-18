@@ -45,7 +45,7 @@ class ComponentSpec(LLMValidated):
         "data members of the model this component defines — and the work that "
         "produces and changes it. Several operations on that artifact "
         "(creating, updating, reviewing, approving, sending it) are one "
-        "artifact, not several. A piece of work that is itself an artifact — a section "
+        "artifact, not several. A part of the work that is itself an artifact — a section "
         "with its own content, audience, or quality criteria (for example a "
         "strategy section or a financial projection inside a business plan), a "
         "separate record, deliverable, or unrelated technical work such as "
@@ -102,7 +102,7 @@ class ComponentSpec(LLMValidated):
         description=(
             "What this component itself does, as opposed to other components. "
             "One artifact — the data members of the model it defines — and the "
-            "operations that produce and change it; no piece of work that is "
+            "operations that produce and change it; no part of the work that is "
             "itself an artifact (a section with its own content, audience, or "
             "quality), no separate record or deliverable, no unrelated "
             "technical work. Also states what is out of scope."

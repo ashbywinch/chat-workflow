@@ -22,15 +22,14 @@ class Deliverable(LLMValidated):
     """A single workflow deliverable."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "The success criteria are a check someone can apply when the "
-        "deliverable is produced — not an after-the-fact outcome like 'no one "
-        "complains' or 'everyone is happy', and not just its format.",
-        "The integration points say what happens to it after it is made: "
-        "who receives it next and what they do with it, or that it stays "
-        "with the user and is not handed on. The storage requirements say "
-        "where it is kept. Neither restates what it contains.",
-        "If the name alone is ambiguous, the description explains what the "
-        "deliverable contains.",
+        "The quality check is one someone can apply when the thing is "
+        "produced — not an after-the-fact outcome like 'no one complains' or "
+        "'everyone is happy', and not just its shape.",
+        "What happens to it next says who receives it and what they do with "
+        "it, or that it stays with the user and is not handed on. Where it is "
+        "kept says where. Neither restates what it contains.",
+        "If the thing's name alone is ambiguous, the explanation says what it "
+        "contains.",
     ]
 
     name: Annotated[

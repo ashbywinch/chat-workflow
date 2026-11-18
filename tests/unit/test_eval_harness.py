@@ -164,6 +164,23 @@ class TestAgentIOUserBot(unittest.TestCase):
         self.assertEqual(text, "Yes, that looks right.")
         self.assertEqual(mock_completion.call_count, 2)
 
+    @patch("tests.evals.helpers.time.sleep", return_value=None)
+    @patch("tests.evals.helpers.litellm.completion")
+    def test_a_transient_provider_error_is_retried(self, mock_completion, mock_sleep):
+        """A gateway 5xx is infrastructure, not a failed user turn."""
+
+        class InternalServerError(Exception):
+            status_code = 500
+
+        mock_completion.side_effect = [
+            InternalServerError("bad gateway"),
+            self._response("Yes, that looks right."),
+        ]
+        io = AgentIO("You are a test user.", cast(Config, SimpleNamespace(model="test")))
+
+        self.assertEqual(io.prompt("You"), "Yes, that looks right.")
+        self.assertEqual(mock_completion.call_count, 2)
+
     @patch("tests.evals.helpers.litellm.completion")
     def test_three_empty_responses_raise(self, mock_completion):
         mock_completion.side_effect = [self._response("") for _ in range(3)]

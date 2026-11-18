@@ -23,17 +23,17 @@ class Resource(LLMValidated):
     """A single workflow resource."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "The source says where the material comes from — a person, system, "
-        "document, or place — and the format says its shape. A person or "
-        "system source is valid (for example 'The organizer' with format "
-        "'meeting agenda'). If the source is itself the material (for example "
-        "handwritten notes), the format must describe the same kind of "
-        "material, not a contradictory one such as a database.",
-        "The validation criteria are a check the user can apply when the "
-        "resource is produced — specific enough to tell whether it is complete, "
-        "not an after-the-fact outcome like 'no one complains', and not a "
+        "Where it comes from names a person, system, document, or place; its "
+        "shape is described separately. A person or system is a valid origin "
+        "(for example 'The organizer' with shape 'meeting agenda'). If the "
+        "thing is itself the material (for example handwritten notes), its "
+        "shape must describe the same kind of material, not a contradictory "
+        "one such as a database.",
+        "The completeness check is one the user can apply when the thing is "
+        "produced — specific enough to tell whether it is complete, not an "
+        "after-the-fact outcome like 'no one complains', and not a "
         "restatement of how they gather it.",
-        "A resource must not list itself as a dependency.",
+        "A thing must not depend on itself.",
     ]
 
     source: Annotated[
@@ -95,7 +95,8 @@ class Resource(LLMValidated):
 
     For each one, in the user's words:
     - where it comes from: a person, place, system, or document, not the act of getting it ("The fridge and freezer",
-    not "Looking in the fridge");
+    not "Looking in the fridge"). If they know it from experience, the source is the person (them), and its shape says
+    it is in their head; never make the experience itself the source;
     - what it looks like when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
     feedback", not "Chatting to the sous");
     - what it needs first, if anything;

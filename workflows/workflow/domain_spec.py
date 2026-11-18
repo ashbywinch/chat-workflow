@@ -136,8 +136,10 @@ class ComponentDomainSpec(LLMValidated):
     Start with a draft: the parts the thing needs, in their words, with one line each on what it holds. Ask them to
     correct it.
 
-    Then ask what makes it good enough to use, and record their answer as checks, not qualities ("Every decision has a
-    reason", not "Clear and complete"). Infer the expertise you need and confirm it in one sentence.
+    Then propose the checks that make it good enough to use, from your domain knowledge, and record their answer as
+    checks, not qualities ("Every decision has a reason", not "Clear and complete"). Ask them to confirm or add, rather
+    than asking an open question they have already answered. Infer the expertise you need and confirm it in one
+    sentence.
 
     Ask one question at a time and do not interrogate them.
 

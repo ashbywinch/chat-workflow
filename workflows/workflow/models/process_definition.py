@@ -21,11 +21,12 @@ class ProcessDefinition(LLMValidated):
     """The stages and concrete steps of the user's work."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "Phases are broad stages; activities are concrete steps that can be "
-        "assigned to a component.",
-        "Every activity is concrete enough that a component could own it.",
-        "The orchestrating component is the person or role that keeps the "
-        "work moving. The user's own role is valid when they do the work end "
+        "The stages are broad; the concrete steps inside them can be "
+        "assigned to a part of the work.",
+        "Every step is concrete enough that one part of the work could "
+        "produce it.",
+        "The person who keeps things moving is the person or role that keeps "
+        "the work moving. The user's own role is valid when they do the work end "
         "to end (for example 'Freelance Writer' or 'Meal Planner'); a job "
         "title the user states, such as 'Project Manager', is their own role "
         "and is accepted. It is not "

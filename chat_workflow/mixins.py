@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Protocol
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -112,7 +112,14 @@ class RuleVerdicts(BaseModel):
     )
 
 
-def _verdict_claims_the_rule_passes(verdict: RuleVerdict) -> bool:
+class _VerdictLike(Protocol):
+    """The two fields the coherence check reads, from either verdict type."""
+
+    explanation: str | None
+    fix: str | None
+
+
+def _verdict_claims_the_rule_passes(verdict: _VerdictLike) -> bool:
     """True when a failed verdict's own conclusion says the rule passed.
 
     A self-contradictory verdict is a malformed judge response, not a

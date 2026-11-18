@@ -32,12 +32,12 @@ class GapAnalysis(LLMValidated):
     """Analysis of missing elements, gaps, and recommendations."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "Entries in missing_components and missing_playbooks must reference "
-        "specific domain concepts from the user's work, not "
-        "generic labels (e.g. 'InvoiceManager', not 'missing component').",
-        "Recommendations must be concrete, actionable next steps, not vague "
-        "suggestions (e.g. 'Create an InvoiceManager component with input/output "
-        "contracts', not 'address the gap').",
+        "The things that are missing name specific domain concepts from the "
+        "user's work, not generic labels (e.g. 'InvoiceManager', not "
+        "'missing part').",
+        "The next steps are concrete and actionable, not vague suggestions "
+        "(e.g. 'Create an InvoiceManager part with its inputs and outputs', "
+        "not 'address the gap').",
     ]
 
     missing_components: Annotated[
@@ -65,10 +65,10 @@ class GapAnalysis(LLMValidated):
     )
     organizational_gaps: Annotated[
         list[OwnershipGap],
-        UserLabel("work with no clear owner", "organizational gaps"),
+        UserLabel("work with no one in charge", "organizational gaps"),
     ] = Field(
         default_factory=list,
-        description="Work that has no clear owner",
+        description="Work that no one has taken responsibility for",
     )
     recommendations: Annotated[
         list[str],
@@ -111,7 +111,7 @@ class GapAnalysis(LLMValidated):
         one step passes to the next, and which ideas they mentioned have no
         part or step.
 
-        Converge rather than exploring further; once the missing pieces are
+        Converge rather than exploring further; once the missing parts are
         named, do not keep asking about new parts of the work. The user may
         believe nothing is missing; your job is to report what the work and the
         parts actually show. Sending is its own part only when it keeps its own
