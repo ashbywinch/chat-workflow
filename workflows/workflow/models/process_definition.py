@@ -25,8 +25,7 @@ class ProcessDefinition(LLMValidated):
         "to a part of the work.",
         "Every step is concrete enough that one part of the work could "
         "produce it.",
-        "The person who keeps things moving is the person or role that keeps "
-        "the work moving. The user's own role is valid when they do the work end "
+        "The person in charge is the person or role that keeps the work moving. The user's own role is valid when they do the work end "
         "to end (for example 'Freelance Writer' or 'Meal Planner'); a job "
         "title the user states, such as 'Project Manager', is their own role "
         "and is accepted. It is not "
@@ -66,7 +65,7 @@ class ProcessDefinition(LLMValidated):
     orchestrating_component: Annotated[
         str,
         UserLabel(
-            "who keeps things moving",
+            "who is in charge",
             "orchestrating component",
             "orchestrating",
             guard=False,
@@ -100,7 +99,7 @@ def _gather_notes(
     """Collect the user's description of how their work happens.
 
 Greet them, say what you are doing, and ask "What do you do?". If the description parameter already holds their answer,
-start from it instead.
+start from it instead: it is what they already told you, so use it and ask only for what it leaves out.
 
 Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in
 their words.
@@ -122,7 +121,7 @@ Do not walk the user through the stages asking what happens in each — work it 
 the result as a draft, keeping their own names.
 
 Present the complete breakdown and ask them to confirm it. Ask only for what the description does not contain at all:
-who is involved, and who keeps things moving. If the user does not know something, suggest one possibility and mark it
+who is involved, and who is in charge. If the notes say the user does it all, both answers are the user; do not ask. If the user does not know something, suggest one possibility and mark it
 as a suggestion. When they give "me" or "the person" as the role, that is the answer.
 
 When they confirm, return it."""

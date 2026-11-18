@@ -23,8 +23,9 @@ class Resource(LLMValidated):
     """A single workflow resource."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "Where it comes from names a person, system, document, or place; its "
-        "shape is described separately. A person or system is a valid origin "
+        "Where it comes from names a person or group of people, a system, a "
+        "document, or a place; its "
+        "shape is described separately. A person or group is a valid origin "
         "(for example 'The organizer' with shape 'meeting agenda'). If the "
         "thing is itself the material (for example handwritten notes), its "
         "shape must describe the same kind of material, not a contradictory "
@@ -110,7 +111,8 @@ class Resource(LLMValidated):
     yourself and ask them to confirm it.
 
     Work through one at a time: propose its shape and check, ask the user to confirm or correct, and only then move to
-    the next. Do not put checks for several in one message. Raw notes, and anything the user trusts as sent, still get a
+    the next. When they name one, accept it; do not read back a longer list of alternatives. Do not put checks for
+    several in one message. Raw notes, and anything the user trusts as sent, still get a
     minimal check on the thing itself; do not ask how they know their own notes are complete. If they have only one, do
     not ask for more.
 

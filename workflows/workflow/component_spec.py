@@ -141,10 +141,10 @@ class ComponentSpec(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "One of: value_stream (a continuous outcome or KPI someone is "
-            "accountable for — director/C-level work, not a discrete document), "
-            "artifact_producing (creates and updates a discrete artifact), "
-            "planning_service (plans or coordinates work)"
+            "One of: value_stream (someone is accountable for a continuous "
+            "result or KPI), artifact_producing (it produces a document), "
+            "planning_service (it plans or coordinates work). Say what it is "
+            "in the user's words; the stored value stays in the result."
         ),
     )
     incidental_notes: Annotated[

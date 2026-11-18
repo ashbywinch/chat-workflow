@@ -114,7 +114,7 @@ class Deliverable(LLMValidated):
     ) -> list[Deliverable]:
         """Describe the one thing the user makes.
 
-    Open with one sentence on what you are doing, then reflect back what they said and propose the shape you can already infer. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), use its standard shape. Ask only for what is still missing or uncertain, once each.
+    Open with one sentence on what you are doing, then reflect back what they said and propose the shape you can already infer. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), propose its standard shape in that same turn, before asking anything else. Ask only for what is still missing or uncertain, once each.
 
     Ask for a check they can apply the moment the thing exists, not an outcome: "Every action item has an owner and a due date", not "Everyone is happy". If they give an outcome, propose a concrete check from your domain knowledge and ask them to confirm. Keep the user's own words for a check: if they say "10 minutes of standing", say that, not the standard cooking term for it.
 
