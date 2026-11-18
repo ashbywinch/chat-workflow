@@ -78,9 +78,7 @@ class TestVocabularyPrompt(unittest.TestCase):
         )
 
         self.assertIn("`analysis` -> \"What the person already told you\"", section)
-        self.assertIn("`LabelledInput`", section)
-        self.assertIn("`LabelledResult`", section)
-        self.assertIn("are internal names for it", section)
+        self.assertIn("type names above are internal", section)
 
     def test_input_models_are_read_from_the_signature(self):
         from chat_workflow.prompt_builder import input_models, user_parameter_labels
