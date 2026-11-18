@@ -123,9 +123,8 @@ class ComponentStructure(BaseModel):
         Include a validator for every rule a field can enforce structurally —
         a date format, a non-empty list, a required companion field. Return an
         empty list only when nothing is structurally enforceable. Use the
-        user's words for the shape: "text", "a list of people", "if there is
-        one". If the user asks about a code term you used, explain it in plain
-        language and restate the pending proposal. Use "continue" to propose,
+        user's words for the shape. If the user asks about a code term you
+        used, explain it in plain language and restate the pending proposal. Use "continue" to propose,
         "success" when the user confirms all. When confirmed, move on.
         """
         ...  # type: ignore[reportReturnType]
