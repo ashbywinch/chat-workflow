@@ -30,9 +30,8 @@ _PROVIDER_API_KEY_ENV = {
 
 def get_client(
     provider: str,
-    *,
-    api_key_env: str | None = None,
     api_base: str | None = None,
+    api_key_env: str | None = None,
     model_supports_tools: bool = False,
 ):
     """Get an instructor-patched LLM client for *provider*.
@@ -40,14 +39,10 @@ def get_client(
     The API key is read from the corresponding environment variable
     (e.g. ``OPENAI_API_KEY`` for ``provider="openai"``); override with
     ``api_key_env``. A custom endpoint can be set with ``api_base``
-    (e.g. ``https://opencode.ai/zen/go/v1`` for opencode-go models).
-
-    When *api_base* is given it is set as the provider-specific
-    ``OPENAI_API_BASE`` (or ``<PROVIDER>_API_BASE``) environment
-    variable so litellm routes requests to the custom endpoint.
-
-    When *model_supports_tools* is True the client uses Instructor's
-    native tool-calling mode (``Mode.TOOLS``) instead of JSON mode.
+    (e.g. ``https://opencode.ai/zen/go/v1`` for opencode-go models). Pass
+    ``model_supports_tools=True`` when the model can call tools: the client
+    then uses instructor's ``Mode.TOOLS``, so a step may call tools and still
+    return its structured result.
     """
     provider = provider.lower()
 
@@ -56,7 +51,6 @@ def get_client(
             f"Unsupported provider: {provider}. Supported: {', '.join(_PROVIDER_API_KEY_ENV)}"
         )
 
-    # Resolve API key — custom env var or provider default
     key_env = api_key_env or _PROVIDER_API_KEY_ENV[provider]
     api_key = os.getenv(key_env)
     if not api_key:
@@ -65,14 +59,11 @@ def get_client(
         )
 
     os.environ[provider.upper() + "_API_KEY"] = api_key
-
-    # Custom API base (for OpenAI-compatible endpoints). litellm reads the
-    # provider-specific env var; the global is kept in sync for callers that
-    # inspect it.
     if api_base:
-        os.environ[provider.upper() + "_API_BASE"] = api_base
         litellm.api_base = api_base
-
+    # Native tool calling when the model supports it: instructor's TOOLS mode
+    # lets a step call tools and still return the structured result, instead of
+    # encoding tool calls as a hand-written JSON protocol.
     mode = instructor.Mode.TOOLS if model_supports_tools else instructor.Mode.JSON
     return instructor.from_litellm(completion, mode=mode)
 
