@@ -185,6 +185,22 @@ class TestDiagramStructure(unittest.TestCase):
 
         self.assertIn("self-loop", str(ctx.exception))
 
+    def test_the_outcome_goes_to_the_consumer(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                'participant Inventory as "Inventory: Receive"\n'
+                "Order->>Inventory: start\n"
+                "Inventory-->>Order: ack\n"
+                "opt may happen\n"
+                "Order->>Inventory: more\n"
+                "end\n"
+                "Inventory->>Order: done"
+            )
+
+        self.assertIn("consumer", str(ctx.exception))
+
     def test_a_missing_decision_point_names_the_repair(self):
         with self.assertRaises(ValidationError) as ctx:
             self._check(

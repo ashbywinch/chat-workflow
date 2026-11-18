@@ -23,7 +23,7 @@ from .models.gap_analysis import GapAnalysis as _GapAnalysis
 
 _PARTICIPANT_LINE = re.compile(r'^participant\s+(\w+)\s+as\s+"([^"]+)"\s*$')
 _ARROW_LINE = re.compile(r"^(\w+)\s*(-->>|->>|-->|->|--x|-x)\s*(\w+)\s*:\s*(.+)$")
-_BLOCK_LINE = re.compile(r"^(alt|opt|loop)\b")
+_BLOCK_LINE = re.compile(r"^(alt|opt)\b")
 
 
 def _normalise_name(name: str) -> str:
@@ -92,18 +92,6 @@ def _validate_diagram_structure(
             "`else` branch for a choice, or an `opt` block for a step that may "
             "or may not happen."
         )
-    if len(participants) > 1 and not any((target, source) in arrows for source, target in arrows):
-        raise ValidationError(
-            "With more than one participant, the diagram needs a return flow: "
-            "an arrow back to a participant who sent work earlier."
-        )
-    source, target = arrows[-1]
-    if source == target:
-        raise ValidationError(
-            "The last message is a self-loop. Send the outcome to the "
-            "participant who receives the work, not back to the same one."
-        )
-
     known = (
         {_normalise_name(component.name) for component in components}
         | {_normalise_name(component.owner_role) for component in components}
@@ -120,6 +108,27 @@ def _validate_diagram_structure(
                 + ", ".join(sorted(known))
                 + "."
             )
+
+    if len(participants) > 1 and not any((target, source) in arrows for source, target in arrows):
+        raise ValidationError(
+            "With more than one participant, the diagram needs a return flow: "
+            "an arrow back to a participant who sent work earlier."
+        )
+    source, target = arrows[-1]
+    if source == target:
+        raise ValidationError(
+            "The last message is a self-loop. Send the outcome to the "
+            "participant who receives the work, not back to the same one."
+        )
+    consumers = {_normalise_name(output.consumer) for output in outputs}
+    target_path = participants[target].split(":", 1)[0].strip()
+    if consumers and _normalise_name(target_path) not in consumers:
+        raise ValidationError(
+            f"The last message goes to '{target_path}', not to the output's "
+            "consumer. Send the outcome to one of: "
+            + ", ".join(sorted(consumers))
+            + "."
+        )
 
 
 class WorkflowSpec(BlobSyncMixin, LLMValidated):
