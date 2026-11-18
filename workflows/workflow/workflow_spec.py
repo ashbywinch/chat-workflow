@@ -44,7 +44,8 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         Validation("Must use <br/> tags for splitting long text across lines"),
         Validation(
             "Must show the entry point, the flow of work between participants, "
-            "at least one decision point, a return flow, and a clear outcome. "
+            "at least one decision point, a return flow when there is more than "
+            "one participant, and a clear outcome. "
             "A decision point is either an `alt` block with `else` branches, "
             "for a choice between paths, or an `opt` block, for a step that "
             "may or may not happen; an `opt` needs no else branch. A return "
@@ -350,6 +351,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
                     requirements=req,
                     session=session,
                     output_dir=output_dir,
+                    deliverables=outputs,
                 )
                 session.io.echo(f"  ✓ {req.name} created at {component.code_path}")
             except Exception as e:

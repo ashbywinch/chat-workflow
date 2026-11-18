@@ -129,19 +129,25 @@ class ComponentDomainSpec(LLMValidated):
             ComponentSpec,
             "What this part of the work is responsible for, in the user's words",
         ],
+        deliverables: Annotated[
+            list[Deliverable] | None,
+            "What the user makes, with the check they gave for it",
+        ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentDomainSpec:
         """Shape what the thing contains with the user.
 
-    Start with a draft: the parts the thing needs, in their words, with one line each on what it holds. Ask them to
-    correct it.
+    The responsibilities are already agreed, so do not ask the user to confirm the shape again. State the parts the
+    thing needs, in their words, and move on; do not turn the shape into a second confirmation.
 
-    Then propose the checks that make it good enough to use, from your domain knowledge, and record their answer as
-    checks, not qualities ("Every decision has a reason", not "Clear and complete"). Ask them to confirm or add, rather
-    than asking an open question they have already answered. Infer the expertise you need and confirm it in one
-    sentence.
+    If `deliverables` is given, the success criteria it carries is the check the user already gave: use it as the
+    quality checks and do not ask for quality again. If there are no deliverables, propose the checks from your domain
+    knowledge and ask the user to confirm or add.
 
-    Ask one question at a time and do not interrogate them.
+    Infer the expertise you need and confirm it in one sentence. Ask one question at a time and do not interrogate
+    them.
 
-    Return the result when they confirm the shape and the checks."""
+    Return the result when they confirm."""
         ...  # type: ignore[reportReturnType]
+
+from .models.deliverable import Deliverable  # noqa: E402

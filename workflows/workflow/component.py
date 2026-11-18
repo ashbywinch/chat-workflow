@@ -180,6 +180,7 @@ class Component(LLMValidated):
         *,
         session: Session,
         output_dir: Path | None = None,
+        deliverables: list | None = None,
     ) -> Component:
         """Create ONE business component.
 
@@ -201,6 +202,7 @@ class Component(LLMValidated):
             session.io.echo(f"Exploring domain: {requirements.name}...")
             domain_spec = ComponentDomainSpec.explore(
                 responsibilities=requirements,
+                deliverables=deliverables,
                 session=session,
             )
 
