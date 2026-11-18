@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, override
 
 from pydantic import Field, field_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import Blob, Validation
+from chat_workflow.exceptions import ValidationError
 from chat_workflow.mixins import BlobSyncMixin, LLMValidated
 
 from .component_spec import ComponentSpec
@@ -19,6 +20,106 @@ from .models import (
     generate_from_chat,
 )
 from .models.gap_analysis import GapAnalysis as _GapAnalysis
+
+_PARTICIPANT_LINE = re.compile(r'^participant\s+(\w+)\s+as\s+"([^"]+)"\s*$')
+_ARROW_LINE = re.compile(r"^(\w+)\s*(-->>|->>|-->|->|--x|-x)\s*(\w+)\s*:\s*(.+)$")
+_BLOCK_LINE = re.compile(r"^(alt|opt|loop)\b")
+
+
+def _normalise_name(name: str) -> str:
+    """Compare a diagram label with a record name without case/spacing noise."""
+    return re.sub(r"[\s_-]+", " ", name.strip().casefold())
+
+
+def _validate_diagram_structure(
+    diagram: str,
+    components: list[ComponentSpec],
+    outputs: list[Deliverable],
+    inputs: list[Resource],
+) -> None:
+    """Check the diagram's mechanical contract and name the repair.
+
+    The model writes this diagram from the record. The rules below are facts
+    about the text, so a wrong diagram fails here with the line to fix instead
+    of reaching an LLM judge that can only say it is wrong. Semantic ownership
+    stays with the judge; syntax, participants, flow, a decision point, the
+    return flow and the outcome are decided here.
+    """
+    participants: dict[str, str] = {}
+    arrows: list[tuple[str, str]] = []
+    blocks: list[str] = []
+    for line in diagram.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("%%"):
+            continue
+        participant = _PARTICIPANT_LINE.match(stripped)
+        if participant:
+            participants[participant.group(1)] = participant.group(2)
+            continue
+        if _BLOCK_LINE.match(stripped):
+            blocks.append(stripped.split()[0])
+            continue
+        arrow = _ARROW_LINE.match(stripped)
+        if arrow:
+            arrows.append((arrow.group(1), arrow.group(3)))
+
+    if not participants:
+        raise ValidationError(
+            'The diagram declares no participants. Declare each one as '
+            '`participant <Path> as "<Component Path>: <Playbook>"`.'
+        )
+    undeclared = sorted({name for pair in arrows for name in pair} - set(participants))
+    if undeclared:
+        raise ValidationError(
+            "The diagram uses participant(s) that are not declared: "
+            + ", ".join(undeclared)
+            + '. Declare each as `participant <Path> as "<Component Path>: <Playbook>"`.'
+        )
+    if not arrows:
+        raise ValidationError(
+            "The diagram has no messages. Show the work as arrows from one "
+            "participant to another, starting at the entry point."
+        )
+    if not any(source != target for source, target in arrows):
+        raise ValidationError(
+            "Every message is a self-loop; the diagram shows no hand-off "
+            "between participants. Show at least one message from one "
+            "participant to another."
+        )
+    if not blocks:
+        raise ValidationError(
+            "The diagram has no decision point. Add an `alt` block with an "
+            "`else` branch for a choice, or an `opt` block for a step that may "
+            "or may not happen."
+        )
+    if len(participants) > 1 and not any((target, source) in arrows for source, target in arrows):
+        raise ValidationError(
+            "With more than one participant, the diagram needs a return flow: "
+            "an arrow back to a participant who sent work earlier."
+        )
+    source, target = arrows[-1]
+    if source == target:
+        raise ValidationError(
+            "The last message is a self-loop. Send the outcome to the "
+            "participant who receives the work, not back to the same one."
+        )
+
+    known = (
+        {_normalise_name(component.name) for component in components}
+        | {_normalise_name(component.owner_role) for component in components}
+        | {_normalise_name(output.name) for output in outputs}
+        | {_normalise_name(output.consumer) for output in outputs}
+        | {_normalise_name(resource.source) for resource in inputs}
+    )
+    for label in participants.values():
+        path = label.split(":", 1)[0].strip()
+        if _normalise_name(path) not in known:
+            raise ValidationError(
+                f"The participant '{path}' is not a component, a component's "
+                "owner, an input, or an output in this workflow. Use one of: "
+                + ", ".join(sorted(known))
+                + "."
+            )
 
 
 class WorkflowSpec(BlobSyncMixin, LLMValidated):
@@ -72,6 +173,11 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         ),
         min_length=1,
     )
+
+    @override
+    def validate_deterministic_rules(self) -> None:
+        """Run the diagram's mechanical contract before the LLM judge."""
+        _validate_diagram_structure(self.diagram, self.components, self.outputs, self.inputs)
 
     @field_validator("diagram")
     @classmethod

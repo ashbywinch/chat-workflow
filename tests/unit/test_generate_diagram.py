@@ -8,6 +8,7 @@ from pyfakefs.fake_filesystem_unittest import TestCase
 
 from chat_workflow import Session, SessionLog
 from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
+from chat_workflow.exceptions import ValidationError
 from chat_workflow.models import AgentIntent, AgentResponse
 from workflows.workflow.component_spec import ComponentSpec
 from workflows.workflow.models import (
@@ -15,7 +16,10 @@ from workflows.workflow.models import (
     ProcessDefinition,
     Resource,
 )
-from workflows.workflow.workflow_spec import WorkflowSpec
+from workflows.workflow.workflow_spec import (
+    WorkflowSpec,
+    _validate_diagram_structure,
+)
 
 
 class FakeConfig:
@@ -124,6 +128,104 @@ class TestGenerateDiagram(unittest.TestCase):
         self.assertIsInstance(result, WorkflowSpec)
         self.assertEqual(result.name, "Test Workflow")
         self.assertIn("sequenceDiagram", result.diagram)
+
+
+class TestDiagramStructure(unittest.TestCase):
+    """The diagram's mechanical contract, with the repair in the message."""
+
+    def _check(self, diagram: str) -> None:
+        _validate_diagram_structure(
+            diagram, _make_components(), _make_outputs(), _make_inputs()
+        )
+
+    def test_a_complete_diagram_passes(self):
+        self._check(
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant Inventory as "Inventory: Receive"\n'
+            "Order->>Inventory: reservation\n"
+            "Inventory-->>Order: confirmed\n"
+            "alt item unavailable\n"
+            "Order->>Inventory: backorder\n"
+            "else available\n"
+            "Order->>Inventory: confirm\n"
+            "end\n"
+            "Order->>Inventory: outcome"
+        )
+
+    def test_a_missing_return_flow_names_the_repair(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                'participant Inventory as "Inventory: Receive"\n'
+                "alt choice\n"
+                "Order->>Inventory: one\n"
+                "else other\n"
+                "Order->>Inventory: two\n"
+                "end\n"
+                "Order->>Inventory: outcome"
+            )
+
+        self.assertIn("return flow", str(ctx.exception))
+
+    def test_a_self_loop_outcome_names_the_repair(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                'participant Inventory as "Inventory: Receive"\n'
+                "Order->>Inventory: start\n"
+                "Inventory-->>Order: ack\n"
+                "opt may happen\n"
+                "Order->>Inventory: more\n"
+                "end\n"
+                "Order->>Order: done"
+            )
+
+        self.assertIn("self-loop", str(ctx.exception))
+
+    def test_a_missing_decision_point_names_the_repair(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                'participant Inventory as "Inventory: Receive"\n'
+                "Order->>Inventory: start\n"
+                "Inventory-->>Order: ack"
+            )
+
+        self.assertIn("decision point", str(ctx.exception))
+
+    def test_an_undeclared_participant_names_it(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Order as "Order: Process"\n'
+                "opt may happen\n"
+                "Order->>Ghost: start\n"
+                "end"
+            )
+
+        self.assertIn("Ghost", str(ctx.exception))
+        self.assertIn("not declared", str(ctx.exception))
+
+    def test_a_participant_outside_the_record_names_the_known_ones(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self._check(
+                "sequenceDiagram\n"
+                'participant Ghost as "Ghost: Haunt"\n'
+                'participant Order as "Order: Process"\n'
+                "Ghost->>Order: start\n"
+                "Order-->>Ghost: ack\n"
+                "opt may happen\n"
+                "Ghost->>Order: more\n"
+                "end\n"
+                "Ghost->>Order: outcome"
+            )
+
+        self.assertIn("Ghost", str(ctx.exception))
+        self.assertIn("not a component", str(ctx.exception))
 
 
 class TestCreateDiagram(TestCase):
