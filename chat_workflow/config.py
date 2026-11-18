@@ -125,8 +125,20 @@ class Config:
 
     @property
     def api_base(self) -> str | None:
-        """Custom API base URL (e.g. https://opencode.ai/zen/go/v1). None = provider default."""
-        return self._config_data["llm"].get("api_base")
+        """The endpoint the preset talks to.
+
+        A preset that states one uses it. The ``openai`` provider without one
+        is pinned to ``OPENAI_BASE_URL`` — the house gateway — so an ambient
+        base (litellm's global, or a base a previous call pinned) cannot route
+        the call to another host. A call that lands elsewhere fails with that
+        host's own error, which reads as a bug in the change under test.
+        """
+        stated = self._config_data["llm"].get("api_base")
+        if stated:
+            return str(stated)
+        if self.provider == "openai":
+            return os.environ.get("OPENAI_BASE_URL") or None
+        return None
 
     @property
     def api_key_env(self) -> str | None:
