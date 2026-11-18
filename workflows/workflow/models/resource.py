@@ -118,8 +118,11 @@ class Resource(LLMValidated):
     Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply. When
     they confirm the set, return it without summarising it again.
 
-    Describe each in the user's words. Say "what you start with", and never
-    "resource", "material", "inventory", or "completeness". Stay at the level of what they
-    start with, not its contents: if they describe their domain, acknowledge it
-    in a clause and return to them."""
+    Describe each in the user's words. Check it as "where it comes from", "what
+    it looks like", "what it needs first", and "how you know you have
+    everything" — never as `source`, `format`, `dependencies`, or
+    `validation_criteria`. Say "what you start with", and never "resource",
+    "material", "inventory", "complete", or "completeness". Stay at the level of
+    what they start with, not its contents: if they describe their domain,
+    acknowledge it in a clause and return to them."""
         ...  # type: ignore[reportReturnType]
