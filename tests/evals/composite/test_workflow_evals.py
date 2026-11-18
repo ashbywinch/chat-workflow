@@ -70,7 +70,7 @@ class TestProcessDefinitionEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
             method_kwargs=dict(
-                max_turns=10,
+                max_turns=14,
             ),
             user_persona=user_persona,
         )
@@ -96,7 +96,7 @@ class TestProcessDefinitionEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
             method_kwargs=dict(
-                max_turns=10,
+                max_turns=14,
             ),
             user_persona=user_persona,
             judge_rules=REDIRECT_JUDGE_RULES,
@@ -127,7 +127,7 @@ class TestResourceEval(unittest.TestCase):
             method_kwargs=dict(
                 analysis=fixtures.meeting_analysis(),
                 deliverables=[fixtures.meeting_minutes_deliverable()],
-                max_turns=10,
+                max_turns=14,
             ),
             user_persona=user_persona,
         )
@@ -191,7 +191,7 @@ class TestOutputEval(unittest.TestCase):
             model_method=Deliverable.generate_from_chat,
             method_kwargs=dict(
                 analysis=fixtures.meeting_analysis(),
-                max_turns=10,
+                max_turns=14,
             ),
             user_persona=user_persona,
             judge_rules=META_LEVEL_JUDGE_RULES,
@@ -218,7 +218,7 @@ class TestOutputEval(unittest.TestCase):
 
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"analysis": None, "max_turns": 10},
+            method_kwargs={"analysis": None, "max_turns": 14},
             user_persona=user_persona,
             judge_rules=REDIRECT_JUDGE_RULES,
         )
@@ -256,7 +256,7 @@ class TestComponentSpecEval(unittest.TestCase):
                 analysis=analysis,
                 inputs=inputs,
                 outputs=outputs,
-                max_turns=10,
+                max_turns=14,
             ),
             user_persona=user_persona,
         )

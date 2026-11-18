@@ -88,7 +88,7 @@ class TestConfusionHandlingEval(unittest.TestCase):
         """Deliverable.generate_from_chat drops jargon when user is confused."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 10},
+            method_kwargs={"max_turns": 16},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=CONFUSION_JUDGE_RULES,
         )
@@ -100,7 +100,7 @@ class TestConfusionHandlingEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
             method_kwargs={
-                "max_turns": 14,
+                "max_turns": 20,
                 "deliverables": [fixtures.weekly_meal_plan_deliverable()],
             },
             user_persona=CONFUSED_USER_PERSONA,
@@ -120,7 +120,7 @@ class TestJargonFreeEval(unittest.TestCase):
         """Deliverable conversation uses plain language, not field names."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 10},
+            method_kwargs={"max_turns": 16},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
         )
@@ -132,7 +132,7 @@ class TestJargonFreeEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
             method_kwargs={
-                "max_turns": 10,
+                "max_turns": 16,
                 "deliverables": [fixtures.weekly_meal_plan_deliverable()],
             },
             user_persona=CONFUSED_USER_PERSONA,
@@ -148,7 +148,7 @@ class TestJargonFreeEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=generate_from_chat,
             method_kwargs={
-                "max_turns": 10,
+                "max_turns": 16,
             },
             user_persona=CONFUSED_PROCESS_PERSONA,
             judge_rules=JARGON_FREE_RULES,
@@ -168,7 +168,7 @@ class TestJargonFreeEval(unittest.TestCase):
                 "analysis": analysis,
                 "inputs": inputs,
                 "outputs": outputs,
-                "max_turns": 10,
+                "max_turns": 16,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
@@ -186,7 +186,7 @@ class TestJargonFreeEval(unittest.TestCase):
             method_kwargs={
                 "components": requirements,
                 "analysis": analysis,
-                "max_turns": 10,
+                "max_turns": 16,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,

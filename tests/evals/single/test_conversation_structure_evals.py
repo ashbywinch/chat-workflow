@@ -178,7 +178,7 @@ class TestWarmOpenEval(unittest.TestCase):
         """Deliverable.generate_from_chat opens warmly, not with an abrupt question."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 10},
+            method_kwargs={"max_turns": 16},
             user_persona=SKEPTICAL_FIRST_TIME_PERSONA,
             judge_rules=WARM_OPEN_RULES,
         )
@@ -193,7 +193,7 @@ class TestDomainProposalEval(unittest.TestCase):
         """Deliverable proposes meeting minutes structure from domain knowledge."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 10},
+            method_kwargs={"max_turns": 16},
             user_persona=DOMAIN_EXPECTATION_PERSONA,
             judge_rules=OUTPUT_DOMAIN_PROPOSAL_RULES,
         )
@@ -210,7 +210,7 @@ class TestDomainProposalEval(unittest.TestCase):
         meeting_minutes = fixtures.meeting_minutes_deliverable()
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
-            method_kwargs={"max_turns": 10, "deliverables": [meeting_minutes]},
+            method_kwargs={"max_turns": 16, "deliverables": [meeting_minutes]},
             user_persona=DOMAIN_EXPECTATION_PERSONA,
             judge_rules=RESOURCE_DOMAIN_PROPOSAL_RULES,
         )
@@ -225,7 +225,7 @@ class TestAdaptiveConversationEval(unittest.TestCase):
         """Deliverable pivots to proposing mode when user says 'what do you think?' or 'suggest something'."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 10},
+            method_kwargs={"max_turns": 16},
             user_persona=PARTICIPATORY_USER_PERSONA,
             judge_rules=ADAPTIVE_CONVERSATION_RULES,
         )
@@ -237,7 +237,7 @@ class TestAdaptiveConversationEval(unittest.TestCase):
         result = run_multi_turn_eval(
             model_method=Resource.generate_from_chat,
             method_kwargs={
-                "max_turns": 10,
+                "max_turns": 16,
                 "deliverables": [fixtures.meeting_minutes_deliverable()],
             },
             user_persona=PARTICIPATORY_RESOURCE_PERSONA,

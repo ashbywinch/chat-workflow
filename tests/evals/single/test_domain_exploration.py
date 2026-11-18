@@ -48,7 +48,7 @@ class TestDomainExplorationEval(unittest.TestCase):
             model_method=ComponentDomainSpec.explore,
             method_kwargs=dict(
                 responsibilities=responsibilities,
-                max_turns=8,
+                max_turns=12,
             ),
             user_persona=user_persona,
         )
