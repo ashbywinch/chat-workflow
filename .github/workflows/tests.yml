@@ -22,7 +22,11 @@ jobs:
         run: make test
       
       - name: Evaluation tests
+        # The evals call the house gateway (config.json names its route), so the
+        # step needs the gateway base and its token. Without them every eval
+        # failed with an APIKeyError that read as "the change is broken".
         env:
+          OPENAI_API_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
+          OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENCODE_GO_EVALS_API_KEY: ${{ secrets.OPENCODE_GO_EVALS_API_KEY }}
         run: make evals
