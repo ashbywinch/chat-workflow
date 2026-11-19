@@ -112,12 +112,16 @@ CI (or locally before pushing) as the gate.
 | File | What |
 |------|------|
 | `workflows/evaluation_criteria/models.py` | Data models & business rules (`EvaluationCriteria`, `Criterion`) |
-| `chat_workflow/atomic_workflow_step.py` | `@atomic_workflow_step`/`@composite_workflow_step` decorators, `AtomicWorkflowStep`, `StreamingDebug` |
-| `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
+| `chat_workflow/atomic_workflow.py` | `@atomic_workflow`/`@composite_workflow` decorators, `AtomicWorkflow`, `StreamingDebug` |
+| `chat_workflow/conversation.py` | `Conversation` — the one model call, transcript and retry budgets |
+| `chat_workflow/session.py` | Recursive `Session`: parent/children, `instructions`, `spawn` |
+| `chat_workflow/session_component.py` | `SessionComponent`: greet, run a step, sign off |
+| `chat_workflow/decorators.py` | Prompt assembly, the framework aliases, chat/one-turn options |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow_cli/cli.py` | Typer CLI entrypoint with automatic workflow discovery |
-| `workflows/evaluation_criteria/flows.py` | Workflow functions: `generate_criteria`, `refine`, `generate_reviewed_criteria` |
+| `workflows/workflow/workflow_spec.py` | `WorkflowSpec` — the meta-workflow (analysis, diagram, components) |
+| `workflows/evaluation_criteria/generate_reviewed_criteria.py` | The example workflow functions |
 
 ### Development Commands
 
@@ -126,7 +130,7 @@ make                # Create venv, install deps + hooks, create .env from .env.e
 make check          # Lint + typecheck — the gate CI and the pre-push hook run
 make test          # Unit tests only (no API key needed, ~2s)
 make test-verbose  # Same with verbose output per test
-make evals          # Real-API evals through Cloudflare AI Gateway (~90s)
+make evals          # Full real-API eval suite through Cloudflare AI Gateway
 make evals-verbose  # Same with verbose output
 make coverage       # Unit tests + coverage.xml for CI
 make docs-check     # Every relative markdown link resolves

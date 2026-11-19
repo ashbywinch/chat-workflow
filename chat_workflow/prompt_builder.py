@@ -28,9 +28,7 @@ from .metadata import (
 # Internal params that the @atomic_workflow_step decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
 # ``max_turns`` is an orchestration knob, not content; the model cannot use it.
-_INTERNAL_PARAMS: frozenset[str] = frozenset(
-    {"session", "debug", "self", "cls", "max_turns"}
-)
+_INTERNAL_PARAMS: frozenset[str] = frozenset({"session", "debug", "self", "cls"})
 
 
 def _format_docstring(docstring: str | None, **kwargs) -> str:

@@ -34,7 +34,7 @@ class TestSnakeToKebab(unittest.TestCase):
 
 
 class TestDiscoverWorkflowFunctions(unittest.TestCase):
-    """discover_workflow_functions filters module members by _is_workflow_step."""
+    """discover_workflow_functions filters module members by _is_workflow."""
 
     def test_finds_workflow_functions(self):
         module = types.ModuleType("test_mod")
@@ -42,7 +42,7 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
         def wf_func():
             pass
 
-        wf_func._is_workflow_step = True  # type: ignore[attr-defined]
+        wf_func._is_workflow = True  # type: ignore[attr-defined]
 
         def plain_func():
             pass
@@ -92,7 +92,7 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
         def my_workflow(context: str = "", *, tools):
             pass
 
-        my_workflow._is_workflow_step = True  # type: ignore[attr-defined]
+        my_workflow._is_workflow = True  # type: ignore[attr-defined]
 
         fake_module.my_workflow = my_workflow  # type: ignore[attr-defined]
 

@@ -11,13 +11,14 @@ does not greet or sign off unless the caller asks for it.
 
 from __future__ import annotations
 
-import json
+import re
 from collections.abc import Callable
 from inspect import cleandoc
 from typing import Annotated, Any, TypeVar
 
 from .conversation_rules import WARM_OPEN
-from .decorators import atomic_workflow_step, composite_workflow_step
+from .decorators import atomic_workflow, composite_workflow
+from .models import TextReply
 from .session import Session
 
 T = TypeVar("T")
@@ -25,26 +26,15 @@ T = TypeVar("T")
 _FALLBACK_CLOSING = "I have what I need."
 
 
-def _is_structured_text(text: str) -> bool:
-    """True when a one-turn text is a JSON object or array, not a sentence."""
-    stripped = text.strip()
-    if not stripped or stripped[0] not in "{[":
-        return False
-    try:
-        return isinstance(json.loads(stripped), (dict, list))
-    except (ValueError, TypeError):
-        return False
-
-
 class SessionComponent:
     """Runs one conversation: a greeting, the step, and a closing."""
 
-    @atomic_workflow_step(
+    @atomic_workflow(
         chat=False,
         single_turn=True,
         conversation_validation_rules=[WARM_OPEN],
     )
-    def greet(self, *, session: Session, max_turns: int = 1) -> str:
+    def greet(self, *, session: Session, max_turns: int = 1) -> TextReply:
         """Open the conversation.
 
         Give one short greeting, say in one sentence what you are here to help
@@ -55,7 +45,7 @@ class SessionComponent:
         """
         ...  # type: ignore[reportReturnType]
 
-    @atomic_workflow_step(chat=False, single_turn=True)
+    @atomic_workflow(chat=False, single_turn=True)
     def sign_off(
         self,
         *,
@@ -65,7 +55,7 @@ class SessionComponent:
             "The thing the conversation produced; internal reference only",
         ] = None,
         max_turns: int = 1,
-    ) -> str:
+    ) -> TextReply:
         """Close the conversation.
 
         Say in one short sentence that you have what you need. The result is an
@@ -74,7 +64,7 @@ class SessionComponent:
         """
         ...  # type: ignore[reportReturnType]
 
-    @composite_workflow_step
+    @composite_workflow
     def converse(self, step: Callable[..., T], *, session: Session) -> T:
         """Hold one conversation with the user about their own work.
 
@@ -86,16 +76,24 @@ class SessionComponent:
         it, then return to the question; never develop their domain content.
         Describe the picture in their words, not as a list of field names.
 
-        The task at hand asks for something specific. Do that task's work,
-        not the next one's. When the user agrees with the picture you
-        described, finish in the same response; never re-present an unchanged
-        draft or ask for a second approval. If their last message asks you
-        something, answer it before finishing. Do not give up on the thing:
-        propose it in their own words, and stop only if they reject every
-        concrete proposal.
+        Before the first question of a step, say in one sentence what you are
+        doing and why. The task at hand asks for something specific. Do that
+        task's work, not the next one's. When the user agrees with the picture
+        you described, finish in the same response; never re-present an
+        unchanged draft or ask for a second approval. If their last message
+        asks you something, answer it before finishing. Do not give up on the
+        thing: propose it in their own words, and stop only if they reject
+        every concrete proposal.
         """
         if session.instructions is None:
-            session.instructions = cleandoc(self.converse.__doc__ or "")
+            instructions = cleandoc(self.converse.__doc__ or "")
+            doc = cleandoc(getattr(step, "__doc__", "") or "").strip()
+            purpose = re.split(r"(?<=[.!?])\s+", doc)[0] if doc else ""
+            if purpose:
+                instructions = (
+                    f"{instructions}\n\nThis session's task: {purpose}"
+                )
+            session.instructions = instructions
 
         # A top-level step that makes no user turns is not a conversation: it
         # has nothing to greet or close. Composite steps default to chat-on.
@@ -111,15 +109,10 @@ class SessionComponent:
         session.active = True
         try:
             if not session.state.messages:
-                session.say(self.greet(session=session))
+                session.say(self.greet(session=session).text)
             result = step(session=session)
             session.state.final_result = result
-            closing = self.sign_off(result=result, session=session)
-            if _is_structured_text(closing):
-                # A closing is one sentence. If the model copies the result
-                # instead, say the plain closing rather than leak field names.
-                closing = _FALLBACK_CLOSING
-            session.say(closing)
+            session.say(self.sign_off(result=result, session=session).text)
             return result
         finally:
             session.active = False

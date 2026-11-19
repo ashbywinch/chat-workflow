@@ -1,93 +1,128 @@
-"""The transcript refuses a message list a provider would mishandle."""
+"""The transcript: PydanticAI's message list, projected for people and judges.
+
+Pinned here: which parts become which entries, that thinking and tool traffic
+survive the audit view, that the user view contains only what a person saw,
+and that the stored form round-trips byte-for-byte.
+"""
 
 import unittest
 
-from chat_workflow.transcript import Transcript, TranscriptError
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    RetryFeedbackPart,
+    RetryInfo,
+    TextPart,
+    ThinkingPart,
+    ToolCallPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
+
+from chat_workflow.transcript import dump, entries, load, render
+from tests.conftest import make_valid_criteria
 
 
-class TestValidShape(unittest.TestCase):
-    def test_instructions_are_folded_into_one_leading_system_message(self):
-        transcript = Transcript.from_messages(
-            [
-                {"role": "system", "content": "You help."},
-                {"role": "system", "content": "Reply in English."},
-                {"role": "user", "content": "hello"},
+def _messages() -> list:
+    return [
+        ModelRequest(parts=[UserPromptPart("Grandma said so")]),
+        ModelResponse(
+            parts=[
+                ThinkingPart("I should look this up"),
+                ToolCallPart(tool_name="search", args={"query": "walter"}, tool_call_id="c1"),
             ]
+        ),
+        ModelRequest(
+            parts=[
+                ToolReturnPart(tool_name="search", content={"hit": "the war record"}, tool_call_id="c1"),
+                RetryFeedbackPart(
+                    content="the envelope is missing 'result'", retry=RetryInfo(cause="model_retry")
+                ),
+            ]
+        ),
+        ModelResponse(parts=[TextPart("Rejected answer")]),
+        ModelResponse(parts=[TextPart('{"intent": "success", "result": {"ok": true}}')]),
+    ]
+
+
+class TestEntries(unittest.TestCase):
+    def test_each_part_is_its_own_kind(self):
+        kinds = [kind for kind, _ in entries(_messages())]
+
+        self.assertEqual(
+            kinds,
+            ["user", "thinking", "tool-call", "tool-return", "validation", "assistant", "output"],
         )
 
-        messages = transcript.wire()
+    def test_a_tool_call_carries_its_name_and_arguments(self):
+        call = next(text for kind, text in entries(_messages()) if kind == "tool-call")
 
-        self.assertEqual([m["role"] for m in messages], ["system", "user"])
-        self.assertEqual(messages[0]["content"], "You help.\n\nReply in English.")
+        self.assertIn("search", call)
+        self.assertIn("walter", call)
 
-    def test_consecutive_user_turns_are_joined(self):
-        transcript = Transcript.from_messages(
-            [
-                {"role": "system", "content": "You help."},
-                {"role": "user", "content": "hello"},
-                {"role": "user", "content": "[framework] return JSON"},
-            ]
-        )
+    def test_the_final_structured_answer_is_output_not_a_turn(self):
+        kinds = [kind for kind, _ in entries(_messages())]
 
-        messages = transcript.wire()
-
-        self.assertEqual([m["role"] for m in messages], ["system", "user"])
-        self.assertIn("[framework]", messages[-1]["content"])
+        self.assertEqual(kinds.count("output"), 1)
+        self.assertEqual(kinds.count("assistant"), 1)
 
 
-class TestEnforcedRules(unittest.TestCase):
-    def _error(self, messages) -> str:
-        with self.assertRaises(TranscriptError) as ctx:
-            Transcript.from_messages(messages).wire()
-        return str(ctx.exception)
+class TestRender(unittest.TestCase):
+    def test_the_audit_view_keeps_thinking_tools_and_retries(self):
+        text = render(_messages())
 
-    def test_a_system_message_after_a_turn_raises(self):
-        message = self._error(
-            [
-                {"role": "system", "content": "You help."},
-                {"role": "user", "content": "hello"},
-                {"role": "system", "content": "Reply in English."},
-            ]
-        )
-        self.assertIn("must come before the conversation starts", message)
-        self.assertIn("empty completion", message)
+        self.assertIn("[thinking]\nI should look this up", text)
+        self.assertIn("[tool-call]", text)
+        self.assertIn("[tool-return]", text)
+        self.assertIn("[validation]", text)
+        self.assertIn("missing 'result'", text)
 
-    def test_an_empty_message_raises(self):
-        message = self._error(
-            [
-                {"role": "system", "content": "You help."},
-                {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "   "},
-            ]
-        )
-        self.assertIn("may not be empty", message)
+    def test_the_user_view_is_only_what_a_person_saw(self):
+        text = render(_messages(), audience="user")
 
-    def test_two_assistant_turns_raise(self):
-        message = self._error(
-            [
-                {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "hi"},
-                {"role": "assistant", "content": "again"},
-            ]
-        )
-        self.assertIn("Two assistant turns", message)
+        self.assertIn("[user]\nGrandma said so", text)
+        self.assertIn("[assistant]\nRejected answer", text)
+        self.assertNotIn("thinking", text)
+        self.assertNotIn("tool-call", text)
+        self.assertNotIn("missing 'result'", text)
+        self.assertNotIn("intent", text)
 
-    def test_a_request_without_a_turn_raises(self):
-        message = self._error([{"role": "system", "content": "You help."}])
-        self.assertIn("no conversation turn", message)
+    def test_the_result_replaces_the_raw_answer(self):
+        result = make_valid_criteria()
 
-    def test_a_request_ending_on_assistant_raises(self):
-        message = self._error(
-            [
-                {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "hi"},
-            ]
-        )
-        self.assertIn("must end with a user turn", message)
+        audit = render(_messages(), result=result)
+        audience = render(_messages(), audience="user", result=result)
 
-    def test_an_unknown_role_raises(self):
-        message = self._error([{"role": "tool", "content": "{}"}])
-        self.assertIn("Unknown role", message)
+        self.assertIn("[structured-result]", audit)
+        self.assertIn("budget", audit)
+        self.assertNotIn('"intent": "success"', audit)
+        self.assertIn("[structured-result]", audience)
+        self.assertNotIn("budget", audience)
+
+    def test_a_failed_run_keeps_its_last_answer_as_evidence(self):
+        text = render(_messages())
+
+        self.assertIn("[output]", text)
+        self.assertIn('{"intent": "success", "result": {"ok": true}}', text)
+
+
+class TestStoredForm(unittest.TestCase):
+    def test_the_message_list_round_trips_byte_for_byte(self):
+        messages = _messages()
+
+        stored = dump(messages)
+        again = load(stored)
+
+        self.assertEqual(dump(again), stored)
+
+    def test_thinking_and_tool_parts_survive_the_round_trip(self):
+        again = load(dump(_messages()))
+        kinds = [kind for kind, _ in entries(again)]
+
+        self.assertIn("thinking", kinds)
+        self.assertIn("tool-call", kinds)
+        self.assertIn("tool-return", kinds)
+        self.assertIn("validation", kinds)
 
 
 if __name__ == "__main__":

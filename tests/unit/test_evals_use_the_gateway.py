@@ -20,8 +20,8 @@ class TestEvalsUseTheGateway(unittest.TestCase):
         assert not llm.get("api_base"), f"config.json pins {llm['api_base']!r}; the eval must use the gateway"
 
     def test_the_model_is_a_gateway_route(self) -> None:
-        model = Config(CONFIG).model
-        assert model.startswith("openai/dynamic/"), model
+        llm = json.loads(CONFIG.read_text())["llm"]
+        assert llm["model"].startswith("openai/dynamic/"), llm["model"]
 
     def test_the_key_is_the_gateway_token(self) -> None:
         assert Config(CONFIG).api_key_env == "OPENAI_API_KEY"

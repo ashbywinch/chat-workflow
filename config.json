@@ -1,25 +1,9 @@
 {
   "llm": {
-    "active": "cloudflare",
-    "presets": {
-      "cloudflare": {
-        "provider": "openai",
-        "model": "openai/dynamic/fallback2",
-        "api_key_env": "OPENAI_API_KEY",
-        "model_supports_tools": false,
-        "extra_headers": {
-          "cf-aig-skip-cache": "true"
-        }
-      },
-      "openrouter": {
-        "provider": "openrouter",
-        "model": "openrouter/google/gemini-2.5-flash-lite",
-        "api_key_env": "OPENROUTER_API_KEY",
-        "model_supports_tools": false
-      }
-    },
+    "provider": "openai",
+    "model": "openai/dynamic/fallback2",
+    "api_key_env": "OPENAI_API_KEY",
     "temperature": 0.7,
-    "max_retries": 3,
-    "request_timeout_seconds": 300
+    "max_retries": 3
   }
 }

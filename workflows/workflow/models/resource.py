@@ -93,7 +93,8 @@ class Resource(LLMValidated):
     ) -> list[Resource]:
         """List what the user starts with before they make the thing they make.
 
-    The conversation has already opened; do not greet again. If the conversation already lists what they start with, use that list and do not ask which ones they have. Otherwise, in your first turn, name the thing they make from `deliverables`, propose the things people
+    The conversation has already opened; do not greet again. Start your first reply with "Let's list what you start with before you make {deliverables[0].name}." Then, in one sentence,
+    say what you are doing: listing what they start with before they make the thing. If the conversation already lists what they start with, use that list and do not ask which ones they have. Otherwise, in your first turn, name the thing they make from `deliverables`, propose the things people
     usually start with for that kind of work, and ask which of them they have.
 
     For each one, in the user's words:

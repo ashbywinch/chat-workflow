@@ -18,11 +18,11 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | File | What |
 |------|------|
 | `chat_workflow/decorators.py` | `@atomic_workflow_step`/`@composite_workflow_step` decorators |
-| `chat_workflow/atomic_workflow_step.py` | `AtomicWorkflowStep` — drives a single atomic workflow step turn loop |
+| `chat_workflow/atomic_workflow.py` | `AtomicWorkflow` — drives a single atomic workflow step turn loop |
 | `chat_workflow/session.py` | `Session` — runtime context (IO, state, config) |
 | `chat_workflow/session_log.py` | `SessionLog` — accumulated session state |
 | `chat_workflow/debug.py` | `StreamingDebug` — real-time LLM tracing |
-| `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
+| `chat_workflow/conversation.py` | `Conversation.send()` — multi-provider LLM client via PydanticAI |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow_cli/cli.py` | CLI with automatic workflow discovery |
@@ -47,7 +47,7 @@ Example workflows live in the `workflows/` directory.
 ### Core Concepts
 
 - **High usability for workflow authors**: Authors must be able to easily figure out the library and create extremely readable workflows with minimal boilerplate
-- **Structured outputs via Instructor**: LLM returns Pydantic objects
+- **Structured outputs via PydanticAI's answer tool**: LLM returns Pydantic objects
 - **Multi-turn conversation**: Stateful orchestrator manages dialogue flow
 - **Dual configuration**: Provider/model/preset in `config.json`, API keys and the gateway endpoint in the environment (`OPENAI_API_KEY`, `OPENAI_BASE_URL`)
 - **Configuration at the edge**: Configuration must only be set/read at the perimeter (CLI, test setup, etc.)
@@ -95,14 +95,14 @@ The architecture follows these principles. Because we are building a **system th
 
 ### File Responsibilities
 
-#### `chat_workflow/atomic_workflow_step.py` — Conversation Logic
-- Core class: `AtomicWorkflowStep`
+#### `chat_workflow/atomic_workflow.py` — Conversation Logic
+- Core class: `AtomicWorkflow`
 - Manages turn state (`max_turns` configurable)
 - Receives system prompt from `@atomic_workflow_step` decorator
 - Three outcomes: continue/success/failure
 
-#### `llm_interaction.py` — LLM Abstraction
-- Unified client for multiple providers via `get_client()`
+#### `conversation.py` — LLM Abstraction
+- Unified client for multiple providers via `Conversation.send()`
 - Supports: OpenAI, Google, OpenRouter, etc.
 - Uses instructor for structured output
 
@@ -137,8 +137,8 @@ make coverage       # Unit tests + coverage.xml
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them
 - `AgentResponse` is a Generic BaseModel with `intent: AgentIntent` and a `model_validator` for consistency
-- `AtomicWorkflowStep.process_turn()` checks turn limit, calls LLM, handles intent
-- Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowStepFailedError`
+- `AtomicWorkflow.process_turn()` checks turn limit, calls LLM, handles intent
+- Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowFailedError`
 
 ## Testing Strategy
 
@@ -156,7 +156,7 @@ tests/
 ├── unit/
 │   ├── test_models.py              # Pydantic model validation (no mock)
 │   ├── test_orchestrator_logic.py  # Orchestrator logic (mock _call_llm)
-│   └── test_llm_interaction.py     # LLM interaction (mock get_client)
+│   └── test_conversation.py     # LLM interaction (mock get_client)
 └── evals/
     └── test_real_api.py            # Real API tests (require config.json + API key)
 ```
@@ -198,19 +198,19 @@ This streams all LLM requests/responses to stderr with timing:
 | Add/modify type introspection | `chat_workflow/metadata.py` | `_format_type_name()`, `_get_return_type()` |
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
-| Modify conversation flow | `chat_workflow/atomic_workflow_step.py` | `AtomicWorkflowStep.process_turn()` |
-| Add LLM provider | `chat_workflow/llm_interaction.py` | `get_client()` |
+| Modify conversation flow | `chat_workflow/atomic_workflow.py` | `AtomicWorkflow.process_turn()` |
+| Add LLM provider | `chat_workflow/conversation.py` | `Conversation.send()` |
 | Modify CLI auto-discovery | `chat_workflow_cli/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
 
 ### Quick Start for Common Changes
 
 **Modify conversation flow:**
 1. Edit `@atomic_workflow_step`-decorated function docstrings in example workflow files
-2. Check `AtomicWorkflowStep.process_turn()` logic in `atomic_workflow_step.py`
+2. Check `AtomicWorkflow.process_turn()` logic in `atomic_workflow.py`
 3. Update `tests/unit/test_orchestrator_logic.py`
 
 **Add LLM provider:**
-1. Update `chat_workflow/llm_interaction.py` `get_client()`
+1. Update `chat_workflow/conversation.py` `Conversation.send()`
 2. Add provider configuration handling
 
 **Modify CLI auto-discovery:**

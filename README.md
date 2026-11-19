@@ -10,7 +10,7 @@ Chat Workflow is a framework for developers to create guided conversation flows,
 - **Structured Output Generation**: Every flow produces valid, complete Pydantic objects or raises clear exceptions
 - **Validation-First Design**: Information about "What good output looks like" lives in Pydantic models and is validated programmatically
 - **Multi-Turn Conversation Management**: Stateful orchestrator handles dialogue flow with configurable turn limits
-- **Multi-Provider LLM Support**: Works with OpenAI, Google, OpenRouter, and other providers via litellm
+- **Multi-Provider LLM Support**: Works with OpenAI, Google, OpenRouter, and other providers through PydanticAI and the configured OpenAI-compatible gateway
 - **Human-in-the-Loop Architecture**: LLMs act as coaches/facilitators, leveraging human knowledge and intuition
 - **Deterministic Control Flow**: Authors compose flows using standard Python control structures
 

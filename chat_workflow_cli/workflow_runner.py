@@ -6,7 +6,7 @@ from typing import Any
 import typer
 
 from chat_workflow.config import Config
-from chat_workflow.exceptions import AtomicWorkflowStepFailedError, TurnLimitExceededError
+from chat_workflow.exceptions import AtomicWorkflowFailedError, TurnLimitExceededError
 from chat_workflow.session import Session
 from chat_workflow.session_component import SessionComponent
 from chat_workflow.session_log import SessionLog
@@ -27,6 +27,7 @@ class WorkflowRunner:
         user_params: dict[str, Any],
     ) -> None:
         """Run a workflow function with framework plumbing."""
+        typer.echo("Starting conversation... (Ctrl+C to quit)")
         io = TyperUserIO()
         session_log = SessionLog()
         config = Config(self.config_path)
@@ -69,8 +70,8 @@ class WorkflowRunner:
         except KeyboardInterrupt:
             typer.echo("\n\nConversation cancelled.")
             raise typer.Exit(0) from None
-        except AtomicWorkflowStepFailedError as e:
-            typer.secho(f"Atomic workflow step failed: {e.message}", err=True, fg=typer.colors.RED)
+        except AtomicWorkflowFailedError as e:
+            typer.secho(f"Atomic workflow failed: {e.message}", err=True, fg=typer.colors.RED)
             _log_and_exit(result_dict=None, default_success=False)
             raise typer.Exit(1) from None
         except TurnLimitExceededError as e:
@@ -78,7 +79,8 @@ class WorkflowRunner:
             _log_and_exit(result_dict=None, default_success=False, feedback="Turn limit reached")
             raise typer.Exit(1) from None
         except Exception as e:
-            # Save session log automatically on unhandled exceptions (no feedback prompt)
+            # Save the transcript automatically on unhandled exceptions (no
+            # feedback prompt).
             try:
                 path = log_session(
                     messages=session_log.messages,

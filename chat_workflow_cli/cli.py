@@ -30,7 +30,9 @@ def discover_workflows() -> dict[str, Path]:
 def discover_workflow_functions(module) -> dict[str, Callable[..., Any]]:
     functions = {}
     for name, obj in inspect.getmembers(module):
-        if inspect.isfunction(obj) and getattr(obj, "_is_workflow_step", False) and not name.startswith("_"):
+        if not inspect.isfunction(obj) or name.startswith("_"):
+            continue
+        if getattr(obj, "_is_workflow", False) or getattr(obj, "_is_workflow_step", False):
             functions[name] = obj
     return functions
 
@@ -86,7 +88,10 @@ def _discover_class_workflow_methods(module) -> dict[str, dict[str, Callable[...
             continue
         methods: dict[str, Callable[..., Any]] = {}
         for mname, mobj in inspect.getmembers(obj):
-            if not getattr(mobj, "_is_workflow_step", False) or mname.startswith("_"):
+            if not (
+                getattr(mobj, "_is_workflow", False)
+                or getattr(mobj, "_is_workflow_step", False)
+            ) or mname.startswith("_"):
                 continue
             methods[mname] = mobj
         if methods:

@@ -6,7 +6,7 @@
 |---|---|---|
 | Python 3.12 | Current house runtime; typing and `match` support | R1–R7 |
 | Pydantic v2 | Models are the contract: field descriptions feed the prompt, validators enforce business rules | R1, R3 |
-| Instructor + litellm | One structured-output client over many providers; JSON mode keeps models without tool calling usable | R5 |
+| PydanticAI (`pydantic-ai-slim`) | One model path over an OpenAI-compatible gateway; the answer is a forced tool call, which the endpoint enforces | R5 |
 | Typer | CLI discovery is a small surface with good help text | R2 |
 | codegen / libcst | Workflow code generation and static verification | R2 |
 | Cloudflare AI Gateway | Provider keys stay out of the app; OpenCode → DeepSeek failover; per-repo analytics | R5 |
@@ -22,7 +22,7 @@ harness needs module-level discovery and a timeout wrapper.
 flowchart TD
     CLI[chat_workflow_cli] -->|discovers and runs| WF[workflows/*]
     WF -->|composes| CORE[chat_workflow core]
-    CORE -->|instructor + litellm| GW[Cloudflare AI Gateway]
+    CORE -->|Conversation + PydanticAI| GW[Cloudflare AI Gateway]
     GW --> OPENCODE[OpenCode primary]
     GW --> DEEPSEEK[DeepSeek fallback]
     CORE --> MODELS[Pydantic models + validators]
@@ -45,12 +45,13 @@ layering change updates the test in the same commit.
 
 | Concept | Owner | Contract |
 |---|---|---|
-| `Config` | `chat_workflow/config.py` | Reads `config.json`; resolves the active preset into provider/model/api key env/api base |
-| `Session` | `chat_workflow/session.py` | One conversation: IO, its own `SessionLog`, config, optional parent/children, `instructions`, `active`; `spawn` creates a clean child |
+| `Config` | `chat_workflow/config.py` | Reads `config.json`; resolves provider/model/api key env/api base |
+| `Session` | `chat_workflow/session.py` | One conversation: IO, its own PydanticAI transcript, config, optional parent/children, `instructions`, `active`; `spawn` creates a clean child |
 | `SessionComponent` | `chat_workflow/session_component.py` | Runs a session: `greet`, `converse(step)`, `sign_off`; stateless and usable at any depth |
-| `AtomicWorkflowStep` | `chat_workflow/atomic_workflow_step.py` | Drives one turn loop until success, failure, or the turn limit; its system prompt is the session's instructions plus the step's prompt |
+| `AtomicWorkflow` | `chat_workflow/atomic_workflow.py` | One turn loop over a `Conversation`: intent, turn limit, the last-turn shape |
+| `Conversation` | `chat_workflow/conversation.py` | The one model call: transcript, answer tool, transport/unusable/output budgets |
 | `CompositeWorkflow` | `chat_workflow/decorators.py` | Calls atomic and composite children with the same `Session` |
-| `AgentResponse` / `AgentIntent` | `chat_workflow/models.py` | The structured turn result: continue, success + value, or failure |
+| `AgentResponse` / `AgentIntent` | `chat_workflow/models.py` | A discriminated union: continue, success + value, or failure; the answer is a tool call |
 | `LLMValidated` | `chat_workflow/mixins.py` | Runs `Validation(...)` rules through the model |
 | `BlobSyncMixin` | `chat_workflow/mixins.py` | Materialises annotated fields to files after success |
 | `Component` | `workflows/workflow/component.py` | The generated component: a class with a Pydantic model and workflow steps |
@@ -61,6 +62,26 @@ layering change updates the test in the same commit.
 `WorkflowSpec` is the **workflow spec**, not a runtime workflow. A runtime workflow
 is an atomic or composite workflow step. Further vocabulary:
 [domain concepts](reference/domain-concepts.md).
+
+## The model path
+
+There is one path from the library to a model: `Conversation.send()` in
+`chat_workflow/conversation.py`. A workflow step, the rule judge, and an eval's
+user simulation are all conversations. Nothing else imports a provider SDK.
+
+- The answer is a forced `answer` tool call (`ToolOutput(..., strict=True)`).
+  `response_format` is not used: the endpoints behind this model accept it and
+  ignore it; a tool's schema is enforced on the same route.
+- The transcript is PydanticAI's message list — thinking, tool calls, tool
+  returns, retry prompts and the final answer. `transcript.render` is the one
+  projection into the audit view and the user view.
+- Retry policy, one class per failure: transport failures are the provider
+  SDK's resend; a response with no usable content is resampled invisibly; a
+  rejected answer is a visible retry carrying the validator's own complaint; a
+  tool failure is a tool result the model adapts to. `max_requests` bounds one
+  turn's model steps.
+- The last allowed turn offers `FinalResponse` (success or failure, no
+  continue), so a step that has run out of turns cannot ask another question.
 
 ## Session and prompt architecture
 
@@ -87,34 +108,36 @@ The prompt and history come from the session:
   by the step's prompt: its docstring (procedure), parameters, the
   `## Conversation checklist`, the result model's class-level rules, and the
   user-facing phrase for each internal name.
-- `initial_messages` = `session.state.messages`. After the step, only its new
-  user and assistant turns are appended; the step's system prompt and framework
-  corrections are not session history.
+- The step is seeded with `session.state.messages` (the PydanticAI transcript).
+  After the step, only the messages it added are folded back; the step's
+  instructions and framework corrections are not session history.
 - The checklist is declared on the step (`conversation_validation_rules`,
   defaulting to `DEFAULT_RULES`). It is rendered as `## Conversation checklist`
   and is the list the judge applies.
-- `AgentResponse` + Instructor own the protocol (`intent`, `message`,
-  `result`). No authored prompt says "return JSON", "put the text in message",
-  or "never reply with plain text". Repair turns may name the violation and
-  the field to fix; they are validation feedback, not authored prompts.
+- `AgentResponse` is a discriminated union (`continue`, `success`, `failure`);
+  the answer travels as a forced `answer` tool call, so the schema — not a
+  prompt sentence — owns the protocol. No authored prompt says "return JSON",
+  "put the text in message", or "never reply with plain text". A rejected
+  answer is retried with the validator's own complaint; a transport failure is
+  resent; a blank or thinking-only response is resampled invisibly.
 - A response that is not an answer — the model's own reasoning, another API's
-  object, an empty object — is not replayed as an assistant turn. The framework
-  sends a conversation correction asking for a reply to the user; the schema
-  and Instructor still enforce the envelope. A truncated or non-answer sample
-  is retried as a fresh provider sample.
+  object, an empty object — is not replayed as an assistant turn. The answer
+  schema and the answer tool still enforce the envelope; a truncated or
+  non-answer sample is retried as a fresh provider sample.
 
 ## Data flow
 
 1. The CLI discovers workflow entrypoints, constructs a root `Session`, and
    runs the top-level step through `SessionComponent.converse`.
 2. An atomic workflow step assembles `session.instructions` + its own prompt,
-   appends the session's messages as `initial_messages`, and sends them plus the
-   response model to `get_client()`.
-3. `get_client()` resolves the credential from `api_key_env`, points litellm
-   at `api_base` (or `OPENAI_BASE_URL`), and picks Instructor's JSON or
-   TOOLS mode from `model_supports_tools`.
-4. The model returns an `AgentResponse`; a `success` intent runs the
-   business-rule validator and the blob mixin, then returns the typed value.
+   seeds a `Conversation` with the session transcript, and sends it through
+   PydanticAI.
+3. `model_provider.build_model()` resolves the credential from `api_key_env`
+   and points PydanticAI at `api_base` (or `OPENAI_BASE_URL`).
+4. The model returns a call to the `answer` tool; the discriminated
+   `AgentResponse` validates it. A `success` result runs the business-rule
+   validator and the blob mixin, then returns the typed value; a rejected
+   answer is retried with the validator's complaint.
 5. A composite workflow step loops over atomic children, feeds gaps back into
    refinement steps, and returns the final typed result. Its children share the
    session and its conversation; a child session created with `spawn` gets a
@@ -125,8 +148,8 @@ The prompt and history come from the session:
 | Decision | Alternatives | Requirement |
 |---|---|---|
 | Cloudflare AI Gateway is the eval/CI provider | Direct OpenRouter/OpenCode keys per repo | R5: one credential, failover, analytics |
-| Instructor JSON mode by default | Forced tool calling | R5: DeepSeek V4 thinking mode rejects forced `tool_choice` |
-| Agent sampling keeps the provider default | An explicit `temperature=0.7` | Measured: 0.7 made the tuned model emit its reasoning as JSON across the eval suite; the default is stochastic and compliant |
+| The answer is a forced `answer` tool call | `response_format` / Instructor JSON mode | The endpoints accept `response_format` and ignore it; a tool's schema is enforced on the same route |
+| Agent sampling uses the configured temperature | Pinning to 0 for determinism | The model is stochastic; the eval must resemble production, and 0 is not deterministic anyway |
 | `unittest` for the eval harness | pytest | Evals need module discovery and a wall-clock timeout wrapper |
 | Pyrefly with a both-direction baseline lock | basedpyright, mypy | A large existing codebase; the lock catches new and stale diagnostics |
 | No server or database | Web service | The library runs in the caller's process |

@@ -5,7 +5,6 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from chat_workflow import Config
 
@@ -100,7 +99,7 @@ class TestConfig(unittest.TestCase):
                 "temperature": 0.3,
                 "max_retries": 5,
                 "request_timeout_seconds": 60,
-                "model_supports_tools": True,
+                "extra_headers": {"cf-aig-skip-cache": "true"},
             }
         }
         temp_path = self._write_temp_config(data)
@@ -113,17 +112,18 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(cfg.temperature, 0.3)
             self.assertEqual(cfg.max_retries, 5)
             self.assertEqual(cfg.request_timeout_seconds, 60)
-            self.assertTrue(cfg.model_supports_tools)
+            self.assertEqual(cfg.extra_headers, {"cf-aig-skip-cache": "true"})
         finally:
             os.unlink(temp_path)
 
     def test_api_base_and_key_env_default_to_none(self):
         temp_path = self._write_temp_config({"llm": {"provider": "openai", "model": "gpt-4"}})
         try:
-            with patch.dict(os.environ, {"OPENAI_BASE_URL": ""}):
-                cfg = Config(Path(temp_path))
-                self.assertIsNone(cfg.api_base)
-                self.assertIsNone(cfg.api_key_env)
+            cfg = Config(Path(temp_path))
+            # The openai provider is pinned to the house gateway when no base
+            # is stated; the key env is the provider default.
+            self.assertEqual(cfg.api_base, os.environ.get("OPENAI_BASE_URL") or None)
+            self.assertIsNone(cfg.api_key_env)
         finally:
             os.unlink(temp_path)
 
@@ -134,7 +134,7 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(cfg.temperature, 0.7)
             self.assertEqual(cfg.max_retries, 3)
             self.assertEqual(cfg.request_timeout_seconds, 30)
-            self.assertFalse(cfg.model_supports_tools)
+            self.assertEqual(cfg.extra_headers, {})
         finally:
             os.unlink(temp_path)
 
@@ -154,7 +154,7 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(cfg.temperature, 0.5)
             self.assertEqual(cfg.max_retries, 3)
             self.assertEqual(cfg.request_timeout_seconds, 120)
-            self.assertFalse(cfg.model_supports_tools)
+            self.assertEqual(cfg.extra_headers, {})
         finally:
             os.unlink(temp_path)
 
@@ -173,6 +173,21 @@ class TestConfig(unittest.TestCase):
         try:
             cfg = Config(Path(temp_path))
             self.assertFalse(cfg.debug)
+        finally:
+            os.unlink(temp_path)
+
+    def test_overrides_merge_over_the_file(self):
+        """An eval states 'do not serve me the cache' without a second config file."""
+        temp_path = self._write_temp_config(
+            {"llm": {"provider": "openai", "model": "m", "temperature": 0.2}}
+        )
+        try:
+            cfg = Config(
+                Path(temp_path),
+                overrides={"llm": {"extra_headers": {"cf-aig-skip-cache": "true"}}},
+            )
+            self.assertEqual(cfg.temperature, 0.2)
+            self.assertEqual(cfg.extra_headers, {"cf-aig-skip-cache": "true"})
         finally:
             os.unlink(temp_path)
 

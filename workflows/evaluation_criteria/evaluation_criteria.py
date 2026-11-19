@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Self
+from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from chat_workflow import atomic_workflow_step
-from chat_workflow.mixins import LLMValidated
+from chat_workflow import atomic_workflow
 
 
 class Criterion(BaseModel):
@@ -31,17 +30,9 @@ class Criterion(BaseModel):
         default=None,
         description="Ideal or target value for this criterion (e.g., 'High quality materials', 'Under $50')",
     )
-    priority_basis: str | None = Field(
-        default=None,
-        description=(
-            "Why this weight: the user's own words or the use case that set "
-            "this criterion's importance (e.g. 'works all day on a plane'). "
-            "Not a restatement of the criterion."
-        ),
-    )
 
 
-class EvaluationCriteria(LLMValidated):
+class EvaluationCriteria(BaseModel):
     """A list of criteria for evaluating possible choices in a specific context.
 
     For example, evaluating options for a planned purchase.
@@ -51,16 +42,6 @@ class EvaluationCriteria(LLMValidated):
         context: Context for these evaluation criteria
             (e.g., 'Birthday presents for a 7-year-old child').
     """
-
-    _validation_rules: ClassVar[list[str]] = [
-        "Each criterion is specific to the user's context, not a generic "
-        "criterion that could apply to any decision.",
-        "The weights reflect the user's stated priorities, not arbitrary "
-        "defaults: every criterion carries a `priority_basis` grounded in what "
-        "the user said, and the heaviest weight is the criterion they said "
-        "matters most.",
-        "The criteria cover the trade-offs the user actually faces.",
-    ]
 
     criteria: list[Criterion] = Field(
         default_factory=list,
@@ -72,7 +53,7 @@ class EvaluationCriteria(LLMValidated):
         description="Context for these evaluation criteria (e.g., 'Birthday presents for a 7-year-old child')",
     )
 
-    @atomic_workflow_step
+    @atomic_workflow
     @classmethod
     def generate_from_chat(
         cls,
@@ -84,26 +65,12 @@ class EvaluationCriteria(LLMValidated):
         creating good evaluation criteria.
 
         Behavior:
-        - Use the context to frame the criteria.
         - Ask one question at a time.
         - Start broad, then ask specific follow-ups.
-        - Base the criteria on what the user tells you. The one thing you
-          infer is their relative importance.
+        - Base output only on information explicitly provided by the user.
         - If the user is vague, ask clarifying questions.
-        - The criteria must include one named "budget". If the user has not
-          mentioned cost, ask about it once in plain language; do not invent a
-          number.
-        - Infer the ranking from the use case they describe and state it in
-          one sentence for confirmation. Never ask the user to rank the
-          criteria one by one. Never give every criterion the same default
-          weight unless the user says they matter equally.
-        - Record why each weight is what it is in `priority_basis`, using the
-          user's words or the use case they described.
-        - When you have enough, or the user asks you to finalize, propose the
-          complete set of criteria and return success in that same turn.
-        - Use intent="failure" only if the user refuses to take part at all. A
-          missing ranking, weight, or number is never a reason to fail: infer
-          it and say what you assumed.
+        - If the user is uncooperative or refuses to provide useful information within max_turns,
+            use intent="failure".
         """
         ...  # type: ignore[reportReturnType]
 

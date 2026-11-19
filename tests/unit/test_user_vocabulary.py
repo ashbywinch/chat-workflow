@@ -4,11 +4,8 @@ import unittest
 from typing import Annotated
 
 from chat_workflow.annotations import UserLabel, user_labels
-from chat_workflow.atomic_workflow_step import AtomicWorkflowStep
 from chat_workflow.decorators import _build_user_vocabulary_section
 from chat_workflow.mixins import LLMValidated
-from chat_workflow.models import AgentResponse
-from tests.conftest import make_atomic_workflow_step_config
 
 
 class LabelledResult(LLMValidated):
@@ -27,18 +24,6 @@ class LabelledInput(LLMValidated):
         list[str],
         UserLabel("the main stages", "phases", guard=False),
     ]
-
-
-def _step() -> AtomicWorkflowStep:
-    config = make_atomic_workflow_step_config(
-        response_model_override=AgentResponse[LabelledResult],
-        system_prompt="Test prompt",
-    )
-    return AtomicWorkflowStep(config=config)
-
-
-def _continue(message: str) -> AgentResponse[LabelledResult]:
-    return AgentResponse[LabelledResult](intent="continue", message=message)
 
 
 class TestUserLabelExtraction(unittest.TestCase):

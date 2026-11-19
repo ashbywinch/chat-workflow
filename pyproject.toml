@@ -1,15 +1,12 @@
 [project]
 name = "chat-workflow"
-version = "0.1.0"
+version = "0.2.0"
 description = "Framework for building structured LLM conversation workflows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "codegen>=0.57.0",
-    "igraph>=1.0.0",
-    "instructor>=1.15.1",
     "libcst>=1.8.6",
-    "litellm>=1.58.15",
+    "pydantic-ai-slim[openai]>=2.70",
     "pydantic>=2.13.3",
     "python-dotenv>=1.2.2",
     "typer>=0.24.1",
@@ -42,24 +39,21 @@ select = ["E", "F", "I", "UP", "B", "SIM", "N"]
 # runtime reflection that inspects Generic[TResult] / TypeVar patterns.
 ignore = ["UP046", "UP047"]
 
-
-
 # "Fixable" allows Ruff to automatically rewrite the code for you
 fixable = ["ALL"]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "archunitpython>=1.5.0",
-    "code-review-graph>=2.3.3",
     "coverage>=7.0.0",
     "pyfakefs>=6.3.2",
-    "pyrefly>=1.4.1",
+    "pyrefly>=1.5.0",
     "python-lsp-server>=1.12.0",
     "ruff>=0.11.0",
 ]
 
 [tool.coverage.run]
+# Measure the packages, not every module a test happens to import: a test that
+# execs a temporary module made `coverage report` fail with "No source for
+# code" and the gate could not run at all.
 source = ["chat_workflow", "workflows", "chat_workflow_cli"]
-
-[tool.coverage.report]
-show_missing = true

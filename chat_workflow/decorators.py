@@ -1,4 +1,4 @@
-"""Decorators for chat-workflow: @atomic_workflow_step and @composite_workflow_step."""
+"""Decorators for chat-workflow: @atomic_workflow and @composite_workflow."""
 
 from __future__ import annotations
 
@@ -6,12 +6,14 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any, get_args, get_origin
 
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
-from .atomic_workflow_step import AtomicWorkflowStep
-from .atomic_workflow_step_config import AtomicWorkflowStepConfig
+from .atomic_workflow import AtomicWorkflow
+from .atomic_workflow_config import AtomicWorkflowConfig
+from .conversation import Conversation
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
-from .models import AgentResponse, TurnResult
+from .debug import StreamingDebug
+from .models import AgentResponse, FinalResponse, Success, TurnResult
 from .prompt_builder import (
     _build_params_section,
     _format_docstring,
@@ -31,6 +33,14 @@ def _inner_model(return_type: Any) -> Any:
     return return_type
 
 
+def _is_result_model(return_type: Any) -> bool:
+    """True for a Pydantic model, a list of one, or plain text."""
+    if return_type is str:
+        return True
+    inner = _inner_model(return_type)
+    return isinstance(inner, type) and issubclass(inner, BaseModel)
+
+
 def _build_checklist_section(rules: dict[str, str]) -> str:
     lines = ["## Conversation checklist", "Apply these to your own behaviour:"]
     for label, description in rules.items():
@@ -39,11 +49,7 @@ def _build_checklist_section(rules: dict[str, str]) -> str:
 
 
 def _build_validation_rules_section(return_type: Any) -> str:
-    """Put the result model's class-level validation rules in the prompt.
-
-    Field-level ``Validation(...)`` rules are already in the JSON schema (after
-    ``LLMValidated`` rebuilds it); this covers the class-level rules.
-    """
+    """Put the result model's class-level validation rules in the prompt."""
     model = _inner_model(return_type)
     rules = getattr(model, "_validation_rules", None)
     if not rules:
@@ -63,9 +69,12 @@ def _output_defs(return_type: Any) -> frozenset[str]:
     if return_type is None:
         return frozenset()
     try:
-        schema = AgentResponse[return_type].model_json_schema()
+        schema = TypeAdapter(AgentResponse[return_type]).json_schema()
     except Exception:
-        return frozenset()
+        try:
+            schema = TypeAdapter(FinalResponse[return_type]).json_schema()
+        except Exception:
+            return frozenset()
     return frozenset(schema.get("$defs", {}))
 
 
@@ -74,20 +83,12 @@ def _build_user_vocabulary_section(
     inputs: tuple[type[BaseModel], ...] = (),
     parameter_labels: dict[str, str] | None = None,
 ) -> str:
-    """Tell the model which names are internal and where each phrase lives.
-
-    Result and input fields already carry their phrase as the field's schema
-    title (``UserLabel`` is the one declaration; ``LLMValidated`` puts it in
-    the schema). The two names that have no field to live on are a parameter
-    name and a model type name; this section maps the first to the parameter
-    description and points at the thing itself for the second.
-    """
+    """Tell the model which names are internal and where each phrase lives."""
     parameter_labels = parameter_labels or {}
     type_names = [
         model.__name__
         for model in (*inputs, _inner_model(return_type))
-        if isinstance(model, type)
-        and issubclass(model, BaseModel)
+        if isinstance(model, type) and issubclass(model, BaseModel)
     ]
     if not parameter_labels and not type_names:
         return ""
@@ -142,6 +143,14 @@ def _build_system_prompt(
     if params_section:
         sections.append(params_section.strip())
 
+    if chat:
+        sections.append(
+            "## Start of the step\n"
+            "Say in one sentence what this step is doing and why before your "
+            "first question or proposal. Never return the result in the step's "
+            "first response."
+        )
+
     if chat and conversation_rules:
         sections.append(_build_checklist_section(conversation_rules))
 
@@ -160,73 +169,99 @@ def _build_system_prompt(
     if vocabulary_section:
         sections.append(vocabulary_section)
 
+    # The model now sees its own previous structured turns in the transcript,
+    # so the turn policy has to be stated rather than inferred: without it a
+    # cooperative "that's all, please finalize" gets another question and the
+    # step runs to its turn limit.
+    sections.append(
+        "## When to finish\n"
+        "Use intent='continue' only while you still need something from the "
+        "user. When the user says they are done, agrees with what you "
+        "proposed, or has supplied what the result needs, return "
+        "intent='success' — every value in the result must come from what "
+        "they told you. A question they left unanswered does not hold the "
+        "result back: finish with what they did give. If they are "
+        "uncooperative, or the turn limit is reached without that material, "
+        "return intent='failure': a result they did not supply is not theirs."
+    )
+
     return "\n\n".join(sections)
 
 
-def _setup_atomic_workflow_step(
+def _setup_atomic_workflow(
     system_prompt: str,
-    actual_return_type: type[BaseModel],
+    actual_return_type: Any,
     max_turns: int,
     debug: Any,
     session: Any,
-    initial_messages: list[dict[str, str]] | None = None,
-    conversation_validation_rules: dict[str, str] | None = None,
-    chat: bool = True,
-    single_turn: bool = False,
-) -> AtomicWorkflowStep:
-    """Create and configure an AtomicWorkflowStep."""
-    from .exceptions import AtomicWorkflowStepFailedError
+) -> AtomicWorkflow:
+    """Create and configure an AtomicWorkflow on the session's transcript."""
+    from .exceptions import AtomicWorkflowFailedError
 
-    return AtomicWorkflowStep(
-        config=AtomicWorkflowStepConfig(
+    conversation = Conversation(
+        model=session.config.model,
+        provider=session.config.provider,
+        instructions=system_prompt,
+        output_type=AgentResponse[actual_return_type],
+        final_output_type=FinalResponse[actual_return_type],
+        messages=list(session.state.messages),
+        api_base=session.config.api_base,
+        api_key_env=session.config.api_key_env,
+        output_retries=getattr(session.config, "max_retries", 2),
+        transport_retries=getattr(session.config, "max_retries", 2),
+        timeout_seconds=session.config.request_timeout_seconds,
+        extra_headers=getattr(session.config, "extra_headers", None),
+        temperature=getattr(session.config, "temperature", None),
+    )
+
+    def _on_success(response: Success[Any]) -> TurnResult[Any]:
+        return TurnResult[Any].success(response.result)
+
+    return AtomicWorkflow(
+        config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
             response_model=AgentResponse[actual_return_type],
+            final_response_model=FinalResponse[actual_return_type],
             max_turns=max_turns,
-            initial_messages=initial_messages,
-            on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message or ""),
-            on_success=lambda response: TurnResult[actual_return_type].success(
-                response.result,
-                message="Completed successfully!",
+            initial_messages=None,
+            on_continue=lambda response: TurnResult[actual_return_type].continuing(
+                response.message
             ),
-            on_failure=lambda response: AtomicWorkflowStepFailedError(response.message or "No reason given"),
+            on_success=_on_success,
+            on_failure=lambda response: AtomicWorkflowFailedError(response.message),
             debug=debug,
             model=session.config.model,
             provider=session.config.provider,
             api_base=session.config.api_base,
             api_key_env=session.config.api_key_env,
-            max_retries=session.config.max_retries,
+            transport_retries=getattr(session.config, "max_retries", 2),
             request_timeout_seconds=session.config.request_timeout_seconds,
-            model_supports_tools=session.config.model_supports_tools,
             extra_headers=getattr(session.config, "extra_headers", None),
-            conversation_validation_rules=conversation_validation_rules,
-            chat=chat,
-            single_turn=single_turn,
+            temperature=getattr(session.config, "temperature", None),
+            conversation=conversation,
         )
     )
 
 
-def atomic_workflow_step(
+def atomic_workflow(
     func: Callable[..., Any] | None = None,
     *,
     conversation_validation_rules: list[tuple[str, str]] | None = None,
     chat: bool = True,
     single_turn: bool = False,
 ) -> Callable[..., Any]:
-    """Auto-orchestrates an LLM atomic workflow step using its docstring as system prompt.
+    """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts a ``session`` parameter (:class:`~chat_workflow.session.Session`).
 
-    ``chat=False`` means the workflow has no user conversation: it makes one
-    LLM call with the parameters and no user prompts. A ``continue`` intent is
-    treated as an in-context error; the framework appends a correction and
-    retries within the turn budget.
+    ``chat=False`` means the workflow has no user conversation: a ``continue``
+    is fed back as an in-context correction and retried within the turn budget.
 
-    ``single_turn=True`` is a one-turn text step: a ``continue`` message is
-    the step's result, so it completes without asking the user. It is how the
-    session's greeting and closing are produced.
+    ``single_turn=True`` is a one-turn text step: a ``continue`` is not
+    offered, so it completes without asking the user.
     """
-    from .exceptions import AtomicWorkflowStepFailedError
+    from .exceptions import AtomicWorkflowFailedError
 
     author_rules = conversation_validation_rules or []
     merged_rules: dict[str, str] = dict(_DEFAULT_CONVERSATION_RULES)
@@ -242,20 +277,19 @@ def atomic_workflow_step(
             debug = kwargs.pop("debug", None)
 
             if session is None:
-                raise TypeError(f"Atomic workflow step '{f.__name__}' requires 'session' parameter")
+                raise TypeError(
+                    f"Atomic workflow '{f.__name__}' requires 'session' parameter"
+                )
 
             state = session.state
             actual_return_type = resolve_return_type(raw_func, f, args, kwargs)
 
-            if actual_return_type is not None:
-                origin = get_origin(actual_return_type)
-                if origin is list:
-                    inner_type = get_args(actual_return_type)[0]
-                    if not (isinstance(inner_type, type) and issubclass(inner_type, BaseModel)):
-                        raise TypeError(
-                            f"@atomic_workflow_step function '{f.__name__}' list return type "
-                            f"resolves to list[{inner_type}] which is not a Pydantic model subclass"
-                        )
+            if actual_return_type is None or not _is_result_model(actual_return_type):
+                raise TypeError(
+                    f"@atomic_workflow function '{f.__name__}' return type resolves "
+                    f"to '{actual_return_type}' which is not a Pydantic model or "
+                    "a list of one"
+                )
 
             system_prompt = _build_system_prompt(
                 raw_func,
@@ -265,28 +299,31 @@ def atomic_workflow_step(
                 chat=chat,
                 instructions=session.instructions,
             )
-            max_turns = kwargs.pop("max_turns", 10)
+            max_turns = kwargs.pop("max_turns", 1 if single_turn else 10)
 
-            workflow_step = _setup_atomic_workflow_step(
-                system_prompt, actual_return_type, max_turns, debug, session,
-                initial_messages=list(state.messages),
-                conversation_validation_rules=merged_rules,
-                chat=chat,
-                single_turn=single_turn,
+            if debug is None and session.config.debug:
+                debug = StreamingDebug()
+
+            workflow = _setup_atomic_workflow(
+                system_prompt, actual_return_type, max_turns, debug, session
             )
-            result = session.run(workflow_step=workflow_step, first_user_input="")
+            result = session.run(
+                workflow=workflow, first_user_input="", chat=chat
+            )
             state.initial_result = result
 
             if result.result is None:
-                raise AtomicWorkflowStepFailedError("Atomic workflow step completed but no result was produced")
+                raise AtomicWorkflowFailedError(
+                    "Atomic workflow completed but no result was produced"
+                )
 
             return result.result
 
-        wrapper._is_workflow_step = True  # pyright: ignore[reportAttributeAccessIssue]
-        wrapper._chat = chat  # pyright: ignore[reportAttributeAccessIssue]
-        wrapper._single_turn = single_turn  # pyright: ignore[reportAttributeAccessIssue]
-        wrapper.__conversation_rules__ = merged_rules  # pyright: ignore[reportAttributeAccessIssue]
-
+        for marker in ("_is_workflow", "_is_workflow_step"):
+            setattr(wrapper, marker, True)
+        wrapper._chat = chat  # type: ignore[attr-defined]
+        wrapper._single_turn = single_turn  # type: ignore[attr-defined]
+        wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]
         return wrapper
 
     if func is not None:
@@ -294,13 +331,8 @@ def atomic_workflow_step(
     return _decorator
 
 
-def composite_workflow_step(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Passes through to the wrapped function. Caller must provide ``session=``.
-
-    Handles ``@classmethod`` — if the decorated function is a classmethod
-    descriptor, the underlying function is extracted, wrapped, and re-wrapped
-    as a ``classmethod`` so that ``cls`` is automatically prepended on call.
-    """
+def composite_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Passes through to the wrapped function. Caller must provide ``session=``."""
 
     raw_func = func.__func__ if isinstance(func, classmethod) else func
 
@@ -310,9 +342,12 @@ def composite_workflow_step(func: Callable[..., Any]) -> Callable[..., Any]:
         if session is not None:
             return raw_func(*args, **kwargs)
 
-        raise TypeError(f"Composite workflow step '{raw_func.__name__}' requires 'session' parameter")
+        raise TypeError(
+            f"Composite workflow '{raw_func.__name__}' requires 'session' parameter"
+        )
 
-    wrapper._is_workflow_step = True  # pyright: ignore[reportAttributeAccessIssue]
+    for marker in ("_is_workflow", "_is_workflow_step"):
+        setattr(wrapper, marker, True)
 
     if isinstance(func, classmethod):
         return classmethod(wrapper)

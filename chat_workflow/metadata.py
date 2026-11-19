@@ -118,7 +118,5 @@ def _format_param_value(value: Any) -> str:
     if isinstance(value, str):
         return json.dumps(value)
     if isinstance(value, BaseModel):
-        return value.model_dump_json(indent=2)
-    if isinstance(value, list) and value and all(isinstance(item, BaseModel) for item in value):
-        return json.dumps([item.model_dump() for item in value], indent=2)
+        return str(value)
     return repr(value)

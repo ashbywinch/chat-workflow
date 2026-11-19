@@ -5,9 +5,11 @@ import uuid
 from collections.abc import Iterator
 from typing import Any, override
 
-from .atomic_workflow_step import AtomicWorkflowStep
+from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart
+
+from .atomic_workflow import AtomicWorkflow
 from .models import TurnResult
-from .session_log import SessionLog, _record_atomic_workflow_step
+from .session_log import SessionLog, _record_atomic_workflow
 
 
 class UserIO:
@@ -17,35 +19,16 @@ class UserIO:
     """
 
     def echo(self, message: str) -> None: ...
-    def prompt(self, label: str, **kwargs) -> str: ...
-
-
-def _append_message(
-    messages: list[dict[str, str]], role: str, content: str
-) -> None:
-    """Append one conversation turn, merging a repeated role.
-
-    A session records what the user saw, so a framework echo can follow an
-    assistant turn with no user turn between them. Providers reject two
-    assistant messages in a row; joining them keeps the history valid without
-    losing either sentence.
-    """
-    clean = content.strip()
-    if not clean:
-        return
-    if messages and messages[-1].get("role") == role:
-        messages[-1]["content"] = f"{messages[-1]['content']}\n\n{clean}"
-        return
-    messages.append({"role": role, "content": clean})
+    def prompt(self, label: str) -> str: ...
 
 
 class _RecordingIO(UserIO):
     """Record composite-workflow IO in the session transcript.
 
-    Atomic workflow steps record their messages through
-    :func:`_record_atomic_workflow_step`; composite workflow steps call ``session.io``
-    directly. Without this wrapper those prompts and answers never reach the
-    transcript the judge reads.
+    Atomic workflows record their own transcript in
+    :class:`~chat_workflow.conversation.Conversation`. Composite workflows call
+    ``session.io`` directly; without this wrapper those echoes and prompts
+    never reach the transcript the user and the judge read.
     """
 
     def __init__(self, io: UserIO, log: SessionLog) -> None:
@@ -56,23 +39,26 @@ class _RecordingIO(UserIO):
     def echo(self, message: str) -> None:
         clean = message.removeprefix("\nAssistant: ").strip()
         if clean:
-            self._log.record(
-                "framework", clean, kind="composite_echo", audience="user"
-            )
+            self._log.messages.append(ModelResponse(parts=[TextPart(clean)]))
         self._io.echo(message)
 
     @override
-    def prompt(self, label: str, **kwargs: Any) -> str:
-        self._log.record(
-            "assistant", label, kind="composite_prompt", audience="user"
-        )
-        _append_message(self._log.messages, "assistant", label)
-        answer = self._io.prompt(label, **kwargs)
-        self._log.record(
-            "user", answer, kind="composite_prompt", audience="user"
-        )
-        _append_message(self._log.messages, "user", answer)
+    def prompt(self, label: str) -> str:
+        self._log.messages.append(ModelResponse(parts=[TextPart(label)]))
+        answer = self._io.prompt(label)
+        self._log.messages.append(ModelRequest.user_text_prompt(answer))
         return answer
+
+
+def _last_role(messages: list[ModelMessage]) -> str:
+    if not messages:
+        return ""
+    last = messages[-1]
+    if isinstance(last, ModelResponse):
+        return "assistant"
+    if isinstance(last, ModelRequest):
+        return "user"
+    return ""
 
 
 @dataclasses.dataclass
@@ -81,9 +67,9 @@ class Session:
 
     A session is one conversation: the user-visible conversation at the top
     level, or one meeting spawned from inside it. The same class is used at
-    every depth. ``state`` holds this session's own messages and audit events;
-    a child does not inherit the parent's conversation, and the parent records
-    the child as an event so the tree can be rendered and audited.
+    every depth. ``state`` holds this session's own transcript; a child does
+    not inherit the parent's conversation, and the parent records the child so
+    the tree can be rendered and audited.
     """
 
     io: UserIO
@@ -119,10 +105,10 @@ class Session:
     ) -> Session:
         """Create a child session: same user, same provider, clean context.
 
-        The child records its own messages; the parent records a child-session
-        event (id, title, order) so the tree can be rendered and audited. The
-        brief for the child is passed as parameters to its step, not as the
-        parent's conversation.
+        The child records its own transcript; the parent keeps the child in
+        ``children`` so the tree can be rendered and audited. The brief for
+        the child is passed as parameters to its step, not as the parent's
+        conversation.
         """
         child = Session(
             io=self._raw_io,
@@ -133,15 +119,6 @@ class Session:
             title=title,
         )
         self.children.append(child)
-        self.state.record(
-            "framework",
-            None,
-            kind="child_session",
-            audience="internal",
-            session=child.id,
-            title=title,
-            order=len(self.children),
-        )
         return child
 
     def walk(self) -> Iterator[Session]:
@@ -155,59 +132,51 @@ class Session:
         return next((item for item in self.walk() if item.id == session_id), None)
 
     def say(self, text: str) -> None:
-        """Speak an assistant turn that the user sees and the history keeps."""
+        """Speak an assistant turn that the user sees and the transcript keeps."""
         clean = text.removeprefix("\nAssistant: ").strip()
         if not clean:
             return
-        _append_message(self.state.messages, "assistant", clean)
-        self.state.record("assistant", clean, audience="user")
+        self.state.messages.append(ModelResponse(parts=[TextPart(clean)]))
         self._raw_io.echo(f"\nAssistant: {clean}")
 
     def run[TResult](
         self,
-        workflow_step: AtomicWorkflowStep[TResult],
+        workflow: AtomicWorkflow[TResult],
         first_user_input: str,
+        *,
+        chat: bool = True,
     ) -> TurnResult[TResult]:
-        """Run an atomic workflow step to completion.
+        """Run an atomic workflow to completion.
 
-        Sends the first user input, then loops over user prompts
-        until the step signals completion (success or failure).
+        Sends the first user input, then loops over user prompts until the
+        workflow signals completion (success or failure). A chat-off workflow
+        has no user to ask: a ``continue`` is fed back as an in-context
+        correction and retried within the turn budget.
         """
         try:
             first = first_user_input
-            if (
-                not first
-                and workflow_step.chat
-                and workflow_step.messages[-1].get("role") == "assistant"
-            ):
+            if not first and chat and _last_role(workflow.messages) == "assistant":
                 # The assistant spoke last (a greeting or a composite echo);
                 # the next turn belongs to the user.
                 first = self._raw_io.prompt("\nYou")
-            result = workflow_step.process_turn(first)
-            if not result.is_complete and workflow_step.chat:
+            result = workflow.process_turn(first)
+            if not result.is_complete:
                 self._raw_io.echo(f"\nAssistant: {result.message}")
 
             while not result.is_complete:
-                if workflow_step.chat:
+                if chat:
                     user_input = self._raw_io.prompt("\nYou")
-                    result = workflow_step.process_turn(user_input)
+                    result = workflow.process_turn(user_input)
                 else:
-                    # No user to ask. Feed the failure back in context so the
-                    # agent can return a complete object or an explicit failure.
-                    # This is a repair turn, not an authored prompt: it may say
-                    # where the text belongs so a chat-off step can finish.
-                    workflow_step.messages.append({
-                        "role": "user",
-                        "content": (
-                            "No user is available to answer. Return success now: "
-                            "put the completed result in `result` (not `message`), "
-                            "or failure if it cannot be produced."
-                        ),
-                    })
-                    result = workflow_step.process_turn("")
-                if not result.is_complete and workflow_step.chat:
+                    # No user to ask. The framework turn is a correction, not
+                    # an authored prompt: it may say what the step must return.
+                    result = workflow.process_turn(
+                        "No user is available to answer. Return success with the "
+                        "completed result, or failure if it cannot be produced."
+                    )
+                if not result.is_complete:
                     self._raw_io.echo(f"\nAssistant: {result.message}")
 
             return result
         finally:
-            _record_atomic_workflow_step(self.state, workflow_step)
+            _record_atomic_workflow(self.state, workflow)

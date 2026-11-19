@@ -10,11 +10,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import litellm
 from pydantic import BaseModel, Field
+from pydantic_ai.messages import ModelRequest
 
-from chat_workflow import Config, Session, SessionComponent, SessionLog
+from chat_workflow import (
+    Config,
+    Conversation,
+    Session,
+    SessionComponent,
+    SessionLog,
+)
 from chat_workflow.conversation_rules import NO_REPETITION
+from chat_workflow.transcript import entries, render
 
 
 @dataclass
@@ -42,50 +49,30 @@ class EvalStats:
         )
 
 
-# Global token counter used by litellm success_callback.
-_token_count: int = 0
-
-
-def _token_counter_callback(kwargs, completion_response, start_time, end_time) -> None:
-    """litellm success_callback — accumulates tokens from every LLM call."""
-    global _token_count
-    usage = getattr(completion_response, "usage", None)
-    if usage:
-        _token_count += getattr(usage, "total_tokens", 0) or 0
-
-
-def _reset_token_counter() -> None:
-    """Reset the global litellm token counter to zero."""
-    global _token_count
-    _token_count = 0
-
-
-def _read_token_counter() -> int:
-    """Return the current litellm token count without modifying it."""
-    return _token_count
-
 _DEFAULT_TRANSCRIPT_DIR = Path(__file__).parent.parent.parent / "test-results" / "transcripts"
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.json"
 
+# The gateway caches a completion by request body and replays it without
+# calling the model. An eval that is served a stored answer measures the cache,
+# not the prompt. A cold reasoning route also needs more than the production
+# timeout, so the eval ceiling is explicit.
+_EVAL_OVERRIDES = {
+    "llm": {
+        "extra_headers": {"cf-aig-skip-cache": "true"},
+        "request_timeout_seconds": 300,
+    }
+}
+
 
 def make_config() -> Config:
-    """Load the eval config and prove it is pointed at Cloudflare AI Gateway.
-
-    All house LLM traffic goes through the gateway (`skill://cloudflare-ai-gateway`):
-    the gateway owns the provider keys and fails over between them. A preset
-    with the `openai` provider and no explicit `api_base` relies on
-    `OPENAI_BASE_URL`; without it litellm would silently call api.openai.com.
-    """
-    config = Config(_CONFIG_PATH)
-    base_url = os.getenv("OPENAI_BASE_URL", "")
-    if config.provider == "openai" and (not base_url or "{" in base_url):
+    """The house config, with the gateway cache bypassed and room for a cold call."""
+    config = Config(_CONFIG_PATH, overrides=_EVAL_OVERRIDES)
+    if config.provider == "openai" and not config.api_base:
         raise RuntimeError(
-            "OPENAI_BASE_URL is not set (or still contains the .env.example "
-            "placeholder). Evals must route through Cloudflare AI Gateway — run "
-            "`make setup` to create .env from .env.example, fill in the account "
-            "and gateway, then set OPENAI_API_KEY (the gateway token)."
+            "OPENAI_BASE_URL is not set. Evals must route through Cloudflare AI "
+            "Gateway — run `make setup` to create .env from .env.example."
         )
     return config
 
@@ -98,15 +85,19 @@ def make_tools(io, config: Config | None = None) -> Session:
     )
 
 
+_DEFAULT_TRANSCRIPT_DIR = Path(__file__).parent.parent.parent / "test-results" / "transcripts"
+
+_PROJECT_ROOT = Path(__file__).parent.parent.parent
+_CONFIG_PATH = _PROJECT_ROOT / "config.json"
+
+
 class AgentIO:
     """UserIO implementation backed by an LLM — plays a realistic user role.
 
-    Instead of hardcoded MockIO responses, this generates natural user responses
-    by calling the LLM with a persona prompt. This creates more realistic
-    multi-turn conversations for eval tests.
-
-    The user bot is an expert in their own domain (their meetings) but knows
-    nothing about workflow decomposition. They just want help with their problem.
+    The user bot is a :class:`~chat_workflow.conversation.Conversation` with a
+    persona. Workflow messages are fed to it as user turns; its replies are
+    assistant turns. It is a model call like every other one, through the same
+    gateway and the same transcript.
     """
 
     def __init__(self, persona_prompt: str, config: Config):
@@ -123,87 +114,45 @@ class AgentIO:
         )
         self.config = config
         self.outputs: list[str] = []
-        # Conversation history from user bot's perspective:
-        # - workflow agent messages are "user" (they're addressing the user bot)
-        # - user bot responses are "assistant" (the bot is responding)
-        self._history: list[dict[str, str]] = []
+        self._persona = persona_prompt
+        self._conversation = Conversation(
+            model=config.model,
+            provider=config.provider,
+            instructions=self.persona_prompt,
+            output_type=str,
+            api_base=config.api_base,
+            api_key_env=config.api_key_env,
+            output_retries=config.max_retries,
+            transport_retries=config.max_retries,
+            timeout_seconds=config.request_timeout_seconds,
+            extra_headers=config.extra_headers,
+            temperature=0.7,
+        )
 
     def echo(self, message: str) -> None:
         """Capture what the workflow agent said."""
         self.outputs.append(message)
-        # Strip the "\nAssistant: " prefix that Session.run adds
         clean = message.removeprefix("\nAssistant: ").strip()
         if clean:
-            # From user bot's perspective, the workflow is the "user" talking to them
-            self._history.append({"role": "user", "content": clean})
+            self._conversation.messages.append(
+                ModelRequest.user_text_prompt(
+                    "Remember who you are. This is your role, not the "
+                    f"helper's:\n{self._persona}\n\n"
+                    "The helper said:\n"
+                    f"{clean}\n\n"
+                    "Write your next message as that person. Do not offer to "
+                    "help, do not ask the helper what they do, and do not "
+                    "repeat the helper's words."
+                )
+            )
 
     def prompt(self, label: str) -> str:
-        """Generate a user response using the LLM.
-
-        Retries an empty completion instead of returning it: an empty user turn
-        would consume one of the agent's turns and make a healthy conversation
-        look like a loop.
-        """
-        # Build messages: system persona + conversation history
-        messages = [{"role": "system", "content": self.persona_prompt}]
-        messages.extend(self._history)
-
-        # Suppress litellm debug output
-        litellm.suppress_debug_info = True
-
-        last_finish: str | None = None
-        last_content = ""
-        last_reasoning = ""
-        for attempt in range(3):
-            try:
-                response = litellm.completion(
-                    model=self.config.model,
-                    messages=messages,
-                    # A reasoning model spends part of its budget on hidden
-                    # reasoning; leave enough room for the user's reply after it.
-                    max_tokens=8000,
-                    temperature=0.7,
-                    # The gateway cache must be bypassed on every call, including
-                    # the user bot. A cached user reply replays an earlier
-                    # conversation and makes a green run meaningless.
-                    extra_headers=getattr(self.config, "extra_headers", None),
-                )
-            except Exception as exc:
-                # A 5xx or a malformed gateway response says nothing about the
-                # conversation. Resend; do not let infrastructure look like a
-                # failed user turn.
-                from chat_workflow.atomic_workflow_step import (
-                    _is_transient_provider_error,
-                )
-
-                if attempt == 2 or not _is_transient_provider_error(exc):
-                    raise
-                time.sleep(2**attempt)
-                continue
-
-            choice = response.choices[0]
-            last_finish = getattr(choice, "finish_reason", None)
-            last_content = (choice.message.content or "").strip()
-            last_reasoning = getattr(choice.message, "reasoning_content", None) or ""
-            if last_content:
-                self._history.append({"role": "assistant", "content": last_content})
-                return last_content
-            # A max_tokens cutoff is not something the model can fix by being
-            # asked again; retrying the same request only burns tokens.
-            if last_finish == "length":
-                raise RuntimeError(
-                    f"User bot hit max_tokens before replying for {label!r} "
-                    f"(model={self.config.model}, finish_reason='length', "
-                    f"reasoning={last_reasoning[:200]!r}). Increase max_tokens "
-                    "or shorten the conversation history."
-                )
-
-        raise RuntimeError(
-            f"User bot returned an empty response three times for {label!r} "
-            f"(model={self.config.model}, finish_reason={last_finish!r}, "
-            f"content={last_content!r}, "
-            f"reasoning={last_reasoning[:200]!r})"
-        )
+        """Generate the user's reply to the workflow's last message."""
+        turn = self._conversation.send(None)
+        text = turn.output.strip()
+        if not text:
+            raise RuntimeError(f"User bot returned an empty reply for {label!r}")
+        return text
 
 
 class JudgeVerdict(BaseModel):
@@ -285,34 +234,26 @@ def llm_judge(
     The judge is deliberately deterministic: temperature 0.0 and a model that
     can be pinned independently of the agent via ``CHAT_WORKFLOW_JUDGE_MODEL``.
     """
-    from chat_workflow import get_client
-
-    rules_text = "\n".join(f"{i + 1}. {name}: {desc}" for i, (name, desc) in enumerate(rules.items()))
-    client = get_client(
-        provider=config.provider,
-        api_key_env=config.api_key_env,
-        api_base=config.api_base,
-        model_supports_tools=config.model_supports_tools,
+    rules_text = "\n".join(
+        f"{i + 1}. {name}: {desc}" for i, (name, desc) in enumerate(rules.items())
     )
-    result: JudgeResult = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
+    conversation = Conversation(
         model=os.getenv(JUDGE_MODEL_ENV) or config.model,
-        messages=[
-            {
-                "role": "system",
-                "content": JUDGE_SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": f"Rules to evaluate:\n{rules_text}\n\nConversation transcript:\n{transcript}",
-            },
-        ],
-        response_model=JudgeResult,
-        max_retries=config.max_retries,
-        timeout=config.request_timeout_seconds,
+        provider=config.provider,
+        instructions=JUDGE_SYSTEM_PROMPT,
+        output_type=JudgeResult,
+        api_base=config.api_base,
+        api_key_env=config.api_key_env,
+        output_retries=config.max_retries,
+        transport_retries=config.max_retries,
+        timeout_seconds=config.request_timeout_seconds,
         temperature=0.0,
-        extra_headers=getattr(config, "extra_headers", None),
+        extra_headers=config.extra_headers,
     )
-    return result
+    turn = conversation.send(
+        f"Rules to evaluate:\n{rules_text}\n\nConversation transcript:\n{transcript}"
+    )
+    return turn.output
 
 
 def _jsonable(value: Any) -> Any:
@@ -328,89 +269,6 @@ def _jsonable(value: Any) -> Any:
     return repr(value)
 
 
-def _render_session(
-    session: Session,
-    *,
-    audience: str | None,
-    given: dict[str, Any] | None,
-    result: Any,
-    is_root: bool,
-) -> list[str]:
-    """Render one session, inlining its children where they were spawned."""
-    parts: list[str] = []
-    if is_root and given:
-        parts.append(
-            "[given]\n"
-            "Context the user already provided in earlier phases. It is "
-            "established fact, not something the assistant invented.\n"
-            + json.dumps(_jsonable(given), indent=2)
-        )
-    validation: list[str] = []
-    has_result = False
-    events = getattr(session.state, "events", None) or []
-
-    if events:
-        for event in events:
-            if event.kind == "child_session":
-                child = session.child(str(event.meta.get("session", "")))
-                if child is not None:
-                    parts.extend(
-                        _render_session(
-                            child,
-                            audience=audience,
-                            given=None,
-                            result=child.state.final_result,
-                            is_root=False,
-                        )
-                    )
-                continue
-            if event.type == "result":
-                has_result = True
-                continue
-            if audience is not None and event.audience != audience:
-                continue
-            if event.type == "validation":
-                status = "recovered" if event.meta.get("recovered") else "unrecovered"
-                validation.append(f"[{status}] turn {event.turn}: {str(event.content or '')[:800]}")
-                continue
-            parts.append(f"[{event.type}]\n{event.content}")
-    else:
-        for message in session.state.messages:
-            role = message.get("role", "?")
-            content = message.get("content", "")
-            if role == "system":
-                continue
-            stripped = content.lstrip()
-            if stripped.startswith("[framework]"):
-                if audience is None:
-                    parts.append(f"[framework]\n{content}")
-            elif role == "assistant" and stripped.startswith("{") and '"intent"' in stripped:
-                # A rejected completion envelope; never conversation.
-                if audience is None:
-                    parts.append(f"[framework]\n{content}")
-            else:
-                parts.append(f"[{role}]\n{content}")
-
-    if validation:
-        parts.append("[validation events]\n" + "\n".join(validation))
-
-    has_result = has_result or result is not None
-    if has_result:
-        if audience is not None:
-            parts.append("[structured-result]\n(workflow produced its validated result)")
-        else:
-            rendered = (
-                result.model_dump_json(indent=2)
-                if isinstance(result, BaseModel)
-                else json.dumps(_jsonable(result), indent=2)
-                if result is not None
-                else "(workflow produced its validated result)"
-            )
-            parts.append(f"[structured-result]\n{rendered}")
-
-    return parts
-
-
 def format_transcript(
     session: Session,
     result: Any = None,
@@ -418,55 +276,43 @@ def format_transcript(
     audience: str | None = None,
     given: dict[str, Any] | None = None,
 ) -> str:
-    """Render the canonical event log of a session tree as text.
+    """Render the session tree's transcript, or the subset a person saw.
 
-    ``audience="user"`` keeps only the entries the user saw: their turns, the
-    assistant's replies, and anything the harness echoed to the screen.
-    Corrections, validation feedback and the result JSON are internal, so they
-    stay out — a proofreader must not see text the user never saw. ``None``
-    keeps everything, for the audit view.
-
-    The audience is recorded on each event, so the projection is a property of
-    the data rather than of who is asking for it.
-
-    ``given`` is the non-session context the method already received (the
-    inputs from earlier phases). The judge needs it to tell "you already told
-    me" apart from "you said nothing"; it is rendered before the turns.
-
-    A child session is rendered where its parent spawned it, so the transcript
-    is the whole tree the user saw. Sessions created before the event log (or
-    tests that append directly to ``messages``) fall back to the message-based
-    rendering.
+    ``audience="user"`` keeps only the turns a person saw. ``None`` keeps the
+    full audit view, including thinking, tool traffic and retry prompts.
+    ``given`` is the non-session context the step received; the judge needs it
+    to tell "you already told me" apart from "you said nothing".
     """
-    return "\n---\n".join(
-        _render_session(
-            session,
-            audience=audience,
-            given=given,
-            result=result,
-            is_root=True,
+    parts: list[str] = []
+    if given:
+        parts.append(
+            "[given]\n"
+            "Context the user already provided in earlier phases. It is "
+            "established fact, not something the assistant invented.\n"
+            + json.dumps(_jsonable(given), indent=2)
         )
-    )
+    for item in session.walk():
+        text = render(
+            item.state.messages,
+            audience="user" if audience == "user" else "all",
+            result=result if item is session else item.state.final_result,
+        )
+        if text:
+            parts.append(text)
+    return "\n---\n".join(parts)
 
 
 def _has_conversation(session: Session) -> bool:
     """True when the session contains at least one user or assistant turn."""
-    events = getattr(session.state, "events", None) or []
-    if any(event.type in ("user", "assistant") for event in events):
-        return True
     return any(
-        message.get("role") in ("user", "assistant")
-        for message in session.state.messages
+        kind in ("user", "assistant")
+        for item in session.walk()
+        for kind, _ in entries(item.state.messages)
     )
 
 
 def _judge_says_it_passes(verdict: JudgeVerdict) -> bool:
-    """True when a failed verdict's own conclusion says there was no violation.
-
-    The judge occasionally sets ``passed=False`` while its explanation ends
-    "No violation found" or "does not violate the rule". That is a malformed
-    verdict, not a failure; discard it exactly as the object-rule judge does.
-    """
+    """True when a failed verdict's own conclusion says there was no violation."""
     from chat_workflow.mixins import _verdict_claims_the_rule_passes
 
     return _verdict_claims_the_rule_passes(verdict)
@@ -504,36 +350,16 @@ class RunRecord:
         }
 
 
-def _messages_as_events(session: Session) -> list[dict[str, Any]]:
-    """Fallback event list for sessions that only have ``messages``."""
-    events: list[dict[str, Any]] = []
-    for message in session.state.messages:
-        role = message.get("role", "?")
-        if role == "system":
-            continue
-        content = message.get("content", "")
-        stripped = content.lstrip()
-        event_type = role
-        if stripped.startswith("[framework]") or (
-            role == "assistant" and stripped.startswith("{") and '"intent"' in stripped
-        ):
-            event_type = "framework"
-        events.append({"type": event_type, "content": content})
-    return events
-
-
 def _session_events(session: Session) -> list[dict[str, Any]]:
-    """Flatten the event log of a session tree, tagging each entry's session."""
+    """Flatten the transcript of a session tree, tagging each entry."""
     events: list[dict[str, Any]] = []
     for item in session.walk():
-        if getattr(item.state, "events", None):
-            source = [event.to_dict() for event in item.state.events]
-        elif item is session:
-            source = _messages_as_events(item)
-        else:
-            source = []
-        for event in source:
-            event["session"] = item.id
+        for kind, text in entries(item.state.messages):
+            event: dict[str, Any] = {
+                "type": kind,
+                "content": text,
+                "session": item.id,
+            }
             if item.title:
                 event["title"] = item.title
             events.append(event)
@@ -576,7 +402,7 @@ def capture_on_failure(
             error=f"{type(exc).__name__}: {exc}",
             model=getattr(session.state, "model", None) or getattr(session.config, "model", None),
             provider=getattr(session.config, "provider", None),
-            tokens=_read_token_counter(),
+            tokens=getattr(session.state.usage, "total_tokens", 0),
             duration_s=(time.time() - started_at) if started_at else None,
         )
 
@@ -631,12 +457,12 @@ def run_multi_turn_eval(
 ) -> Any:
     """Run a multi-turn workflow eval with an LLM user bot and optional LLM judge.
 
-    Hands off to the model method (which is an @atomic_workflow_step-decorated
+    Hands off to the model method (which is an @atomic_workflow-decorated
     classmethod), then verifies turn efficiency, runs the judge on the
     conversation transcript, and dumps the transcript on failure.
 
     Args:
-        model_method: The @atomic_workflow_step or @composite_workflow_step classmethod to test
+        model_method: The @atomic_workflow or @composite_workflow classmethod to test
         method_kwargs: Keyword args to pass to model_method. The harness creates
             the root session and wraps the step in a SessionComponent.
         user_persona: Persona prompt for the AgentIO user bot
@@ -646,12 +472,7 @@ def run_multi_turn_eval(
             Defaults to llm_judge. Pass None to skip judging.
         config: Config instance. Defaults to make_config().
     """
-    # Register litellm token callback (already registered globally in
-    # tests/evals/__init__.py, but ensure it's active even when running
-    # standalone or if the module-level registration was overridden).
-    _reset_token_counter()
-    litellm.success_callback = [_token_counter_callback]
-
+    # The transcript and usage belong to the Session; no second token counter.
     config = config or make_config()
     if judge_rules is None:
         judge_rules = getattr(model_method, "__conversation_rules__", None) or DEFAULT_JUDGE_RULES
@@ -723,9 +544,10 @@ def run_multi_turn_eval(
             raise AssertionError("[no typed result] workflow returned None")
 
     recovered = [
-        event
-        for event in session.state.events
-        if event.type == "validation" and event.meta.get("recovered")
+        text
+        for item in session.walk()
+        for kind, text in entries(item.state.messages)
+        if kind == "validation"
     ]
     if recovered:
         line = (

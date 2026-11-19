@@ -259,18 +259,18 @@ class LLMValidated(BaseModel):
 
     @model_validator(mode="after")
     def validate_llm_rules(self) -> BaseModel:
-        """Call the LLM to check all rules against the current instance.
+        """Call the model to check all rules against the current instance.
 
-        Uses :func:`chat_workflow.llm_interaction.get_client` to obtain
-        an LLM client from config.  Builds a prompt listing all rules and
-        asks the LLM to verify each one.  Raises :class:`ValidationError`
-        (from ``chat_workflow.exceptions``) on any violation.
+        The rule judge is a :class:`~chat_workflow.conversation.Conversation`:
+        one model path, one transcript, and the schema carried by the request.
+        Raises :class:`ValidationError` (from ``chat_workflow.exceptions``) on
+        any violation.
 
-        Skips silently when infrastructure is unavailable (no config file
-        or API key), so models can be constructed in test environments.
+        Skips silently when infrastructure is unavailable (no config file or
+        API key), so models can be constructed in test environments.
         """
         from .config import Config
-        from .llm_interaction import get_client
+        from .conversation import Conversation
 
         # Deterministic first: cheap, precise, and no judge tokens wasted on
         # an object that is structurally invalid.
@@ -288,18 +288,7 @@ class LLMValidated(BaseModel):
         except Exception:
             return self
 
-        try:
-            client = get_client(
-                provider=config.provider,
-                api_key_env=config.api_key_env,
-                api_base=config.api_base,
-                model_supports_tools=config.model_supports_tools,
-            )
-        except Exception:
-            return self
-
         prompt = (
-            "You are a validation assistant. Evaluate the data against each rule.\n\n"
             f"Data:\n{self.model_dump_json(indent=2)}\n\n"
             "Rules:\n"
         )
@@ -323,14 +312,31 @@ class LLMValidated(BaseModel):
         )
 
         try:
-            verdicts = client.chat.completions.create(
+            conversation = Conversation(
                 model=config.model,
-                messages=[{"role": "user", "content": prompt}],
-                response_model=RuleVerdicts,
-                max_retries=config.max_retries,
-                timeout=config.request_timeout_seconds,
+                provider=config.provider,
+                api_base=config.api_base,
+                api_key_env=config.api_key_env,
+                instructions=(
+                    "You are a validation assistant. Evaluate the data against "
+                    "each rule."
+                ),
+                output_type=RuleVerdicts,
+                output_retries=config.max_retries,
+                transport_retries=config.max_retries,
+                timeout_seconds=config.request_timeout_seconds,
                 temperature=0.0,
+                extra_headers=config.extra_headers,
             )
+            # This validator runs inside the agent's own event loop, where
+            # `Conversation.send` cannot start one. A thread gives the judge
+            # its own loop; the validator stays synchronous, as Pydantic
+            # requires.
+            import concurrent.futures
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                turn = pool.submit(conversation.send, prompt).result()
+            verdicts = turn.output
         except Exception:
             return self
 

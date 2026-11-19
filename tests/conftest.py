@@ -3,15 +3,22 @@
 Common test configuration and fixtures.
 """
 
-import os
 import signal
 import sys
-import time
 from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from chat_workflow import AgentResponse, AtomicWorkflowStepConfig, AtomicWorkflowStepFailedError, TurnResult
+from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
+from pydantic_ai.models.function import FunctionModel
+
+from chat_workflow import (
+    AgentResponse,
+    AtomicWorkflowConfig,
+    AtomicWorkflowFailedError,
+    Conversation,
+    TurnResult,
+)
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 # Add the project root to Python path
@@ -19,20 +26,15 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-class HarnessTimeout(BaseException):
-    """Raised when a test exceeds its timeout.
+class TimeoutError(Exception):
+    """Raised when a test exceeds its timeout."""
 
-    Inherits from :class:`BaseException`, not :class:`Exception`: the LLM
-    client catches ``Exception`` internally and would otherwise swallow the
-    timeout and continue the call. ``unittest`` records a ``BaseException`` as
-    a test error and continues the suite.
-    """
+    pass
 
 
 def timeout(seconds: int):
     """
-    Decorator that raises HarnessTimeout if the wrapped function exceeds the timeout.
-    Also tracks LLM token usage and test timing for the cost report.
+    Decorator that raises TimeoutError if the wrapped function exceeds the timeout.
 
     Usage:
         @timeout(10)
@@ -43,17 +45,11 @@ def timeout(seconds: int):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # Reset token counter before each test so we capture per-test usage
-            _reset_token_counter()
-            start = time.time()
-
             def handler(signum, frame):
-                raise HarnessTimeout(f"Test timed out after {seconds} seconds")
+                raise TimeoutError(f"Test timed out after {seconds} seconds")
 
-            # Set the signal handler and disable SA_RESTART so a blocking
-            # network call is interrupted instead of silently restarting.
+            # Set the signal handler
             old_handler = signal.signal(signal.SIGALRM, handler)
-            signal.siginterrupt(signal.SIGALRM, True)
             signal.alarm(seconds)
 
             try:
@@ -62,53 +58,10 @@ def timeout(seconds: int):
                 # Restore original handler and cancel alarm
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, old_handler)
-                # Write token + timing data to eval report
-                _write_eval_report(func, start)
 
         return wrapper
 
     return decorator
-
-
-def _reset_token_counter() -> None:
-    try:
-        from tests.evals.helpers import _reset_token_counter as _rtc
-        _rtc()
-    except ImportError:
-        pass
-
-
-def _write_eval_report(func, start: float) -> None:
-    """Append timing and token data to test-results/eval-report.txt.
-
-    Only writes if CHAT_WORKFLOW_EVAL_REPORT is set.  Uses the unittest
-    method name if available (``self._testMethodName``) or the function
-    name as fallback.
-    """
-    if not os.environ.get("CHAT_WORKFLOW_EVAL_REPORT"):
-        return
-    try:
-        from tests.evals.helpers import _read_token_counter
-        tokens = _read_token_counter()
-        duration = time.time() - start
-
-        # Try to get the test method name from unittest
-        import inspect
-        method_name = func.__name__
-        for frame in inspect.stack():
-            locals = frame[0].f_locals
-            method = locals.get("self")
-            if method is not None and hasattr(method, "_testMethodName"):
-                method_name = method._testMethodName
-                break
-
-        report_dir = Path(__file__).parent.parent / "test-results"
-        report_dir.mkdir(parents=True, exist_ok=True)
-        report_path = report_dir / "eval-report.txt"
-        with open(report_path, "a") as f:
-            f.write(f"  [{method_name}] {duration:.0f}s  {tokens} tok\n")
-    except Exception:
-        pass  # Don't let tracking failures break tests
 
 
 class FakeConfig:
@@ -121,14 +74,12 @@ class FakeConfig:
     max_retries = 3
     request_timeout_seconds = 30
     debug = False
-    model_supports_tools = False
-    api_base = None
-    api_key_env = None
+    extra_headers: dict[str, str] = {}
 
 
 def make_valid_criteria() -> EvaluationCriteria:
     """Create a standard valid EvaluationCriteria for tests."""
-    return EvaluationCriteria.model_construct(
+    return EvaluationCriteria(
         context="test context",
         criteria=[
             Criterion(name="budget", description="Budget constraint", weight=8.0),
@@ -137,49 +88,83 @@ def make_valid_criteria() -> EvaluationCriteria:
     )
 
 
-def make_atomic_workflow_step_config(
+def _success(action) -> TurnResult:
+    """The success callback: a success turn always carries a result."""
+    if action.result is None:
+        raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
+    return TurnResult[EvaluationCriteria].success(action.result)
+
+
+def make_atomic_workflow_config(
     response_model_override: type | None = None,
     max_turns: int = 10,
     **overrides: Any,
-) -> AtomicWorkflowStepConfig:
-    """Create a standard AtomicWorkflowStepConfig for testing."""
+) -> AtomicWorkflowConfig:
+    """Create a standard AtomicWorkflowConfig for testing."""
     kwargs = dict(
         system_prompt="Test prompt",
         response_model=response_model_override or AgentResponse[EvaluationCriteria],
         max_turns=max_turns,
         on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
-        on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
-        on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or "No reason given"),
+        on_success=_success,
+        on_failure=lambda action: AtomicWorkflowFailedError(action.message or "No reason given"),
     )
     kwargs.update(overrides)
-    return AtomicWorkflowStepConfig(**kwargs)
+    return AtomicWorkflowConfig(**kwargs)
 
 
-class MockInstructorClient:
-    """Mock instructor client for testing LLM interactions."""
+def text_response(payload: Any) -> ModelResponse:
+    """A model response that calls the ``answer`` tool with *payload*.
 
-    def __init__(self, responses=None):
-        self.responses = responses or []
-        self.call_count = 0
-        self.last_call_args = None
-        self.last_call_kwargs = None
-        self.chat = self.MockChatCompletions(self)
+    The answer travels as a tool call: the endpoints behind this model enforce
+    a tool's schema and ignore ``response_format``. The schema wraps the
+    intents' union in an object under ``response``, so the arguments do too.
+    """
+    if isinstance(payload, dict) and "response" not in payload:
+        payload = {"response": payload}
+    return ModelResponse(parts=[ToolCallPart("answer", payload)])
 
-    class MockChatCompletions:
-        def __init__(self, parent):
-            self.parent = parent
-            self.completions = self
 
-        def create(self, model=None, messages=None, response_model=None, max_retries=None, **kwargs):
-            self.parent.call_count += 1
-            self.parent.last_call_args = (model, messages, response_model, max_retries)
-            self.parent.last_call_kwargs = kwargs
-            if self.parent.responses:
-                response = self.parent.responses.pop(0)
-                if isinstance(response, Exception):
-                    raise response
-                return response
-            return AgentResponse[EvaluationCriteria](intent="continue", message="Test question")
+class ScriptedModel:
+    """A FunctionModel body that replays scripted responses and counts calls.
 
-    def get_client(self, provider=None):
-        return self
+    An item may be a payload (serialised as the response text), a
+    ``ModelResponse`` (for blank or thinking-only responses), or a callable
+    returning either. The last item repeats once the script runs out.
+    """
+
+    def __init__(self, responses: list[Any]) -> None:
+        self.responses = list(responses)
+        self.calls: list[list[ModelMessage]] = []
+
+    def __call__(self, messages: list[ModelMessage], info: Any) -> ModelResponse:
+        del info
+        self.calls.append(list(messages))
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        item = self.responses[index]
+        if callable(item):
+            item = item()
+        if isinstance(item, BaseException):
+            raise item
+        if isinstance(item, ModelResponse):
+            return item
+        return text_response(item)
+
+
+def make_conversation(
+    responses: list[Any],
+    *,
+    output_type: type | None = None,
+    **overrides: Any,
+) -> Any:
+    """A Conversation on a scripted model: no network, no provider."""
+    script = ScriptedModel(responses)
+    conversation = Conversation(
+        model="scripted-model",
+        instructions="Test instructions",
+        output_type=output_type or AgentResponse[EvaluationCriteria],
+        model_client=FunctionModel(script),
+        **overrides,
+    )
+    conversation.script = script  # type: ignore[attr-defined]  # tests read the calls
+    return conversation

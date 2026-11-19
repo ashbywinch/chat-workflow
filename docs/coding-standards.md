@@ -392,9 +392,9 @@ Each module has one reason to change:
   parameter section building)
 - `metadata.py` owns type introspection (type formatting, return-type
   resolution, parameter inspection)
-- `atomic_workflow_step.py` owns conversation orchestration (turn management,
+- `atomic_workflow.py` owns conversation orchestration (turn management,
   LLM calling, intent handling)
-- `llm_interaction.py` owns the LLM provider abstraction
+- `conversation.py` owns the LLM provider abstraction
 
 If a function does not match the module's stated purpose, create a new
 module.
@@ -403,7 +403,7 @@ module.
 
 When the same pattern appears in multiple places, extract it into a
 dedicated module. `prompt_builder.py` and `metadata.py` were extracted from
-`atomic_workflow_step.py` because prompt formatting and type introspection are
+`atomic_workflow.py` because prompt formatting and type introspection are
 used by `decorators.py` and are conceptually separate concerns.
 
 ### Smells

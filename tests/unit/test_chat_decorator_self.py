@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Test that @atomic_workflow_step with Self return type raises TypeError.
+"""Test that @atomic_workflow with Self return type raises TypeError.
 
-This test proves that using typing.Self as a return type in a @atomic_workflow_step-decorated
+This test proves that using typing.Self as a return type in a @atomic_workflow-decorated
 classmethod causes a TypeError: issubclass() arg 1 must be a class.
 
-The bug is at chat_workflow/atomic_workflow_step.py:511 where issubclass()
+The bug is at chat_workflow/atomic_workflow.py:511 where issubclass()
 is called on the return type annotation without checking if it's a special
 form like typing.Self.
 
@@ -23,14 +23,14 @@ from pydantic import BaseModel
 
 
 class TestChatDecoratorSelfTypeError(unittest.TestCase):
-    """Prove that Self return type in @atomic_workflow_step decorator no longer raises at import time."""
+    """Prove that Self return type in @atomic_workflow decorator no longer raises at import time."""
 
     def test_self_return_type_imports_successfully(self):
-        """Importing a module with @atomic_workflow_step + Self return type should succeed (no TypeError)."""
+        """Importing a module with @atomic_workflow + Self return type should succeed (no TypeError)."""
         module_code = """
 from typing import Self
 from pydantic import BaseModel, Field
-from chat_workflow import atomic_workflow_step
+from chat_workflow import atomic_workflow
 
 
 class DummyModel(BaseModel):
@@ -38,7 +38,7 @@ class DummyModel(BaseModel):
 
 
 class TestWorkflow:
-    @atomic_workflow_step
+    @atomic_workflow
     @classmethod
     def generate(
         cls,
@@ -83,14 +83,14 @@ class TestWorkflow:
 
 
 class TestChatDecoratorTypeVar(unittest.TestCase):
-    """Test that @atomic_workflow_step with TypeVar return type works correctly."""
+    """Test that @atomic_workflow with TypeVar return type works correctly."""
 
     def test_typevar_decoration_succeeds(self):
         """TypeVar bound to BaseModel should decorate without error."""
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import atomic_workflow_step
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -99,7 +99,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@atomic_workflow_step
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
@@ -132,7 +132,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import atomic_workflow_step
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -141,7 +141,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@atomic_workflow_step
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
@@ -177,7 +177,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import atomic_workflow_step
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -186,7 +186,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@atomic_workflow_step
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
@@ -226,7 +226,7 @@ def generate(context: str, max_turns: int = 10) -> ModelType:
         module_code = """
 from typing import TypeVar
 from pydantic import BaseModel, Field
-from chat_workflow import atomic_workflow_step
+from chat_workflow import atomic_workflow
 
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
@@ -235,7 +235,7 @@ class DummyModel(BaseModel):
     name: str = Field(description="A name")
 
 
-@atomic_workflow_step
+@atomic_workflow
 def generate(context: str, max_turns: int = 10) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass

@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import json
 from enum import StrEnum
-from typing import Any, Generic, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 TResult = TypeVar("TResult")
+
+# The name of the tool that carries a step's answer. The endpoint enforces a
+# tool's schema where it ignores `response_format`, so the answer is a call.
+ANSWER_TOOL = "answer"
 
 
 class AgentIntent(StrEnum):
@@ -19,134 +22,67 @@ class AgentIntent(StrEnum):
     FAILURE = "failure"
 
 
-# Domain fields that a model returns directly when it forgets the envelope.
-# Kept at module level so the runtime can tell a correctable envelope mistake
-# from a response that is not an answer at all.
-KNOWN_RESULT_FIELDS: frozenset[str] = frozenset(
-    {
-        "consumer",
-        "format",
-        "success_criteria",
-        "integration_points",
-        "storage_requirements",
-        "source",
-        "trigger_conditions",
-        "dependencies",
-        "validation_criteria",
-        "phases",
-        "activities",
-        "outputs",
-        "inputs",
-    }
-)
+class Continue(BaseModel):
+    """Ask the user another question; the answer is not ready this turn."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    intent: Literal[AgentIntent.CONTINUE]
+    message: str = Field(min_length=1, description="The question for the user.")
 
 
-class AgentResponse(BaseModel, Generic[TResult]):
-    """The structured response from an LLM agent after one turn.
+class Success(BaseModel, Generic[TResult]):
+    """The finished object; the step is complete."""
 
-    The agent tells the framework what to do next via ``intent``:
-    - ``CONTINUE``: ask the user another question
-    - ``SUCCESS``: return the completed result
-    - ``FAILURE``: abort with an error message
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    intent: AgentIntent
-    message: str | None = Field(
-        default=None,
-        description=(
-            "Message for the user, in their words. Never name a field, a type, "
-            "a schema, or a workflow term. If the user says they do not "
-            'understand a word, do not use it again. Required when intent is "continue" '
-            'or "failure". Must be null when intent is "success".'
-        ),
+    intent: Literal[AgentIntent.SUCCESS]
+    result: TResult = Field(description="The complete object the caller asked for.")
+
+
+class Failure(BaseModel):
+    """The result cannot be produced; stop and say why."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    intent: Literal[AgentIntent.FAILURE]
+    message: str = Field(min_length=1, description="Why the result cannot be produced.")
+
+
+type AgentResponse[TResult] = Annotated[
+    Continue | Success[TResult] | Failure, Field(discriminator="intent")
+]
+"""What an agent returns after one turn, as three shapes, not one.
+
+The schema *is* the rule: a ``continue`` has no ``result`` property and a
+``success`` has no ``message``, with ``additionalProperties: false`` on each
+branch. An answer that both asks and answers is inexpressible, so it is never
+generated and never retried. A model validator could not do this: Pydantic
+does not translate validator logic into JSON Schema, so a rule written there
+reaches the model only as a rejection after the fact.
+"""
+
+type FinalResponse[TResult] = Annotated[
+    Success[TResult] | Failure, Field(discriminator="intent")
+]
+"""The answer when no turn remains: it cannot ask a question.
+
+A step that has run out of turns is offered these shapes only, so "ask
+another question" is not expressible and no retry has to argue about it.
+"""
+
+
+class TextReply(BaseModel):
+    """One piece of user-facing text, such as a greeting or a closing."""
+
+    text: str = Field(
+        min_length=1,
+        description="The text to show the user.",
     )
-    result: TResult | None = Field(
-        default=None,
-        description=(
-            'The final object. Required when intent is "success". Must be null when intent is "continue" or "failure".'
-        ),
-    )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _validate_response_envelope(cls, data: Any) -> Any:
-        """Catch common LLM output mistakes and give actionable error messages.
-
-        - Bare list: LLM returned an array without AgentResponse wrapper.
-        - Inner fields directly: LLM returned domain fields without intent/result.
-        """
-        if isinstance(data, list):
-            raise ValueError(
-                "Received a bare list/array instead of an AgentResponse object. "
-                "You MUST respond with a JSON object that has 'intent' and 'result' "
-                "keys, not a bare array. "
-                "Correct format for a list result:\n"
-                '  {"intent": "success", "result": [{"field1": "value1", ...}]}\n'
-                "Correct format for a single result:\n"
-                '  {"intent": "success", "result": {"field1": "value1", ...}}'
-            )
-        if isinstance(data, dict):
-            known_inner_fields = KNOWN_RESULT_FIELDS
-            if known_inner_fields & data.keys() and "intent" not in data and "result" not in data:
-                raise ValueError(
-                    "Missing required 'intent' and 'result' wrapper. "
-                    "Your response includes domain fields ({}) but is missing the "
-                    "'intent' and 'result' envelope. "
-                    "Correct format:\n"
-                    '  {{"intent": "success", "result": {{...your fields...}}}}'.format(
-                        ", ".join(sorted(known_inner_fields & data.keys()))
-                    )
-                )
-        return data
-
-    @model_validator(mode="after")
-    def validate_intent_consistency(self):
-        if self.intent == AgentIntent.CONTINUE:
-            if not self.message:
-                raise ValueError(
-                    "CONTINUE intent requires a message field with your question for the user. "
-                    "Do not include a result field."
-                )
-            # Tolerate result with CONTINUE — some LLMs (e.g. Gemini Flash Lite)
-            # persistently include a partial result. The on_continue callback
-            # only uses message, so the result is safely ignored.
-        elif self.intent == AgentIntent.FAILURE:
-            if not self.message:
-                raise ValueError("FAILURE intent requires a message field explaining why.")
-            if self.result is not None:
-                raise ValueError("FAILURE intent cannot include result.")
-        elif self.intent == AgentIntent.SUCCESS and self.result is None:
-            raise ValueError(
-                "SUCCESS intent requires a field named 'result' containing the complete object. "
-                "Your data must use 'result' as the key name, not 'outputs', 'inputs', or any other name."
-            )
-        # The message is what the user reads. A structured result pasted into
-        # it is not a reply, and it leaks field names the user never sees.
-        if (
-            self.intent in (AgentIntent.CONTINUE, AgentIntent.FAILURE)
-            and self.message
-            and self.message.lstrip()[:1] in ("{", "[")
-        ):
-            try:
-                payload: Any = json.loads(self.message)
-            except (ValueError, TypeError):
-                payload = None
-            if payload is not None and isinstance(payload, (dict, list)):
-                raise ValueError(
-                    "The message field is the text the user sees, not a "
-                    "structured result. Write the reply as plain sentences; "
-                    "put the result object in result with intent success."
-                )
-        # A success turn has no user-facing message. Some models put the whole
-        # response JSON in `message`; clearing it keeps the conversation
-        # transcript free of internal output.
-        if self.intent == AgentIntent.SUCCESS:
-            self.message = None
-        return self
 
 
 class TurnResult(BaseModel, Generic[TResult]):
-    """The outcome of processing a single turn in an atomic workflow step."""
+    """The outcome of processing a single turn in an atomic workflow."""
 
     result: TResult | None = None
     message: str
@@ -163,13 +99,8 @@ class TurnResult(BaseModel, Generic[TResult]):
         result: TResult,
         message: str = "Completed successfully!",
     ) -> TurnResult[TResult]:
-        """The workflow completed with a valid result.
-
-        ``result`` has already been validated as part of the agent response.
-        Re-validating it here would run model validators (including the LLM
-        judge) a second time, so construct the trusted wrapper directly.
-        """
-        return cls.model_construct(result=result, message=message, is_complete=True)
+        """The workflow completed with a valid result."""
+        return cls(result=result, message=message, is_complete=True)
 
     @classmethod
     def failure(cls, message: str) -> TurnResult[TResult]:

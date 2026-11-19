@@ -1,51 +1,87 @@
-from .atomic_workflow_step import AtomicWorkflowStep
-from .atomic_workflow_step_config import AtomicWorkflowStepConfig
+from .annotations import Blob, UserLabel, Validation
+from .atomic_workflow import AtomicWorkflow
+from .atomic_workflow_config import AtomicWorkflowConfig
+from .code_generator import generate_class, verify_code
 from .config import Config
+from .conversation import Conversation, ModelTurn
 from .debug import StreamingDebug
-from .decorators import atomic_workflow_step, composite_workflow_step
+from .decorators import atomic_workflow, composite_workflow
 from .exceptions import (
     APIKeyError,
-    AtomicWorkflowStepFailedError,
+    AtomicWorkflowFailedError,
     ChatWorkflowError,
     ConfigFileError,
     ConfigurationError,
     InvalidResponseError,
+    MaxRetriesExceededError,
     ProviderNotFoundError,
     ProviderNotSupportedError,
     TurnLimitExceededError,
     ValidationError,
 )
 from .interactive_entity import InteractiveEntity
-from .llm_interaction import get_client, list_available_providers
-from .models import AgentIntent, AgentResponse, TurnResult
+from .mixins import BlobSyncMixin, LLMValidated
+from .model_provider import build_model, list_available_providers
+from .models import (
+    AgentIntent,
+    AgentResponse,
+    Continue,
+    Failure,
+    FinalResponse,
+    Success,
+    TextReply,
+    TurnResult,
+)
 from .session import Session
 from .session_component import SessionComponent
 from .session_log import SessionLog
+
+# The framework's decorator names before the model-path refactor. A workflow
+# author's existing steps and the generated components keep working.
+atomic_workflow_step = atomic_workflow
+composite_workflow_step = composite_workflow
 
 __all__ = [
     "APIKeyError",
     "AgentIntent",
     "AgentResponse",
-    "AtomicWorkflowStep",
-    "AtomicWorkflowStepConfig",
-    "AtomicWorkflowStepFailedError",
+    "AtomicWorkflow",
+    "AtomicWorkflowConfig",
+    "AtomicWorkflowFailedError",
+    "Blob",
+    "BlobSyncMixin",
     "ChatWorkflowError",
     "Config",
     "ConfigFileError",
     "ConfigurationError",
+    "Continue",
+    "Conversation",
+    "Failure",
+    "FinalResponse",
     "InteractiveEntity",
     "InvalidResponseError",
+    "LLMValidated",
+    "MaxRetriesExceededError",
+    "ModelTurn",
     "ProviderNotFoundError",
     "ProviderNotSupportedError",
     "Session",
     "SessionComponent",
     "SessionLog",
+    "Success",
     "StreamingDebug",
+    "TextReply",
     "TurnLimitExceededError",
     "TurnResult",
+    "UserLabel",
+    "Validation",
     "ValidationError",
+    "atomic_workflow",
     "atomic_workflow_step",
+    "build_model",
+    "composite_workflow",
     "composite_workflow_step",
-    "get_client",
+    "generate_class",
     "list_available_providers",
+    "verify_code",
 ]

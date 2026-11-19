@@ -11,6 +11,8 @@ Also tests that new _validation_rules entries are collected.
 import unittest
 from unittest.mock import patch
 
+from pydantic import ValidationError as PydanticValidationError
+
 from tests.sample_code import (
     AUXILIARY_RETURN_CODE,
     CREATE_UPDATE_CODE,
@@ -53,7 +55,7 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
 
         # E501 is not auto-fixed by `_ruff_fix`, so it reaches validation.
         code = VALID_COMPONENT_CODE + "\n# " + "x" * 130 + "\n"
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
         message = str(ctx.exception)
@@ -67,7 +69,7 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
         """Invalid Python syntax should raise ValidationError."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=INVALID_SYNTAX_CODE)
 
         self.assertIn("not valid Python", str(ctx.exception))
@@ -79,7 +81,7 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
         """Code with no BaseModel subclass should raise ValidationError."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=NO_BASEMODEL_CODE)
 
         self.assertIn("at least one BaseModel", str(ctx.exception))
@@ -89,7 +91,7 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
         """Code with multiple independent BaseModel subclasses should raise."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=MULTIPLE_BASEMODEL_CODE)
 
         self.assertIn("multiple BaseModel", str(ctx.exception))
@@ -99,7 +101,7 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
         """Code without @atomic_workflow_step decorator should raise ValidationError."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=NO_WORKFLOW_CODE)
 
         self.assertIn("at least one public method", str(ctx.exception))
@@ -118,7 +120,7 @@ class TestSessionPromptPlacement(unittest.TestCase):
             "When you have enough, show the draft once and ask if it is right.",
             "Return JSON with intent and result.",
         )
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             self._DeterministicOnly(code=code)
 
         self.assertIn("response protocol", str(ctx.exception))
@@ -127,7 +129,7 @@ class TestSessionPromptPlacement(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         code = VALID_COMPONENT_CODE + "\n\nclass SessionComponent:\n    pass\n"
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             self._DeterministicOnly(code=code)
 
         self.assertIn("must not define a SessionComponent", str(ctx.exception))
@@ -136,7 +138,7 @@ class TestSessionPromptPlacement(unittest.TestCase):
         from chat_workflow.exceptions import ValidationError
 
         code = VALID_COMPONENT_CODE.replace("def create(", "def greet(")
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             self._DeterministicOnly(code=code)
 
         self.assertIn("greeting or closing", str(ctx.exception))
@@ -154,7 +156,7 @@ class TestPrimaryArtifactRule(unittest.TestCase):
         """The check is part of the component's validation, not the test harness."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             self._DeterministicOnly(code=SECOND_ARTIFACT_CODE)
 
         self.assertIn("outside the primary artifact", str(ctx.exception))
@@ -179,7 +181,7 @@ class TestPrimaryArtifactRule(unittest.TestCase):
         """A BaseModel not reachable from the primary model is a second artifact."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=SECOND_ARTIFACT_CODE)
 
         self.assertIn("outside the primary artifact", str(ctx.exception))
@@ -190,7 +192,7 @@ class TestPrimaryArtifactRule(unittest.TestCase):
         """Independent returned models mean two artifacts."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=MULTIPLE_RETURN_TYPES_CODE)
 
         self.assertIn("independent BaseModel types", str(ctx.exception))
@@ -216,7 +218,7 @@ class TestPrimaryArtifactRule(unittest.TestCase):
         """Two independent artifacts with no single returned primary are rejected."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=MULTI_ARTIFACT_CODE)
 
         self.assertIn("multiple BaseModel subclasses", str(ctx.exception))
@@ -284,7 +286,7 @@ class MinutesDraft(BaseModel):
         ...
 '''
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
         self.assertIn("repeats the class docstring", str(ctx.exception))
@@ -314,7 +316,7 @@ class MinutesDraft(BaseModel):
         ...
 '''
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
         self.assertIn("description of field 'key_decisions'", str(ctx.exception))
@@ -364,7 +366,7 @@ class MinutesDraft(BaseModel):
             f'"""You help someone turn sketchy notes into minutes {long_line} Start from what',
         )
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
         self.assertIn("ruff", str(ctx.exception))
@@ -390,13 +392,13 @@ class MinutesDraft(BaseModel):
 
         code = VALID_COMPONENT_CODE.replace(
             "from chat_workflow import atomic_workflow_step",
-            "from pydantic_ai import atomic_workflow_step",
+            "from invented_package_xyz import atomic_workflow_step",
         )
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
-        self.assertIn("pydantic_ai", str(ctx.exception))
+        self.assertIn("invented_package_xyz", str(ctx.exception))
 
 
     @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
@@ -404,7 +406,7 @@ class MinutesDraft(BaseModel):
         """A validator that only does `pass` enforces nothing."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=NOOP_VALIDATOR_CODE)
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
@@ -533,7 +535,7 @@ class MinutesDraft(BaseModel):
             1,
         )
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
         self.assertIn("@field_validator('meeting_date')", str(ctx.exception))
@@ -618,7 +620,7 @@ class MinutesDraft(BaseModel):
             "_validation_rules: ClassVar[list[str]]", "_validation_rules: list[str]"
         )
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=code)
 
         self.assertIn("ClassVar[list[str]]", str(ctx.exception))

@@ -1,128 +1,199 @@
-"""The message list a chat model receives, with its constraints enforced.
+"""What the model was told and what it said, read from the stored messages.
 
-A chat transcript is stricter than it looks. The rules below are documented by
-the providers, or measured on the model this project is tuned for. They live
-here rather than in a comment at the call site so that getting them wrong is a
-failure where the mistake is made, not a confusing empty completion later.
+The transcript *is* PydanticAI's message list: thinking, tool calls, tool
+returns, retry prompts and the final structured output all live there, and
+``ModelMessagesTypeAdapter`` round-trips it byte-for-byte. This module is the
+one projection of that list into text — for the debug stream, for a failure
+message, and for a judge — plus the serialisation used by anything that stores
+a run.
 
-What each role means
---------------------
-``system``
-    An instruction *to* the model, from the application. It is not a turn and
-    it is not something the model said. Putting a turn here makes it part of
-    the model's standing brief; putting an instruction in ``assistant`` makes
-    the model believe it produced that text.
-``user``
-    A turn from the person. A framework correction is a user turn too — it is
-    the next thing the model is asked to respond to — and carries the
-    ``[framework]`` prefix so it is never mistaken for the user's own words.
-``assistant``
-    The model's own output.
+Two views, one source. The audit view (``audience="all"``) includes the
+model's thinking, its tool traffic and the rejected outputs a retry prompt
+answered. The user view keeps only what a person saw: their own turns and the
+assistant's replies, with a marker where the validated result was produced.
+Nothing is inferred from message text, and no second history exists.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass, field
+import json
+from collections.abc import Iterable, Sequence
 from typing import Any, Literal
 
-Role = Literal["system", "user", "assistant"]
-
-# The model this project is tuned for returns an empty completion when the
-# request ends on a system message: 4 empty replies in 6 with the instruction
-# last, 0 in 6 with it first, same conversation.
-_EMPTY_ON_SYSTEM_LAST = (
-    "Measured on this model: the same conversation with the instruction last "
-    "returned an empty completion 4 times in 6, and 0 times in 6 with it first."
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    RetryFeedbackPart,
+    SystemPromptPart,
+    TextPart,
+    ThinkingPart,
+    ToolCallPart,
+    ToolReturnPart,
+    UserPromptPart,
 )
 
+from .models import ANSWER_TOOL
 
-class TranscriptError(RuntimeError):
-    """The message list is not in a shape a chat API accepts."""
+Audience = Literal["all", "user"]
+
+# Entry kinds. ``output`` is the final structured response (the request's
+# schema made it, the caller validated it); ``structured-result`` is the typed
+# value the workflow produced.
+_USER_KINDS = frozenset({"user", "assistant"})
 
 
-@dataclass
-class Transcript:
-    """A conversation assembled so the provider can answer it.
+def entries(messages: Sequence[ModelMessage]) -> list[tuple[str, str]]:
+    """The transcript as ``(kind, text)``, in the order the model saw it.
 
-    Two rules are applied silently because they are provider-compatibility
-    normalisations, not mistakes: multiple instructions are folded into one
-    leading system message, and consecutive ``user`` turns are joined. Every
-    other violation raises, with the rule and its source next to the raise.
+    The last response's text is ``output``: it is the structured answer, not a
+    conversational turn, and a caller decides how to show it.
     """
+    last_answer = _last_answer_index(messages)
+    result: list[tuple[str, str]] = []
+    for index, message in enumerate(messages):
+        if isinstance(message, ModelRequest):
+            result.extend(_request_entries(message))
+        elif isinstance(message, ModelResponse):
+            result.extend(_response_entries(message, is_answer=index == last_answer))
+    return result
 
-    instructions: list[str] = field(default_factory=list)
-    turns: list[dict[str, str]] = field(default_factory=list)
 
-    @classmethod
-    def from_messages(cls, messages: Iterable[dict[str, Any]]) -> Transcript:
-        transcript = cls()
-        for message in messages:
-            transcript.append(
-                str(message.get("role") or ""), str(message.get("content") or "")
-            )
-        return transcript
+def render(
+    messages: Sequence[ModelMessage],
+    *,
+    audience: Audience = "all",
+    result: Any = None,
+) -> str:
+    """The transcript as text, or the subset a person saw.
 
-    def append(self, role: str, content: str) -> None:
-        """Add one message, or raise if it cannot be part of a valid request."""
-        if not content.strip():
-            raise TranscriptError(
-                "A message may not be empty: several providers reject an empty "
-                "text block, and one consisting only of whitespace too."
-            )
-        if role == "system":
-            if self.turns:
-                raise TranscriptError(
-                    "A system message must come before the conversation starts. "
-                    "It is an instruction to the model, not a turn, so a system "
-                    "message after a turn is in the wrong place. "
-                    + _EMPTY_ON_SYSTEM_LAST
-                )
-            self.instructions.append(content)
-            return
-        if role not in ("user", "assistant"):
-            raise TranscriptError(
-                f"Unknown role {role!r}. The transcript uses system, user and "
-                "assistant; tool results would need their own pairing rules."
-            )
-        if self.turns and self.turns[-1]["role"] == role:
-            if role == "assistant":
-                raise TranscriptError(
-                    "Two assistant turns in a row: the model did not reply "
-                    "between them. Some providers merge consecutive same-role "
-                    "turns silently and others reject the request, so the "
-                    "caller must not produce this."
-                )
-            # Consecutive user turns are common (a turn, then a framework
-            # correction). Providers merge them, so join them here.
-            self.turns[-1]["content"] += "\n\n" + content
-            return
-        self.turns.append({"role": role, "content": content})
+    ``result`` is the validated value the workflow produced. With it, the raw
+    structured answer is not repeated as a turn; the result takes its place.
+    Without it (a failed run), the raw answer stays — it is the evidence of
+    what went wrong.
+    """
+    parts: list[tuple[str, str]] = []
+    for kind, text in entries(messages):
+        if kind == "output":
+            # In the audit view a failed run keeps its last answer as evidence.
+            # A judge never sees it: the raw envelope is internal.
+            if audience == "all" and result is None:
+                parts.append((kind, text))
+            continue
+        if audience == "user" and kind not in _USER_KINDS:
+            continue
+        parts.append((kind, text))
+    if result is not None:
+        rendered = (
+            result.model_dump_json(indent=2)
+            if hasattr(result, "model_dump_json")
+            else json.dumps(result, indent=2, default=str)
+        )
+        if audience == "user":
+            parts.append(("structured-result", "(the workflow produced its validated result)"))
+        else:
+            parts.append(("structured-result", rendered))
+    return "\n---\n".join(f"[{kind}]\n{text}" for kind, text in parts)
 
-    def user(self, content: str) -> None:
-        self.append("user", content)
 
-    def assistant(self, content: str) -> None:
-        self.append("assistant", content)
+def dump(messages: Sequence[ModelMessage]) -> bytes:
+    """The stored form: the message list, byte-for-byte."""
+    return ModelMessagesTypeAdapter.dump_json(list(messages))
 
-    def wire(self) -> list[dict[str, str]]:
-        """The list to send, or raise if the model would have nothing to answer."""
-        if not self.turns:
-            raise TranscriptError(
-                "The request has no conversation turn. A chat request needs a "
-                "user turn to respond to; a system-only request is answered "
-                "with an empty completion. " + _EMPTY_ON_SYSTEM_LAST
-            )
-        if self.turns[-1]["role"] != "user":
-            raise TranscriptError(
-                "The request must end with a user turn: 'To trigger a "
-                "response from the model, end with a user message' (OpenAI "
-                "chat completions). Ending on an assistant turn is a prefill, "
-                "which current models reject outright; ending on a system "
-                "message leaves nothing to answer."
-            )
-        messages: list[dict[str, str]] = []
-        if self.instructions:
-            messages.append({"role": "system", "content": "\n\n".join(self.instructions)})
-        messages.extend(self.turns)
-        return messages
+
+def load(data: bytes | str) -> list[ModelMessage]:
+    """Read a transcript written by :func:`dump`."""
+    return ModelMessagesTypeAdapter.validate_json(data)
+
+
+def _answer_envelope(part: ToolCallPart) -> dict[str, Any] | None:
+    args = part.args
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            return None
+    if not isinstance(args, dict):
+        return None
+    body = args.get("response", args)
+    return body if isinstance(body, dict) else None
+
+
+def _is_final_answer(envelope: dict[str, Any] | None) -> bool:
+    return bool(envelope) and envelope.get("intent") in ("success", "failure")
+
+
+def _last_answer_index(messages: Sequence[ModelMessage]) -> int | None:
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if not isinstance(message, ModelResponse):
+            continue
+        for part in message.parts:
+            if (
+                isinstance(part, ToolCallPart)
+                and part.tool_name == ANSWER_TOOL
+                and _is_final_answer(_answer_envelope(part))
+            ):
+                return index
+            if isinstance(part, TextPart):
+                stripped = part.content.strip()
+                if (
+                    stripped.startswith("{")
+                    and '"intent"' in stripped
+                    and ('"success"' in stripped or '"failure"' in stripped)
+                ):
+                    return index
+    return None
+
+
+def _request_entries(message: ModelRequest) -> Iterable[tuple[str, str]]:
+    for part in message.parts:
+        if isinstance(part, SystemPromptPart):
+            # The instructions are the same every turn; the step's own record
+            # of them is the prompt, not a transcript entry.
+            continue
+        if isinstance(part, UserPromptPart):
+            yield "user", _text(part.content)
+        elif isinstance(part, RetryFeedbackPart):
+            yield "validation", _text(part.content)
+        elif isinstance(part, ToolReturnPart):
+            if part.tool_name == ANSWER_TOOL:
+                # the answer itself, already shown as its call
+                continue
+            outcome = getattr(part, "outcome", "success")
+            kind = "validation" if outcome == "retried" else "tool-return"
+            yield kind, _tool_return_text(part)
+
+
+def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tuple[str, str]]:
+    for part in message.parts:
+        if isinstance(part, TextPart):
+            if part.content.strip():
+                yield ("output" if is_answer else "assistant"), part.content
+        elif isinstance(part, ThinkingPart):
+            yield "thinking", part.content
+        elif isinstance(part, ToolCallPart):
+            if part.tool_name == ANSWER_TOOL:
+                envelope = _answer_envelope(part)
+                spoken = envelope.get("message") if envelope else None
+                # A continue answer is the assistant's question and is shown;
+                # a success/failure answer is the structured result and is not.
+                kind = "output" if _is_final_answer(envelope) else "assistant"
+                yield kind, spoken or part.args_as_json_str()
+            else:
+                yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
+
+
+def _tool_return_text(part: ToolReturnPart) -> str:
+    content = part.content
+    return content if isinstance(content, str) else json.dumps(content, default=str)
+
+
+def _text(content: Any) -> str:
+    """A user or feedback part's text, even when it carries rich content."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(item if isinstance(item, str) else str(item) for item in content)
+    return str(content)

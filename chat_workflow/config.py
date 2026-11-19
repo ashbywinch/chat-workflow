@@ -5,35 +5,20 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .llm_interaction import ProviderType
+from .model_provider import PROVIDERS, ProviderType
 
 
 class Config:
     """Configuration manager for LLM settings.
 
     The caller provides the path to config.json. No auto-discovery.
-
-    Supports two config layouts:
-
-    **Simple** (backward compatible):
-    .. code-block:: json
-
-        {"llm": {"provider": "openrouter", "model": "...", ...}}
-
-    **Presets** (for easy switching):
-    .. code-block:: json
-
-        {"llm": {"active": "my-preset",
-                 "presets": {"my-preset": {"provider": "...", ...}},
-                 "temperature": 0.7, ...}}
-
-    When *active* + *presets* are present the named preset is merged into
-    the top-level ``llm`` so all property accessors resolve correctly.
+    ``overrides`` is merged over the file, for an application that varies a
+    setting (an eval that must bypass a gateway cache) without a second file.
     """
 
-    _VALID_PROVIDERS = frozenset({"openai", "google", "anthropic", "groq", "together", "azure", "openrouter"})
+    _VALID_PROVIDERS = PROVIDERS
 
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path, overrides: dict[str, Any] | None = None):
         from .exceptions import ConfigFileError, ConfigurationError
 
         self._config_data: dict[str, Any] = {
@@ -41,7 +26,6 @@ class Config:
                 "temperature": 0.7,
                 "max_retries": 3,
                 "request_timeout_seconds": 30,
-                "model_supports_tools": False,
             }
         }
 
@@ -59,14 +43,8 @@ class Config:
         except OSError as e:
             raise ConfigFileError(f"Could not read {config_path}: {e}") from e
 
-        # Resolve preset if using the presets/active layout
-        llm = self._config_data.get("llm", {})
-        presets = llm.get("presets")
-        active = llm.get("active")
-        if presets and active:
-            if active not in presets:
-                raise ConfigurationError(f"Unknown LLM preset '{active}'. Available: {', '.join(presets)}")
-            llm.update(presets[active])
+        if overrides:
+            self._merge_config(self._config_data, overrides)
 
         if not self._config_data.get("llm", {}).get("provider"):
             raise ConfigurationError("Missing required field in config.json: llm.provider")
@@ -110,28 +88,22 @@ class Config:
 
     @property
     def extra_headers(self) -> dict[str, str]:
-        """Headers for every model request.
+        """Headers sent with every model request.
 
-        A gateway in front of the provider may cache responses, which makes an
-        eval replay an old reply instead of testing the current prompt. Set
-        ``"extra_headers": {"cf-aig-skip-cache": "true"}`` on the eval preset
-        to bypass it.
+        A gateway may cache responses by request body, which makes an eval
+        replay an old answer instead of testing the current prompt. Set
+        ``"extra_headers": {"cf-aig-skip-cache": "true"}`` to bypass it.
         """
         return dict(self._config_data["llm"].get("extra_headers") or {})
 
     @property
-    def model_supports_tools(self) -> bool:
-        return self._config_data["llm"].get("model_supports_tools", False)
-
-    @property
     def api_base(self) -> str | None:
-        """The endpoint the preset talks to.
+        """The endpoint the configured provider talks to.
 
-        A preset that states one uses it. The ``openai`` provider without one
-        is pinned to ``OPENAI_BASE_URL`` — the house gateway — so an ambient
-        base (litellm's global, or a base a previous call pinned) cannot route
-        the call to another host. A call that lands elsewhere fails with that
-        host's own error, which reads as a bug in the change under test.
+        A stated base wins. The ``openai`` provider without one is pinned to
+        ``OPENAI_BASE_URL`` — the house gateway — so an ambient base cannot
+        route the call to another host. An OpenAI-compatible provider with no
+        stated base uses its published host (see ``model_provider``).
         """
         stated = self._config_data["llm"].get("api_base")
         if stated:
