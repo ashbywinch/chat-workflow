@@ -162,7 +162,8 @@ the stages and steps. Group the concrete steps into a few broad stages; a stage 
 heading, and no step may appear both as a stage and as an activity. Infer the participants from the steps — a step that
 sends work to a manager or finance names that party — and the role in charge is the person or role that keeps the work
 moving. If the notes say the user does it all, the orchestrating component and the sole participant are the user. Do not
-invent people or steps the notes do not support.
+invent people or steps the notes do not support. A name the notes say the user is unsure about — "I don't know if JD is
+John or a project" — is not a participant; leave it out. An example is not a fact.
 
 Return the complete ProcessDefinition."""
     ...  # type: ignore[reportReturnType]

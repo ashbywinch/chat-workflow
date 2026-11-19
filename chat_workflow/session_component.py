@@ -56,10 +56,12 @@ class SessionComponent:
     ) -> TextReply:
         """Describe what the workflow produced, in the user's words.
 
-        Say what it is and name its main parts, using the words the user gave.
-        Do not ask a question, do not list field names or JSON, and do not
-        mention the internal schema. Keep it to a short paragraph or a short
-        list.
+        Say what it is and name its main parts by name, using the words the
+        user gave; a count is not a name. If the conversation already covered
+        it, one short sentence that it is captured is enough; do not repeat the
+        details. Do not ask a question,
+        do not list field names or JSON, and do not mention the internal
+        schema. Keep it to a short paragraph or a short list.
         """
         ...  # type: ignore[reportReturnType]
 

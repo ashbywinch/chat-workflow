@@ -18,9 +18,8 @@ PROCESS_DEFINITION_RULES = {
     NO_REPETITION[0]: NO_REPETITION[1],
     "Uses expertise": (
         "The assistant builds the stages, steps, participants, and role in "
-        "charge from the user's description, grouping concrete steps into "
-        "broad stages instead of asking the user to name each stage or step "
-        "from scratch."
+        "charge from the user's description instead of asking the user to "
+        "name each stage or step from scratch."
     ),
     "Honest about provenance": (
         "Every stage, step, participant, and role in the breakdown comes from "
