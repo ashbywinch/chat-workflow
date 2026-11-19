@@ -197,6 +197,38 @@ class TestRejectedOutput(unittest.TestCase):
         self.assertEqual(_retry_parts(conversation), [])
 
 
+class TestBusinessRules(unittest.TestCase):
+    """A caller's rule on the answer model rides the one output-retry channel."""
+
+    def test_a_rule_from_the_answer_model_is_told_to_the_model(self):
+        """A rule is only retried because ``ValidationError`` is a ``ValueError``.
+
+        Pydantic captures a ``ValueError`` from a validator and hands its
+        sentence to the same retry a missing field uses. Without that base the
+        exception escapes validation and the workflow crashes on an answer the
+        model could have corrected.
+        """
+        budgetless = {
+            "intent": "success",
+            "result": {
+                "context": "A birthday present",
+                "criteria": [
+                    {"name": "price", "description": "Keeps the gift affordable"},
+                    {"name": "thought", "description": "Shows the person was considered"},
+                ],
+            },
+        }
+        conversation = make_conversation([budgetless, VALID])
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(len(conversation.script.calls), 2)
+        feedback = _retry_parts(conversation)[0]
+        rendered = feedback.content if isinstance(feedback.content, str) else json.dumps(feedback.content)
+        self.assertIn("budget", rendered.lower())
+
+
 class TestRequestSettings(unittest.TestCase):
     """The budgets and limits reach the request as separate settings."""
 

@@ -87,12 +87,13 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=budget_allcaps)
 
-        from chat_workflow import ValidationError
-
         no_budget = [
             Criterion(name="cost", description="Cost constraint", weight=8.0),
             Criterion(name="quality", description="Quality level", weight=7.0),
         ]
+        # A rule stated on the answer model is a validation failure of that
+        # answer: Pydantic wraps the raised rule so the framework's output
+        # retry can hand its sentence back to the model.
         with self.assertRaises(ValidationError) as context:
             EvaluationCriteria(criteria=no_budget)
 

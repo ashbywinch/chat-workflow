@@ -52,8 +52,17 @@ class ProviderNotFoundError(ProviderError):
     pass
 
 
-class ValidationError(ChatWorkflowError):
-    """Validation errors for business rules."""
+class ValidationError(ChatWorkflowError, ValueError):
+    """An answer the caller's business rules reject.
+
+    It is a ``ValueError`` because that is the only way a rule stated on an
+    answer model reaches the framework's output-retry channel: Pydantic turns
+    a ``ValueError`` from a validator into a ``pydantic.ValidationError``,
+    whose sentence is sent back to the model by the same retry that handles a
+    missing or mistyped field. Raised from a validator without this, the
+    exception escapes validation and a model that forgot one rule crashes the
+    workflow instead of being told.
+    """
 
     pass
 
