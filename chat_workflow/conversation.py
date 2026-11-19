@@ -251,16 +251,19 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
 class _ProviderLog:
     """Which upstream endpoint answered, recorded for the failure message.
 
-    The gateway names its upstream in ``cf-aig-provider``/``cf-aig-model``, and
-    the endpoints behind one model differ: some enforce the request's tool
-    schema, some treat it as a hint. A failed turn is diagnosable only when the
-    log says who served it. Attaching is best-effort: a model without an httpx
-    client simply records nothing.
+    The gateway names its own upstream in ``cf-aig-provider`` — on the house
+    route that is always ``openrouter``, which says nothing about who actually
+    answered. OpenRouter puts the serving endpoint in the response body's
+    ``provider``, and its generation id in ``id`` (the id also answers at
+    ``/api/v1/generation``). The endpoints behind one model differ: some enforce
+    the request's tool schema, some treat it as a hint, so the log records both.
+    Attaching is best-effort: a model without an httpx client records nothing.
     """
 
     def __init__(self) -> None:
         self.provider: str | None = None
         self.model: str | None = None
+        self.generation: str | None = None
 
     @classmethod
     def attach(cls, model: Model) -> _ProviderLog:
@@ -269,6 +272,17 @@ class _ProviderLog:
         async def record(response: Any) -> None:
             log.provider = response.headers.get("cf-aig-provider")
             log.model = response.headers.get("cf-aig-model")
+            try:
+                # The body is buffered (requests are not streamed), so reading
+                # it here does not consume what the transport reads next.
+                await response.aread()
+                body = response.json()
+            except Exception:  # noqa: BLE001 — a log must never break a call
+                return
+            if isinstance(body, dict):
+                log.provider = body.get("provider") or log.provider
+                log.model = body.get("model") or log.model
+                log.generation = body.get("id") or log.generation
 
         client = getattr(model, "client", None)
         http = getattr(client, "_client", None)
