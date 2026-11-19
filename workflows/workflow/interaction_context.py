@@ -91,7 +91,7 @@ class ComponentInteractionContext(BaseModel):
 
 def _format_interaction_context(draft: ComponentInteractionContext) -> str:
     """Present the interaction proposal in the user's words."""
-    lines = ["Here's how I'd work with you:"]
+    lines = ["Now I'll propose how I should work with you.", "", "Here's how I'd work with you:"]
     if draft.must_prioritize:
         lines.append("- I'll always cover: " + "; ".join(draft.must_prioritize))
     if draft.auto_suggest:

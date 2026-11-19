@@ -176,6 +176,7 @@ def _format_process_definition(draft: ProcessDefinition) -> str:
     steps = "; ".join(draft.activities)
     people = ", ".join(draft.participants)
     return (
+        "Now I'll pull together the stages and steps from what you've told me.\n\n"
         "Here's the picture I've got from what you told me:\n"
         f"- Stages: {stages}\n"
         f"- Steps: {steps}\n"

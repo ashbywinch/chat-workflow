@@ -207,7 +207,7 @@ from .models.resource import Resource  # noqa: E402
 
 def _format_components(draft: list[ComponentSpec]) -> str:
     """Present the derived parts in the user's words, without internal labels."""
-    lines = ["Here are the parts I see:", ""]
+    lines = ["Now I'll map the parts of your work from what you've told me.", "", "Here are the parts I see:", ""]
     for index, part in enumerate(draft, 1):
         line = f"{index}. {part.name} — {part.purpose}"
         if part.scope_description:
