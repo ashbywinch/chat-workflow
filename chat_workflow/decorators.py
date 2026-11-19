@@ -46,9 +46,10 @@ def _build_system_prompt(
         "user. When the user says they are done, agrees with what you "
         "proposed, or has supplied what the result needs, return "
         "intent='success' — every value in the result must come from what "
-        "they told you. If they are uncooperative, or the turn limit is "
-        "reached without that material, return intent='failure': a result "
-        "they did not supply is not theirs."
+        "they told you. A question they left unanswered does not hold the "
+        "result back: finish with what they did give. If they are "
+        "uncooperative, or the turn limit is reached without that material, "
+        "return intent='failure': a result they did not supply is not theirs."
     )
     return system_prompt
 
