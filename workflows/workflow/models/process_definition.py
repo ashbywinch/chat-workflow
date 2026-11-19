@@ -24,6 +24,13 @@ _OPENS_WITH_THE_DRAFT: tuple[str, str] = (
     "establish.",
 )
 
+_CONFIRMS_THE_DRAFT: tuple[str, str] = (
+    "Confirms the draft",
+    "The assistant presents the complete draft breakdown in its first "
+    "response and returns the result only after the user confirms it or "
+    "corrects a value.",
+)
+
 
 class ProcessDefinition(LLMValidated):
     """The stages and concrete steps of the user's work."""
@@ -137,15 +144,37 @@ def _draft_process_definition(
     """Turn the user's description into the stages and steps of their work.
 
 The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Keep their names for
-the stages and steps. The role in charge is the person or role that keeps the work moving; if the notes say the user
-does it all, the orchestrating component and the sole participant are the user. Do not invent people or steps the notes
-do not support.
+the stages and steps. Group the concrete steps into a few broad stages; a stage is not one of the steps repeated as a
+heading, and no step may appear both as a stage and as an activity. Infer the participants from the steps — a step that
+sends work to a manager or finance names that party — and the role in charge is the person or role that keeps the work
+moving. If the notes say the user does it all, the orchestrating component and the sole participant are the user. Do not
+invent people or steps the notes do not support.
 
 Return the complete ProcessDefinition."""
     ...  # type: ignore[reportReturnType]
 
 
-@atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE, _OPENS_WITH_THE_DRAFT])
+def _format_process_definition(draft: ProcessDefinition) -> str:
+    """Present a derived breakdown in the user's words, without field names."""
+    stages = " → ".join(draft.phases)
+    steps = "; ".join(draft.activities)
+    people = ", ".join(draft.participants)
+    return (
+        "Here's the picture I've got from what you told me:\n"
+        f"- Stages: {stages}\n"
+        f"- Steps: {steps}\n"
+        f"- Who's involved: {people}\n"
+        f"- In charge: {draft.orchestrating_component}"
+    )
+
+
+@atomic_workflow_step(
+    conversation_validation_rules=[
+        _NO_EXECUTOR_MODE,
+        _OPENS_WITH_THE_DRAFT,
+        _CONFIRMS_THE_DRAFT,
+    ]
+)
 def _confirm_process_definition(
     draft: Annotated[
         ProcessDefinition,
@@ -155,10 +184,9 @@ def _confirm_process_definition(
 ) -> ProcessDefinition:
     """Present the draft breakdown and ask the user to confirm or correct it.
 
-The draft is the complete breakdown derived from their description. Present it in their words — the stages, the
-steps inside them, who is involved, and who is in charge — then ask one confirm-or-correct question. Do not ask them to
-name the stages or steps; the draft already has them. If they correct a value, update it and return the corrected
-result. If they confirm, return it. Ask only for a gap the draft cannot fill; do not re-ask what the draft contains."""
+The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. If they confirm,
+return the draft. If they correct a value, update it and return the corrected result. Do not re-present the whole draft
+and do not ask them to name the stages or steps; the draft already has them. Ask only for a gap the draft cannot fill."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -189,6 +217,10 @@ def generate_from_chat(
     else:
         gathered = _gather_notes(session=session, max_turns=gather_turns)
     draft = _draft_process_definition(notes=gathered.notes, session=session)
+    # The proposal is the model's own draft, shown in the user's words before
+    # the confirmation turn. A confirmation turn that skips the presentation
+    # would leave the user (and the judge) with no proposal at all.
+    session.say(_format_process_definition(draft))
     return _confirm_process_definition(
         draft=draft, session=session, max_turns=max_turns
     )
