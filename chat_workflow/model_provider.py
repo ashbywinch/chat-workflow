@@ -62,6 +62,20 @@ _EXTRA_FOR = {
 }
 
 
+def _model_id(provider: str, model: str) -> str:
+    """The service's own model id: a prefix naming *its* provider is config.
+
+    A route is written ``openai/dynamic/fallback2``; the wire wants
+    ``dynamic/fallback2``. The gateway is not a parser — it reads a leading
+    ``openai/`` as "send the caller's key to OpenAI" and drops its own, which
+    surfaces as an upstream 401 that looks like a missing credential. Only the
+    selected provider's prefix is removed, because ``openrouter`` model ids
+    legitimately begin with another vendor's name (``openai/gpt-4o``).
+    """
+    prefix = f"{provider}/"
+    return model[len(prefix) :] if model.startswith(prefix) else model
+
+
 def build_model(
     *,
     provider: str,
@@ -75,6 +89,11 @@ def build_model(
     provider's own environment variable. ``api_base`` overrides the service's
     host (the gateway is such an override); an OpenAI-compatible service with
     no override uses its published host.
+
+    A model may be written the way a config names its route —
+    ``openai/dynamic/fallback2`` — or as the service's own id. The service
+    only understands the id, so this function removes a leading prefix that
+    names the *selected* provider (see ``_model_id``).
     """
     provider = provider.lower()
     if provider in _EXTRA_FOR:
@@ -92,6 +111,8 @@ def build_model(
     api_key = os.getenv(key_env)
     if not api_key:
         raise APIKeyError(f"{key_env} not set. Get your API key and set this environment variable.")
+
+    model = _model_id(provider, model)
 
     if provider == "azure":
         # Azure needs its resource endpoint and, unless it is the v1 API, an

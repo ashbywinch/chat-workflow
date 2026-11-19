@@ -43,6 +43,24 @@ class TestBuildModel(unittest.TestCase):
         self.assertIn("gateway.example", model.provider.base_url)
         self.assertEqual(model.model_name, "route/model")
 
+    def test_a_prefix_naming_the_provider_is_not_part_of_the_model_id(self):
+        """config.json spells a route ``openai/dynamic/fallback2``; the wire wants the id.
+
+        A gateway reads the leading ``openai/`` as "forward to OpenAI with the
+        caller's key", which loses the gateway's own auth and returns OpenAI's
+        401. ``model_name`` is the string the SDK sends as ``model``.
+        """
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "secret"}, clear=True):
+            model = build_model(provider="openai", model="openai/dynamic/fallback2")
+
+        self.assertEqual(model.model_name, "dynamic/fallback2")
+
+    def test_another_vendors_prefix_stays_in_the_model_id(self):
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": "secret"}, clear=True):
+            model = build_model(provider="openrouter", model="openai/gpt-4o")
+
+        self.assertEqual(model.model_name, "openai/gpt-4o")
+
     def test_openrouter_uses_its_published_host(self):
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": "secret"}, clear=True):
             model = build_model(provider="openrouter", model="vendor/model")
