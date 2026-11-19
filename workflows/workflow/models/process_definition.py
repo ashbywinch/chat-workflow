@@ -1,9 +1,9 @@
 # ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
 from __future__ import annotations
 
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from chat_workflow import atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
@@ -102,6 +102,20 @@ class ProcessDefinition(LLMValidated):
     ] = Field(
         ..., description="Everyone involved (people, roles, or systems)", min_length=1
     )
+
+    @model_validator(mode="after")
+    def _stages_are_broader_than_steps(self) -> Self:
+        """A stage groups steps; the same phrase cannot be both."""
+        stages = {phase.strip().casefold() for phase in self.phases}
+        steps = {step.strip().casefold() for step in self.activities}
+        overlap = sorted(stages & steps)
+        if overlap:
+            raise ValueError(
+                "A stage cannot also be a concrete step. Group the steps "
+                "under broader stages; these appear in both: "
+                + ", ".join(overlap)
+            )
+        return self
 
 
 class GatheredNotes(BaseModel):

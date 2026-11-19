@@ -17,9 +17,10 @@ from workflows.workflow.models import ProcessDefinition, generate_from_chat
 PROCESS_DEFINITION_RULES = {
     NO_REPETITION[0]: NO_REPETITION[1],
     "Uses expertise": (
-        "The assistant derives the stages, steps, participants, and role in "
-        "charge from what the user described, grouping concrete steps into "
-        "broad stages rather than asking the user to name each one."
+        "The assistant builds the stages, steps, participants, and role in "
+        "charge from the user's description, grouping concrete steps into "
+        "broad stages instead of asking the user to name each stage or step "
+        "from scratch."
     ),
     "Honest about provenance": (
         "Every stage, step, participant, and role in the breakdown comes from "
