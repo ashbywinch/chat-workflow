@@ -78,6 +78,8 @@ Edit `config.json` in the project root to configure your preferred provider and 
 
 **Available providers**: `openai` (the house gateway or OpenAI), `openrouter`, `groq`, `together`, `azure`. Google and Anthropic need their own PydanticAI SDK extra and are refused with a message naming it.
 
+**Model ids**: a prefix naming the configured provider is the route's name, not part of the id — `openrouter/google/gemini-2.0-flash-lite-001` reaches OpenRouter as `google/gemini-2.0-flash-lite-001`. Only the selected provider's own prefix is removed.
+
 **Temperature**: Controls randomness (0.0 = deterministic, 1.0 = creative)
 
 ## Using the CLI
