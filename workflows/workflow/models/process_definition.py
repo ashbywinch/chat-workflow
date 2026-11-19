@@ -184,9 +184,12 @@ def _confirm_process_definition(
 ) -> ProcessDefinition:
     """Present the draft breakdown and ask the user to confirm or correct it.
 
-The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. If they confirm,
-return the draft. If they correct a value, update it and return the corrected result. Do not re-present the whole draft
-and do not ask them to name the stages or steps; the draft already has them. Ask only for a gap the draft cannot fill."""
+The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. Name one
+concrete improvement grounded in the breakdown — a capture format, a template, or a checklist they could adopt — and
+ask whether it fits. Do not invent a tool or product they did not mention; keep the improvement to a practice. If they
+confirm, return the draft. If they correct a value, update it and return the corrected result. Do not re-present the
+whole draft and do not ask them to name the stages or steps; the draft already has them. Ask only for a gap the draft
+cannot fill."""
     ...  # type: ignore[reportReturnType]
 
 

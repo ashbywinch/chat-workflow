@@ -22,6 +22,7 @@ from .session import Session
 
 T = TypeVar("T")
 
+_FALLBACK_GREETING = "Hi there — what are you working on?"
 _FALLBACK_CLOSING = "I have what I need."
 
 
@@ -101,12 +102,14 @@ class SessionComponent:
         session.active = True
         try:
             if not session.state.messages:
-                session.say(
-                    self.greet(
+                try:
+                    greeting = self.greet(
                         session=session,
                         _first_user_input="Start the conversation.",
-                    ).text
-                )
+                    ).text.strip()
+                except Exception:
+                    greeting = _FALLBACK_GREETING
+                session.say(greeting or _FALLBACK_GREETING)
             result = step(session=session)
             session.state.final_result = result
             try:

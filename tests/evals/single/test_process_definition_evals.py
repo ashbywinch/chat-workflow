@@ -6,8 +6,27 @@ Evals fail (not skip) when infrastructure is missing.
 
 import unittest
 
+from chat_workflow.conversation_rules import NO_REPETITION
 from tests.evals.helpers import run_multi_turn_eval
 from workflows.workflow.models import ProcessDefinition, generate_from_chat
+
+# A ProcessDefinition describes the user's own work; it is not a tool or a
+# template. The judge asks whether the assistant derived the breakdown from
+# what the user said (grouping steps into stages), not whether it proposed a
+# product.
+PROCESS_DEFINITION_RULES = {
+    NO_REPETITION[0]: NO_REPETITION[1],
+    "Uses expertise": (
+        "The assistant derives the stages, steps, participants, and role in "
+        "charge from what the user described, grouping concrete steps into "
+        "broad stages rather than asking the user to name each one."
+    ),
+    "Honest about provenance": (
+        "Every stage, step, participant, and role in the breakdown comes from "
+        "what the user described or is a clearly presented inference; the "
+        "assistant does not invent details the user never mentioned."
+    ),
+}
 
 
 class TestGatherNotesEval(unittest.TestCase):
@@ -24,6 +43,14 @@ class TestGatherNotesEval(unittest.TestCase):
             model_method=generate_from_chat,
             method_kwargs=dict(max_turns=14),
             user_persona=user_persona,
+            judge_rules={
+                **PROCESS_DEFINITION_RULES,
+                "Warm open": (
+                    "The assistant's first response is an open-ended invitation "
+                    "about the user's work, not a request to name stages, steps, "
+                    "or fields."
+                ),
+            },
         )
         self.assertIsInstance(result, ProcessDefinition)
 
@@ -38,6 +65,14 @@ class TestGatherNotesEval(unittest.TestCase):
             model_method=generate_from_chat,
             method_kwargs=dict(max_turns=14),
             user_persona=user_persona,
+            judge_rules={
+                **PROCESS_DEFINITION_RULES,
+                "Anything else?": (
+                    "After the user's first description, the assistant invites "
+                    "elaboration with one open invitation such as 'Anything "
+                    "else?', not a new structural question."
+                ),
+            },
         )
         self.assertIsInstance(result, ProcessDefinition)
 
@@ -52,6 +87,14 @@ class TestGatherNotesEval(unittest.TestCase):
             model_method=generate_from_chat,
             method_kwargs=dict(max_turns=14),
             user_persona=user_persona,
+            judge_rules={
+                **PROCESS_DEFINITION_RULES,
+                "Open exploration": (
+                    "The assistant explores the user's work before naming stages "
+                    "or steps; it does not ask the user to confirm a structure "
+                    "mid-exploration."
+                ),
+            },
         )
         self.assertIsInstance(result, ProcessDefinition)
 
@@ -72,6 +115,7 @@ class TestGenerateFromNotesEval(unittest.TestCase):
             model_method=generate_from_chat,
             method_kwargs=dict(max_turns=14),
             user_persona=user_persona,
+            judge_rules=PROCESS_DEFINITION_RULES,
         )
         self.assertIsInstance(result, ProcessDefinition)
 
@@ -86,5 +130,13 @@ class TestGenerateFromNotesEval(unittest.TestCase):
             model_method=generate_from_chat,
             method_kwargs=dict(max_turns=14),
             user_persona=user_persona,
+            judge_rules={
+                **PROCESS_DEFINITION_RULES,
+                "Suggests one possibility": (
+                    "When the user has not mentioned a detail the breakdown "
+                    "needs, the assistant proposes one concrete possibility and "
+                    "asks them to confirm it, rather than asking an open question."
+                ),
+            },
         )
         self.assertIsInstance(result, ProcessDefinition)

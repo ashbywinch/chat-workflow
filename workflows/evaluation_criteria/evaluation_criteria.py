@@ -70,7 +70,10 @@ class EvaluationCriteria(BaseModel):
         - Base output only on information explicitly provided by the user.
           `context` names the topic; it is not the user's answers and is not
           enough to fill the criteria.
-        - If the user is vague, ask clarifying questions.
+        - If the user is vague, ask clarifying questions. If they answer a
+          question with a vague non-answer, ask once more; if they still give
+          no value, return intent="failure" rather than inventing one from the
+          context.
         - If the user is uncooperative or refuses to provide useful information within max_turns,
             use intent="failure".
         """
