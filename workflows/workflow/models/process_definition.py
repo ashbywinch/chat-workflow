@@ -159,11 +159,12 @@ def _draft_process_definition(
 
 The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Keep their names for
 the stages and steps. Group the concrete steps into a few broad stages; a stage is not one of the steps repeated as a
-heading, and no step may appear both as a stage and as an activity. Infer the participants from the steps — a step that
-sends work to a manager or finance names that party — and the role in charge is the person or role that keeps the work
-moving. If the notes say the user does it all, the orchestrating component and the sole participant are the user. Do not
-invent people or steps the notes do not support. A name the notes say the user is unsure about — "I don't know if JD is
-John or a project" — is not a participant; leave it out. An example is not a fact.
+heading, and no step may appear both as a stage and as an activity. List only the people or roles the notes actually
+name; a step that says "submit for approval" does not name an approver, so leave the approver out and let the
+confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
+say the user does it all, the orchestrating component and the sole participant are the user. Do not invent people or
+steps the notes do not support. A name the notes say the user is unsure about — "I don't know if JD is John or a
+project" — is not a participant; leave it out. An example is not a fact.
 
 Return the complete ProcessDefinition."""
     ...  # type: ignore[reportReturnType]
@@ -199,12 +200,13 @@ def _confirm_process_definition(
 ) -> ProcessDefinition:
     """Present the draft breakdown and ask the user to confirm or correct it.
 
-The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. Name one
-concrete improvement grounded in the breakdown — a capture format, a template, or a checklist they could adopt — and
-ask whether it fits. Do not invent a tool or product they did not mention; keep the improvement to a practice. If they
-confirm, return the draft. If they correct a value, update it and return the corrected result. Do not re-present the
-whole draft and do not ask them to name the stages or steps; the draft already has them. Ask only for a gap the draft
-cannot fill."""
+The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. If the draft
+leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask about that gap
+and offer one concrete possibility in the question. Name one concrete improvement grounded in the breakdown — a capture
+format, a template, or a checklist they could adopt — and ask whether it fits. Do not invent a tool or product they did
+not mention; keep the improvement to a practice. If they confirm, return the draft. If they correct a value, update it
+and return the corrected result. Do not re-present the whole draft and do not ask them to name the stages or steps; the
+draft already has them."""
     ...  # type: ignore[reportReturnType]
 
 
