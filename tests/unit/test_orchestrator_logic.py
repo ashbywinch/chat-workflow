@@ -638,7 +638,7 @@ class TestTheStepOnTheTranscript(unittest.TestCase):
 
         session.run(workflow=orchestrator, first_user_input="hello")
 
-        self.assertEqual(len(state.messages), 2)
+        self.assertEqual(len(state.messages), 3)  # request, answer call, its return
         self.assertEqual(state.usage.requests, 1)
         self.assertEqual(state.turn_count, 1)
 

@@ -34,6 +34,8 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+from .models import ANSWER_TOOL
+
 Audience = Literal["all", "user"]
 
 # Entry kinds. ``output`` is the final structured response (the request's
@@ -109,7 +111,9 @@ def _last_answer_index(messages: Sequence[ModelMessage]) -> int | None:
     for index in range(len(messages) - 1, -1, -1):
         message = messages[index]
         if isinstance(message, ModelResponse) and any(
-            isinstance(part, TextPart) and part.content.strip() for part in message.parts
+            (isinstance(part, TextPart) and part.content.strip())
+            or (isinstance(part, ToolCallPart) and part.tool_name == ANSWER_TOOL)
+            for part in message.parts
         ):
             return index
     return None
@@ -126,6 +130,9 @@ def _request_entries(message: ModelRequest) -> Iterable[tuple[str, str]]:
         elif isinstance(part, RetryFeedbackPart):
             yield "validation", _text(part.content)
         elif isinstance(part, ToolReturnPart):
+            if part.tool_name == ANSWER_TOOL:
+                # the answer itself, already shown as its call
+                continue
             outcome = getattr(part, "outcome", "success")
             kind = "validation" if outcome == "retried" else "tool-return"
             yield kind, _tool_return_text(part)
@@ -139,7 +146,10 @@ def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tu
         elif isinstance(part, ThinkingPart):
             yield "thinking", part.content
         elif isinstance(part, ToolCallPart):
-            yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
+            if part.tool_name == ANSWER_TOOL:
+                yield ("output" if is_answer else "assistant"), part.args_as_json_str()
+            else:
+                yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
 
 
 def _tool_return_text(part: ToolReturnPart) -> str:

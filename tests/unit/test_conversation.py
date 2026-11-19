@@ -9,9 +9,16 @@ from __future__ import annotations
 
 import json
 import unittest
+from typing import Any
 
 from pydantic_ai.exceptions import ModelHTTPError
-from pydantic_ai.messages import ModelResponse, RetryFeedbackPart, TextPart
+from pydantic_ai.messages import (
+    ModelResponse,
+    RetryFeedbackPart,
+    RetryPromptPart,
+    TextPart,
+    ToolReturnPart,
+)
 
 from chat_workflow import Conversation, MaxRetriesExceededError, Success
 from chat_workflow.models import AgentIntent
@@ -20,12 +27,19 @@ from tests.conftest import make_conversation, make_valid_criteria
 VALID = {"intent": "success", "result": make_valid_criteria().model_dump()}
 
 
-def _retry_parts(conversation: Conversation) -> list[RetryFeedbackPart]:
+def _retry_parts(conversation: Conversation) -> list[Any]:
+    """Every correction the model was given.
+
+    The answer is a tool call, so a rejection comes back as a retried
+    ``ToolReturnPart``; a business rule and a field error share that channel.
+    A text answer's retry is still a ``RetryFeedbackPart``.
+    """
     return [
         part
         for message in conversation.messages
         for part in getattr(message, "parts", ())
-        if isinstance(part, RetryFeedbackPart)
+        if isinstance(part, (RetryFeedbackPart, RetryPromptPart))
+        or (isinstance(part, ToolReturnPart) and getattr(part, "outcome", "success") != "success")
     ]
 
 
@@ -53,11 +67,11 @@ class TestTypedOutput(unittest.TestCase):
 
         self.assertEqual(second.output.intent, AgentIntent.SUCCESS)
 
-        self.assertEqual(len(conversation.messages), 4)
-        # The second request carried the first exchange: its request and
-        # response, then the new prompt.
-        sent = conversation.script.calls[1]
-        self.assertEqual(len(sent), 3)
+        # Each turn is a request, the answer's tool call and its return; the
+        # second request carries the first turn's exchange.
+        self.assertEqual(len(conversation.messages), 6)
+        carried = [type(part).__name__ for message in conversation.script.calls[1] for part in message.parts]
+        self.assertIn("ToolCallPart", carried)
 
     def test_an_empty_prompt_opens_the_conversation(self):
         conversation = make_conversation([VALID])

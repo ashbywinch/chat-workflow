@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TResult = TypeVar("TResult")
 
+# The name of the tool that carries a step's answer. The endpoint enforces a
+# tool's schema where it ignores `response_format`, so the answer is a call.
+ANSWER_TOOL = "answer"
+
 
 class AgentIntent(StrEnum):
     """What the agent wants the framework to do next."""

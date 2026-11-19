@@ -3,14 +3,13 @@
 Common test configuration and fixtures.
 """
 
-import json
 import signal
 import sys
 from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 from chat_workflow import (
@@ -115,15 +114,15 @@ def make_atomic_workflow_config(
 
 
 def text_response(payload: Any) -> ModelResponse:
-    """A model response whose text is *payload* as JSON.
+    """A model response that calls the ``answer`` tool with *payload*.
 
-    An answer object is nested under ``response``: the provider needs an
-    object at the root, so the request's schema is
-    ``{"response": <the intents' union>}``.
+    The answer travels as a tool call: the endpoints behind this model enforce
+    a tool's schema and ignore ``response_format``. The schema wraps the
+    intents' union in an object under ``response``, so the arguments do too.
     """
     if isinstance(payload, dict) and "response" not in payload:
         payload = {"response": payload}
-    return ModelResponse(parts=[TextPart(json.dumps(payload))])
+    return ModelResponse(parts=[ToolCallPart("answer", payload)])
 
 
 class ScriptedModel:

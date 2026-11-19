@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 import pydantic_ai
-from pydantic_ai import Agent, AgentRunResult, NativeOutput, RetryModelRequest, UsageLimits
+from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, UsageLimits
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import (
@@ -40,12 +40,14 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 from pydantic_ai.models import Model, ModelRequestContext
+from pydantic_ai.output import ToolOutput
 from pydantic_ai.settings import ModelSettings
 from pydantic_ai.tools import RunContext
 from pydantic_ai.usage import RunUsage
 
 from .exceptions import MaxRetriesExceededError
 from .model_provider import ProviderType, build_model
+from .models import ANSWER_TOOL
 
 T = TypeVar("T")
 
@@ -201,11 +203,14 @@ def _has_user_turn(messages: Sequence[ModelMessage]) -> bool:
 class Conversation(Generic[T]):
     """A model, its instructions, and the transcript of one conversation.
 
-    ``output_retries`` is the output channel: a response the output type or a
-    business rule rejects is fed back with the rejection, and the model is
-    asked to correct it. ``transport_retries`` is the provider SDK's resend for
-    429/5xx/connection failures — invisible, because it says nothing about the
-    conversation. ``unusable_resends`` is the no-content resend above.
+    ``output_retries`` is the answer channel: the answer is a call to the
+    ``answer`` tool (the endpoint enforces a tool's schema even when it ignores
+    ``response_format``), so a rejected answer — a wrong field or a business
+    rule — is fed back with the rejection and the model is asked to correct it.
+    That is also the budget for a malformed call to a step's own tools.
+    ``transport_retries`` is the provider SDK's resend for 429/5xx/connection
+    failures — invisible, because it says nothing about the conversation.
+    ``unusable_resends`` is the no-content resend above.
     ``max_requests`` bounds one turn's model steps (including tool rounds) so a
     model that never concludes fails instead of billing forever.
     """
@@ -272,9 +277,9 @@ class Conversation(Generic[T]):
             )
         agent: Agent[Any, T] = Agent(
             self._model,
-            output_type=NativeOutput(self._output_type, name="response", strict=True),
+            output_type=ToolOutput(self._output_type, name=ANSWER_TOOL, strict=True),
             system_prompt=self._instructions,
-            retries={"output": self._output_retries},
+            retries={"output": self._output_retries, "tools": self._output_retries},
             capabilities=[resender],
         )
         try:
