@@ -57,7 +57,7 @@ Example workflows live in the `workflows/` directory.
 #### `conversation.py` — the model path
 - One `Conversation.send()` for every model call
 - Supports: OpenAI, Google, OpenRouter, etc.
-- PydanticAI enforces the output schema (`NativeOutput`, strict `json_schema`) and keeps the transcript
+- PydanticAI enforces the output schema as the `answer` tool's parameters (`ToolOutput`, strict) and keeps the transcript
 
 #### `chat_workflow_cli/cli.py` — CLI with Auto-Discovery
 - Discovers `@composite_workflow` functions in `workflows/` directory
@@ -79,7 +79,7 @@ make test          # Unit tests only (no API key needed, ~0.01s)
 make test-verbose  # Same with verbose output per test
 make evals          # Real-API evals (requires config.json + API key, ~90s)
 make evals-verbose  # Same with verbose output
-make lint           # ruff and basedpyright
+make lint           # ruff; `make typecheck` runs pyrefly
 ```
 
 ## Critical Patterns

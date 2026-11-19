@@ -280,7 +280,16 @@ class Conversation(Generic[T]):
         agent: Agent[Any, T] = Agent(
             self._model,
             output_type=ToolOutput(self._output_type, name=ANSWER_TOOL, strict=True),
-            system_prompt=self._instructions,
+            system_prompt=self._instructions
+            + (
+                "\n\n## Final turn\n"
+                "No further turn will be offered. Answer now with what the user "
+                "has given: intent='success' with the complete result, or "
+                "intent='failure' if it cannot be produced. Do not ask another "
+                "question."
+                if final_turn
+                else ""
+            ),
             retries={"output": self._output_retries, "tools": self._output_retries},
             capabilities=[resender],
         )
@@ -327,17 +336,8 @@ class Conversation(Generic[T]):
         not leave sockets to the garbage collector.
         """
         async with agent:
-            instructions = self._instructions
-            if final_turn:
-                instructions += (
-                    "\n\n## Final turn\n"
-                    "No further turn will be offered. Answer now with what the user has "
-                    "given: intent='success' with the complete result, or intent='failure' "
-                    "if it cannot be produced. Do not ask another question."
-                )
             return await agent.run(
                 prompt,
-                instructions=instructions,
                 message_history=list(self.messages),
                 model_settings=self.model_settings(),
                 usage_limits=UsageLimits(request_limit=self._max_requests),

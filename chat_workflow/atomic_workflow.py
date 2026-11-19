@@ -62,6 +62,7 @@ class AtomicWorkflow(Generic[TResult]):
             max_tokens=config.max_tokens,
             timeout_seconds=config.request_timeout_seconds,
             extra_headers=config.extra_headers,
+            temperature=config.temperature,
         )
 
     @property

@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     RetryFeedbackPart,
     RetryPromptPart,
+    SystemPromptPart,
     TextPart,
     ToolReturnPart,
 )
@@ -273,6 +274,43 @@ class TestBusinessRules(unittest.TestCase):
         feedback = _retry_parts(conversation)[0]
         rendered = feedback.content if isinstance(feedback.content, str) else json.dumps(feedback.content)
         self.assertIn("budget", rendered.lower())
+
+
+class TestInstructions(unittest.TestCase):
+    def test_the_instructions_are_sent_once(self):
+        """The agent carries the step's instructions; a run adds only the
+        final-turn note. Passing both rendered them twice on every request."""
+        conversation = make_conversation([VALID])
+        conversation.send("hello", final_turn=True)
+
+        parts = [
+            part
+            for message in conversation.script.calls[0]
+            for part in message.parts
+            if isinstance(part, SystemPromptPart)
+        ]
+        self.assertEqual(len(parts), 1)
+        self.assertIn("Final turn", parts[0].content)
+        self.assertEqual(parts[0].content.count("Test instructions"), 1)
+
+
+class TestTheUserView(unittest.TestCase):
+    def test_it_shows_the_question_not_the_answer_envelope(self):
+        from chat_workflow.transcript import render
+
+        conversation = make_conversation(
+            [
+                {"intent": "continue", "message": "What is the budget?"},
+                VALID,
+            ]
+        )
+        conversation.send("I need criteria")
+        conversation.send("About fifty pounds")
+
+        text = render(conversation.messages, audience="user")
+
+        self.assertIn("What is the budget?", text)
+        self.assertNotIn('"intent"', text)
 
 
 class TestGatewayUpstreamFailures(unittest.TestCase):

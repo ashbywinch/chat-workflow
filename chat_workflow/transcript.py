@@ -147,7 +147,17 @@ def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tu
             yield "thinking", part.content
         elif isinstance(part, ToolCallPart):
             if part.tool_name == ANSWER_TOOL:
-                yield ("output" if is_answer else "assistant"), part.args_as_json_str()
+                args = part.args
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except ValueError:
+                        args = None
+                body = args.get("response", args) if isinstance(args, dict) else None
+                spoken = body.get("message") if isinstance(body, dict) else None
+                yield ("output" if is_answer else "assistant"), (
+                    spoken or part.args_as_json_str()
+                )
             else:
                 yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
 

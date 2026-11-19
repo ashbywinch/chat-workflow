@@ -52,3 +52,4 @@ class AtomicWorkflowConfig(Generic[TResult]):
     max_tokens: int = 16384
     request_timeout_seconds: float = 30.0
     extra_headers: dict[str, str] | None = None
+    temperature: float | None = None

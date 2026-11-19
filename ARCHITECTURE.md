@@ -19,10 +19,12 @@ workflows/, CLI  →  AtomicWorkflow  →  Conversation  →  PydanticAI  →  p
   OpenAI-compatible services (the house gateway, OpenAI, OpenRouter, Groq,
   Together) and Azure are wired in. Google and Anthropic need their own SDK
   extra and are refused with a message naming it.
-- **Schema enforcement** (`conversation.py`): the request carries the output
-  schema (`NativeOutput(..., name="response", strict=True)`), so the model
-  cannot return an out-of-enum value or a malformed envelope. The prompt never
-  restates the schema.
+- **Schema enforcement** (`conversation.py`): the answer is a call to an
+  `answer` tool (`ToolOutput(..., name="answer", strict=True)`), so the request
+  carries the schema as that tool's parameters. `response_format` is not used:
+  the endpoints behind this model accept it and ignore it (measured — a bare
+  object where the schema required the `response` envelope). A tool's schema is
+  enforced on the same route. The prompt never restates the schema.
 - **The transcript is the message list**, not a rendering: thinking, tool
   calls, tool returns, retry prompts and the final output all live in it.
   `transcript.py` is the one projection into text (audit view, user view) and
@@ -35,9 +37,9 @@ workflows/, CLI  →  AtomicWorkflow  →  Conversation  →  PydanticAI  →  p
 |---|---|---|---|
 | transport (429/5xx/connection/timeout) | the provider SDK resends the identical request | `transport_retries` | no |
 | no usable content (blank, thinking-only, token-limit stop) | `RetryModelRequest`: same step, no prompt added, model never learns | `unusable_resends` (per request step) | engine diagnosis only |
-| output rejected (shape or business rule) | `ModelRetry`: a visible retry prompt carrying the validator's complaint | `output_retries` | yes (`RetryFeedbackPart`) |
+| answer rejected (shape or business rule) | a retried `answer` tool return carrying the validator's complaint | `output_retries`, shared with the step's tools | yes (`ToolReturnPart(outcome="retried")`) |
 | tool failure | a failed tool *result*; the model adapts in the same run | none | yes (`ToolReturnPart`) |
-| malformed tool call | a retried tool return | `tool_retries` | yes |
+| malformed tool call | a retried tool return | `output_retries` (one budget, no separate `tool_retries`) | yes |
 
 Shape and business-rule rejections share one output-retry budget because they
 are one channel in PydanticAI's native-output path. Separating them would need

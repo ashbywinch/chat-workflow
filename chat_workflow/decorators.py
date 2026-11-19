@@ -84,6 +84,7 @@ def _setup_atomic_workflow(
             transport_retries=session.config.max_retries,
             request_timeout_seconds=session.config.request_timeout_seconds,
             extra_headers=getattr(session.config, "extra_headers", None),
+            temperature=getattr(session.config, "temperature", None),
         )
     )
 
