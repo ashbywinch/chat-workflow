@@ -142,7 +142,7 @@ def _confirm_interaction_context(
 ) -> ComponentInteractionContext:
     """The proposal and the three questions have already been shown. Use the user's answers.
 
-Ask only about a point they left unanswered. If they correct a value, update it and return the corrected context. If
-they confirm, return the draft. Do not re-present the whole proposal, repeat the three questions, or ask what to call
-the artifact."""
+Ask only about a point they left unanswered. If they correct a value, say in one sentence what you changed, update it,
+and return the corrected context. If they confirm, return the draft. Do not re-present the whole proposal, repeat the
+three questions, or ask what to call the artifact."""
     ...  # type: ignore[reportReturnType]

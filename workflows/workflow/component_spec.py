@@ -256,7 +256,8 @@ def _confirm_components(
 ) -> list[ComponentSpec]:
     """The parts have already been shown to the user. Ask one confirm-or-correct question.
 
-Do not re-present the whole set. If the user confirms, return the draft. If they correct a part, update it and return
-the corrected set. Ask only about a gap the draft cannot fill; do not ask the user to name a part, say who owns it, or
-describe a stage the analysis already lists."""
+Do not re-present the whole set. If the user confirms, return the draft. If they correct a part, or add a requirement
+that belongs to an existing part, say in one sentence that you added it to that part, update the part, and return the
+corrected set. If the requirement is a new artifact, propose a new part. Ask only about a gap the draft cannot fill; do
+not ask the user to name a part, say who owns it, or describe a stage the analysis already lists."""
     ...  # type: ignore[reportReturnType]

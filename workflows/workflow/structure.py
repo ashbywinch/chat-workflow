@@ -188,7 +188,7 @@ def _confirm_structure(
 ) -> ComponentStructure:
     """The structure has been shown. Ask one confirm-or-correct question.
 
-If the user confirms, return the draft. If they correct a type or a rule, update it and return the corrected
-structure. Ask only about a gap the draft cannot fill; do not re-present the whole structure or ask the user to choose
-code types."""
+If the user confirms, return the draft. If they correct a type or a rule, say in one sentence what you changed,
+update it, and return the corrected structure. Ask only about a gap the draft cannot fill; do not re-present the whole
+structure or ask the user to choose code types."""
     ...  # type: ignore[reportReturnType]
