@@ -115,7 +115,14 @@ def make_atomic_workflow_config(
 
 
 def text_response(payload: Any) -> ModelResponse:
-    """A model response whose text is *payload* as JSON."""
+    """A model response whose text is *payload* as JSON.
+
+    An answer object is nested under ``response``: the provider needs an
+    object at the root, so the request's schema is
+    ``{"response": <the intents' union>}``.
+    """
+    if isinstance(payload, dict) and "response" not in payload:
+        payload = {"response": payload}
     return ModelResponse(parts=[TextPart(json.dumps(payload))])
 
 
@@ -138,6 +145,8 @@ class ScriptedModel:
         item = self.responses[index]
         if callable(item):
             item = item()
+        if isinstance(item, BaseException):
+            raise item
         if isinstance(item, ModelResponse):
             return item
         return text_response(item)

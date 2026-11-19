@@ -4,7 +4,7 @@ from io import StringIO
 
 from chat_workflow import (
     AgentIntent,
-    AgentResponse,
+    Continue,
     Session,
     SessionLog,
     StreamingDebug,
@@ -54,7 +54,7 @@ class TestDebugStreaming(unittest.TestCase):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What is your budget?")
+        action = Continue(intent=AgentIntent.CONTINUE, message="What is your budget?")
         debug.on_response(action, duration_ms=123.45)
 
         output = debug_output.getvalue()

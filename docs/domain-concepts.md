@@ -36,11 +36,11 @@ This document defines the core vocabulary of the chat-workflow library and maps 
 
 ## Agent Response
 
-**What it is:** The structured object the LLM returns after one turn. It carries an `intent` (what the framework should do next) and optionally a `message` for the user or a `result` (the validated Pydantic object).
+**What it is:** The structured object the LLM returns after one turn. It carries an `intent` (what the framework should do next) and, according to that intent, a `message` for the user or a `result` (the validated Pydantic object): a question in `message` while continuing, the answer in `result` when finished, the reason in `message` when it cannot be produced.
 
 **Broadly known as:** *Structured output* (Vercel AI SDK), *tool call* / *function call* (OpenAI API), *completion* with a *finish reason*. The `intent` field aligns with what other frameworks call *stop reason*, *finish reason*, or *routing decision*.
 
-**In the code:** `AgentResponse` (model), `AgentIntent` (enum: `CONTINUE`, `SUCCESS`, `FAILURE`).
+**In the code:** `AgentResponse` (the union of `Continue`, `Success`, `Failure`), `AgentIntent` (enum: `CONTINUE`, `SUCCESS`, `FAILURE`).
 
 ## Turn Result
 

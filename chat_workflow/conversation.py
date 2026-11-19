@@ -30,7 +30,7 @@ from typing import Any, Generic, TypeVar
 import pydantic_ai
 from pydantic_ai import Agent, AgentRunResult, NativeOutput, RetryModelRequest, UsageLimits
 from pydantic_ai.capabilities import AbstractCapability
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -48,6 +48,30 @@ from .exceptions import MaxRetriesExceededError
 from .model_provider import ProviderType, build_model
 
 T = TypeVar("T")
+
+# The gateway answers "I could not get a response from the provider" with an
+# HTTP 400 and its own code (measured: 2005), not a 5xx. The request is sound;
+# the upstream failed, so the call is transport-retried like a 503. A 400 with
+# any other body is the request's fault and is raised unchanged.
+_UPSTREAM_FAILURE_CODES = frozenset({2005})
+_UPSTREAM_FAILURE_TEXT = "failed to get response from provider"
+
+
+def _is_upstream_failure(exc: ModelHTTPError) -> bool:
+    """Whether a rejected request is really the gateway's upstream failing."""
+    if exc.status_code != 400:
+        return False
+    body = exc.body
+    entries = body if isinstance(body, list) else [body]
+    for entry in entries:
+        if isinstance(entry, dict):
+            if entry.get("code") in _UPSTREAM_FAILURE_CODES:
+                return True
+            if _UPSTREAM_FAILURE_TEXT in str(entry.get("message", "")).lower():
+                return True
+        elif _UPSTREAM_FAILURE_TEXT in str(entry).lower():
+            return True
+    return False
 
 # The library starts the runs, so the library owns the output: PydanticAI's
 # first-run banner is for a person wiring an agent by hand, not for a workflow
@@ -130,12 +154,17 @@ class _ResendUnusable(AbstractCapability[Any]):
 
 
 def _has_usable_content(response: ModelResponse) -> bool:
-    """True when the response carries text or a tool call.
+    """True when the response carries text or a tool call that was not cut off.
 
     A thinking-only response is not an answer, and a blank text part carries
-    nothing a validator could accept. Anything the model actually wrote — even
-    a wrong answer — is usable: that is the output retry's job, not this one's.
+    nothing a validator could accept. A response stopped at the token limit is
+    not an answer either, even when text precedes the cut: the structured
+    output is incomplete, so there is nothing to correct — only a fresh sample
+    to take. Anything else the model wrote — even a wrong answer — is usable:
+    that is the output retry's job, not this one's.
     """
+    if response.finish_reason == "length":
+        return False
     return any(
         (isinstance(part, TextPart) and part.content.strip())
         or isinstance(part, ToolCallPart)
@@ -145,7 +174,7 @@ def _has_usable_content(response: ModelResponse) -> bool:
 
 def _unusable_cause(response: ModelResponse) -> str:
     if response.finish_reason == "length":
-        return "token limit reached before any output"
+        return "token limit reached before the answer finished"
     if any(isinstance(part, TextPart) for part in response.parts):
         return "blank response"
     return "thinking only, no output"
@@ -177,7 +206,7 @@ class Conversation(Generic[T]):
         model: str,
         provider: ProviderType = "openrouter",
         instructions: str,
-        output_type: type[T],
+        output_type: Any,
         api_base: str | None = None,
         api_key_env: str | None = None,
         messages: Sequence[ModelMessage] = (),
@@ -239,7 +268,7 @@ class Conversation(Generic[T]):
             capabilities=[resender],
         )
         try:
-            result = asyncio.run(self._run_turn(agent, prompt))
+            result = self._run_with_transport_retries(agent, prompt)
         except UnexpectedModelBehavior as exc:
             raise MaxRetriesExceededError(self._output_retries, reason=str(exc)) from exc
 
@@ -251,6 +280,23 @@ class Conversation(Generic[T]):
         )
         self.messages.extend(turn.messages)
         return turn
+
+    def _run_with_transport_retries(self, agent: Agent[Any, T], prompt: str | None) -> AgentRunResult[T]:
+        """One turn, resent when the gateway reports its upstream failing.
+
+        PydanticAI retries the statuses that mean "try again" (429, 5xx). The
+        gateway uses a 400 with its own code for the same situation, which
+        PydanticAI rightly treats as the caller's fault; this class is the one
+        place that knows the exception.
+        """
+        attempts = self._transport_retries + 1
+        for attempt in range(attempts):
+            try:
+                return asyncio.run(self._run_turn(agent, prompt))
+            except ModelHTTPError as exc:
+                if not _is_upstream_failure(exc) or attempt + 1 >= attempts:
+                    raise
+        raise AssertionError("unreachable: the last attempt raises")
 
     async def _run_turn(self, agent: Agent[Any, T], prompt: str | None) -> AgentRunResult[T]:
         """One run inside its own task, with the model client opened and closed.

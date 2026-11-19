@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -15,7 +15,7 @@ from pydantic_ai.usage import RunUsage
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .conversation import Conversation
 from .exceptions import AtomicWorkflowFailedError
-from .models import AgentIntent, AgentResponse, TurnResult
+from .models import AgentIntent, Continue, Failure, Success, TurnResult
 from .transcript import render
 
 TResult = TypeVar("TResult")
@@ -42,9 +42,9 @@ class AtomicWorkflow(Generic[TResult]):
         self.max_turns = config.max_turns
         self.model = config.model
         self.response_model = config.response_model
-        self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_continue
-        self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_success
-        self.on_failure: Callable[[AgentResponse[TResult]], AtomicWorkflowFailedError] = config.on_failure
+        self.on_continue: Callable[[Continue], TurnResult[TResult]] = config.on_continue
+        self.on_success: Callable[[Success[TResult]], TurnResult[TResult]] = config.on_success
+        self.on_failure: Callable[[Failure], AtomicWorkflowFailedError] = config.on_failure
         self.debug = config.debug
         self.usage = RunUsage()
         self._conversation = config.conversation or Conversation(
@@ -95,7 +95,7 @@ class AtomicWorkflow(Generic[TResult]):
 
         raise InvalidResponseError(f"Invalid intent received: {response.intent}")
 
-    def _call_llm(self, user_input: str | None = None) -> AgentResponse[TResult]:
+    def _call_llm(self, user_input: str | None = None) -> Any:
         """One turn with the model, timed for the debug stream."""
         started = time.monotonic()
         if self.debug:

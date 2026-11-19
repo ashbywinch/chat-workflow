@@ -10,9 +10,10 @@ from __future__ import annotations
 import json
 import unittest
 
-from pydantic_ai.messages import ModelResponse, RetryFeedbackPart
+from pydantic_ai.exceptions import ModelHTTPError
+from pydantic_ai.messages import ModelResponse, RetryFeedbackPart, TextPart
 
-from chat_workflow import AgentResponse, Conversation, MaxRetriesExceededError
+from chat_workflow import Conversation, MaxRetriesExceededError, Success
 from chat_workflow.models import AgentIntent
 from tests.conftest import make_conversation, make_valid_criteria
 
@@ -34,7 +35,7 @@ class TestTypedOutput(unittest.TestCase):
 
         turn = conversation.send("hello")
 
-        self.assertIsInstance(turn.output, AgentResponse)
+        self.assertIsInstance(turn.output, Success)
         self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
         self.assertEqual(turn.output.result, make_valid_criteria())
         self.assertEqual(turn.usage.requests, 1)
@@ -123,6 +124,24 @@ class TestUnusableResponses(unittest.TestCase):
 
         self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
         self.assertEqual(turn.resends[0].finish_reason, "length")
+
+    def test_a_truncated_answer_is_resent_not_corrected(self):
+        """A token-limit stop cuts the JSON mid-object. There is no answer to
+        correct, so the same request is sampled again — the output retry would
+        only ask the model to fix a fragment it never finished."""
+        truncated = ModelResponse(
+            parts=[TextPart('{"response": {"intent": "success", "result": {"crit',
+            )],
+            finish_reason="length",
+        )
+        conversation = make_conversation([truncated, VALID])
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(len(conversation.script.calls), 2)
+        self.assertEqual(turn.resends[0].cause, "token limit reached before the answer finished")
+        self.assertEqual(_retry_parts(conversation), [])
 
     def test_the_resend_is_bounded(self):
         conversation = make_conversation(
@@ -227,6 +246,32 @@ class TestBusinessRules(unittest.TestCase):
         feedback = _retry_parts(conversation)[0]
         rendered = feedback.content if isinstance(feedback.content, str) else json.dumps(feedback.content)
         self.assertIn("budget", rendered.lower())
+
+
+class TestGatewayUpstreamFailures(unittest.TestCase):
+    """The gateway reports its own upstream failing as a 400, not a 5xx."""
+
+    def test_the_gateways_upstream_failure_is_resent(self):
+        error = ModelHTTPError(
+            400,
+            "dynamic/fallback2",
+            body=[{"code": 2005, "message": "Failed to get response from provider"}],
+        )
+        conversation = make_conversation([error, VALID])
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(len(conversation.script.calls), 2)
+
+    def test_a_rejected_request_is_not_resent(self):
+        error = ModelHTTPError(400, "dynamic/fallback2", body=[{"code": 4000, "message": "bad schema"}])
+        conversation = make_conversation([error, VALID])
+
+        with self.assertRaises(ModelHTTPError):
+            conversation.send("hello")
+
+        self.assertEqual(len(conversation.script.calls), 1)
 
 
 class TestRequestSettings(unittest.TestCase):

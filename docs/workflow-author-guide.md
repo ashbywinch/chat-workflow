@@ -149,53 +149,51 @@ This makes each step testable in isolation and reusable across workflows.
 
 ### Example Model
 
-This example is from the internals of chat-workflow - it's the model that all LLM responses get wrapped in to support multi turn chat functionality.
+This example is from the internals of chat-workflow: the shapes every LLM
+answer takes, so one step can run across several turns.
 
 ```python
-from pydantic import BaseModel, Field, model_validator
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from chat_workflow import AgentIntent
 
 TResult = TypeVar("TResult")
 
-class AgentResponse(BaseModel, Generic[TResult]):
-    intent: AgentIntent
-    message: str | None = Field(
-        default=None,
-        description='Message for the user. Required when intent is CONTINUE or FAILURE. Must be null when intent is SUCCESS.',
-    )
-    result: TResult | None = Field(
-        default=None,
-        description='The result object. Required when intent is SUCCESS. Must be null when intent is CONTINUE or FAILURE.',
-    )
 
-    @model_validator(mode="after")
-    def validate_intent_consistency(self):
-        if self.intent == AgentIntent.CONTINUE:
-            if not self.message:
-                raise ValueError(
-                    "CONTINUE intent requires a message field with your question for the user. "
-                    "Do not include a result field."
-                )
-            if self.result is not None:
-                raise ValueError(
-                    "CONTINUE intent cannot include result. "
-                    "Use intent=AgentIntent.SUCCESS if you have complete result to return."
-                )
-        elif self.intent == AgentIntent.FAILURE:
-            if not self.message:
-                raise ValueError(
-                    "FAILURE intent requires a message field explaining why."
-                )
-            if self.result is not None:
-                raise ValueError("FAILURE intent cannot include result.")
-        elif self.intent == AgentIntent.SUCCESS:
-            if self.result is None:
-                raise ValueError(
-                    "SUCCESS intent requires a result field with the complete result."
-                )
-        return self
+class Continue(BaseModel):
+    """Ask the user another question; the answer is not ready this turn."""
+
+    model_config = ConfigDict(extra="forbid")
+    intent: Literal[AgentIntent.CONTINUE]
+    message: str = Field(min_length=1)
+
+
+class Success(BaseModel, Generic[TResult]):
+    """The finished object; the step is complete."""
+
+    model_config = ConfigDict(extra="forbid")
+    intent: Literal[AgentIntent.SUCCESS]
+    result: TResult
+
+
+class Failure(BaseModel):
+    """The result cannot be produced; stop and say why."""
+
+    model_config = ConfigDict(extra="forbid")
+    intent: Literal[AgentIntent.FAILURE]
+    message: str = Field(min_length=1)
+
+
+type AgentResponse[TResult] = Annotated[
+    Continue | Success[TResult] | Failure, Field(discriminator="intent")
+]
 ```
+
+Three shapes rather than one object with optional fields: the request's schema
+then says which fields each intent carries, so an answer cannot both ask and
+answer, and no validator has to reject it after the fact.
 
 ## Parameter Descriptions via `Annotated`
 

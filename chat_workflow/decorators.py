@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .debug import StreamingDebug
-from .models import AgentResponse, TurnResult
+from .models import AgentResponse, Success, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
 from .types_meta import resolve_return_type
 
@@ -63,11 +63,7 @@ def _setup_atomic_workflow(
     """Create and configure an AtomicWorkflow."""
     from .exceptions import AtomicWorkflowFailedError
 
-    def _on_success(response: AgentResponse[Any]) -> TurnResult[Any]:
-        if response.result is None:
-            # AgentResponse's validator guarantees a result on success; this
-            # keeps that invariant visible to the type checker.
-            raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
+    def _on_success(response: Success[Any]) -> TurnResult[Any]:
         return TurnResult[Any].success(response.result)
 
     return AtomicWorkflow(
@@ -76,9 +72,9 @@ def _setup_atomic_workflow(
             response_model=AgentResponse[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
-            on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message or ""),
+            on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message),
             on_success=_on_success,
-            on_failure=lambda response: AtomicWorkflowFailedError(response.message or "No reason given"),
+            on_failure=lambda response: AtomicWorkflowFailedError(response.message),
             debug=debug,
             model=session.config.model,
             provider=session.config.provider,

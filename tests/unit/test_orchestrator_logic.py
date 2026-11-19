@@ -7,9 +7,12 @@ from chat_workflow import (
     AgentResponse,
     AtomicWorkflow,
     AtomicWorkflowFailedError,
+    Continue,
+    Failure,
     InvalidResponseError,
     Session,
     SessionLog,
+    Success,
     TurnLimitExceededError,
 )
 from tests.conftest import FakeConfig, make_atomic_workflow_config, make_valid_criteria
@@ -41,7 +44,7 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_process_turn_success(self, mock_call_llm):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria())
+        action = Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria())
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("Let's create criteria")
@@ -54,7 +57,7 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_process_turn_continue(self, mock_call_llm):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What's your budget range?")
+        action = Continue(intent=AgentIntent.CONTINUE, message="What's your budget range?")
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("Hello")
@@ -68,9 +71,7 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_process_turn_failure_raises_exception(self, mock_call_llm):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
-        action = AgentResponse[EvaluationCriteria](
-            intent=AgentIntent.FAILURE, message="I don't have enough information to help"
-        )
+        action = Failure(intent=AgentIntent.FAILURE, message="I don't have enough information to help")
         mock_call_llm.return_value = action
 
         with self.assertRaises(AtomicWorkflowFailedError) as context:
@@ -89,9 +90,7 @@ class TestAtomicWorkflow(unittest.TestCase):
         both error.__str__ and error.message)."""
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
-        action = AgentResponse[EvaluationCriteria](
-            intent=AgentIntent.FAILURE, message="I don't have enough information"
-        )
+        action = Failure(intent=AgentIntent.FAILURE, message="I don't have enough information")
         mock_call_llm.return_value = action
 
         with self.assertRaises(AtomicWorkflowFailedError) as context:
@@ -109,7 +108,7 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_process_turn_empty_input(self, mock_call_llm):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="First question")
+        action = Continue(intent=AgentIntent.CONTINUE, message="First question")
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("")
@@ -122,9 +121,9 @@ class TestAtomicWorkflow(unittest.TestCase):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(max_turns=5))
 
         responses = [
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="Question 1"),
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="Question 2"),
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria()),
+            Continue(intent=AgentIntent.CONTINUE, message="Question 1"),
+            Continue(intent=AgentIntent.CONTINUE, message="Question 2"),
+            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria()),
         ]
         mock_call_llm.side_effect = responses
 
@@ -147,9 +146,7 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_orchestrator_raises_on_max_turns(self, mock_call_llm):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(max_turns=2))
 
-        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
-            intent=AgentIntent.CONTINUE, message="Another question"
-        )
+        mock_call_llm.return_value = Continue(intent=AgentIntent.CONTINUE, message="Another question")
 
         result1 = orchestrator.process_turn("A1")
         self.assertFalse(result1.is_complete)
@@ -196,7 +193,7 @@ class TestWorkflowIntegration(unittest.TestCase):
     def test_leaf_accepts_tools_parameter(self, mock_call_llm):
         from chat_workflow import SessionLog
 
-        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+        mock_call_llm.return_value = Success[EvaluationCriteria](
             intent=AgentIntent.SUCCESS, result=make_valid_criteria()
         )
 
@@ -217,7 +214,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         """Caller can pass io+state+config to build session themselves."""
         from chat_workflow import SessionLog
 
-        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+        mock_call_llm.return_value = Success[EvaluationCriteria](
             intent=AgentIntent.SUCCESS, result=make_valid_criteria()
         )
 
@@ -240,7 +237,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         from chat_workflow import SessionLog
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
-        mock_call_llm.return_value = AgentResponse[EvaluationCriteria](
+        mock_call_llm.return_value = Success[EvaluationCriteria](
             intent=AgentIntent.SUCCESS, result=make_valid_criteria()
         )
 
@@ -282,9 +279,9 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         mock_call_llm.side_effect = [
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=initial_criteria),
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
+            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=initial_criteria),
+            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
+            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
         ]
 
         mock_io = Mock()
@@ -371,7 +368,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         """
         from unittest.mock import Mock, patch
 
-        from chat_workflow import AgentIntent, AgentResponse, AtomicWorkflow
+        from chat_workflow import AtomicWorkflow
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria
         from workflows.evaluation_criteria.refine import refine
 
@@ -397,7 +394,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             patch.object(AtomicWorkflow, "__init__", tracking_init),
             patch.object(AtomicWorkflow, "_call_llm") as mock_call_llm,
         ):
-            mock_call_llm.return_value = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
+            mock_call_llm.return_value = Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
 
             mock_io = Mock()
             mock_io.echo = Mock()
@@ -421,22 +418,9 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         response_model = captured_response_model[0]
         self.assertIsNotNone(response_model, "response_model should be set")
 
-        # Check the inner type param via pydantic generic metadata
-        # (pydantic v2 doesn't use standard typing.get_args())
-        metadata = response_model.__pydantic_generic_metadata__
-        args = metadata.get("args", ())
-        self.assertEqual(
-            len(args),
-            1,
-            f"Expected 1 type arg in {response_model}, got args={args}",
-        )
-
-        inner_type = args[0]
-        self.assertIs(
-            inner_type,
-            EvaluationCriteria,
-            f"response_model inner type should be EvaluationCriteria, got {inner_type}",
-        )
+        # The decorator resolved the TypeVar: the concrete union, not the
+        # unresolved AgentResponse[ModelType].
+        self.assertEqual(response_model, AgentResponse[EvaluationCriteria])
 
 
 class TestAutoParamInjection(unittest.TestCase):
@@ -632,9 +616,7 @@ class TestTheStepOnTheTranscript(unittest.TestCase):
                 {"intent": "success", "result": make_valid_criteria().model_dump()},
             ]
         )
-        orchestrator = AtomicWorkflow(
-            config=make_atomic_workflow_config(conversation=conversation)
-        )
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(conversation=conversation))
 
         first = orchestrator.process_turn("I need criteria")
         second = orchestrator.process_turn("About fifty pounds")
@@ -647,12 +629,8 @@ class TestTheStepOnTheTranscript(unittest.TestCase):
     def test_the_session_log_receives_the_transcript_and_usage(self):
         from tests.conftest import make_conversation
 
-        conversation = make_conversation(
-            [{"intent": "success", "result": make_valid_criteria().model_dump()}]
-        )
-        orchestrator = AtomicWorkflow(
-            config=make_atomic_workflow_config(conversation=conversation)
-        )
+        conversation = make_conversation([{"intent": "success", "result": make_valid_criteria().model_dump()}])
+        orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(conversation=conversation))
         mock_io = Mock()
         mock_io.echo = Mock()
         state = SessionLog()

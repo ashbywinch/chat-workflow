@@ -86,7 +86,7 @@ make lint           # ruff and basedpyright
 
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them
-- `AgentResponse` is a Generic BaseModel with `intent: AgentIntent` and a `model_validator` for consistency
+- `AgentResponse` is a union of three shapes — `Continue`, `Success[T]`, `Failure` — each carrying only its own fields (`extra="forbid"`), so the request's schema states the intent rule instead of a validator
 - `AtomicWorkflow.process_turn()` checks turn limit, calls LLM, handles intent
 - Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowFailedError`
 

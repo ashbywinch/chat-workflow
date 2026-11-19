@@ -1,12 +1,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from .conversation import Conversation
 from .debug import StreamingDebug
 from .exceptions import AtomicWorkflowFailedError
 from .model_provider import ProviderType
-from .models import AgentResponse, TurnResult
+from .models import Continue, Failure, Success, TurnResult
 
 TResult = TypeVar("TResult")
 
@@ -26,13 +26,16 @@ class AtomicWorkflowConfig(Generic[TResult]):
     """
 
     system_prompt: str
-    response_model: type[AgentResponse[TResult]]
+    # A model or a union alias: what the request's schema is built from, so it
+    # is not `type[...]` — that is the point of the field.
+    response_model: Any
     max_turns: int
-    # The turn's outcome handled: the step cannot run without all three, so
-    # they are required rather than None-checked at every turn.
-    on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]]
-    on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]]
-    on_failure: Callable[[AgentResponse[TResult]], AtomicWorkflowFailedError]
+    # Each turn's outcome reaches the handler that asked for it, so a handler
+    # reads the fields that shape actually has: a continue has a message and
+    # no result, a success the reverse.
+    on_continue: Callable[[Continue], TurnResult[TResult]]
+    on_success: Callable[[Success[TResult]], TurnResult[TResult]]
+    on_failure: Callable[[Failure], AtomicWorkflowFailedError]
     initial_messages: list[dict[str, str]] | None = None
     debug: StreamingDebug | None = None
     model: str = "default-model"

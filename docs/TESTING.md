@@ -34,9 +34,9 @@ def test_multi_turn_conversation(self, mock_call_llm):
         on_continue=..., on_success=..., on_failure=...,
     )
     responses = [
-        AgentResponse(intent=AgentIntent.CONTINUE, message="Question 1"),
-        AgentResponse(intent=AgentIntent.CONTINUE, message="Question 2"),
-        AgentResponse(intent=AgentIntent.SUCCESS, result=valid_criteria),
+        Continue(intent=AgentIntent.CONTINUE, message="Question 1"),
+        Continue(intent=AgentIntent.CONTINUE, message="Question 2"),
+        Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=valid_criteria),
     ]
     mock_call_llm.side_effect = responses
     result1 = orchestrator.process_turn("Hello")
