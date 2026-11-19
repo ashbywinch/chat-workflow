@@ -76,7 +76,10 @@ class AtomicWorkflow(Generic[TResult]):
             raise TurnLimitExceededError(self.max_turns)
 
         self.turn_count += 1
-        response = self._call_llm(user_input)
+        # The last turn is told so: a model that would ask again is given one
+        # turn to answer with what it has, and the step still fails if it will not.
+        final_turn = self.turn_count >= self.max_turns
+        response = self._call_llm(user_input, final_turn=final_turn)
 
         if response.intent == AgentIntent.CONTINUE:
             return self.on_continue(response)
@@ -95,12 +98,12 @@ class AtomicWorkflow(Generic[TResult]):
 
         raise InvalidResponseError(f"Invalid intent received: {response.intent}")
 
-    def _call_llm(self, user_input: str | None = None) -> Any:
+    def _call_llm(self, user_input: str | None = None, *, final_turn: bool = False) -> Any:
         """One turn with the model, timed for the debug stream."""
         started = time.monotonic()
         if self.debug:
             self.debug.on_request(self.messages, self.model)
-        turn = self._conversation.send(user_input)
+        turn = self._conversation.send(user_input, final_turn=final_turn)
         self.usage.incr(turn.usage)
         if self.debug:
             duration_ms = (time.monotonic() - started) * 1000

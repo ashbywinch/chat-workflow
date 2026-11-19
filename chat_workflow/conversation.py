@@ -258,11 +258,13 @@ class Conversation(Generic[T]):
         # keeps it for the conversation's later turns.
         self._model: Model | None = model_client
 
-    def send(self, prompt: str | None = None) -> ModelTurn[T]:
+    def send(self, prompt: str | None = None, *, final_turn: bool = False) -> ModelTurn[T]:
         """One turn: *prompt* (or the opening prompt), then the typed result.
 
         ``prompt`` may be ``None`` when the transcript already ends with a user
         turn — a step that was given its opening context as initial messages.
+        ``final_turn`` tells the model this is its last chance: a step that
+        would otherwise keep asking is told to answer with what it has.
         """
         if not prompt or not prompt.strip():
             prompt = None if _has_user_turn(self.messages) else OPENING_PROMPT
@@ -283,7 +285,7 @@ class Conversation(Generic[T]):
             capabilities=[resender],
         )
         try:
-            result = self._run_with_transport_retries(agent, prompt)
+            result = self._run_with_transport_retries(agent, prompt, final_turn=final_turn)
         except UnexpectedModelBehavior as exc:
             raise MaxRetriesExceededError(self._output_retries, reason=str(exc)) from exc
 
@@ -296,7 +298,9 @@ class Conversation(Generic[T]):
         self.messages.extend(turn.messages)
         return turn
 
-    def _run_with_transport_retries(self, agent: Agent[Any, T], prompt: str | None) -> AgentRunResult[T]:
+    def _run_with_transport_retries(
+        self, agent: Agent[Any, T], prompt: str | None, *, final_turn: bool = False
+    ) -> AgentRunResult[T]:
         """One turn, resent when the gateway reports its upstream failing.
 
         PydanticAI retries the statuses that mean "try again" (429, 5xx). The
@@ -307,13 +311,15 @@ class Conversation(Generic[T]):
         attempts = self._transport_retries + 1
         for attempt in range(attempts):
             try:
-                return asyncio.run(self._run_turn(agent, prompt))
+                return asyncio.run(self._run_turn(agent, prompt, final_turn=final_turn))
             except ModelHTTPError as exc:
                 if not _is_upstream_failure(exc) or attempt + 1 >= attempts:
                     raise
         raise AssertionError("unreachable: the last attempt raises")
 
-    async def _run_turn(self, agent: Agent[Any, T], prompt: str | None) -> AgentRunResult[T]:
+    async def _run_turn(
+        self, agent: Agent[Any, T], prompt: str | None, *, final_turn: bool = False
+    ) -> AgentRunResult[T]:
         """One run inside its own task, with the model client opened and closed.
 
         ``run_sync`` starts a loop per call but never closes the client it
@@ -321,8 +327,17 @@ class Conversation(Generic[T]):
         not leave sockets to the garbage collector.
         """
         async with agent:
+            instructions = self._instructions
+            if final_turn:
+                instructions += (
+                    "\n\n## Final turn\n"
+                    "No further turn will be offered. Answer now with what the user has "
+                    "given: intent='success' with the complete result, or intent='failure' "
+                    "if it cannot be produced. Do not ask another question."
+                )
             return await agent.run(
                 prompt,
+                instructions=instructions,
                 message_history=list(self.messages),
                 model_settings=self.model_settings(),
                 usage_limits=UsageLimits(request_limit=self._max_requests),
