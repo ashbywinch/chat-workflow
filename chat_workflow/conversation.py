@@ -179,7 +179,7 @@ def _has_usable_content(response: ModelResponse) -> bool:
         # answer: measured as `{"response":Got it — a…}` from an endpoint
         # that treats the tool schema as a hint. Correcting it is not the
         # model's job; the same request is sampled again.
-        return all(_arguments_are_json(part) for part in calls)
+        return all(_arguments_are_object(part) for part in calls)
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     # A stall emits the opening token and then whitespace to the token limit
     # (measured on the gateway: `{"response":` followed by 5,392 lines of
@@ -188,8 +188,12 @@ def _has_usable_content(response: ModelResponse) -> bool:
     return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
 
 
-def _arguments_are_json(part: ToolCallPart) -> bool:
-    """Whether a tool call's arguments are an object, not raw model prose."""
+def _arguments_are_object(part: ToolCallPart) -> bool:
+    """Whether a tool call's arguments are an object, not raw model prose.
+
+    A tool's arguments are always an object, so anything else — a list, a
+    number, unparseable text — is not a call the schema could have produced.
+    """
     args = part.args
     if isinstance(args, dict):
         return True
@@ -204,7 +208,7 @@ def _arguments_are_json(part: ToolCallPart) -> bool:
 def _unusable_cause(response: ModelResponse) -> str:
     if response.finish_reason == "length":
         return "token limit reached before the answer finished"
-    if any(isinstance(part, ToolCallPart) and not _arguments_are_json(part) for part in response.parts):
+    if any(isinstance(part, ToolCallPart) and not _arguments_are_object(part) for part in response.parts):
         return "tool arguments were not JSON"
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
