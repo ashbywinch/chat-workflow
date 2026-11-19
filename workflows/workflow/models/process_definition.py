@@ -16,6 +16,14 @@ _NO_EXECUTOR_MODE: tuple[str, str] = (
     "content or execute the work for the user.",
 )
 
+_OPENS_WITH_THE_DRAFT: tuple[str, str] = (
+    "Opens with the draft",
+    "The assistant's first response presents the complete breakdown derived "
+    "from the notes, in the user's words. It does not ask the user to name the "
+    "stages, the steps, the role, or the participants that the notes already "
+    "establish.",
+)
+
 
 class ProcessDefinition(LLMValidated):
     """The stages and concrete steps of the user's work."""
@@ -121,26 +129,36 @@ Put the user's description in `notes`, in their words — not your reply to them
     ...  # type: ignore[reportReturnType]
 
 
-@atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
-def _generate_from_notes(
-    notes: Annotated[str, "What the person told you"],
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_process_definition(
+    notes: Annotated[str, "What the person told you, in their words"],
+    max_turns: Annotated[int, "Maximum turns"] = 1,
+) -> ProcessDefinition:
+    """Turn the user's description into the stages and steps of their work.
+
+The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Keep their names for
+the stages and steps. The role in charge is the person or role that keeps the work moving; if the notes say the user
+does it all, the orchestrating component and the sole participant are the user. Do not invent people or steps the notes
+do not support.
+
+Return the complete ProcessDefinition."""
+    ...  # type: ignore[reportReturnType]
+
+
+@atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE, _OPENS_WITH_THE_DRAFT])
+def _confirm_process_definition(
+    draft: Annotated[
+        ProcessDefinition,
+        "The complete breakdown derived from the user's description",
+    ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Turn the notes into the stages and steps of the user's work, and confirm it.
+    """Present the draft breakdown and ask the user to confirm or correct it.
 
-The notes hold what the user told you, and they are complete. Open with the draft itself: do not greet, do not ask
-what they do, and do not ask again for anything the notes already say. Do not ask "anything else?" or whether the notes
-are complete — they are; the gathering step already asked. Derive the breakdown from the notes yourself.
-Do not walk the user through the stages asking what happens in each — work it out from their description and present
-the result as a draft, keeping their own names.
-
-Present the complete breakdown and ask them to confirm it. Ask only for what the description does not contain at all:
-who is involved, and who is in charge. If the notes say the user does it all, both answers are the user; do not ask. If the user does not know something, suggest one possibility and mark it
-as a suggestion. When they give "me" or "the person" as the role, that is the answer.
-
-When they confirm, return it.
-
-Use only the values in `notes`. The examples in the field descriptions are illustrative, never values to copy. If `notes` is not a description of the user's work, return failure rather than inventing one. Do not ask the user to name the thing; the orchestrating component is derived from the notes."""
+The draft is the complete breakdown derived from their description. Present it in their words — the stages, the
+steps inside them, who is involved, and who is in charge — then ask one confirm-or-correct question. Do not ask them to
+name the stages or steps; the draft already has them. If they correct a value, update it and return the corrected
+result. If they confirm, return it. Ask only for a gap the draft cannot fill; do not re-ask what the draft contains."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -170,8 +188,9 @@ def generate_from_chat(
         )
     else:
         gathered = _gather_notes(session=session, max_turns=gather_turns)
-    return _generate_from_notes(
-        notes=gathered.notes, session=session, max_turns=max_turns
+    draft = _draft_process_definition(notes=gathered.notes, session=session)
+    return _confirm_process_definition(
+        draft=draft, session=session, max_turns=max_turns
     )
 
 
