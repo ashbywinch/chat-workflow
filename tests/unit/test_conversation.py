@@ -296,6 +296,26 @@ class TestInstructions(unittest.TestCase):
         self.assertEqual(parts[0].content.count("Test instructions"), 1)
 
 
+class TestProviderLog(unittest.TestCase):
+    def test_a_failure_names_the_endpoint_that_served_it(self):
+        """The endpoints behind one model differ; a failure is diagnosable
+        only when the message says who answered."""
+        from chat_workflow.conversation import _ProviderLog
+
+        log = _ProviderLog()
+        log.provider = "DeepInfra"
+        log.model = "deepseek/deepseek-v4-flash"
+
+        self.assertEqual(log.suffix(), " (served by DeepInfra, deepseek/deepseek-v4-flash)")
+        self.assertEqual(_ProviderLog().suffix(), "")
+
+    def test_a_model_without_a_client_records_nothing(self):
+
+        conversation = make_conversation([VALID])
+
+        self.assertEqual(conversation._provider_log.suffix(), "")
+
+
 class TestStepTools(unittest.TestCase):
     def test_a_step_can_call_its_own_tool(self):
         seen: list[str] = []

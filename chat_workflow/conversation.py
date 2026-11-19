@@ -224,6 +224,43 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+class _ProviderLog:
+    """Which upstream endpoint answered, recorded for the failure message.
+
+    The gateway names its upstream in ``cf-aig-provider``/``cf-aig-model``, and
+    the endpoints behind one model differ: some enforce the request's tool
+    schema, some treat it as a hint. A failed turn is diagnosable only when the
+    log says who served it. Attaching is best-effort: a model without an httpx
+    client simply records nothing.
+    """
+
+    def __init__(self) -> None:
+        self.provider: str | None = None
+        self.model: str | None = None
+
+    @classmethod
+    def attach(cls, model: Model) -> _ProviderLog:
+        log = cls()
+
+        async def record(response: Any) -> None:
+            log.provider = response.headers.get("cf-aig-provider")
+            log.model = response.headers.get("cf-aig-model")
+
+        client = getattr(model, "client", None)
+        http = getattr(client, "_client", None)
+        hooks = getattr(http, "event_hooks", None)
+        if isinstance(hooks, dict) and isinstance(hooks.get("response"), list):
+            hooks["response"].append(record)
+        return log
+
+    def suffix(self) -> str:
+        """`` (served by X, model Y)``, or nothing when nothing was recorded."""
+        if not self.provider and not self.model:
+            return ""
+        parts = [part for part in (self.provider, self.model) if part]
+        return f" (served by {', '.join(parts)})"
+
+
 class Conversation(Generic[T]):
     """A model, its instructions, and the transcript of one conversation.
 
@@ -281,6 +318,7 @@ class Conversation(Generic[T]):
         self._final_output_type = final_output_type
         self._tools = tuple(_failed_as_result(tool) for tool in tools)
         self._deps = deps
+        self._provider_log = _ProviderLog()
         self._thinking = thinking
         # The injection seam for tests: a FunctionModel scripts a whole turn
         # without a network or a provider SDK. Production builds the real one
@@ -307,6 +345,7 @@ class Conversation(Generic[T]):
                 api_base=self._api_base,
                 api_key_env=self._api_key_env,
             )
+            self._provider_log = _ProviderLog.attach(self._model)
         agent: Agent[Any, T] = Agent(
             self._model,
             tools=self._tools,
@@ -331,7 +370,9 @@ class Conversation(Generic[T]):
         try:
             result = self._run_with_transport_retries(agent, prompt, final_turn=final_turn)
         except UnexpectedModelBehavior as exc:
-            raise MaxRetriesExceededError(self._output_retries, reason=str(exc)) from exc
+            raise MaxRetriesExceededError(
+                self._output_retries, reason=f"{exc}{self._provider_log.suffix()}"
+            ) from exc
 
         turn = ModelTurn(
             output=result.output,
