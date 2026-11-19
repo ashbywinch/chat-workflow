@@ -47,7 +47,7 @@ layering change updates the test in the same commit.
 |---|---|---|
 | `Config` | `chat_workflow/config.py` | Reads `config.json`; resolves provider/model/api key env/api base |
 | `Session` | `chat_workflow/session.py` | One conversation: IO, its own PydanticAI transcript, config, optional parent/children, `instructions`, `active`; `spawn` creates a clean child |
-| `SessionComponent` | `chat_workflow/session_component.py` | Runs a session: `greet`, `converse(step)`, `sign_off`; stateless and usable at any depth |
+| `SessionComponent` | `chat_workflow/session_component.py` | Runs a session: `greet`, `converse(step)`, `present`, `sign_off`; stateless and usable at any depth |
 | `AtomicWorkflow` | `chat_workflow/atomic_workflow.py` | One turn loop over a `Conversation`: intent, turn limit, the last-turn shape |
 | `Conversation` | `chat_workflow/conversation.py` | The one model call: transcript, answer tool, transport/unusable/output budgets |
 | `CompositeWorkflow` | `chat_workflow/decorators.py` | Calls atomic and composite children with the same `Session` |
@@ -95,9 +95,14 @@ meeting spawned inside it are the same class:
   greeting condition is `not state.messages`, not a second flag.
 - `SessionComponent` is behaviour, not a different session. `converse` sets
   `session.instructions` from its docstring when the session has none, greets
-  when the session has no messages, runs the step, then signs off. The wrap is
-  explicit in the CLI and the eval harness; the decorators never auto-wrap a
-  nested step.
+  when the session has no messages, runs the step, gives the result a
+  presentation turn if the step answered without speaking, then signs off. The
+  wrap is explicit in the CLI and the eval harness; the decorators never
+  auto-wrap a nested step.
+- A step whose result is a derived artifact uses the same shape: a chat-off
+  one-turn step derives the value from its inputs, the composite shows it in
+  the user's words, and a chat-on step asks one confirm-or-correct question.
+  This keeps the model from asking the user to define what it can derive.
 - `greet` and `sign_off` are one-turn text steps (`chat=False`,
   `single_turn=True`): a continue message is the text they produce, so they do
   not ask a user who is not part of that step. They start from an explicit

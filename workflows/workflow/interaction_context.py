@@ -6,7 +6,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from chat_workflow import atomic_workflow_step
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 
 from .domain_spec import ComponentDomainSpec
@@ -59,7 +59,7 @@ class ComponentInteractionContext(BaseModel):
         description=("Common pitfalls the assistant should watch for, e.g. 'Users often forget to list attendees'"),
     )
 
-    @atomic_workflow_step
+    @composite_workflow_step
     @classmethod
     def gather(
         cls,
@@ -75,27 +75,69 @@ class ComponentInteractionContext(BaseModel):
             ("The structural design — what fields and rules the artifact follows"),
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> ComponentInteractionContext:
-        """You are a conversation designer. Start from the domain spec and
-        structure; do not ask the user to define the interaction from scratch.
-        They already name the artifact, so never ask what to call it.
-        Your first message must propose all four parts:
-        1. What the assistant should always cover.
-        2. What it should suggest proactively.
-        3. The tone, only if the user volunteered one.
-        4. What usually goes wrong that the assistant should catch.
+        """Derive how the assistant should interact, then confirm it."""
+        draft = _draft_interaction_context(
+            domain_spec=domain_spec,
+            structure=structure,
+            session=session,
+        )
+        session.say(_format_interaction_context(draft))
+        return _confirm_interaction_context(
+            draft=draft, session=session, max_turns=max_turns
+        )
 
-        Even if the user has already volunteered some or all of the answers,
-        restate the complete picture as one proposal and ask them to confirm
-        it; do not return success on the first turn. Derive likely answers for
-        all four from the artifact's domain and structure, present them, and
-        then ask the user to confirm or correct each one with explicit
-        questions: "What should I always prioritize?
-        What would you like me to suggest proactively? What usually goes wrong
-        that I should catch?" Do not ask only about priorities, and do not ask
-        each topic as a separate turn. If the user asks to go deeper on one
-        point, answer that point and return to the proposal. When the user
-        confirms the proposal, return success. If the user refuses to engage,
-        return failure.
-        """
-        ...  # type: ignore[reportReturnType]
+
+def _format_interaction_context(draft: ComponentInteractionContext) -> str:
+    """Present the interaction proposal in the user's words."""
+    lines = ["Here's how I'd work with you:"]
+    if draft.must_prioritize:
+        lines.append("- I'll always cover: " + "; ".join(draft.must_prioritize))
+    if draft.auto_suggest:
+        lines.append("- I'll suggest: " + "; ".join(draft.auto_suggest))
+    if draft.tone_preference:
+        lines.append("- Tone: " + draft.tone_preference)
+    if draft.user_pain_points:
+        lines.append("- I'll watch for: " + "; ".join(draft.user_pain_points))
+    return "\n".join(lines)
+
+
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_interaction_context(
+    domain_spec: Annotated[
+        ComponentDomainSpec,
+        "What the artifact means in the user's world and what makes it excellent",
+    ],
+    structure: Annotated[
+        ComponentStructure,
+        "What fields and rules the artifact follows",
+    ],
+    max_turns: Annotated[int, "Maximum turns"] = 1,
+) -> ComponentInteractionContext:
+    """Derive how the assistant should interact with the user.
+
+The domain spec and structure are established. Derive all four parts yourself; do not ask the user anything:
+1. What the assistant should always cover.
+2. What it should suggest proactively.
+3. The tone, only if the user volunteered one; otherwise leave it empty.
+4. What usually goes wrong that the assistant should catch.
+Never ask what to call the artifact; the domain spec names it. Return the complete context."""
+    ...  # type: ignore[reportReturnType]
+
+
+@atomic_workflow_step
+def _confirm_interaction_context(
+    draft: Annotated[
+        ComponentInteractionContext,
+        "The complete interaction proposal already shown to the user",
+    ],
+    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+) -> ComponentInteractionContext:
+    """The interaction proposal has been shown. Ask a targeted follow-up for each part.
+
+Ask: "What would you add to what I should always prioritize? What would you like me to suggest proactively? What
+usually goes wrong that I should catch?" Even if the user volunteered answers, ask these once as follow-ups and
+confirm the proposal before returning. If they correct a value, update it and return the corrected context. If they
+confirm, return the draft. Do not re-present the whole proposal and do not ask what to call the artifact."""
+    ...  # type: ignore[reportReturnType]
