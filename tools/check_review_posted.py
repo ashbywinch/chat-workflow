@@ -194,12 +194,16 @@ def main() -> int:
         try:
             run = _get_json(f"https://api.github.com/repos/{repo}/actions/runs/{run_id}", token)
             reviewed_after = run["run_started_at"]
-        # lucidlint: ignore swallow the run API is best-effort data availability — the ::warning print surfaces the degradation at runtime, and re-raising would fail the check when the committer-date anchor is still a conservative fallback
+        # lucidlint: ignore swallow — the run API is best-effort data
+        # availability; the ::warning print surfaces the degradation at runtime.
         except (HTTPError, KeyError, ValueError) as e:
             # fall back to the committer date — the run API may lag or the
             # token may lack actions: read. Never silent: a degraded anchor
             # is still a conservative one (committer date predates the push).
-            print(f"::warning::run_started_at unavailable ({type(e).__name__}: {e}) — anchoring coverage to the committer date")
+            print(
+                f"::warning::run_started_at unavailable ({type(e).__name__}: {e})"
+                " — anchoring coverage to the committer date"
+            )
 
     try:
         comments = _get_json(f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments?per_page=100", token)

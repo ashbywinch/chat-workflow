@@ -41,9 +41,40 @@ jobs:
           OPENAI_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
           OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # SECURITY: the config comes from a pinned branch, never the PR head
-          # (a same-repo branch could ship its own api_base/config and
-          # exfiltrate the key). chat-workflow has no pr-agent-config branch,
-          # so this names the default branch explicitly rather than relying on
-          # a 404 fallback.
-          PR_AGENT_CONFIG_BRANCH: main
+          # SECURITY: the config comes from a maintainer branch, never the PR
+          # head (a same-repo branch could ship its own api_base/config and
+          # exfiltrate the key).
+          PR_AGENT_CONFIG_BRANCH: pr-agent-config
+
+  verify:
+    # A SEPARATE job that runs AFTER the bot job completes: GitHub does not
+    # serve a job's log until it finishes, so the checker can only read the
+    # bot's failure reason from here.
+    #
+    # `always()`: a failed or cancelled bot job must still be judged. A skipped
+    # check counts as passing where a required one is concerned, so a gate that
+    # skipped with the bot would green exactly the runs it exists to catch.
+    needs: pr-review
+    if: always() && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read # read the bot's completed run log for the failure reason
+    steps:
+      # SECURITY: checkout the DEFAULT branch, not the PR head — the script runs
+      # with GITHUB_TOKEN, and a PR could replace it with code that exfiltrates
+      # the token.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Fail loud if no review covers the head commit
+        env:
+          SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # python3 -I (isolated) keeps the checkout off sys.path — a repo-root
+        # json.py/urllib.py/sitecustomize.py must not shadow the script's
+        # stdlib imports and run code with GITHUB_TOKEN.
+        run: python3 -I tools/check_review_posted.py
