@@ -82,9 +82,13 @@ class TestSessionComponent(unittest.TestCase):
             return "the result"
 
         original_greet = SessionComponent.greet
+        original_present = SessionComponent.present
         original_sign_off = SessionComponent.sign_off
         SessionComponent.greet = lambda self, *, session, **kwargs: TextReply(  # type: ignore[method-assign]
             text="Hi there! I help describe your work."
+        )
+        SessionComponent.present = lambda self, *, session, result, **kwargs: (  # type: ignore[method-assign]
+            TextReply(text="Here is the result.")
         )
         SessionComponent.sign_off = lambda self, *, session, result=None, **kwargs: (  # type: ignore[method-assign]
             TextReply(text="I have what I need.")
@@ -93,6 +97,7 @@ class TestSessionComponent(unittest.TestCase):
             result = SessionComponent().converse(step, session=session)
         finally:
             SessionComponent.greet = original_greet  # type: ignore[method-assign]
+            SessionComponent.present = original_present  # type: ignore[method-assign]
             SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
 
         self.assertEqual(result, "the result")
@@ -110,8 +115,12 @@ class TestSessionComponent(unittest.TestCase):
         calls: list[str] = []
 
         original_greet = SessionComponent.greet
+        original_present = SessionComponent.present
         original_sign_off = SessionComponent.sign_off
         SessionComponent.greet = lambda self, *, session, **kwargs: calls.append("greet")  # type: ignore[method-assign]
+        SessionComponent.present = lambda self, *, session, result, **kwargs: (  # type: ignore[method-assign]
+            TextReply(text="Here is the result.")
+        )
         SessionComponent.sign_off = lambda self, *, session, result=None, **kwargs: (  # type: ignore[method-assign]
             TextReply(text="I have what I need.")
         )
@@ -119,10 +128,13 @@ class TestSessionComponent(unittest.TestCase):
             SessionComponent().converse(lambda *, session: "result", session=session)
         finally:
             SessionComponent.greet = original_greet  # type: ignore[method-assign]
+            SessionComponent.present = original_present  # type: ignore[method-assign]
             SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
 
         self.assertEqual(calls, [])
-        self.assertEqual(len(session.state.messages), 2)
+        # The seeded message, the presentation the step did not make, and the
+        # closing.
+        self.assertEqual(len(session.state.messages), 3)
 
 
 if __name__ == "__main__":

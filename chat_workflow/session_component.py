@@ -13,12 +13,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from inspect import cleandoc
-from typing import TypeVar
+from typing import Annotated, Any, TypeVar
 
 from .conversation_rules import WARM_OPEN
 from .decorators import atomic_workflow, composite_workflow
 from .models import TextReply
 from .session import Session
+from .transcript import entries
 
 T = TypeVar("T")
 
@@ -42,6 +43,23 @@ class SessionComponent:
         use — and ask what they would like help with. Keep it warm and plain:
         no list of questions, no form, no jargon. Do not ask the user to
         introduce themselves.
+        """
+        ...  # type: ignore[reportReturnType]
+
+    @atomic_workflow(chat=False, single_turn=True)
+    def present(
+        self,
+        *,
+        session: Session,
+        result: Annotated[Any, "The result to describe; internal reference only"],
+        max_turns: int = 1,
+    ) -> TextReply:
+        """Describe what the workflow produced, in the user's words.
+
+        Say what it is and name its main parts, using the words the user gave.
+        Do not ask a question, do not list field names or JSON, and do not
+        mention the internal schema. Keep it to a short paragraph or a short
+        list.
         """
         ...  # type: ignore[reportReturnType]
 
@@ -110,8 +128,27 @@ class SessionComponent:
                 except Exception:
                     greeting = _FALLBACK_GREETING
                 session.say(greeting or _FALLBACK_GREETING)
+            before = len(session.state.messages)
             result = step(session=session)
             session.state.final_result = result
+            # A step that answered without ever speaking left the user with
+            # nothing to react to. The wrapper owns the presentation turn, so
+            # the result is described in the user's words before the close.
+            if result is not None and not _step_spoke(
+                session.state.messages, before
+            ):
+                try:
+                    presented = self.present(
+                        result=result,
+                        session=session,
+                        _first_user_input=(
+                            "Describe the result to the user in their words."
+                        ),
+                    ).text.strip()
+                except Exception:
+                    presented = ""
+                if presented:
+                    session.say(presented)
             try:
                 closing = self.sign_off(
                     session=session,
@@ -131,3 +168,8 @@ class SessionComponent:
             return result
         finally:
             session.active = False
+
+
+def _step_spoke(messages: list[Any], before: int) -> bool:
+    """True when the step added a user-visible assistant turn of its own."""
+    return any(kind == "assistant" for kind, _ in entries(messages[before:]))

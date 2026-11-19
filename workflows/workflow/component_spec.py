@@ -6,7 +6,7 @@ from typing import Annotated, ClassVar, Literal
 
 from pydantic import Field, field_validator
 
-from chat_workflow import atomic_workflow_step
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
@@ -167,7 +167,7 @@ class ComponentSpec(LLMValidated):
             )
         return value
 
-    @atomic_workflow_step
+    @composite_workflow_step
     @classmethod
     def identify_from_chat(
         cls,
@@ -182,27 +182,81 @@ class ComponentSpec(LLMValidated):
             "Parts already identified; include them and add any that are missing",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> list[ComponentSpec]:
-        """Find the parts of the user's work.
+        """Derive the parts of the user's work, then confirm the set.
 
-    Each part is one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
-    reviews or sends another part's thing belongs to that part.
-
-    The analysis, inputs and outputs are established facts. The owner is `analysis.orchestrating_component`; the parts
-    are derived from its activities. Start with one sentence on what you are doing, then propose the parts you can
-    already see, including the ones in `existing_components`. Do not ask the user to name the thing, say who owns it, or
-    describe a stage the analysis already lists; propose those and let them correct you. Name each part after its thing
-    ("Approval Record", not "Approval"). For each, say what it does end to end and at least one thing it does not do.
-    Propose the remaining fields and the expertise you will act as; confirm them; do not ask for a job title. Describe
-    what kind of thing it is in plain words — the thing it produces, or the plan or service it is. Never say the
-    internal labels "value_stream", "artifact_producing", or "planning_service" aloud.
-
-    Ask about gaps one at a time, in plain words, and call it "part of the work".
-
-    When the user confirms the set, return it."""
-        ...  # type: ignore[reportReturnType]
+        The parts are derived from the analysis and the outputs, shown to the
+        user in their words, and confirmed or corrected in one conversation.
+        """
+        draft = _draft_components(
+            analysis=analysis,
+            inputs=inputs,
+            outputs=outputs,
+            existing_components=existing_components,
+            session=session,
+        )
+        session.say(_format_components(draft))
+        return _confirm_components(draft=draft, session=session, max_turns=max_turns)
 
 
 from .models.deliverable import Deliverable  # noqa: E402
 from .models.process_definition import ProcessDefinition  # noqa: E402
 from .models.resource import Resource  # noqa: E402
+
+
+def _format_components(draft: list[ComponentSpec]) -> str:
+    """Present the derived parts in the user's words, without internal labels."""
+    lines = ["Here are the parts I see:", ""]
+    for index, part in enumerate(draft, 1):
+        line = f"{index}. {part.name} — {part.purpose}"
+        if part.scope_description:
+            line += f" {part.scope_description}"
+        if part.owner_role:
+            line += f" Owned by {part.owner_role}."
+        lines.append(line)
+    return "\n".join(lines)
+
+
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_components(
+    analysis: Annotated[
+        ProcessDefinition,
+        "What the person has told you about how their work happens",
+    ],
+    inputs: Annotated[list[Resource], "What the person starts with"],
+    outputs: Annotated[list[Deliverable], "What the person makes"],
+    existing_components: Annotated[
+        list[str] | None,
+        "Parts already identified; include them and add any that are missing",
+    ] = None,
+    max_turns: Annotated[int, "Maximum turns"] = 1,
+) -> list[ComponentSpec]:
+    """Derive the parts of the user's work from the analysis.
+
+The analysis, inputs and outputs are established facts. The owner is `analysis.orchestrating_component`; the parts
+are derived from its activities. Include the parts in `existing_components` and add any that are missing.
+Do not ask the user anything: derive the complete set and return it.
+
+Each part is one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
+reviews or sends another part's thing belongs to that part. Name each part after its thing ("Approval Record", not
+"Approval"). For each, say what it does end to end and at least one thing it does not do. Describe what kind of thing
+it is in plain words — the thing it produces, or the plan or service it is. Never say the internal labels
+"value_stream", "artifact_producing", or "planning_service"."""
+    ...  # type: ignore[reportReturnType]
+
+
+@atomic_workflow_step
+def _confirm_components(
+    draft: Annotated[
+        list[ComponentSpec],
+        "The complete set of parts already derived from the analysis",
+    ],
+    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+) -> list[ComponentSpec]:
+    """The parts have already been shown to the user. Ask one confirm-or-correct question.
+
+Do not re-present the whole set. If the user confirms, return the draft. If they correct a part, update it and return
+the corrected set. Ask only about a gap the draft cannot fill; do not ask the user to name a part, say who owns it, or
+describe a stage the analysis already lists."""
+    ...  # type: ignore[reportReturnType]
