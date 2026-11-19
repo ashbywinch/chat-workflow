@@ -11,7 +11,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from chat_workflow import atomic_workflow_step
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 
 from .domain_spec import ComponentDomainSpec
 
@@ -94,7 +94,7 @@ class ComponentStructure(BaseModel):
         description="Additional Python imports needed by the generated code",
     )
 
-    @atomic_workflow_step
+    @composite_workflow_step
     @classmethod
     def design(
         cls,
@@ -106,31 +106,89 @@ class ComponentStructure(BaseModel):
             ),
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> ComponentStructure:
-        """You are a data design expert. Propose the shape and rules in one
-        message, using business language: "attendees is a list of people",
-        "each action item has an owner and due date".
+        """Derive the structure from the domain spec, then confirm it."""
+        draft = _draft_structure(domain_spec=domain_spec, session=session)
+        session.say(_format_structure(draft, domain_spec))
+        return _confirm_structure(
+            draft=draft, session=session, max_turns=max_turns
+        )
 
-        `domain_spec` already lists the fields and the type hints. Treat them
-        as the proposal's starting point: do not ask the user what information
-        to capture, and do not ask them to name the fields. For each field,
-        propose the type and any structurally enforceable rule, then ask the
-        user to confirm or correct the whole proposal.
 
-        Translate the user's business language into the technical structure
-        silently; do not ask the user to choose code types. If a field needs a
-        nested shape, express it as a nested BaseModel, a dataclass, or a
-        TypedDict; the codegen step will include it. Do not define a second
-        independent artifact. For dates, use a str with an ISO format or a
-        pre-validator; never a date/datetime field.
+def _plain_type(type_expr: str) -> str:
+    """Say a type in business words, not Python syntax."""
+    text = type_expr.strip()
+    text = text.replace("| None", "").strip()
+    if text.startswith("Optional[") and text.endswith("]"):
+        text = text[len("Optional[") : -1]
+    if text == "str":
+        plain = "text"
+    elif text in {"int", "float"}:
+        plain = "a number"
+    elif text == "bool":
+        plain = "yes or no"
+    elif text.startswith("list[") and text.endswith("]"):
+        plain = "a list of " + _plain_type(text[len("list[") : -1])
+    elif text.startswith("dict[") or text == "dict":
+        plain = "a set of values"
+    else:
+        plain = text.replace("_", " ").casefold()
+    return plain
 
-        Derive rules only for criteria that are field-specific and
-        structurally enforceable; holistic criteria can stay as guidance.
-        Include a validator for every rule a field can enforce structurally —
-        a date format, a non-empty list, a required companion field. Return an
-        empty list only when nothing is structurally enforceable. Use the
-        user's words for the shape. If the user asks about a code term you
-        used, explain it in plain language and restate the pending proposal. Use "continue" to propose,
-        "success" when the user confirms all. When confirmed, move on.
-        """
-        ...  # type: ignore[reportReturnType]
+
+def _format_structure(
+    draft: ComponentStructure, domain_spec: ComponentDomainSpec
+) -> str:
+    """Present the derived structure in the user's words."""
+    hints = {field.name: field.field_type_hint for field in domain_spec.fields}
+    descriptions = {
+        field.name: field.domain_description for field in domain_spec.fields
+    }
+    lines = ["Now I'll turn what we agreed into a concrete shape.", "The parts:"]
+    for field in draft.fields:
+        hint = hints.get(field.name) or _plain_type(field.type_expr)
+        description = descriptions.get(field.name)
+        line = f"- {field.name.replace('_', ' ')}: {hint}"
+        if description:
+            line += f" — {description}"
+        lines.append(line)
+    if draft.model_validators:
+        lines.append("The rules:")
+        lines.extend(f"- {validator.rule}" for validator in draft.model_validators)
+    lines.append("Does this capture it, or would you change a part?")
+    return "\n".join(lines)
+
+
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_structure(
+    domain_spec: Annotated[
+        ComponentDomainSpec,
+        "What the artifact means in the user's world, its fields, and what makes it excellent",
+    ],
+    max_turns: Annotated[int, "Maximum turns"] = 1,
+) -> ComponentStructure:
+    """Derive the structure from the domain spec.
+
+The domain spec already lists the fields and the type hints. Derive the complete ComponentStructure yourself; do not
+ask the user anything. For each field, choose the type and any structurally enforceable rule. Translate the business
+language into the technical structure silently. For dates, use a str with an ISO format or a pre-validator; never a
+date/datetime field. Include a validator for every rule a field can enforce structurally; return an empty list only
+when nothing is structurally enforceable. Do not define a second independent artifact."""
+    ...  # type: ignore[reportReturnType]
+
+
+@atomic_workflow_step
+def _confirm_structure(
+    draft: Annotated[
+        ComponentStructure,
+        "The complete structure already shown to the user",
+    ],
+    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+) -> ComponentStructure:
+    """The structure has been shown. Ask one confirm-or-correct question.
+
+If the user confirms, return the draft. If they correct a type or a rule, update it and return the corrected
+structure. Ask only about a gap the draft cannot fill; do not re-present the whole structure or ask the user to choose
+code types."""
+    ...  # type: ignore[reportReturnType]
