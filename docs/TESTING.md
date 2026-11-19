@@ -16,7 +16,8 @@ tests/
 ├── unit/
 │   ├── test_models.py              # Pydantic model validation (no mock)
 │   ├── test_orchestrator_logic.py  # Orchestrator logic (mock _call_llm)
-│   └── test_llm_interaction.py     # LLM interaction (mock get_client)
+│   ├── test_conversation.py        # the model path (scripted FunctionModel)
+│   └── test_transcript.py          # the transcript projection
 └── evals/
     └── test_real_api.py            # Real API tests (require config.json + API key)
 ```
@@ -42,17 +43,16 @@ def test_multi_turn_conversation(self, mock_call_llm):
     assert not result1.is_complete
 ```
 
-### 2. LLM Interaction (mock `get_client`)
+### 2. The model path (script a `FunctionModel`)
 ```python
-@patch('chat_workflow.llm_interaction.get_client')
-def test_call_llm_success(self, mock_get_client):
-    mock_client = Mock()
-    mock_client.chat.completions.create.return_value = AgentResponse[...](
-        intent=AgentIntent.CONTINUE, message="Test"
-    )
-    mock_get_client.return_value = mock_client
-    action = self.orchestrator._call_llm()
+# tests/conftest.py builds a Conversation on a scripted model.
+conversation = make_conversation([{"intent": "continue", "message": "Test"}])
+orchestrator = AtomicWorkflow(config=make_atomic_workflow_config(conversation=conversation))
+action = orchestrator.process_turn("Hello")
 ```
+The script is the model: no network, no provider SDK, and the exact responses a
+gateway has been seen to produce (blank, token-limit, wrong envelope). For the
+step's turn rules alone, patch `_call_llm`.
 
 ### 3. Real API Evals (no mocking)
 - Verify prompts generate valid structured output from real LLMs

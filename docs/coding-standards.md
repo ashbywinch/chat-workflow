@@ -56,7 +56,7 @@ Each module should have one reason to change.
 - ``prompt_builder.py`` owns prompt formatting (docstring rendering, parameter section building)
 - ``metadata.py`` owns type introspection (type name formatting, return type resolution, parameter inspection)
 - ``atomic_workflow.py`` owns conversation orchestration (turn management, LLM calling, intent handling)
-- ``llm_interaction.py`` owns LLM provider abstraction
+- ``conversation.py`` owns the model call and its transcript; ``model_provider.py`` owns provider mapping
 
 If you find yourself adding a function to a module that doesn't match its stated purpose, create a new module.
 

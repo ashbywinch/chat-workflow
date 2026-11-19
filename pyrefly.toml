@@ -1,0 +1,3 @@
+# Pyrefly configuration. The gate is `make typecheck`.
+python_version = "3.12"
+project_includes = ["chat_workflow", "workflows", "chat_workflow_cli", "tests"]

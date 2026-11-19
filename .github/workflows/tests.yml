@@ -18,6 +18,12 @@ jobs:
       - name: Lint
         run: make lint
       
+      - name: Typecheck
+        run: make typecheck
+
+      - name: Docs links
+        run: make docs-check
+
       - name: Unit tests
         run: make test
       

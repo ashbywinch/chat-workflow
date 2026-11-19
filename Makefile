@@ -1,5 +1,5 @@
 # Makefile for chat-workflow test automation
-.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint format clean
+.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint typecheck docs-check format clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -25,6 +25,8 @@ help:
 	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
 	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
 	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
+	@echo "  ${GREEN}make docs-check${NC}   Every relative markdown link resolves"
+	@echo "  ${GREEN}make typecheck${NC}    Pyrefly over the core, workflows, CLI and tests"
 	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
 	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)"
 
@@ -36,6 +38,9 @@ run:
 	@$(OUT) evaluation-criteria generate-reviewed-criteria --context "A birthday present"
 
 test: setup lint test-unit
+
+docs-check: setup
+	@${UNITTEST} tests.unit.test_docs_links
 
 test-unit: setup
 	@${UNITTEST} discover tests/unit/
@@ -70,6 +75,9 @@ lint: setup
 # The gates the git hooks call. Neither target existed while the hooks called
 # them, so every commit and push failed after the tests had passed.
 lint-check: lint
+
+typecheck: setup
+	@.venv/bin/pyrefly check chat_workflow/ workflows/ tests/ chat_workflow_cli/
 check: lint
 
 # Auto-fix linting issues

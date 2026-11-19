@@ -196,7 +196,7 @@ chat_workflow/atomic_workflow.py:174  # AtomicWorkflow
 chat_workflow/atomic_workflow.py:204  # process_turn() - main logic
 
 # LLM integration:
-chat_workflow/llm_interaction.py:44  # get_client() - provider setup
+chat_workflow/conversation.py  # Conversation.send() - the one model call
 ```
 
 ## Output Format

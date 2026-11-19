@@ -22,7 +22,8 @@ Chat Workflow is a Python library that enables LLM workflow authors to generate 
 | `chat_workflow/session.py` | `Session` — runtime context (IO, state, config) |
 | `chat_workflow/session_log.py` | `SessionLog` — accumulated session state |
 | `chat_workflow/debug.py` | `StreamingDebug` — real-time LLM tracing |
-| `chat_workflow/llm_interaction.py` | `get_client()` — multi-provider LLM client via instructor+litellm |
+| `chat_workflow/conversation.py` | `Conversation` — the one model call, its transcript and its retry budgets |
+| `chat_workflow/model_provider.py` | `build_model()` — provider/model/endpoint/key to a PydanticAI model |
 | `chat_workflow/config.py` | Singleton `Config()` — reads `config.json` for provider/model/timeout |
 | `chat_workflow/exceptions.py` | Custom exception hierarchy |
 | `chat_workflow_cli/cli.py` | CLI with automatic workflow discovery |
@@ -53,10 +54,10 @@ Example workflows live in the `workflows/` directory.
 - Receives system prompt from `@atomic_workflow` decorator
 - Three outcomes: continue/success/failure
 
-#### `llm_interaction.py` — LLM Abstraction
-- Unified client for multiple providers via `get_client()`
+#### `conversation.py` — the model path
+- One `Conversation.send()` for every model call
 - Supports: OpenAI, Google, OpenRouter, etc.
-- Uses instructor for structured output
+- PydanticAI enforces the output schema (`NativeOutput`, strict `json_schema`) and keeps the transcript
 
 #### `chat_workflow_cli/cli.py` — CLI with Auto-Discovery
 - Discovers `@composite_workflow` functions in `workflows/` directory
@@ -105,7 +106,8 @@ tests/
 ├── unit/
 │   ├── test_models.py              # Pydantic model validation (no mock)
 │   ├── test_orchestrator_logic.py  # Orchestrator logic (mock _call_llm)
-│   └── test_llm_interaction.py     # LLM interaction (mock get_client)
+│   ├── test_conversation.py        # the model path (scripted FunctionModel)
+│   └── test_transcript.py          # the transcript projection
 └── evals/
     └── test_real_api.py            # Real API tests (require config.json + API key)
 ```
@@ -148,7 +150,7 @@ This streams all LLM requests/responses to stderr with timing:
 | Add test for new feature | `tests/unit/` | Follow existing test patterns |
 | Add eval for new feature | `tests/evals/` | Follow existing eval patterns |
 | Modify conversation flow | `chat_workflow/atomic_workflow.py` | `AtomicWorkflow.process_turn()` |
-| Add LLM provider | `chat_workflow/llm_interaction.py` | `get_client()` |
+| Add LLM provider | `chat_workflow/model_provider.py` | `build_model()` |
 | Modify CLI auto-discovery | `chat_workflow_cli/cli.py` | `build_cli_app()`, `discover_workflow_functions()` |
 
 ### Quick Start for Common Changes
@@ -159,7 +161,7 @@ This streams all LLM requests/responses to stderr with timing:
 3. Update `tests/unit/test_orchestrator_logic.py`
 
 **Add LLM provider:**
-1. Update `chat_workflow/llm_interaction.py` `get_client()`
+1. Update `chat_workflow/model_provider.py` `build_model()`
 2. Add provider configuration handling
 
 **Modify CLI auto-discovery:**
