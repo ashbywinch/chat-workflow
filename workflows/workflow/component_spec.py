@@ -191,7 +191,9 @@ class ComponentSpec(LLMValidated):
     Start with one sentence on what you are doing, then propose the parts you can already see, including the ones in
     `existing_components`. Name each after its thing ("Approval Record", not "Approval"). For each, say what it does end
     to end and at least one thing it does not do. Propose the remaining fields and the expertise you will act as;
-    confirm them; do not ask for a job title.
+    confirm them; do not ask for a job title. Describe what kind of thing it is in plain words — the thing it produces,
+    or the plan or service it is. Never say the internal labels "value_stream", "artifact_producing", or
+    "planning_service" aloud.
 
     Ask about gaps one at a time, in plain words, and call it "part of the work".
 

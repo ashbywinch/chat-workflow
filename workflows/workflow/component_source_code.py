@@ -49,9 +49,17 @@ def _basemodel_class_names(tree: ast.AST) -> set[str]:
 
 
 def _join_source_lines(value: Any) -> Any:
-    """Accept the module as lines or as one string."""
+    """Accept the module as lines or as one string.
+
+    A model occasionally puts several lines into one array element as
+    newline escapes. The contract is one string per line, so split them
+    mechanically instead of spending a retry on the escape.
+    """
     if isinstance(value, list):
-        return "\n".join(str(line) for line in value)
+        lines: list[str] = []
+        for item in value:
+            lines.extend(str(item).split("\n"))
+        return "\n".join(lines)
     return value
 
 
@@ -1565,8 +1573,8 @@ class ComponentSourceCode(LLMValidated):
             @classmethod
             def update(cls, draft: MinutesDraft) -> MinutesDraft:
                 \"\"\"You help someone correct or extend existing minutes.
-                Ask what should change, show the result once, and return
-                success on confirmation.\"\"\"
+                Ask what should change, show the result once, and finish
+                on confirmation.\"\"\"
                 ...
 
         The design spec's domain_spec.fields and structure together define the

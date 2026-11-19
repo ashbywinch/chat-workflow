@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from enum import StrEnum
 from typing import Any, Generic, TypeVar
 
@@ -119,6 +120,23 @@ class AgentResponse(BaseModel, Generic[TResult]):
                 "SUCCESS intent requires a field named 'result' containing the complete object. "
                 "Your data must use 'result' as the key name, not 'outputs', 'inputs', or any other name."
             )
+        # The message is what the user reads. A structured result pasted into
+        # it is not a reply, and it leaks field names the user never sees.
+        if (
+            self.intent in (AgentIntent.CONTINUE, AgentIntent.FAILURE)
+            and self.message
+            and self.message.lstrip()[:1] in ("{", "[")
+        ):
+            try:
+                payload: Any = json.loads(self.message)
+            except (ValueError, TypeError):
+                payload = None
+            if payload is not None and isinstance(payload, (dict, list)):
+                raise ValueError(
+                    "The message field is the text the user sees, not a "
+                    "structured result. Write the reply as plain sentences; "
+                    "put the result object in result with intent success."
+                )
         # A success turn has no user-facing message. Some models put the whole
         # response JSON in `message`; clearing it keeps the conversation
         # transcript free of internal output.

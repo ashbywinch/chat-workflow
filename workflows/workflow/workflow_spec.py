@@ -25,17 +25,27 @@ _PARTICIPANT_LINE = re.compile(r'^participant\s+(\w+)\s+as\s+"([^"]+)"\s*$')
 _ARROW_LINE = re.compile(r"^(\w+)\s*(-->>|->>|-->|->|--x|-x)\s*(\w+)\s*:\s*(.+)$")
 _BLOCK_LINE = re.compile(r"^(alt|opt)\b")
 
+# Determiners and possessives do not change which party a name refers to.
+_NAME_DETERMINERS = frozenset(
+    {"the", "a", "an", "my", "our", "your", "their", "his", "her", "its", "this", "that"}
+)
+
 
 def _normalise_name(name: str) -> str:
-    """Compare a diagram label with a record name without case/spacing noise."""
-    return re.sub(r"[\s_-]+", " ", name.strip().casefold())
+    """Compare a diagram label with a record name without case/spacing/punctuation noise."""
+    return re.sub(r"[\s_\-.,;:!?()/]+", " ", name.strip().casefold()).strip()
+
+
+def _name_words(name: str) -> list[str]:
+    """The words that identify a party, without determiners or possessives."""
+    return [word for word in _normalise_name(name).split() if word not in _NAME_DETERMINERS]
 
 
 def _matches_known(path: str, known: set[str]) -> bool:
     """A participant may shorten a record phrase, not invent a new one."""
-    words = _normalise_name(path).split()
+    words = _name_words(path)
     for name in known:
-        name_words = name.split()
+        name_words = _name_words(name)
         if words == name_words:
             return True
         # A shortened party keeps at least two words when it is a prefix of
@@ -337,6 +347,19 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
 
         Diagram:
         - Start with `sequenceDiagram`.
+        - Shape (replace the names with the record's own):
+          sequenceDiagram
+              participant Minutes as "Meeting Minutes: Draft"
+              participant Attendees as "Meeting attendees: Receive"
+              Minutes->>Minutes: Draft the minutes
+              opt Review needed
+                  Minutes->>Attendees: Send the draft
+                  Attendees->>Minutes: Return corrections
+              end
+              Minutes->>Attendees: Send the final minutes
+          Use only a component, a component's owner, an input's source, an
+          output's name, or an output's consumer as a participant. A step is
+          an arrow, not a participant.
         - Declare every participant as `<Path> as "<Component Path>: <Playbook
           Name>"`: the path is one word with no spaces (`MeetingMinutes`, not
           `Meeting Minutes`); the quoted display name carries the spaces. Then a
@@ -344,8 +367,13 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           MinutesDraft as "Minutes Draft: Draft"`). Never use an action sentence
           or a description of the component as the playbook name.
         - Show direct handoffs between components when the work simply passes
-          from one to the next. Include a coordinator participant only when a
-          component really does coordinate the others; do not invent one.
+          from one to the next. Every participant must exchange at least one
+          message with another participant: show the hand-off, and end with
+          the outcome arrow to the output's consumer. Declare the consumer as
+          a participant even when one person does the work; a diagram whose
+          every arrow is a self-loop is invalid. Include a coordinator
+          participant only when a component really does coordinate the others;
+          do not invent one.
         - When the components list contains only artifact-producing components,
           use those components as the participants; do not add the owner role as
           a separate participant when it is a pronoun such as "You". The
@@ -368,6 +396,9 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           no component owns the acknowledgement, show it as a step of the
           component that owns the artifact.
         - Use `<br/>` to split any long message across lines.
+        - The final arrow is the send to the output's consumer. Put any
+          acknowledgement or return flow before it; never end with a return
+          arrow, a self-loop, or a message to the component's owner.
         - Show the entry point, every activity from the analysis, and a clear
           outcome. End with the outcome: the last arrow sends the finished
           artifact from the component that produced it to the output's
@@ -385,7 +416,9 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           sending the same document). If so, it is a workflow step of that
           component. Add a component only when the activity produces its own
           artifact, and name it after that artifact: 'Distribution Record',
-          not 'Distribution'; 'Approval Record', not 'Approval'.
+          not 'Distribution'; 'Approval Record', not 'Approval'; 'Review
+          Notes', not 'Minutes Review'. A review that produces no record of
+          its own is a step of the component that owns the minutes.
         - Use only the activities listed in the analysis; do not add steps such
           as "receive the agenda" or "attend the meeting" unless they are in the
           analysis.

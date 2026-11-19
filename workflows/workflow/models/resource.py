@@ -28,10 +28,14 @@ class Resource(LLMValidated):
         "person or group is a valid origin (for example 'The organizer' with "
         "'meeting agenda'). If the thing is itself the material (for example "
         "handwritten notes), what it looks like must describe the same kind of "
-        "material, not a contradictory one such as a database.",
+        "material, not a contradictory one such as a database. A list the user "
+        "keeps only in their head ('mental list', 'in my head') is a valid "
+        "form when that is where they keep it.",
         "The check is one the user can apply to the finished thing — it says "
         "what must be there, not how they gather it, and not an after-the-fact "
-        "outcome like 'no one complains'.",
+        "outcome like 'no one complains'. A statement that every named part is "
+        "represented in the finished thing ('every shelf and drawer has an "
+        "entry') is a check on the thing, not an outcome.",
         "A thing must not depend on itself.",
     ]
 
@@ -109,11 +113,12 @@ class Resource(LLMValidated):
     answer with a state of mind or an outcome, propose the concrete check
     yourself and ask them to confirm it.
 
-    Work through one at a time: propose what it looks like and the check, ask the user to confirm or correct, and only then move to
-    the next. When they name one, accept it; do not read back a longer list of alternatives. Do not put checks for
-    several in one message. Raw notes, and anything the user trusts as sent, need no completeness
-    question: they are whatever the person wrote. Accept them and move on. If they have only one, do
-    not ask for more.
+    Work through one thing at a time: propose where it comes from, what form it takes, what it needs first, and the check in one
+    draft, then ask one confirm-or-correct question. Do not ask a list of separate questions about one thing, and do not put
+    checks for several things in one message. When they name one, accept it; do not read back a longer list of alternatives.
+    When they confirm one thing, accept it and move to the next; do not summarise it back or ask again. Raw notes, and anything
+    the user trusts as sent, need no completeness question: they are whatever the person wrote. Accept them and move on. If
+    they have only one, do not ask for more.
 
     Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply and end
     the reply with it — do not ask a question in that reply. When they confirm the set, return it without summarising it again.

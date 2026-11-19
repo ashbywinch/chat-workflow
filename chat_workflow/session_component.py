@@ -11,6 +11,7 @@ does not greet or sign off unless the caller asks for it.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from inspect import cleandoc
 from typing import Annotated, Any, TypeVar
@@ -20,6 +21,19 @@ from .decorators import atomic_workflow_step, composite_workflow_step
 from .session import Session
 
 T = TypeVar("T")
+
+_FALLBACK_CLOSING = "I have what I need."
+
+
+def _is_structured_text(text: str) -> bool:
+    """True when a one-turn text is a JSON object or array, not a sentence."""
+    stripped = text.strip()
+    if not stripped or stripped[0] not in "{[":
+        return False
+    try:
+        return isinstance(json.loads(stripped), (dict, list))
+    except (ValueError, TypeError):
+        return False
 
 
 class SessionComponent:
@@ -100,7 +114,12 @@ class SessionComponent:
                 session.say(self.greet(session=session))
             result = step(session=session)
             session.state.final_result = result
-            session.say(self.sign_off(result=result, session=session))
+            closing = self.sign_off(result=result, session=session)
+            if _is_structured_text(closing):
+                # A closing is one sentence. If the model copies the result
+                # instead, say the plain closing rather than leak field names.
+                closing = _FALLBACK_CLOSING
+            session.say(closing)
             return result
         finally:
             session.active = False

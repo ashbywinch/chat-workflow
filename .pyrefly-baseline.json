@@ -824,8 +824,8 @@
    "path": "tests/unit/test_eval_harness.py",
    "code": -2,
    "name": "bad-argument-type",
-   "description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['child_session', 'composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
-   "concise_description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['child_session', 'composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
+   "description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['child_session', 'composite_echo', 'composite_prompt', 'conversation_correction', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
+   "concise_description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['child_session', 'composite_echo', 'composite_prompt', 'conversation_correction', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
    "severity": "error"
   },
   {
@@ -949,9 +949,9 @@
    "severity": "error"
   },
   {
-   "line": 208,
+   "line": 218,
    "column": 9,
-   "stop_line": 208,
+   "stop_line": 218,
    "stop_column": 14,
    "path": "tests/unit/test_models.py",
    "code": -2,

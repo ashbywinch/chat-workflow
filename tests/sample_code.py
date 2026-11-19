@@ -19,7 +19,7 @@ class MinutesDraft(LLMValidated):
     """Structured meeting minutes."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "The meeting date is a real date the meeting took place, not a placeholder.",
+        "Every action item in the minutes names an owner and a due date.",
     ]
 
     meeting_date: str = Field(

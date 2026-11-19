@@ -30,7 +30,10 @@ def meeting_minutes_deliverable() -> Deliverable:
         success_criteria=(
             "Every decision is recorded and every action item names an owner."
         ),
-        integration_points="Emailed to attendees, who review and follow up.",
+        integration_points=(
+            "Meeting attendees receive the document by email, review it, and "
+            "follow up on their action items."
+        ),
         storage_requirements="Shared drive, one folder per meeting series",
     )
 
@@ -68,8 +71,8 @@ def weekly_meal_plan_deliverable() -> Deliverable:
         consumer="Family",
         format="One-page plan",
         success_criteria=(
-            "Each day of the week lists a dinner, and every ingredient in it "
-            "is on the family's allowed list."
+            "Before the plan is finalized, each day of the week lists a dinner, "
+            "and every ingredient in it is on the family's allowed list."
         ),
         integration_points=(
             "The family receives the plan and reads it before shopping and "

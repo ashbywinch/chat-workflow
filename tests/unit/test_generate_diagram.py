@@ -305,6 +305,45 @@ class TestDiagramStructure(unittest.TestCase):
             _make_inputs(),
         )
 
+    def test_a_consumer_with_punctuation_matches_its_prefix(self):
+        outputs = _make_outputs()
+        outputs[0] = outputs[0].model_copy(
+            update={"consumer": "Meeting attendees, who use the action items"}
+        )
+        _validate_diagram_structure(
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant Attendees as "Meeting attendees: Deliver"\n'
+            "Order->>Attendees: start\n"
+            "Attendees-->>Order: ack\n"
+            "opt may happen\n"
+            "Order->>Attendees: more\n"
+            "end\n"
+            "Order->>Attendees: outcome",
+            _make_components(),
+            outputs,
+            _make_inputs(),
+        )
+
+    def test_a_consumer_with_a_possessive_matches_its_party(self):
+        outputs = _make_outputs()
+        outputs[0] = outputs[0].model_copy(
+            update={"consumer": "meeting attendees and my boss"}
+        )
+        _validate_diagram_structure(
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant AttendeesAndBoss as "Meeting Attendees and Boss: Receive"\n'
+            "Order->>AttendeesAndBoss: start\n"
+            "opt may happen\n"
+            "Order->>AttendeesAndBoss: more\n"
+            "end\n"
+            "Order->>AttendeesAndBoss: outcome",
+            _make_components(),
+            outputs,
+            _make_inputs(),
+        )
+
     def test_a_participant_outside_the_record_names_the_known_ones(self):
         with self.assertRaises(ValidationError) as ctx:
             self._check(

@@ -203,6 +203,16 @@ class TestAgentResponseModel(unittest.TestCase):
 
         self.assertIn("FAILURE intent requires a message", str(context.exception))
 
+    def test_a_structured_result_pasted_into_message_is_rejected(self):
+        for payload in ('{"consumer": "you"}', '[{"consumer": "you"}]'):
+            with self.assertRaises(ValueError) as context:
+                AgentResponse[EvaluationCriteria](
+                    intent=AgentIntent.CONTINUE,
+                    message=payload,
+                )
+
+            self.assertIn("text the user sees", str(context.exception))
+
 
 class TestTurnResultModel(unittest.TestCase):
     def setUp(self):

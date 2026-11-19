@@ -28,6 +28,15 @@ from tests.sample_code import (
 from workflows.workflow.component_source_code import ComponentSourceCode
 
 
+class TestSourceLines(unittest.TestCase):
+    def test_an_element_with_embedded_newlines_is_split_into_lines(self):
+        from workflows.workflow.component_source_code import _join_source_lines
+
+        joined = _join_source_lines(["a = 1", "b = 2\nc = 3"])
+
+        self.assertEqual(joined, "a = 1\nb = 2\nc = 3")
+
+
 class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
     """Tests for the programmatic @model_validator on ComponentSourceCode."""
 
@@ -560,7 +569,7 @@ class MinutesDraft(BaseModel):
             "later the same day without confusion."
         )
         code = VALID_COMPONENT_CODE.replace(
-            '"The meeting date is a real date the meeting took place, not a placeholder.",',
+            '"Every action item in the minutes names an owner and a due date.",',
             f'"{long_rule}",',
         )
 

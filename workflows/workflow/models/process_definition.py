@@ -98,13 +98,12 @@ def _gather_notes(
 ) -> str:
     """Collect the user's description of how their work happens.
 
-The conversation has already opened; do not greet again. Say what you are doing and ask "What do you do?". If the description parameter already holds their answer,
-start from it instead: it is what they already told you, so use it and ask only for what it leaves out.
-
-Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in
+The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
+it is what they already told you: do not ask "What do you do?" again; ask only "Is there anything else?" once, then return. Otherwise
+ask "What do you do?" once; after their first answer, ask at most "Is there anything else?" once, then return what they told you, in
 their words.
 
-Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown."""
+Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown."""
     ...  # type: ignore[reportReturnType]
 
 

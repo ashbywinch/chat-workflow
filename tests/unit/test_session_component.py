@@ -127,6 +127,29 @@ class TestSessionComponent(unittest.TestCase):
         self.assertEqual(session.state.final_result, "the result")
 
     @patch("chat_workflow.atomic_workflow_step.AtomicWorkflowStep._call_llm")
+    def test_a_structured_closing_is_replaced_with_the_plain_closing(self, mock_call_llm):
+        mock_call_llm.side_effect = [
+            AgentResponse[str](
+                intent=AgentIntent.SUCCESS,
+                result="Hi there! I help describe your work. What would you like help with?",
+            ),
+            AgentResponse[str](
+                intent=AgentIntent.SUCCESS,
+                result='{"consumer": "you"}',
+            ),
+        ]
+        session = _session()
+
+        def step(*, session: Session) -> str:
+            session.state.messages.append({"role": "user", "content": "done"})
+            return "result"
+
+        SessionComponent().converse(step, session=session)
+
+        self.assertEqual(session.state.messages[-1]["content"], "I have what I need.")
+        self.assertNotIn("consumer", session.state.messages[-1]["content"])
+
+    @patch("chat_workflow.atomic_workflow_step.AtomicWorkflowStep._call_llm")
     def test_converse_does_not_greet_a_session_that_has_messages(self, mock_call_llm):
         mock_call_llm.side_effect = [
             AgentResponse[str](
