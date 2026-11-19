@@ -15,6 +15,12 @@ from tests.evals.helpers import DEFAULT_JUDGE_RULES
 
 META_LEVEL_JUDGE_RULES: dict[str, str] = {
     **DEFAULT_JUDGE_RULES,
+    "No repetition": (
+        "The assistant does not repeat a question the user already answered. A "
+        "first question about a field the user has not mentioned — such as "
+        "who receives an output — is a legitimate gap-filling follow-up, "
+        "not repetition."
+    ),
     "Uses expertise": (
         "The assistant proposes the shape of each output — its name, who it is "
         "for, its format, the check it must pass, and where it goes — from "
