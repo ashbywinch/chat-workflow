@@ -64,6 +64,8 @@ class AtomicWorkflow(Generic[TResult]):
             extra_headers=config.extra_headers,
             temperature=config.temperature,
             final_output_type=config.final_response_model,
+            tools=config.tools,
+            deps=config.deps,
         )
 
     @property

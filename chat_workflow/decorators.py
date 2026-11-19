@@ -60,6 +60,8 @@ def _setup_atomic_workflow(
     max_turns: int,
     debug: Any,
     session: Any,
+    tools: Any = (),
+    deps: Any = None,
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow."""
     from .exceptions import AtomicWorkflowFailedError
@@ -86,12 +88,18 @@ def _setup_atomic_workflow(
             request_timeout_seconds=session.config.request_timeout_seconds,
             extra_headers=getattr(session.config, "extra_headers", None),
             temperature=getattr(session.config, "temperature", None),
+            tools=tools,
+            deps=deps,
         )
     )
 
 
 def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
+
+    ``session``, ``debug``, ``max_turns``, ``tools`` and ``deps`` are the
+    decorator's own parameters: they are removed before the prompt's params
+    section is built, so a step cannot also name one of them.
 
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts a ``session`` parameter (:class:`~chat_workflow.session.Session`).
@@ -104,6 +112,10 @@ def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args, **kwargs):
         session = kwargs.pop("session", None)
         debug = kwargs.pop("debug", None)
+        # a step's tools are not prompt parameters: they never render into
+        # the params section
+        tools = kwargs.pop("tools", ())
+        deps = kwargs.pop("deps", None)
 
         if session is None:
             raise TypeError(f"Atomic workflow '{func.__name__}' requires 'session' parameter")
@@ -125,7 +137,9 @@ def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
         if debug is None and session.config.debug:
             debug = StreamingDebug()
 
-        workflow = _setup_atomic_workflow(system_prompt, actual_return_type, max_turns, debug, session)
+        workflow = _setup_atomic_workflow(
+            system_prompt, actual_return_type, max_turns, debug, session, tools=tools, deps=deps
+        )
         result = session.run(workflow=workflow, first_user_input="")
         state.initial_result = result
 
