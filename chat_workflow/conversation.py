@@ -56,6 +56,10 @@ T = TypeVar("T")
 _UPSTREAM_FAILURE_CODES = frozenset({2005})
 _UPSTREAM_FAILURE_TEXT = "failed to get response from provider"
 
+# A response whose visible text is under this fraction of its length is a
+# stall — whitespace to the token limit — not an answer.
+_NEGLIGIBLE_TEXT = 0.05
+
 
 def _is_upstream_failure(exc: ModelHTTPError) -> bool:
     """Whether a rejected request is really the gateway's upstream failing."""
@@ -165,16 +169,22 @@ def _has_usable_content(response: ModelResponse) -> bool:
     """
     if response.finish_reason == "length":
         return False
-    return any(
-        (isinstance(part, TextPart) and part.content.strip())
-        or isinstance(part, ToolCallPart)
-        for part in response.parts
-    )
+    if any(isinstance(part, ToolCallPart) for part in response.parts):
+        return True
+    text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
+    # A stall emits the opening token and then whitespace to the token limit
+    # (measured on the gateway: `{"response":` followed by 5,392 lines of
+    # newlines). It is no answer, however long the response is.
+    visible = len(text.strip())
+    return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
 
 
 def _unusable_cause(response: ModelResponse) -> str:
     if response.finish_reason == "length":
         return "token limit reached before the answer finished"
+    text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
+    if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
+        return "whitespace instead of an answer"
     if any(isinstance(part, TextPart) for part in response.parts):
         return "blank response"
     return "thinking only, no output"

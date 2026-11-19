@@ -143,6 +143,19 @@ class TestUnusableResponses(unittest.TestCase):
         self.assertEqual(turn.resends[0].cause, "token limit reached before the answer finished")
         self.assertEqual(_retry_parts(conversation), [])
 
+    def test_a_stall_of_whitespace_is_resent(self):
+        """The gateway's model can emit the opening token and then newlines to
+        the token limit (measured: 5,392 lines). Nothing visible is an answer,
+        however long the text is."""
+        stall = ModelResponse(parts=[TextPart('{"response":' + "\r\n   " * 1200)])
+        conversation = make_conversation([stall, VALID])
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(turn.resends[0].cause, "whitespace instead of an answer")
+        self.assertEqual(_retry_parts(conversation), [])
+
     def test_the_resend_is_bounded(self):
         conversation = make_conversation(
             [ModelResponse(parts=[])],
