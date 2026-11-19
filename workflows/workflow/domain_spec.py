@@ -8,11 +8,12 @@ Python or Pydantic implementation details.
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
-from chat_workflow import atomic_workflow_step
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
@@ -121,7 +122,8 @@ class ComponentDomainSpec(LLMValidated):
         holds: the name is the one ComponentSpec carries, and Component uses
         it as the class name.
         """
-        cleaned = "".join(ch for ch in value if ch.isalnum() or ch == "_")
+        parts = [part for part in re.split(r"[^A-Za-z0-9]+", value) if part]
+        cleaned = "".join(part[:1].upper() + part[1:] for part in parts)
         return cleaned or value
 
     conversation_design_pattern: str | None = Field(
@@ -134,7 +136,7 @@ class ComponentDomainSpec(LLMValidated):
         ),
     )
 
-    @atomic_workflow_step
+    @composite_workflow_step
     @classmethod
     def explore(
         cls,
@@ -147,23 +149,68 @@ class ComponentDomainSpec(LLMValidated):
             "What the user makes, with the check they gave for it",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> ComponentDomainSpec:
-        """Shape what the thing contains with the user.
+        """Derive the artifact's domain spec, then confirm it."""
+        draft = _draft_domain_spec(
+            responsibilities=responsibilities,
+            deliverables=deliverables,
+            session=session,
+        )
+        session.say(_format_domain_spec(draft))
+        return _confirm_domain_spec(
+            draft=draft, session=session, max_turns=max_turns
+        )
 
-    The responsibilities are already agreed, so do not ask the user to confirm the shape again. Keep
-    `responsibilities.name` exactly as given: do not reformat, split, or expand it. State the parts the thing needs, in
-    their words, and move on; do not turn the shape into a second confirmation. Open by proposing the fields from the
-    responsibilities and any deliverables; do not ask what to call the thing or ask the user to list its parts from
-    scratch.
 
-    If `deliverables` is given, the success criteria it carries is the check the user already gave: use it as the
-    quality checks and do not ask for quality again. If there are no deliverables, propose the checks from your domain
-    knowledge and ask the user to confirm or add.
+def _format_domain_spec(draft: ComponentDomainSpec) -> str:
+    """Present the derived domain spec in the user's words."""
+    fields = "; ".join(
+        f"{field.name} — {field.domain_description}" for field in draft.fields
+    )
+    quality = "; ".join(draft.what_good_looks_like)
+    return (
+        f"I see we're working on {draft.name} — {draft.description}\n"
+        f"Here are the parts I'd capture: {fields}\n"
+        f"What makes it good: {quality}\n"
+        f"I'd act as {draft.expert_role}."
+    )
 
-    Infer the expertise you need and confirm it in one sentence. Ask one question at a time and do not interrogate
-    them.
 
-    Return the result when they confirm."""
-        ...  # type: ignore[reportReturnType]
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_domain_spec(
+    responsibilities: Annotated[
+        ComponentSpec,
+        "What this part of the work is responsible for, in the user's words",
+    ],
+    deliverables: Annotated[
+        list[Deliverable] | None,
+        "What the user makes, with the check they gave for it",
+    ] = None,
+    max_turns: Annotated[int, "Maximum turns"] = 1,
+) -> ComponentDomainSpec:
+    """Derive the artifact's domain spec from the agreed responsibilities.
+
+The responsibilities and any deliverables are established. Derive the fields, the quality checks, and the expertise
+yourself; do not ask the user anything. Keep `responsibilities.name` exactly as given: do not reformat, split, or
+expand it. Return the complete spec."""
+    ...  # type: ignore[reportReturnType]
+
+
+@atomic_workflow_step
+def _confirm_domain_spec(
+    draft: Annotated[
+        ComponentDomainSpec,
+        "The complete domain spec already shown to the user",
+    ],
+    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+) -> ComponentDomainSpec:
+    """The domain spec has been shown. Ask one question about a field or quality check.
+
+If the user confirms, return the draft. If they correct or add a field or check, update it and return the corrected
+spec. Ask only about a gap the draft cannot fill; do not re-present the whole spec and do not ask what to call the
+artifact."""
+    ...  # type: ignore[reportReturnType]
+
 
 from .models.deliverable import Deliverable  # noqa: E402
