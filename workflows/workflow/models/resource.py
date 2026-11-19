@@ -95,7 +95,7 @@ class Resource(LLMValidated):
 
     The conversation has already opened; do not greet again. Start your first reply with "Let's list what you start with before you make {deliverables[0].name}." Then, in one sentence,
     say what you are doing: listing what they start with before they make the thing. If the conversation already lists what they start with, use that list and do not ask which ones they have. Otherwise, in your first turn, name the thing they make from `deliverables`, propose the things people
-    usually start with for that kind of work, and ask which of them they have.
+    usually start with for that kind of work, and ask which of them they have. The deliverables already name what they make; use that name and do not ask what to call it or what the notes are called.
 
     For each one, in the user's words:
     - where it comes from: ask which person, place, system, or document it comes from, not the act of getting it ("The fridge and freezer",

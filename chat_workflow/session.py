@@ -155,7 +155,15 @@ class Session:
         """
         try:
             first = first_user_input
-            if not first and chat and _last_role(workflow.messages) == "assistant":
+            if not first and not chat:
+                # A one-shot step has no user to open the conversation. The
+                # opening prompt would make it greet instead of producing the
+                # result, so state the job instead.
+                first = (
+                    "No user is available. Produce the result now from the "
+                    "instructions and the inputs."
+                )
+            elif not first and chat and _last_role(workflow.messages) == "assistant":
                 # The assistant spoke last (a greeting or a composite echo);
                 # the next turn belongs to the user.
                 first = self._raw_io.prompt("\nYou")

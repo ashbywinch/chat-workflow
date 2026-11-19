@@ -931,9 +931,10 @@ class ComponentSourceCode(LLMValidated):
         "REJECT any generated docstring or prompt that states the response "
         "format — JSON, intent, message, result, or 'never reply with plain "
         "text'. The response schema owns the protocol.",
-        "The conversation checklist on a generated step complements its "
-        "docstring; it does not paraphrase it. Each rule names a behaviour "
-        "the judge can falsify.",
+        "If a generated step declares a conversation checklist, it complements "
+        "the step's docstring rather than paraphrasing it, and each rule in the "
+        "declared checklist names a behaviour the judge can falsify. A step "
+        "with no declared checklist is not rejected for that absence.",
     ]
     _validation_rules_heading: ClassVar[str] = "Generated code validation rules"
 

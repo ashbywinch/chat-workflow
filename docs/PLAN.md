@@ -9,7 +9,7 @@ later one.
 - **Outputs**: `@atomic_workflow_step`, turn loop, `AgentResponse`, typed result
   or named exception; `@composite_workflow_step`; CLI discovery.
 - **Operations**: `make` creates the venv and installs the package.
-- **Quality gate**: unit tests with a fake instructor client; `make lint`.
+- **Quality gate**: unit tests with a FunctionModel; `make lint`.
 
 ## Phase 1 — Validation and artifacts (done)
 

@@ -207,17 +207,48 @@ def _item_field(items: Any, field: str) -> list[str]:
     return values
 
 
-def _repair_diagram_outcome(diagram: str, outputs: Any) -> str:
+def _primary_output(outputs: Any, components: Any = None) -> tuple[str, str] | None:
+    """The output the final arrow should carry, and its consumer.
+
+    A private working copy — the notes the user writes for themselves, or a
+    draft they never share — is not the outcome. Prefer an output whose
+    consumer is not the user and is not the producing component's owner.
+    """
+    pairs = [
+        (name, consumer)
+        for name, consumer in zip(
+            _item_field(outputs, "name"), _item_field(outputs, "consumer"), strict=False
+        )
+    ]
+    if not pairs:
+        return None
+    owner_roles = {
+        _normalise_name(owner)
+        for owner in _item_field(components, "owner_role")
+        if owner.strip()
+    }
+    self_words = {"you", "me", "i", "user", "self", "myself"}
+    for name, consumer in pairs:
+        words = set(_name_words(consumer.split(":", 1)[0]))
+        if words & self_words:
+            continue
+        if _normalise_name(consumer.split(":", 1)[0]) in owner_roles:
+            continue
+        return name, consumer
+    return pairs[0]
+
+
+def _repair_diagram_outcome(diagram: str, outputs: Any, components: Any = None) -> str:
     """Make the final message the outcome to the consumer.
 
     The record already names the consumer and the output, so the final arrow
     is mechanical. If the model ends on a self-loop or a return flow, append
     the outcome arrow instead of spending a retry on the shape.
     """
-    consumers = _item_field(outputs, "consumer")
-    if not consumers:
+    primary = _primary_output(outputs, components)
+    if primary is None:
         return diagram
-    consumer = consumers[0]
+    output_name, consumer = primary
     consumer_norm = _normalise_name(consumer)
     lines = diagram.splitlines()
     participants: dict[str, str] = {}
@@ -257,7 +288,6 @@ def _repair_diagram_outcome(diagram: str, outputs: Any) -> str:
             (alias for alias in participants if alias != consumer_alias),
             consumer_alias,
         )
-    output_name = (_item_field(outputs, "name") or ["result"])[0]
     message = f"Send the final {output_name}"
     if len(message) > 60:
         message = "Send the final result"
@@ -276,19 +306,18 @@ def _fallback_diagram(components: Any, outputs: Any) -> str:
     from failing the whole run when the model returns only ``sequenceDiagram``.
     """
     component_names = _item_field(components, "name")
-    consumer_names = _item_field(outputs, "consumer")
-    if not component_names or not consumer_names:
+    primary = _primary_output(outputs, components)
+    if not component_names or primary is None:
         return ""
     component = component_names[0]
-    consumer = consumer_names[0]
+    output_name, consumer = primary
     component_alias = re.sub(r"\W+", "", component.title()) or "Component"
     consumer_alias = re.sub(r"\W+", "", consumer.title()) or "Consumer"
     if consumer_alias == component_alias:
         consumer_alias += "Receiver"
     purpose = (_item_field(components, "purpose") or ["Do the work"])[0]
     work = purpose.split(".")[0].strip()[:50] or "Do the work"
-    output_names = _item_field(outputs, "name")
-    outcome = f"Send the final {output_names[0]}" if output_names else "Send the final result"
+    outcome = f"Send the final {output_name}"
     if len(outcome) > 60:
         outcome = "Send the final result"
     return "\n".join(
@@ -356,7 +385,9 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
                 if fallback:
                     diagram = fallback
             repaired = _repair_diagram_outcome(
-                diagram, data.get("outputs") or []
+                diagram,
+                data.get("outputs") or [],
+                data.get("components") or [],
             )
             if repaired != data["diagram"]:
                 data = {**data, "diagram": repaired}
@@ -535,6 +566,11 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           artifact from the component that produced it to the output's
           consumer, copied from `outputs`. A `Note` is not a message and does
           not count as the outcome, and the last arrow must not be a self-loop.
+        - Before returning, check every activity in `analysis.activities`
+          against the diagram's message text. Each one must appear; add a
+          missing activity as a self-loop on the component that owns it. Use
+          the output's consumer for the final arrow, not a private working
+          copy such as the user's own notes.
 
         Record:
         - Copy names, purposes, scopes, and component types unchanged. Do not

@@ -8,6 +8,8 @@ These tests call real LLM APIs and require config.json + API key.
 
 import unittest
 
+from pydantic import ValidationError as PydanticValidationError
+
 from tests.conftest import timeout
 from tests.evals.helpers import make_config
 from tests.sample_code import (
@@ -40,7 +42,7 @@ class TestComponentSourceCodeLlmValidationEval(unittest.TestCase):
         """Code mixing the artifact with cross-cutting concerns fails High Cohesion."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=LOW_COHESION_CODE)
 
         self.assertIn("cross-cutting", str(ctx.exception).lower())
@@ -50,7 +52,7 @@ class TestComponentSourceCodeLlmValidationEval(unittest.TestCase):
         """Code with only type checks should fail Complete Functionality."""
         from chat_workflow.exceptions import ValidationError
 
-        with self.assertRaises(ValidationError) as ctx:
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
             ComponentSourceCode(code=INCOMPLETE_CODE)
 
         self.assertIn("domain business rule", str(ctx.exception).lower())

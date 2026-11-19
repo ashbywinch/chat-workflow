@@ -100,7 +100,10 @@ meeting spawned inside it are the same class:
   nested step.
 - `greet` and `sign_off` are one-turn text steps (`chat=False`,
   `single_turn=True`): a continue message is the text they produce, so they do
-  not ask a user who is not part of that step.
+  not ask a user who is not part of that step. They start from an explicit
+  first input ("Start the conversation." / "The conversation is over."), not
+  the generic opening prompt; a closing that asks a question is replaced with
+  a plain statement.
 
 The prompt and history come from the session:
 
@@ -108,7 +111,9 @@ The prompt and history come from the session:
   by the step's prompt: its docstring (procedure), parameters, the
   `## Conversation checklist`, the result model's class-level rules, and the
   user-facing phrase for each internal name.
-- The step is seeded with `session.state.messages` (the PydanticAI transcript).
+- A chat-on step is seeded with `session.state.messages` (the PydanticAI
+  transcript). A chat-off step starts empty: its parameters are its inputs, and
+  replaying the session would invite it to answer the conversation again.
   After the step, only the messages it added are folded back; the step's
   instructions and framework corrections are not session history.
 - The checklist is declared on the step (`conversation_validation_rules`,
@@ -148,7 +153,7 @@ The prompt and history come from the session:
 | Decision | Alternatives | Requirement |
 |---|---|---|
 | Cloudflare AI Gateway is the eval/CI provider | Direct OpenRouter/OpenCode keys per repo | R5: one credential, failover, analytics |
-| The answer is a forced `answer` tool call | `response_format` / Instructor JSON mode | The endpoints accept `response_format` and ignore it; a tool's schema is enforced on the same route |
+| The answer is a forced `answer` tool call | `response_format` / JSON-mode prompting | The endpoints accept `response_format` and ignore it; a tool's schema is enforced on the same route |
 | Agent sampling uses the configured temperature | Pinning to 0 for determinism | The model is stochastic; the eval must resemble production, and 0 is not deterministic anyway |
 | `unittest` for the eval harness | pytest | Evals need module discovery and a wall-clock timeout wrapper |
 | Pyrefly with a both-direction baseline lock | basedpyright, mypy | A large existing codebase; the lock catches new and stale diagnostics |

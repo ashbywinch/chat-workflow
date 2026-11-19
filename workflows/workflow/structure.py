@@ -111,6 +111,12 @@ class ComponentStructure(BaseModel):
         message, using business language: "attendees is a list of people",
         "each action item has an owner and due date".
 
+        `domain_spec` already lists the fields and the type hints. Treat them
+        as the proposal's starting point: do not ask the user what information
+        to capture, and do not ask them to name the fields. For each field,
+        propose the type and any structurally enforceable rule, then ask the
+        user to confirm or correct the whole proposal.
+
         Translate the user's business language into the technical structure
         silently; do not ask the user to choose code types. If a field needs a
         nested shape, express it as a nested BaseModel, a dataclass, or a

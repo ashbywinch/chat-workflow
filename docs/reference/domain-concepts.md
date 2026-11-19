@@ -34,7 +34,7 @@ steps owned by other components.
 
 **Broadly known as:** In other frameworks this concept appears as a *structured output agent loop*, a *function-calling agent*, a *tool-use loop*, or a *run* (OpenAI SDK). Vercel's AI SDK calls it a multi-step *generation* with `stopWhen`. LangGraph implements it as a *StateGraph* that loops until a condition is met. LlamaIndex has *FunctionAgent* for the same pattern.
 
-**In the code:** `AtomicWorkflowStep` (class), `@atomic_workflow_step` (decorator), `process_turn()` (method that drives one user → LLM cycle).
+**In the code:** `AtomicWorkflow` (class), `@atomic_workflow_step` (decorator), `process_turn()` (method that drives one user → LLM cycle).
 
 ## Composite Workflow Step
 

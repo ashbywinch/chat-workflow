@@ -159,7 +159,7 @@ canonical transcript is `test-results/transcripts/<label>-<ts>.json`: typed
 events (user, assistant, framework, validation, result), the structured result,
 the judge verdicts with evidence and fix, and the model/token metadata. The
 companion `.txt` is the rendered human view; full exception traces (including
-Instructor retry chains) are in `*-exception.txt`.
+provider retry chains) are in `*-exception.txt`.
 
 Do not re-run the eval suite just to see something you already captured. Before blaming the model, read the [Prompt Improvement Mindset](docs/contributors/testing.md#prompt-improvement-mindset) section — eval failures nearly always point to prompt improvements, not model deficiencies.
 ```

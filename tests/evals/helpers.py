@@ -232,9 +232,9 @@ def llm_judge(
 ) -> JudgeResult:
     """Ask an LLM to evaluate a conversation transcript against a list of rules.
 
-    Uses Instructor (via get_client) to return a structured JudgeResult
-    with a verdict for each rule. This is more reliable than parsing
-    free-text YES/NO from the response.
+    Uses a :class:`~chat_workflow.conversation.Conversation` returning a
+    structured JudgeResult with a verdict for each rule. This is more reliable
+    than parsing free-text YES/NO from the response.
 
     The judge is deliberately deterministic: temperature 0.0 and a model that
     can be pinned independently of the agent via ``CHAT_WORKFLOW_JUDGE_MODEL``.

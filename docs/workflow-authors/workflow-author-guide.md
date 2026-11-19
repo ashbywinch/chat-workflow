@@ -67,7 +67,7 @@ Put each thing where it belongs:
 | This step's procedure — what to ask, in what order, when to stop | Your step docstring |
 | The object's quality — fields, constraints, `_validation_rules` | The Pydantic model |
 | The conversation checklist — what a good conversation looks like | `conversation_validation_rules` on the step |
-| The response protocol — intent, message, result | `AgentResponse` and Instructor; never a prompt |
+| The response protocol — intent, message, result | `AgentResponse` and the `answer` tool; never a prompt |
 
 Your docstring is the procedure, not the protocol and not the checklist. It does
 not greet (the session does), it does not restate a checklist rule, and it never
@@ -178,13 +178,13 @@ Don't extract every method into a service class just for purity. A thin convenie
 Business rules go in Pydantic `model_validator` methods and field constraints. Prompts give behavioral guidance only. This separation means:
 
 - Rules are enforced programmatically, not by hoping the LLM follows instructions
-- Rules appear in the JSON schema that Instructor sends to the LLM
+- Rules appear in the JSON schema PydanticAI sends on the `answer` tool
 - Rules are testable with unit tests (no API key needed)
 - Prompts stay focused on conversation strategy
 
 #### Keep Prompts Focused on Behavioral Guidance
 
-A prompt should tell the LLM how to behave, not what data format to produce. Instructor handles schema formatting. Your prompt should cover:
+A prompt should tell the LLM how to behave, not what data format to produce. The framework handles schema formatting. Your prompt should cover:
 
 - The role the LLM should adopt
 - Conversation strategy and approach

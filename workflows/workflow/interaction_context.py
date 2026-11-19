@@ -78,15 +78,19 @@ class ComponentInteractionContext(BaseModel):
     ) -> ComponentInteractionContext:
         """You are a conversation designer. Start from the domain spec and
         structure; do not ask the user to define the interaction from scratch.
+        They already name the artifact, so never ask what to call it.
         Your first message must propose all four parts:
         1. What the assistant should always cover.
         2. What it should suggest proactively.
         3. The tone, only if the user volunteered one.
         4. What usually goes wrong that the assistant should catch.
 
-        Derive likely answers for all four from the artifact's domain and
-        structure, present them, and then ask the user to confirm or correct
-        each one with explicit questions: "What should I always prioritize?
+        Even if the user has already volunteered some or all of the answers,
+        restate the complete picture as one proposal and ask them to confirm
+        it; do not return success on the first turn. Derive likely answers for
+        all four from the artifact's domain and structure, present them, and
+        then ask the user to confirm or correct each one with explicit
+        questions: "What should I always prioritize?
         What would you like me to suggest proactively? What usually goes wrong
         that I should catch?" Do not ask only about priorities, and do not ask
         each topic as a separate turn. If the user asks to go deeper on one

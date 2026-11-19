@@ -146,9 +146,15 @@ def _build_system_prompt(
     if chat:
         sections.append(
             "## Start of the step\n"
-            "Say in one sentence what this step is doing and why before your "
-            "first question or proposal. Never return the result in the step's "
-            "first response."
+            "Say in one sentence what this step is doing and why. Then make "
+            "your first substantive move: if the step was given inputs, "
+            "propose what you can already see from them — the result, or the "
+            "part of it they cover — and ask for a reaction. Do not ask the "
+            "user to name a thing the inputs already name, and do not ask "
+            "them to supply or confirm something the inputs already contain. "
+            "Do not return the complete result in the first response unless "
+            "the inputs already contain all of it and the user has confirmed "
+            "it."
         )
 
     if chat and conversation_rules:
@@ -180,9 +186,12 @@ def _build_system_prompt(
         "proposed, or has supplied what the result needs, return "
         "intent='success' — every value in the result must come from what "
         "they told you. A question they left unanswered does not hold the "
-        "result back: finish with what they did give. If they are "
-        "uncooperative, or the turn limit is reached without that material, "
-        "return intent='failure': a result they did not supply is not theirs."
+        "result back: finish with what they did give. If their answers are "
+        "evasive and supply none of the values the result needs, return "
+        "intent='failure' and say what is missing; do not invent values from "
+        "the step's context. If the turn limit is reached without that "
+        "material, return intent='failure': a result they did not supply is "
+        "not theirs."
     )
 
     return "\n\n".join(sections)
@@ -194,8 +203,17 @@ def _setup_atomic_workflow(
     max_turns: int,
     debug: Any,
     session: Any,
+    *,
+    chat: bool,
 ) -> AtomicWorkflow:
-    """Create and configure an AtomicWorkflow on the session's transcript."""
+    """Create and configure an AtomicWorkflow on the session's transcript.
+
+    A chat-on step is one turn in the session's conversation, so it starts from
+    that transcript. A chat-off step (a greeting, a closing, a one-shot
+    generation) has no user conversation of its own: its inputs are its
+    parameters, and replaying the session would invite it to answer the
+    conversation again.
+    """
     from .exceptions import AtomicWorkflowFailedError
 
     conversation = Conversation(
@@ -204,7 +222,7 @@ def _setup_atomic_workflow(
         instructions=system_prompt,
         output_type=AgentResponse[actual_return_type],
         final_output_type=FinalResponse[actual_return_type],
-        messages=list(session.state.messages),
+        messages=list(session.state.messages) if chat else [],
         api_base=session.config.api_base,
         api_key_env=session.config.api_key_env,
         output_retries=getattr(session.config, "max_retries", 2),
@@ -275,6 +293,10 @@ def atomic_workflow(
         def wrapper(*args, **kwargs):
             session = kwargs.pop("session", None)
             debug = kwargs.pop("debug", None)
+            # A one-shot step has no conversation to open. The wrapper's
+            # caller may name the first input; otherwise Session supplies the
+            # "produce the result" prompt below.
+            first_user_input = kwargs.pop("_first_user_input", "")
 
             if session is None:
                 raise TypeError(
@@ -305,10 +327,17 @@ def atomic_workflow(
                 debug = StreamingDebug()
 
             workflow = _setup_atomic_workflow(
-                system_prompt, actual_return_type, max_turns, debug, session
+                system_prompt,
+                actual_return_type,
+                max_turns,
+                debug,
+                session,
+                chat=chat,
             )
             result = session.run(
-                workflow=workflow, first_user_input="", chat=chat
+                workflow=workflow,
+                first_user_input=first_user_input,
+                chat=chat,
             )
             state.initial_result = result
 

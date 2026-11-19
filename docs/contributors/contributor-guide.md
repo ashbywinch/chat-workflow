@@ -102,9 +102,9 @@ The architecture follows these principles. Because we are building a **system th
 - Three outcomes: continue/success/failure
 
 #### `conversation.py` — LLM Abstraction
-- Unified client for multiple providers via `Conversation.send()`
-- Supports: OpenAI, Google, OpenRouter, etc.
-- Uses instructor for structured output
+- One model path for every provider via `Conversation.send()`
+- Supports any OpenAI-compatible endpoint the gateway routes to
+- Uses PydanticAI; the answer travels as a forced `answer` tool call
 
 #### `chat_workflow_cli/cli.py` — CLI with Auto-Discovery
 - Discovers `@composite_workflow_step` functions in `workflows/` directory
@@ -156,7 +156,7 @@ tests/
 ├── unit/
 │   ├── test_models.py              # Pydantic model validation (no mock)
 │   ├── test_orchestrator_logic.py  # Orchestrator logic (mock _call_llm)
-│   └── test_conversation.py     # LLM interaction (mock get_client)
+│   └── test_conversation.py     # the model call (FunctionModel)
 └── evals/
     └── test_real_api.py            # Real API tests (require config.json + API key)
 ```

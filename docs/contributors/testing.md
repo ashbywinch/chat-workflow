@@ -29,7 +29,7 @@ These rules govern when and how tests must be written for any change:
 
 - **Code without a unit test is untested logic** — the code path may never be exercised.
 - **Prompt text without an eval is a guess** — you won't know if the change improves or degrades conversation quality until you run a real LLM against it.
-- **QA scenarios catch integration issues** — unit tests and evals test in isolation; QA scenarios verify the system works end-to-end (e.g., simulate an InstructorRetryException → verify companion file created + no traceback visible).
+- **QA scenarios catch integration issues** — unit tests and evals test in isolation; QA scenarios verify the system works end-to-end (e.g., simulate a model retry → verify the companion file is created and no traceback reaches the user).
 
 > One rule of thumb: if you changed only prompt text, write an eval. If you changed only code, write a unit test. If you changed both, write both.
 
@@ -38,11 +38,11 @@ These rules govern when and how tests must be written for any change:
 ```
 tests/
 ├── __init__.py
-├── conftest.py                      # Shared fixtures: timeout, FakeConfig, MockInstructorClient
+├── conftest.py                      # Shared fixtures: timeout, FakeConfig, FunctionModel
 ├── unit/
 │   ├── test_models.py              # Pydantic model validation (no mock)
 │   ├── test_orchestrator_logic.py  # Orchestrator logic (mock _call_llm)
-│   └── test_llm_interaction.py     # LLM interaction (mock get_client)
+│   └── test_conversation.py        # the model call (FunctionModel)
 └── evals/
     ├── __init__.py
     ├── helpers.py                  # AgentIO, llm_judge, make_config, make_tools
@@ -54,9 +54,9 @@ tests/
 
 ### 1. Orchestrator Logic (mock `_call_llm`)
 ```python
-@patch.object(AtomicWorkflowStep, '_call_llm')
+@patch.object(AtomicWorkflow, '_call_llm')
 def test_multi_turn_conversation(self, mock_call_llm):
-    orchestrator = AtomicWorkflowStep(
+    orchestrator = AtomicWorkflow(
         system_prompt="Test", response_model=AgentResponse[EvaluationCriteria],
         max_turns=5, initial_messages=None,
         on_continue=..., on_success=..., on_failure=...,
@@ -71,17 +71,12 @@ def test_multi_turn_conversation(self, mock_call_llm):
     assert not result1.is_complete
 ```
 
-### 2. LLM Interaction (mock `get_client`)
-```python
-@patch('chat_workflow.llm_interaction.get_client')
-def test_call_llm_success(self, mock_get_client):
-    mock_client = Mock()
-    mock_client.chat.completions.create.return_value = AgentResponse[...](
-        intent=AgentIntent.CONTINUE, message="Test"
-    )
-    mock_get_client.return_value = mock_client
-    action = self.orchestrator._call_llm()
-```
+### 2. The model call (`FunctionModel`)
+``Conversation`` takes a ``model_client`` seam. A PydanticAI ``FunctionModel``
+scripts a whole turn without a network: it receives the message list and the
+agent info and returns a ``ModelResponse``. The answer itself is an ``answer``
+tool call, so a scripted response includes that call. ``tests/conftest.py``
+provides ``make_conversation`` for the common case.
 
 ### 3. Real API Evals (no mocking)
 Evals call a real LLM to verify prompt quality. They require `config.json` with a valid provider
@@ -102,8 +97,8 @@ class TestProcessDefinitionEval(unittest.TestCase):
     def test_llm_produces_process_definition(self):
         from workflows.workflow.models import ProcessDefinition
 
-        orchestrator = AtomicWorkflowStep(
-            config=AtomicWorkflowStepConfig(
+        orchestrator = AtomicWorkflow(
+            config=AtomicWorkflowConfig(
                 system_prompt="You are a Business Process Analyst...",
                 response_model=AgentResponse[ProcessDefinition],
                 max_turns=3,
@@ -111,7 +106,7 @@ class TestProcessDefinitionEval(unittest.TestCase):
                 initial_messages=[{"role": "user", "content": "Customer places an order..."}],
                 on_continue=lambda action: TurnResult[...].continuing(action.message or ""),
                 on_success=lambda action: TurnResult[...].success(action.result),
-                on_failure=lambda action: AtomicWorkflowStepFailedError(action.message or ""),
+                on_failure=lambda action: AtomicWorkflowFailedError(action.message or ""),
             )
         )
         result = orchestrator.process_turn("Please analyze...")
@@ -319,63 +314,24 @@ once the single-workflow tests pass, before pushing.
 The cost report (``scripts/eval_report.py``) automatically groups tests
 by their file location, making it easy to spot the most expensive evals.
 
-### Provider selection & model trade-offs
+### Provider selection and the model path
 
-The eval suite supports switching between LLM providers via `config.json`
-using a preset system. The default routes through Cloudflare AI Gateway:
+There is one model path: `Conversation.send()` in
+`chat_workflow/conversation.py` calls PydanticAI, which calls an
+OpenAI-compatible endpoint. The repo's `config.json` names the model and the
+key environment variable; `OPENAI_BASE_URL` points at the Cloudflare AI
+Gateway compat endpoint. The eval helper fails loudly when the base URL is
+missing rather than silently calling api.openai.com.
 
-```json
-{"llm": {"active": "cloudflare",
-         "presets": {"cloudflare": {"provider": "openai",
-                                    "model": "openai/dynamic/fallback2",
-                                    "api_key_env": "OPENAI_API_KEY",
-                                    "model_supports_tools": false},
-                     "openrouter": {"provider": "openrouter",
-                                    "model": "openrouter/google/gemini-2.5-flash-lite",
-                                    "api_key_env": "OPENROUTER_API_KEY",
-                                    "model_supports_tools": false}}}}
-```
+A step's answer is a forced `answer` tool call
+(`ToolOutput(..., strict=True)`). `response_format` is not used: the endpoint
+accepts it and ignores it, while a tool's schema is enforced on the same
+route. The tool's schema is built from the step's result type, so a
+discriminated `AgentResponse` is the protocol.
 
-The `cloudflare` preset has no `api_base`: litellm reads `OPENAI_BASE_URL`,
-which must point at the gateway compat endpoint. `make setup` creates
-`.env` from `.env.example`, and the eval helper fails loudly if
-`OPENAI_BASE_URL` is missing rather than silently calling api.openai.com.
-
-Set ``"active"`` to the preset name to switch. Shared settings
-(``temperature``, ``max_retries``, ``request_timeout_seconds``) stay at the
-``llm`` level.
-
-#### Instructor mode: JSON vs TOOLS
-
-The ``model_supports_tools`` flag controls which Instructor mode the client
-uses:
-
-| ``model_supports_tools`` | Instructor mode | How it works |
-|---|---|---|
-| ``false`` (default) | ``Mode.JSON`` | Prompts the model to return valid JSON in the message body. Works with any provider. |
-| ``true`` | ``Mode.TOOLS`` | Registers the response model as an OpenAI-compatible function tool and forces the model to call it. |
-
-**Why ``Mode.TOOLS`` doesn't work with DeepSeek V4 via OpenCode Go:**
-
-DeepSeek V4 models (``deepseek-v4-flash`` and ``deepseek-v4-pro``) are
-**always in thinking mode by default** — there is no non-thinking path for
-these models. Thinking mode has two limitations:
-
-1.  **No forced ``tool_choice``** — The API rejects ``tool_choice`` set to
-    a specific function name or ``"required"``. Only ``"auto"`` and
-    ``"none"`` are accepted. Instructor's ``Mode.TOOLS`` sends a forced
-    ``tool_choice``, which fails with:
-    ``"Thinking mode does not support this tool_choice"``
-
-2.  **Strict function name validation** — Function names must match
-    ``^[a-zA-Z0-9_-]+$``. Instructor uses the Pydantic ``schema["title"]``
-    as the function name, which for generic types like
-    ``AgentResponse[EvaluationCriteria]`` includes brackets.
-
-The community workaround (used by Oh My Pi, LangChain, etc.) is to set
-``supportsToolChoice: false`` for V4 models and fall back to prompting the
-model to call the tool voluntarily rather than forcing it. In our case,
-``Mode.JSON`` avoids both issues entirely.
+`temperature`, `max_retries` and `request_timeout_seconds` live under `llm` in
+`config.json`. The eval helper overrides the gateway cache header and the
+timeout for a cold reasoning route; production keeps the configured values.
 
 #### What model to use
 

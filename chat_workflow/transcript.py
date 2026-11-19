@@ -43,6 +43,22 @@ Audience = Literal["all", "user"]
 # value the workflow produced.
 _USER_KINDS = frozenset({"user", "assistant"})
 
+# The framework speaks first and last for a step that has no user of its own.
+# These prompts reach the model as user turns, but a person never said them, so
+# the user view does not show them and a judge is not asked to read them.
+_FRAMEWORK_PROMPTS = frozenset(
+    {
+        "Start the conversation.",
+        "No user is available. Produce the result now from the instructions "
+        "and the inputs.",
+        "The conversation is over. Close it in one sentence.",
+        "The user has finished. Say in one sentence that you have what they "
+        "need.",
+        "No user is available to answer. Return success with the completed "
+        "result, or failure if it cannot be produced.",
+    }
+)
+
 
 def entries(messages: Sequence[ModelMessage]) -> list[tuple[str, str]]:
     """The transcript as ``(kind, text)``, in the order the model saw it.
@@ -82,6 +98,8 @@ def render(
                 parts.append((kind, text))
             continue
         if audience == "user" and kind not in _USER_KINDS:
+            continue
+        if audience == "user" and kind == "user" and text.strip() in _FRAMEWORK_PROMPTS:
             continue
         parts.append((kind, text))
     if result is not None:

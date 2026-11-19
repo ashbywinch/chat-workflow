@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from chat_workflow import atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
@@ -89,13 +89,25 @@ class ProcessDefinition(LLMValidated):
     )
 
 
+class GatheredNotes(BaseModel):
+    """What the user told us about their work, in their own words."""
+
+    notes: str = Field(
+        min_length=1,
+        description=(
+            "The user's description of how their work happens, in their own "
+            "words. Not your reply to them, and never a question."
+        ),
+    )
+
+
 @atomic_workflow_step(conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE])
 def _gather_notes(
     process_description: Annotated[
         str, "What the person already told you about how their work happens"
     ] = "",
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-) -> str:
+) -> GatheredNotes:
     """Collect the user's description of how their work happens.
 
 The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
@@ -103,7 +115,9 @@ it is what they already told you: do not ask "What do you do?" again; ask only "
 ask "What do you do?" once; after their first answer, ask at most "Is there anything else?" once, then return what they told you, in
 their words.
 
-Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown."""
+Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown.
+
+Put the user's description in `notes`, in their words — not your reply to them. If you still need an answer, ask the question as a continue; never put a question in `notes`."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -115,7 +129,8 @@ def _generate_from_notes(
     """Turn the notes into the stages and steps of the user's work, and confirm it.
 
 The notes hold what the user told you, and they are complete. Open with the draft itself: do not greet, do not ask
-what they do, and do not ask again for anything the notes already say. Derive the breakdown from the notes yourself.
+what they do, and do not ask again for anything the notes already say. Do not ask "anything else?" or whether the notes
+are complete — they are; the gathering step already asked. Derive the breakdown from the notes yourself.
 Do not walk the user through the stages asking what happens in each — work it out from their description and present
 the result as a draft, keeping their own names.
 
@@ -123,7 +138,9 @@ Present the complete breakdown and ask them to confirm it. Ask only for what the
 who is involved, and who is in charge. If the notes say the user does it all, both answers are the user; do not ask. If the user does not know something, suggest one possibility and mark it
 as a suggestion. When they give "me" or "the person" as the role, that is the answer.
 
-When they confirm, return it."""
+When they confirm, return it.
+
+Use only the values in `notes`. The examples in the field descriptions are illustrative, never values to copy. If `notes` is not a description of the user's work, return failure rather than inventing one. Do not ask the user to name the thing; the orchestrating component is derived from the notes."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -142,15 +159,20 @@ def generate_from_chat(
     ProcessDefinition from the gathered notes. When `process_description` is
     provided, start from it instead of asking the user to repeat it.
     """
+    # Gathering is a short step by contract: ask once, invite elaboration
+    # once, return. A larger budget here only lets the model ask again.
+    gather_turns = min(max_turns, 4)
     if process_description:
-        notes = _gather_notes(
+        gathered = _gather_notes(
             process_description=process_description,
             session=session,
-            max_turns=max_turns,
+            max_turns=gather_turns,
         )
     else:
-        notes = _gather_notes(session=session, max_turns=max_turns)
-    return _generate_from_notes(notes=notes, session=session, max_turns=max_turns)
+        gathered = _gather_notes(session=session, max_turns=gather_turns)
+    return _generate_from_notes(
+        notes=gathered.notes, session=session, max_turns=max_turns
+    )
 
 
 # Import Session at runtime to break circular dependency

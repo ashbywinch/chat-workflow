@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from chat_workflow import atomic_workflow_step
 from chat_workflow.annotations import UserLabel
@@ -111,6 +111,19 @@ class ComponentDomainSpec(LLMValidated):
         min_length=1,
     )
 
+    @field_validator("name")
+    @classmethod
+    def _name_is_a_component_name(cls, value: str) -> str:
+        """A component name is a Python class name, not a display phrase.
+
+        The model is told to keep the agreed name, and usually does. When it
+        writes "Meeting Minutes" for "MeetingMinutes", the contract still
+        holds: the name is the one ComponentSpec carries, and Component uses
+        it as the class name.
+        """
+        cleaned = "".join(ch for ch in value if ch.isalnum() or ch == "_")
+        return cleaned or value
+
     conversation_design_pattern: str | None = Field(
         default=None,
         description=(
@@ -137,8 +150,11 @@ class ComponentDomainSpec(LLMValidated):
     ) -> ComponentDomainSpec:
         """Shape what the thing contains with the user.
 
-    The responsibilities are already agreed, so do not ask the user to confirm the shape again. State the parts the
-    thing needs, in their words, and move on; do not turn the shape into a second confirmation.
+    The responsibilities are already agreed, so do not ask the user to confirm the shape again. Keep
+    `responsibilities.name` exactly as given: do not reformat, split, or expand it. State the parts the thing needs, in
+    their words, and move on; do not turn the shape into a second confirmation. Open by proposing the fields from the
+    responsibilities and any deliverables; do not ask what to call the thing or ask the user to list its parts from
+    scratch.
 
     If `deliverables` is given, the success criteria it carries is the check the user already gave: use it as the
     quality checks and do not ask for quality again. If there are no deliverables, propose the checks from your domain

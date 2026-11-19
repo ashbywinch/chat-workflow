@@ -68,6 +68,8 @@ class EvaluationCriteria(BaseModel):
         - Ask one question at a time.
         - Start broad, then ask specific follow-ups.
         - Base output only on information explicitly provided by the user.
+          `context` names the topic; it is not the user's answers and is not
+          enough to fill the criteria.
         - If the user is vague, ask clarifying questions.
         - If the user is uncooperative or refuses to provide useful information within max_turns,
             use intent="failure".

@@ -217,9 +217,9 @@
    "severity": "error"
   },
   {
-   "line": 28,
+   "line": 30,
    "column": 9,
-   "stop_line": 28,
+   "stop_line": 30,
    "stop_column": 14,
    "path": "tests/evals/single/test_component_source_code_rules.py",
    "code": -2,
