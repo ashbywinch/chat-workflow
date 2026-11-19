@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Annotated, ClassVar, override
+from typing import Annotated, Any, ClassVar, override
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import Blob, Validation
@@ -197,6 +197,76 @@ def _validate_diagram_structure(
         )
 
 
+def _item_field(items: Any, field: str) -> list[str]:
+    """Read one string field from a list of dicts or model objects."""
+    values: list[str] = []
+    for item in items or []:
+        value = item.get(field) if isinstance(item, dict) else getattr(item, field, None)
+        if isinstance(value, str) and value.strip():
+            values.append(value.strip())
+    return values
+
+
+def _repair_diagram_outcome(diagram: str, outputs: Any) -> str:
+    """Make the final message the outcome to the consumer.
+
+    The record already names the consumer and the output, so the final arrow
+    is mechanical. If the model ends on a self-loop or a return flow, append
+    the outcome arrow instead of spending a retry on the shape.
+    """
+    consumers = _item_field(outputs, "consumer")
+    if not consumers:
+        return diagram
+    consumer = consumers[0]
+    consumer_norm = _normalise_name(consumer)
+    lines = diagram.splitlines()
+    participants: dict[str, str] = {}
+    for line in lines:
+        match = _PARTICIPANT_LINE.match(line.strip())
+        if match:
+            participants[match.group(1)] = match.group(2)
+
+    consumer_alias = next(
+        (
+            alias
+            for alias, label in participants.items()
+            if _matches_known(label.split(":", 1)[0].strip(), {consumer_norm})
+        ),
+        None,
+    )
+    if consumer_alias is None:
+        consumer_alias = "Consumer"
+        while consumer_alias in participants:
+            consumer_alias += "X"
+        lines.append(f'    participant {consumer_alias} as "{consumer}: Receive"')
+
+    arrows = [
+        (match.group(1), match.group(3))
+        for line in lines
+        if (match := _ARROW_LINE.match(line.strip()))
+    ]
+    if not arrows:
+        return "\n".join(lines)
+    source, target = arrows[-1]
+    if target == consumer_alias and source != consumer_alias:
+        return "\n".join(lines)
+
+    producer = source if source != consumer_alias else target
+    if producer == consumer_alias:
+        producer = next(
+            (alias for alias in participants if alias != consumer_alias),
+            consumer_alias,
+        )
+    output_name = (_item_field(outputs, "name") or ["result"])[0]
+    message = f"Send the final {output_name}"
+    if len(message) > 60:
+        message = "Send the final result"
+    if lines and not lines[-1].strip():
+        lines.pop()
+    lines.append(f"    {producer}->>{consumer_alias}: {message}")
+    return "\n".join(lines)
+
+
 class WorkflowSpec(BlobSyncMixin, LLMValidated):
     """A workflow specification.
 
@@ -230,6 +300,18 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         ),
         min_length=1,
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_the_outcome_arrow(cls, data: Any) -> Any:
+        """Make the last diagram message the outcome to the consumer."""
+        if isinstance(data, dict) and isinstance(data.get("diagram"), str):
+            repaired = _repair_diagram_outcome(
+                data["diagram"], data.get("outputs") or []
+            )
+            if repaired != data["diagram"]:
+                data = {**data, "diagram": repaired}
+        return data
 
     @override
     def validate_deterministic_rules(self) -> None:

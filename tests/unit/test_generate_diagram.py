@@ -18,6 +18,7 @@ from workflows.workflow.models import (
 )
 from workflows.workflow.workflow_spec import (
     WorkflowSpec,
+    _repair_diagram_outcome,
     _validate_diagram_structure,
 )
 
@@ -360,6 +361,57 @@ class TestDiagramStructure(unittest.TestCase):
 
         self.assertIn("Ghost", str(ctx.exception))
         self.assertIn("not a component", str(ctx.exception))
+
+
+class TestDiagramRepair(unittest.TestCase):
+    """The final arrow is mechanical; the framework fixes its shape."""
+
+    def test_a_self_loop_outcome_is_repaired_to_the_consumer(self):
+        diagram = (
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant Inventory as "Inventory: Receive"\n'
+            "Order->>Order: start\n"
+            "Inventory-->>Order: ack\n"
+            "opt may happen\n"
+            "Order->>Order: more\n"
+            "end\n"
+            "Order->>Order: done"
+        )
+
+        repaired = _repair_diagram_outcome(diagram, _make_outputs())
+
+        self.assertIn("Order->>Inventory: Send the final Test", repaired)
+        _validate_diagram_structure(
+            repaired, _make_components(), _make_outputs(), _make_inputs()
+        )
+
+    @patch.object(WorkflowSpec, "collect_all_rules", return_value=[])
+    def test_the_model_repairs_the_outcome_before_validation(self, mock_collect):
+        diagram = (
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant Inventory as "Inventory: Receive"\n'
+            "Order->>Order: start\n"
+            "Inventory-->>Order: ack\n"
+            "opt may happen\n"
+            "Order->>Order: more\n"
+            "end\n"
+            "Order->>Order: done"
+        )
+
+        spec = WorkflowSpec.model_validate(
+            {
+                "name": "Test Workflow",
+                "diagram": diagram,
+                "inputs": [item.model_dump() for item in _make_inputs()],
+                "outputs": [item.model_dump() for item in _make_outputs()],
+                "components": [item.model_dump() for item in _make_components()],
+                "architectural_validation": "One owner, one artifact.",
+            }
+        )
+
+        self.assertIn("Order->>Inventory: Send the final Test", spec.diagram)
 
 
 class TestCreateDiagram(TestCase):

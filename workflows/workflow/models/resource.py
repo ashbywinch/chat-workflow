@@ -93,8 +93,8 @@ class Resource(LLMValidated):
     ) -> list[Resource]:
         """List what the user starts with before they make the thing they make.
 
-    The conversation has already opened; do not greet again. In your first turn, name the thing they make from `deliverables`, and propose the things people
-    usually start with for that kind of work; ask which of them they have.
+    The conversation has already opened; do not greet again. If the conversation already lists what they start with, use that list and do not ask which ones they have. Otherwise, in your first turn, name the thing they make from `deliverables`, propose the things people
+    usually start with for that kind of work, and ask which of them they have.
 
     For each one, in the user's words:
     - where it comes from: ask which person, place, system, or document it comes from, not the act of getting it ("The fridge and freezer",
@@ -109,7 +109,9 @@ class Resource(LLMValidated):
     is on every shelf", not "I can list every item", not "Every shelf has been
     checked", not "No one complains". Name what must be present, not a general
     description of the contents: "Every day of the week has an entry" is a
-    check; "It contains a typical number of days" is a description. If they
+    check; "It contains a typical number of days" is a description. A check starts with the
+    thing, not with "you": "the calendar shows every shift", not "you have seen every shift".
+    If they
     answer with a state of mind or an outcome, propose the concrete check
     yourself and ask them to confirm it.
 
