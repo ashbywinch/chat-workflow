@@ -186,6 +186,23 @@ class TestAgentResponseModel(unittest.TestCase):
         self.assertEqual(action.message, "Can't help with that")
         self.assertIsNone(action.result)
 
+    def test_the_schema_states_what_each_intent_means(self):
+        """The three choices and their consequences travel with the request.
+
+        A model that reads only the schema was choosing `continue` while
+        attaching a complete result (rejected three times in the eval) and,
+        on the final turn, writing the criteria into `message` with no
+        result. The meaning of each value belongs where the value is
+        declared, not in each caller's system prompt.
+        """
+        intent = AgentResponse[EvaluationCriteria].model_json_schema()["properties"]["intent"]
+        description = intent["description"]
+
+        for value in ("continue", "success", "failure"):
+            self.assertIn(f'"{value}"', description)
+        self.assertIn("no result", description)
+        self.assertIn("send the complete result", description)
+
     def test_action_validation_continue_without_message(self):
         with self.assertRaises(ValueError) as context:
             AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message=None)

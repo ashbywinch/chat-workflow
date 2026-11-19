@@ -44,9 +44,11 @@ def _build_system_prompt(
         "\n\n## When to finish\n"
         "Use intent='continue' only while you still need something from the "
         "user. When the user says they are done, agrees with what you "
-        "proposed, or has given everything the result needs, return "
-        "intent='success' with the complete result in that same response. "
-        "Use intent='failure' only if the result cannot be produced."
+        "proposed, or has supplied what the result needs, return "
+        "intent='success' — every value in the result must come from what "
+        "they told you. If they are uncooperative, or the turn limit is "
+        "reached without that material, return intent='failure': a result "
+        "they did not supply is not theirs."
     )
     return system_prompt
 

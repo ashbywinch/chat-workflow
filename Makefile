@@ -48,11 +48,14 @@ test-unit: setup
 test-verbose: setup lint
 	@${UNITTEST} discover tests/unit/ -v
 
+# Each eval carries its own alarm (tests/evals/helpers.eval_timeout). The
+# --timeout below is only a backstop for a hang between tests, so it sits
+# above the sum of one run's budgets: at 300s it killed a legal slow suite.
 evals: setup lint
-	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/
+	@${PYTHON} scripts/run_with_timeout.py --timeout 1200 -- ${UNITTEST} discover tests/evals/
 
 evals-verbose: setup lint
-	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
+	@${PYTHON} scripts/run_with_timeout.py --timeout 1200 -- ${UNITTEST} discover tests/evals/ -v
 
 evals-debug: setup lint
 	@echo "${YELLOW}Running evals with LLM debug tracing...${NC}"

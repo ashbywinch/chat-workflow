@@ -27,7 +27,15 @@ class AgentResponse(BaseModel, Generic[TResult]):
     - ``FAILURE``: abort with an error message
     """
 
-    intent: AgentIntent
+    intent: AgentIntent = Field(
+        description=(
+            'What to do next. "continue": you still need an answer from the user — '
+            'ask for it in message and send no result. "success": you have everything '
+            'the caller asked for — send the complete result now and no message. '
+            '"failure": the result cannot be produced — say why in message and send '
+            "no result."
+        )
+    )
     message: str | None = Field(
         default=None,
         description=(
