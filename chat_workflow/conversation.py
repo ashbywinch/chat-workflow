@@ -23,6 +23,7 @@ accumulate across turns.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import wraps
@@ -172,8 +173,13 @@ def _has_usable_content(response: ModelResponse) -> bool:
     """
     if response.finish_reason == "length":
         return False
-    if any(isinstance(part, ToolCallPart) for part in response.parts):
-        return True
+    calls = [part for part in response.parts if isinstance(part, ToolCallPart)]
+    if calls:
+        # A call whose arguments are not JSON is an encoding failure, not an
+        # answer: measured as `{"response":Got it — a…}` from an endpoint
+        # that treats the tool schema as a hint. Correcting it is not the
+        # model's job; the same request is sampled again.
+        return all(_arguments_are_json(part) for part in calls)
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     # A stall emits the opening token and then whitespace to the token limit
     # (measured on the gateway: `{"response":` followed by 5,392 lines of
@@ -182,9 +188,24 @@ def _has_usable_content(response: ModelResponse) -> bool:
     return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
 
 
+def _arguments_are_json(part: ToolCallPart) -> bool:
+    """Whether a tool call's arguments are an object, not raw model prose."""
+    args = part.args
+    if isinstance(args, dict):
+        return True
+    if not isinstance(args, str):
+        return True
+    try:
+        return isinstance(json.loads(args), dict)
+    except ValueError:
+        return False
+
+
 def _unusable_cause(response: ModelResponse) -> str:
     if response.finish_reason == "length":
         return "token limit reached before the answer finished"
+    if any(isinstance(part, ToolCallPart) and not _arguments_are_json(part) for part in response.parts):
+        return "tool arguments were not JSON"
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
         return "whitespace instead of an answer"

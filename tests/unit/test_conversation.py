@@ -160,6 +160,17 @@ class TestUnusableResponses(unittest.TestCase):
         self.assertEqual(turn.resends[0].cause, "token limit reached before the answer finished")
         self.assertEqual(_retry_parts(conversation), [])
 
+    def test_a_call_whose_arguments_are_not_json_is_resent(self):
+        """An endpoint that treats the tool schema as a hint returns
+        `{"response":Got it — a…}`. Nothing there is an answer to correct."""
+        malformed = ModelResponse(parts=[ToolCallPart("answer", '{"response":Got it — a…}')])
+        conversation = make_conversation([malformed, VALID])
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(turn.resends[0].cause, "tool arguments were not JSON")
+
     def test_a_stall_of_whitespace_is_resent(self):
         """The gateway's model can emit the opening token and then newlines to
         the token limit (measured: 5,392 lines). Nothing visible is an answer,
