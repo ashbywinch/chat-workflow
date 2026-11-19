@@ -23,12 +23,13 @@ accumulate across turns.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import wraps
 from typing import Any, Generic, TypeVar
 
 import pydantic_ai
-from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, UsageLimits
+from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, ToolFailed, UsageLimits
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import (
@@ -200,6 +201,24 @@ def _has_user_turn(messages: Sequence[ModelMessage]) -> bool:
     )
 
 
+def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
+    """A tool that raises returns a failure the model can read.
+
+    The model adapts in the same run; a raised exception would end the turn
+    and tell it nothing. A tool that fails is a result, not a retry — the
+    retry budget is for a call the model got wrong.
+    """
+
+    @wraps(tool)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return tool(*args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — the failure is the result
+            raise ToolFailed(f"{type(exc).__name__}: {exc}") from exc
+
+    return wrapper
+
+
 class Conversation(Generic[T]):
     """A model, its instructions, and the transcript of one conversation.
 
@@ -234,6 +253,8 @@ class Conversation(Generic[T]):
         temperature: float | None = None,
         extra_headers: Mapping[str, str] | None = None,
         final_output_type: Any = None,
+        tools: Sequence[Callable[..., Any]] = (),
+        deps: Any = None,
         thinking: bool = False,
         model_client: Model | None = None,
     ) -> None:
@@ -253,6 +274,8 @@ class Conversation(Generic[T]):
         self._temperature = temperature
         self._extra_headers = dict(extra_headers) if extra_headers else None
         self._final_output_type = final_output_type
+        self._tools = tuple(_failed_as_result(tool) for tool in tools)
+        self._deps = deps
         self._thinking = thinking
         # The injection seam for tests: a FunctionModel scripts a whole turn
         # without a network or a provider SDK. Production builds the real one
@@ -281,6 +304,7 @@ class Conversation(Generic[T]):
             )
         agent: Agent[Any, T] = Agent(
             self._model,
+            tools=list(self._tools),
             output_type=ToolOutput(
                 (self._final_output_type or self._output_type) if final_turn else self._output_type,
                 name=ANSWER_TOOL,
@@ -346,6 +370,7 @@ class Conversation(Generic[T]):
                 prompt,
                 message_history=list(self.messages),
                 model_settings=self.model_settings(),
+                deps=self._deps,
                 usage_limits=UsageLimits(request_limit=self._max_requests),
             )
 

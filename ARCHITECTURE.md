@@ -25,6 +25,11 @@ workflows/, CLI  →  AtomicWorkflow  →  Conversation  →  PydanticAI  →  p
   the endpoints behind this model accept it and ignore it (measured — a bare
   object where the schema required the `response` envelope). A tool's schema is
   enforced on the same route. The prompt never restates the schema.
+- **A step's tools** (`conversation.py`, `atomic_workflow_config.py`): plain
+  functions passed as `tools=[...]`; the signature is the schema the model
+  is given, and `deps` is what a tool receives from the caller. A tool that
+  raises becomes a `ToolFailed` result the model reads and adapts to; a
+  malformed call is a retried tool return under the answer's budget.
 - **The transcript is the message list**, not a rendering: thinking, tool
   calls, tool returns, retry prompts and the final output all live in it.
   `transcript.py` is the one projection into text (audit view, user view) and

@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
@@ -55,3 +55,7 @@ class AtomicWorkflowConfig(Generic[TResult]):
     temperature: float | None = None
     # The answer shapes used on the last allowed turn (no `continue`).
     final_response_model: Any = None
+    # The step's own tools: plain functions whose signature is the schema the
+    # model is given. `deps` is what a tool receives from the caller.
+    tools: Sequence[Callable[..., Any]] = ()
+    deps: Any = None
