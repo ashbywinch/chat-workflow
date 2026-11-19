@@ -179,7 +179,7 @@ def _has_usable_content(response: ModelResponse) -> bool:
         # answer: measured as `{"response":Got it — a…}` from an endpoint
         # that treats the tool schema as a hint. Correcting it is not the
         # model's job; the same request is sampled again.
-        return all(_arguments_are_json(part) for part in calls)
+        return all(_arguments_are_object(part) for part in calls)
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     # A stall emits the opening token and then whitespace to the token limit
     # (measured on the gateway: `{"response":` followed by 5,392 lines of
@@ -188,8 +188,12 @@ def _has_usable_content(response: ModelResponse) -> bool:
     return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
 
 
-def _arguments_are_json(part: ToolCallPart) -> bool:
-    """Whether a tool call's arguments are an object, not raw model prose."""
+def _arguments_are_object(part: ToolCallPart) -> bool:
+    """Whether a tool call's arguments are an object, not raw model prose.
+
+    A tool's arguments are always an object, so anything else — a list, a
+    number, unparseable text — is not a call the schema could have produced.
+    """
     args = part.args
     if isinstance(args, dict):
         return True
@@ -204,7 +208,7 @@ def _arguments_are_json(part: ToolCallPart) -> bool:
 def _unusable_cause(response: ModelResponse) -> str:
     if response.finish_reason == "length":
         return "token limit reached before the answer finished"
-    if any(isinstance(part, ToolCallPart) and not _arguments_are_json(part) for part in response.parts):
+    if any(isinstance(part, ToolCallPart) and not _arguments_are_object(part) for part in response.parts):
         return "tool arguments were not JSON"
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
@@ -251,16 +255,19 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
 class _ProviderLog:
     """Which upstream endpoint answered, recorded for the failure message.
 
-    The gateway names its upstream in ``cf-aig-provider``/``cf-aig-model``, and
-    the endpoints behind one model differ: some enforce the request's tool
-    schema, some treat it as a hint. A failed turn is diagnosable only when the
-    log says who served it. Attaching is best-effort: a model without an httpx
-    client simply records nothing.
+    The gateway names its own upstream in ``cf-aig-provider`` — on the house
+    route that is always ``openrouter``, which says nothing about who actually
+    answered. OpenRouter puts the serving endpoint in the response body's
+    ``provider``, and its generation id in ``id`` (the id also answers at
+    ``/api/v1/generation``). The endpoints behind one model differ: some enforce
+    the request's tool schema, some treat it as a hint, so the log records both.
+    Attaching is best-effort: a model without an httpx client records nothing.
     """
 
     def __init__(self) -> None:
         self.provider: str | None = None
         self.model: str | None = None
+        self.generation: str | None = None
 
     @classmethod
     def attach(cls, model: Model) -> _ProviderLog:
@@ -269,6 +276,17 @@ class _ProviderLog:
         async def record(response: Any) -> None:
             log.provider = response.headers.get("cf-aig-provider")
             log.model = response.headers.get("cf-aig-model")
+            try:
+                # The body is buffered (requests are not streamed), so reading
+                # it here does not consume what the transport reads next.
+                await response.aread()
+                body = response.json()
+            except Exception:  # noqa: BLE001 — a log must never break a call
+                return
+            if isinstance(body, dict):
+                log.provider = body.get("provider") or log.provider
+                log.model = body.get("model") or log.model
+                log.generation = body.get("id") or log.generation
 
         client = getattr(model, "client", None)
         http = getattr(client, "_client", None)
