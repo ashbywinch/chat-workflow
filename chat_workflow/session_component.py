@@ -134,7 +134,7 @@ class SessionComponent:
             # A step that answered without ever speaking left the user with
             # nothing to react to. The wrapper owns the presentation turn, so
             # the result is described in the user's words before the close.
-            if result is not None and not _step_spoke(
+            if result is not None and _needs_presentation(
                 session.state.messages, before
             ):
                 try:
@@ -170,6 +170,17 @@ class SessionComponent:
             session.active = False
 
 
-def _step_spoke(messages: list[Any], before: int) -> bool:
-    """True when the step added a user-visible assistant turn of its own."""
-    return any(kind == "assistant" for kind, _ in entries(messages[before:]))
+def _needs_presentation(messages: list[Any], before: int) -> bool:
+    """True when the step's result has not been said back to the user.
+
+    A step that ends on the user's answer returned its result without speaking
+    it; a step that ends on its own assistant turn has already said something
+    (a question or a presentation). A step with no conversational turn at all
+    answered silently.
+    """
+    conversational = [
+        kind
+        for kind, _ in entries(messages[before:])
+        if kind in ("user", "assistant")
+    ]
+    return not conversational or conversational[-1] == "user"
