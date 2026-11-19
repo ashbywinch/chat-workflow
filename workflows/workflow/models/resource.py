@@ -116,6 +116,9 @@ class Resource(LLMValidated):
     answer with a state of mind or an outcome, propose the concrete check
     yourself and ask them to confirm it.
 
+    Name the typical materials in the reply message itself, one per line, before asking which they have. Never answer with
+    only a description of the output; a list of starting materials is the proposal.
+
     Work through one thing at a time: propose where it comes from, what form it takes, what it needs first, and the check in one
     draft, then ask one confirm-or-correct question. Do not ask a list of separate questions about one thing, and do not put
     checks for several things in one message. When they name one, accept it; do not read back a longer list of alternatives.
