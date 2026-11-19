@@ -35,10 +35,18 @@ class TestLogSession(unittest.TestCase):
     """Tests for log_session()."""
 
     def _sample_messages(self):
-        return [
-            {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"},
-        ]
+        from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart
+
+        from chat_workflow.transcript import dump, load
+
+        return load(
+            dump(
+                [
+                    ModelRequest.user_text_prompt("Hello"),
+                    ModelResponse(parts=[TextPart("Hi there")]),
+                ]
+            )
+        )
 
     def _sample_criteria(self):
         return {
@@ -102,7 +110,10 @@ class TestLogSession(unittest.TestCase):
             self.assertEqual(data["model"], "gpt-4")
             self.assertEqual(data["turn_count"], 5)
             self.assertEqual(data["context"], "testing content")
-            self.assertEqual(data["messages"], messages)
+            from chat_workflow.transcript import dump
+
+            self.assertEqual(data["messages"], json.loads(dump(messages)))
+            self.assertEqual(json.loads(dump(messages))[0]["parts"][0]["content"], "Hello")
             self.assertEqual(data["criteria"], criteria)
             self.assertIn("timestamp", data)
             self.assertIn("user_feedback", data)

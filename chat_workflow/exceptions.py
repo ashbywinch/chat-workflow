@@ -2,6 +2,8 @@
 Custom exceptions for chat-workflow with helpful error messages.
 """
 
+from typing import Any
+
 
 class ChatWorkflowError(Exception):
     """Base exception for all chat-workflow errors."""
@@ -76,7 +78,7 @@ class AtomicWorkflowFailedError(AtomicWorkflowError):
     def __init__(self, reason: str):
         message = f"LLM indicated failure: {reason}"
         super().__init__(message)
-        self.messages: list[dict[str, str]] | None = None
+        self.messages: list[Any] | None = None
 
 
 class APIError(ChatWorkflowError):
@@ -118,6 +120,9 @@ class InvalidResponseError(ModelError):
 class MaxRetriesExceededError(ModelError):
     """Maximum retries exceeded for LLM call."""
 
-    def __init__(self, max_retries: int):
+    def __init__(self, max_retries: int, reason: str = ""):
         message = f"Maximum retries ({max_retries}) exceeded for LLM call"
+        if reason:
+            message = f"{message}: {reason}"
         super().__init__(message)
+        self.reason = reason

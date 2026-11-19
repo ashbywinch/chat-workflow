@@ -1,11 +1,22 @@
-import copy
+from __future__ import annotations
+
+import time
 from collections.abc import Callable
 from typing import Generic, TypeVar
 
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+)
+from pydantic_ai.usage import RunUsage
+
 from .atomic_workflow_config import AtomicWorkflowConfig
-from .debug import _DebugTimer
-from .llm_interaction import ProviderType
+from .conversation import Conversation
+from .exceptions import AtomicWorkflowFailedError
 from .models import AgentIntent, AgentResponse, TurnResult
+from .transcript import render
 
 TResult = TypeVar("TResult")
 
@@ -16,6 +27,10 @@ class AtomicWorkflow(Generic[TResult]):
     Takes an :class:`AtomicWorkflowConfig`, then :meth:`process_turn` steps
     through the conversation loop. The LLM returns an :class:`AgentResponse`
     whose ``intent`` determines what happens next (continue / success / failure).
+
+    The conversation — and so the transcript — belongs to a
+    :class:`~chat_workflow.conversation.Conversation`; this class owns the turn
+    rules (intent, turn limit) and nothing about the model.
     """
 
     def __init__(
@@ -23,23 +38,36 @@ class AtomicWorkflow(Generic[TResult]):
         *,
         config: AtomicWorkflowConfig[TResult],
     ):
-        self.messages: list[dict[str, str]] = [{"role": "system", "content": config.system_prompt}]
         self.turn_count = 0
         self.max_turns = config.max_turns
         self.model = config.model
-        self._provider: ProviderType = config.provider
-        self._api_base = config.api_base
-        self._api_key_env = config.api_key_env
-        self._max_retries = config.max_retries
-        self._request_timeout_seconds = config.request_timeout_seconds
         self.response_model = config.response_model
         self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_continue
         self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_success
-        self.on_failure: Callable[[AgentResponse[TResult]], Exception] = config.on_failure
+        self.on_failure: Callable[[AgentResponse[TResult]], AtomicWorkflowFailedError] = config.on_failure
         self.debug = config.debug
+        self.usage = RunUsage()
+        self._conversation = config.conversation or Conversation(
+            model=config.model,
+            provider=config.provider,
+            instructions=self._instructions(config),
+            output_type=config.response_model,
+            api_base=config.api_base,
+            api_key_env=config.api_key_env,
+            messages=self._initial_transcript(config),
+            output_retries=config.output_retries,
+            transport_retries=config.transport_retries,
+            unusable_resends=config.unusable_resends,
+            max_requests=config.max_requests,
+            max_tokens=config.max_tokens,
+            timeout_seconds=config.request_timeout_seconds,
+            extra_headers=config.extra_headers,
+        )
 
-        for message in config.initial_messages or []:
-            self.messages.append(message)
+    @property
+    def messages(self) -> list[ModelMessage]:
+        """The transcript: the conversation's message list, not a rendering."""
+        return self._conversation.messages
 
     def process_turn(self, user_input: str) -> TurnResult[TResult]:
         from .exceptions import InvalidResponseError, TurnLimitExceededError
@@ -47,15 +75,8 @@ class AtomicWorkflow(Generic[TResult]):
         if self.turn_count >= self.max_turns:
             raise TurnLimitExceededError(self.max_turns)
 
-        if user_input.strip():
-            self.messages.append({"role": "user", "content": user_input})
-
         self.turn_count += 1
-        response = self._call_llm()
-
-        message = response.message
-        if message:
-            self.messages.append({"role": "assistant", "content": message})
+        response = self._call_llm(user_input)
 
         if response.intent == AgentIntent.CONTINUE:
             return self.on_continue(response)
@@ -63,48 +84,52 @@ class AtomicWorkflow(Generic[TResult]):
             return self.on_success(response)
         if response.intent == AgentIntent.FAILURE:
             error = self.on_failure(response)
-            error.messages = list(self.messages)  # type: ignore[attr-defined]
-            transcript = "".join(
-                f"\n[{i}] {m.get('role', '?')}: {m.get('content', '')}" for i, m in enumerate(self.messages)
+            error.messages = list(self.messages)
+            error.message = (
+                f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━\n"
+                f"{render(self.messages)}"
             )
-            error.message = f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━{transcript}"
             if self.debug:
                 self.debug.on_error(error)
             raise error
 
         raise InvalidResponseError(f"Invalid intent received: {response.intent}")
 
-    def _call_llm(self) -> AgentResponse[TResult]:
-        from .exceptions import ProviderNotFoundError
-        from .llm_interaction import get_client
+    def _call_llm(self, user_input: str | None = None) -> AgentResponse[TResult]:
+        """One turn with the model, timed for the debug stream."""
+        started = time.monotonic()
+        if self.debug:
+            self.debug.on_request(self.messages, self.model)
+        turn = self._conversation.send(user_input)
+        self.usage.incr(turn.usage)
+        if self.debug:
+            duration_ms = (time.monotonic() - started) * 1000
+            self.debug.on_response(turn.output, duration_ms)
+        return turn.output
 
-        try:
-            client = get_client(
-                provider=self._provider,
-                api_base=self._api_base,
-                api_key_env=self._api_key_env,
-            )
-            timer = _DebugTimer(self.debug, self.messages, self.model)
+    @staticmethod
+    def _instructions(config: AtomicWorkflowConfig[TResult]) -> str:
+        """The step's instructions, plus any system message given as initial context."""
+        instructions = [config.system_prompt]
+        for message in config.initial_messages or []:
+            if message.get("role") == "system":
+                instructions.append(message.get("content") or "")
+        return "\n\n".join(part for part in instructions if part.strip())
 
-            with timer:
-                # Pass a copy of messages — Instructor patches messages
-                # in-place with the JSON schema. Using a copy keeps our
-                # conversation history clean across turns.
-                response = client.chat.completions.create(  # pyright: ignore[reportCallIssue]
-                    model=self.model,
-                    messages=copy.deepcopy(self.messages),  # pyright: ignore[reportArgumentType]
-                    response_model=self.response_model,
-                    max_retries=self._max_retries,
-                    timeout=self._request_timeout_seconds,
-                )
+    @staticmethod
+    def _initial_transcript(config: AtomicWorkflowConfig[TResult]) -> list[ModelMessage]:
+        """Initial context as transcript messages.
 
-            timer.emit_response(response)
-            return response
-        except ImportError as e:
-            raise ProviderNotFoundError(
-                f"No LLM providers available. {e}\nInstall litellm for multi-provider LLM support: uv add litellm"
-            ) from e
-        except Exception as e:
-            if self.debug:
-                self.debug.on_error(e)
-            raise
+        The config keeps its ``role``/``content`` shape: it is the caller's
+        way of seeding a step, not a second message model. A system message is
+        instructions, not a turn, and is folded into the prompt above.
+        """
+        messages: list[ModelMessage] = []
+        for message in config.initial_messages or []:
+            role = message.get("role")
+            content = message.get("content") or ""
+            if role == "user":
+                messages.append(ModelRequest.user_text_prompt(content))
+            elif role == "assistant":
+                messages.append(ModelResponse(parts=[TextPart(content)]))
+        return messages

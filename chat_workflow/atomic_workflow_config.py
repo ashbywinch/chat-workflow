@@ -2,8 +2,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
+from .conversation import Conversation
 from .debug import StreamingDebug
-from .llm_interaction import ProviderType
+from .exceptions import AtomicWorkflowFailedError
+from .model_provider import ProviderType
 from .models import AgentResponse, TurnResult
 
 TResult = TypeVar("TResult")
@@ -11,19 +13,39 @@ TResult = TypeVar("TResult")
 
 @dataclass
 class AtomicWorkflowConfig(Generic[TResult]):
-    """Configuration for an :class:`AtomicWorkflow`."""
+    """Configuration for an :class:`AtomicWorkflow`.
+
+    The budget fields are separate channels because the failures are different
+    things. ``transport_retries`` resends a request the provider failed
+    (429/5xx/connection); the model never sees it. ``output_retries`` feeds a
+    rejected response back with its rejection, so the model can correct it.
+    ``unusable_resends`` replaces a response that carried nothing (a blank or
+    thinking-only completion) without telling the model. A caller that treats
+    the output as content under test — an eval of the model's judgement — sets
+    ``output_retries`` to 0: a malformed answer is a failure, not a draft.
+    """
 
     system_prompt: str
     response_model: type[AgentResponse[TResult]]
     max_turns: int
+    # The turn's outcome handled: the step cannot run without all three, so
+    # they are required rather than None-checked at every turn.
+    on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]]
+    on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]]
+    on_failure: Callable[[AgentResponse[TResult]], AtomicWorkflowFailedError]
     initial_messages: list[dict[str, str]] | None = None
-    on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] | None = None
-    on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] | None = None
-    on_failure: Callable[[AgentResponse[TResult]], Exception] | None = None
     debug: StreamingDebug | None = None
     model: str = "default-model"
     provider: ProviderType = "openrouter"
     api_base: str | None = None
     api_key_env: str | None = None
-    max_retries: int = 3
-    request_timeout_seconds: int = 30
+    # The injection seam: tests pass a Conversation built on a scripted model.
+    # Production leaves this None and the step builds one from the fields above.
+    conversation: Conversation | None = None
+    output_retries: int = 2
+    transport_retries: int = 2
+    unusable_resends: int = 1
+    max_requests: int = 12
+    max_tokens: int = 16384
+    request_timeout_seconds: float = 30.0
+    extra_headers: dict[str, str] | None = None
