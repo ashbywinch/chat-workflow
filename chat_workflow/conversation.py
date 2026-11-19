@@ -211,9 +211,14 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
 
     @wraps(tool)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Evidence for the blind catch: the contract of a step's tool is "return
+        # an answer or fail"; PydanticAI turns ToolFailed into a result the model
+        # reads, while any other exception ends the turn with nothing to read.
+        # A caller's tool may raise anything (an SDK error, a KeyError from its
+        # own data), so no narrower set can be named.
         try:
             return tool(*args, **kwargs)
-        except Exception as exc:  # noqa: BLE001 — the failure is the result
+        except Exception as exc:  # noqa: BLE001 — any failure is the tool's answer
             raise ToolFailed(f"{type(exc).__name__}: {exc}") from exc
 
     return wrapper
@@ -304,7 +309,7 @@ class Conversation(Generic[T]):
             )
         agent: Agent[Any, T] = Agent(
             self._model,
-            tools=list(self._tools),
+            tools=self._tools,
             output_type=ToolOutput(
                 (self._final_output_type or self._output_type) if final_turn else self._output_type,
                 name=ANSWER_TOOL,
