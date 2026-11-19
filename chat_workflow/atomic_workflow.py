@@ -65,6 +65,10 @@ class AtomicWorkflow(Generic[TResult]):
             temperature=config.temperature,
             final_output_type=config.final_response_model,
         )
+        # The session history this step was given. Only the turns the step
+        # adds are folded back into the session, so a step's prompt and its
+        # initial history are not recorded twice.
+        self.initial_message_count = len(self._conversation.messages)
 
     @property
     def messages(self) -> list[ModelMessage]:

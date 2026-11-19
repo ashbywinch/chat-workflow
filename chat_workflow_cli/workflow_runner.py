@@ -1,3 +1,4 @@
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,7 @@ import typer
 from chat_workflow.config import Config
 from chat_workflow.exceptions import AtomicWorkflowFailedError, TurnLimitExceededError
 from chat_workflow.session import Session
+from chat_workflow.session_component import SessionComponent
 from chat_workflow.session_log import SessionLog
 from chat_workflow.session_logging import log_session
 
@@ -52,9 +54,19 @@ class WorkflowRunner:
                 typer.secho(f"\nFailed to log session: {log_err}", fg=typer.colors.YELLOW)
 
         try:
-            user_params["session"] = session
-            result = func(**user_params)
-            _log_and_exit(result_dict=result.model_dump(), default_success=True)
+            user_params.pop("session", None)
+
+            def run_step(*, session: Session) -> Any:
+                return func(**user_params, session=session)
+
+            # The closure hides the step's chat flag; carry it so a chat-off
+            # top-level step is not greeted or closed.
+            run_step._chat = getattr(func, "_chat", True)  # type: ignore[attr-defined]
+            result = SessionComponent().converse(run_step, session=session)
+            if result is not None:
+                _log_and_exit(result_dict=result.model_dump(), default_success=True)
+            else:
+                typer.echo("\nDone.")
         except KeyboardInterrupt:
             typer.echo("\n\nConversation cancelled.")
             raise typer.Exit(0) from None
@@ -67,4 +79,26 @@ class WorkflowRunner:
             _log_and_exit(result_dict=None, default_success=False, feedback="Turn limit reached")
             raise typer.Exit(1) from None
         except Exception as e:
+            # Save the transcript automatically on unhandled exceptions (no
+            # feedback prompt).
+            try:
+                path = log_session(
+                    messages=session_log.messages,
+                    criteria=None,
+                    success_judgement=False,
+                    feedback_text="Unhandled exception",
+                    model=session_log.model,
+                    turn_count=session_log.turn_count,
+                    context=user_params.get("context", ""),
+                )
+                typer.echo(f"\nSession logged to: {path}")
+                tb_path = path.with_name(path.stem + "-exception.txt")
+                tb_path.write_text(
+                    "=== EXCEPTION DETAILS ===\n"
+                    + "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                    + "\n=== END EXCEPTION DETAILS ===\n"
+                )
+                typer.echo(f"Exception details written to: {tb_path}")
+            except Exception as log_err:
+                typer.secho(f"\nFailed to log session: {log_err}", fg=typer.colors.YELLOW)
             handle_error(e)

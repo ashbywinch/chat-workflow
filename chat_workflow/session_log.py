@@ -31,8 +31,14 @@ def _record_atomic_workflow[T](
     log: SessionLog,
     workflow: AtomicWorkflow[T],
 ) -> None:
-    """Fold an atomic workflow's transcript and usage into the session log."""
-    log.messages.extend(workflow.messages)
+    """Fold an atomic workflow's new transcript and usage into the session log.
+
+    A step may be handed the session's transcript as its starting context. Only
+    the messages the step added are folded back, so the history is not
+    duplicated.
+    """
+    start = getattr(workflow, "initial_message_count", 0)
+    log.messages.extend(workflow.messages[start:])
     log.usage.incr(workflow.usage)
     log.turn_count += workflow.turn_count
     log.model = workflow.model

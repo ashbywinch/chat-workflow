@@ -107,15 +107,43 @@ def load(data: bytes | str) -> list[ModelMessage]:
     return ModelMessagesTypeAdapter.validate_json(data)
 
 
+def _answer_envelope(part: ToolCallPart) -> dict[str, Any] | None:
+    args = part.args
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            return None
+    if not isinstance(args, dict):
+        return None
+    body = args.get("response", args)
+    return body if isinstance(body, dict) else None
+
+
+def _is_final_answer(envelope: dict[str, Any] | None) -> bool:
+    return bool(envelope) and envelope.get("intent") in ("success", "failure")
+
+
 def _last_answer_index(messages: Sequence[ModelMessage]) -> int | None:
     for index in range(len(messages) - 1, -1, -1):
         message = messages[index]
-        if isinstance(message, ModelResponse) and any(
-            (isinstance(part, TextPart) and part.content.strip())
-            or (isinstance(part, ToolCallPart) and part.tool_name == ANSWER_TOOL)
-            for part in message.parts
-        ):
-            return index
+        if not isinstance(message, ModelResponse):
+            continue
+        for part in message.parts:
+            if (
+                isinstance(part, ToolCallPart)
+                and part.tool_name == ANSWER_TOOL
+                and _is_final_answer(_answer_envelope(part))
+            ):
+                return index
+            if isinstance(part, TextPart):
+                stripped = part.content.strip()
+                if (
+                    stripped.startswith("{")
+                    and '"intent"' in stripped
+                    and ('"success"' in stripped or '"failure"' in stripped)
+                ):
+                    return index
     return None
 
 
@@ -147,17 +175,12 @@ def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tu
             yield "thinking", part.content
         elif isinstance(part, ToolCallPart):
             if part.tool_name == ANSWER_TOOL:
-                args = part.args
-                if isinstance(args, str):
-                    try:
-                        args = json.loads(args)
-                    except ValueError:
-                        args = None
-                body = args.get("response", args) if isinstance(args, dict) else None
-                spoken = body.get("message") if isinstance(body, dict) else None
-                yield ("output" if is_answer else "assistant"), (
-                    spoken or part.args_as_json_str()
-                )
+                envelope = _answer_envelope(part)
+                spoken = envelope.get("message") if envelope else None
+                # A continue answer is the assistant's question and is shown;
+                # a success/failure answer is the structured result and is not.
+                kind = "output" if _is_final_answer(envelope) else "assistant"
+                yield kind, spoken or part.args_as_json_str()
             else:
                 yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
 

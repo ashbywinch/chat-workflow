@@ -72,6 +72,15 @@ another question" is not expressible and no retry has to argue about it.
 """
 
 
+class TextReply(BaseModel):
+    """One piece of user-facing text, such as a greeting or a closing."""
+
+    text: str = Field(
+        min_length=1,
+        description="The text to show the user.",
+    )
+
+
 class TurnResult(BaseModel, Generic[TResult]):
     """The outcome of processing a single turn in an atomic workflow."""
 
