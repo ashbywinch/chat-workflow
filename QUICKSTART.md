@@ -27,7 +27,8 @@ chat_workflow/atomic_workflow.py:174  # AtomicWorkflow
 chat_workflow/atomic_workflow.py:204  # process_turn() - main logic
 
 # LLM integration:
-chat_workflow/llm_interaction.py:44  # get_client() - provider setup
+chat_workflow/conversation.py  # Conversation.send() - the one model call
+chat_workflow/model_provider.py  # provider/model -> the model object
 ```
 
 ## Configuration
@@ -47,8 +48,8 @@ export OPENROUTER_API_KEY=your-key-here  # if provider is "openrouter"
 # Run all unit tests (mocks only)
 make test
 
-# Check prompt changes work
-python -c "from chat_workflow.atomic_workflow import AtomicWorkflow; from workflows.evaluation_criteria.models import EvaluationCriteria; from chat_workflow import AgentResponse; o=AtomicWorkflow(system_prompt='test', response_model=AgentResponse[EvaluationCriteria], max_turns=5, on_continue=lambda a: None, on_success=lambda a: None, on_failure=lambda a: Exception('x')); print(o.messages[0]['content'][:200])"
+# Check the model path imports and builds
+python -c "from chat_workflow import Conversation; print('Conversation ready')"
 
 # Check configuration
 python -c "from chat_workflow.config import config; print(config.provider, config.model)"
@@ -57,5 +58,5 @@ python -c "from chat_workflow.config import config; print(config.provider, confi
 ## When You're Stuck
 1. **Business logic issue?** → Check `workflows/evaluation_criteria/models.py` validation
 2. **Conversation flow problem?** → Check `chat_workflow/atomic_workflow.py` prompts & logic
-3. **LLM integration failing?** → Check `chat_workflow/llm_interaction.py`
+3. **LLM integration failing?** → Check `chat_workflow/conversation.py` and `chat_workflow/model_provider.py`
 4. **Test failing?** → Check if it's a real API test needing keys

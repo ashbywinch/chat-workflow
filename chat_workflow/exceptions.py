@@ -2,6 +2,8 @@
 Custom exceptions for chat-workflow with helpful error messages.
 """
 
+from typing import Any
+
 
 class ChatWorkflowError(Exception):
     """Base exception for all chat-workflow errors."""
@@ -50,8 +52,17 @@ class ProviderNotFoundError(ProviderError):
     pass
 
 
-class ValidationError(ChatWorkflowError):
-    """Validation errors for business rules."""
+class ValidationError(ChatWorkflowError, ValueError):
+    """An answer the caller's business rules reject.
+
+    It is a ``ValueError`` because that is the only way a rule stated on an
+    answer model reaches the framework's output-retry channel: Pydantic turns
+    a ``ValueError`` from a validator into a ``pydantic.ValidationError``,
+    whose sentence is sent back to the model by the same retry that handles a
+    missing or mistyped field. Raised from a validator without this, the
+    exception escapes validation and a model that forgot one rule crashes the
+    workflow instead of being told.
+    """
 
     pass
 
@@ -76,7 +87,7 @@ class AtomicWorkflowFailedError(AtomicWorkflowError):
     def __init__(self, reason: str):
         message = f"LLM indicated failure: {reason}"
         super().__init__(message)
-        self.messages: list[dict[str, str]] | None = None
+        self.messages: list[Any] | None = None
 
 
 class APIError(ChatWorkflowError):
@@ -118,6 +129,9 @@ class InvalidResponseError(ModelError):
 class MaxRetriesExceededError(ModelError):
     """Maximum retries exceeded for LLM call."""
 
-    def __init__(self, max_retries: int):
+    def __init__(self, max_retries: int, reason: str = ""):
         message = f"Maximum retries ({max_retries}) exceeded for LLM call"
+        if reason:
+            message = f"{message}: {reason}"
         super().__init__(message)
+        self.reason = reason

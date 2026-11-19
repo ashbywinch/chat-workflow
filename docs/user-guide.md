@@ -25,7 +25,7 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluati
 
 - Python 3.8 or higher
 - Git
-- An API key from an LLM provider (OpenRouter, OpenAI, Anthropic, etc.)
+- An API key from an OpenAI-compatible provider (the Cloudflare AI Gateway, OpenRouter, OpenAI, Groq, Together) or Azure
 
 ### Step-by-Step Installation
 
@@ -59,8 +59,6 @@ export OPENROUTER_API_KEY=your-openrouter-key
 # For OpenAI
 export OPENAI_API_KEY=your-openai-key
 
-# For Anthropic
-export ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
 ### Provider Configuration
@@ -78,7 +76,9 @@ Edit `config.json` in the project root to configure your preferred provider and 
 }
 ```
 
-**Available providers**: `openrouter`, `openai`, `anthropic`, `cohere`, `groq`
+**Available providers**: `openai` (the house gateway or OpenAI), `openrouter`, `groq`, `together`, `azure`. Google and Anthropic need their own PydanticAI SDK extra and are refused with a message naming it.
+
+**Model ids**: a prefix naming the configured provider is the route's name, not part of the id — `openrouter/google/gemini-2.0-flash-lite-001` reaches OpenRouter as `google/gemini-2.0-flash-lite-001`. Only the selected provider's own prefix is removed.
 
 **Temperature**: Controls randomness (0.0 = deterministic, 1.0 = creative)
 
@@ -191,7 +191,7 @@ The generated criteria are displayed at the end of the conversation. You can cop
 **"Provider not supported"**:
 - Check the provider name in `config.json`
 - Ensure you have the required environment variable set
-- Verify the provider is supported by the litellm library
+- Verify the provider is OpenAI-compatible (or Azure) and its key variable is set
 
 **"Configuration file error"**:
 - Ensure `config.json` exists in the project root

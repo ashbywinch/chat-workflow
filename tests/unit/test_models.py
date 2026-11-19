@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import unittest
 
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
-from chat_workflow import AgentIntent, AgentResponse, TurnResult
+from chat_workflow import AgentIntent, AgentResponse, Continue, Failure, Success, TurnResult
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
@@ -87,12 +87,13 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         ]
         EvaluationCriteria(criteria=budget_allcaps)
 
-        from chat_workflow import ValidationError
-
         no_budget = [
             Criterion(name="cost", description="Cost constraint", weight=8.0),
             Criterion(name="quality", description="Quality level", weight=7.0),
         ]
+        # A rule stated on the answer model is a validation failure of that
+        # answer: Pydantic wraps the raised rule so the framework's output
+        # retry can hand its sentence back to the model.
         with self.assertRaises(ValidationError) as context:
             EvaluationCriteria(criteria=no_budget)
 
@@ -155,13 +156,14 @@ class TestEvaluationCriteriaModel(unittest.TestCase):
         self.assertEqual(normalized[1], 0.0)
 
 
-class TestAgentResponseModel(unittest.TestCase):
+class TestAgentResponseShapes(unittest.TestCase):
+    """The three shapes are the schema: each carries exactly its own fields."""
+
     def test_conversation_action_continue(self):
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What's your budget?")
+        action = Continue(intent=AgentIntent.CONTINUE, message="What's your budget?")
 
         self.assertEqual(action.intent, AgentIntent.CONTINUE)
         self.assertEqual(action.message, "What's your budget?")
-        self.assertIsNone(action.result)
 
     def test_conversation_action_success(self):
         criteria = EvaluationCriteria(
@@ -172,36 +174,47 @@ class TestAgentResponseModel(unittest.TestCase):
             ],
         )
 
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
+        action = Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
 
         self.assertEqual(action.intent, AgentIntent.SUCCESS)
-        self.assertIsNone(action.message)
         self.assertEqual(action.result, criteria)
 
     def test_conversation_action_failure(self):
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.FAILURE, message="Can't help with that")
+        action = Failure(intent=AgentIntent.FAILURE, message="Can't help with that")
 
         self.assertEqual(action.intent, AgentIntent.FAILURE)
         self.assertEqual(action.message, "Can't help with that")
-        self.assertIsNone(action.result)
 
-    def test_action_validation_continue_without_message(self):
-        with self.assertRaises(ValueError) as context:
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message=None)
+    def test_the_schema_forbids_mixing_the_shapes(self):
+        """`continue` has no result property, `success` no message property.
 
-        self.assertIn("CONTINUE intent requires a message", str(context.exception))
+        A model validator could only reject such an answer after it was
+        written, and Pydantic never serialises validator logic into the
+        schema the model reads. The union puts the rule in the shape: the
+        forbidden field is absent, and `extra="forbid"` rejects it if sent.
+        """
+        branches = {
+            "continue": (Continue, ("message",)),
+            "success": (Success[EvaluationCriteria], ("result",)),
+            "failure": (Failure, ("message",)),
+        }
+        for intent, (variant, expected) in branches.items():
+            schema = TypeAdapter(variant).json_schema()
+            self.assertEqual(set(schema["properties"]), {"intent", *expected}, intent)
+            self.assertFalse(schema["additionalProperties"], intent)
 
-    def test_action_validation_success_without_result(self):
-        with self.assertRaises(ValueError) as context:
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=None)
+        with self.assertRaises(ValueError):
+            TypeAdapter(AgentResponse[EvaluationCriteria]).validate_python(
+                {"intent": "continue", "message": "Which?", "result": {"context": "x", "criteria": []}}
+            )
 
-        self.assertIn("SUCCESS intent requires a result", str(context.exception))
-
-    def test_action_validation_failure_without_message(self):
-        with self.assertRaises(ValueError) as context:
-            AgentResponse[EvaluationCriteria](intent=AgentIntent.FAILURE, message=None)
-
-        self.assertIn("FAILURE intent requires a message", str(context.exception))
+    def test_each_shape_requires_its_own_fields(self):
+        with self.assertRaises(ValueError):
+            Continue(intent=AgentIntent.CONTINUE, message="")
+        with self.assertRaises(ValueError):
+            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=None)
+        with self.assertRaises(ValueError):
+            Failure(intent=AgentIntent.FAILURE, message="")
 
 
 class TestTurnResultModel(unittest.TestCase):
@@ -236,9 +249,7 @@ class TestTurnResultModel(unittest.TestCase):
         self.assertTrue(result.is_complete)
 
     def test_direct_creation(self):
-        result = TurnResult[EvaluationCriteria](
-            result=self.valid_criteria, message="Custom message", is_complete=True
-        )
+        result = TurnResult[EvaluationCriteria](result=self.valid_criteria, message="Custom message", is_complete=True)
 
         self.assertEqual(result.result, self.valid_criteria)
         self.assertEqual(result.message, "Custom message")

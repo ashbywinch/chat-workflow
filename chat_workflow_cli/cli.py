@@ -89,9 +89,16 @@ def _build_workflow_sub_app(workflow_name: str) -> typer.Typer | None:
             runner = WorkflowRunner()
             runner.run(_func, workflow_params)
 
-        run_cmd.__signature__ = inspect.Signature(
-            parameters=sig_params,
-            return_annotation=inspect.Parameter.empty,
+        # Typer reads the command's signature; replace it so the generated
+        # sub-command has the workflow's own parameters. `setattr` because a
+        # function's declared type has no `__signature__`.
+        setattr(  # noqa: B010 — a function's declared type has no __signature__
+            run_cmd,
+            "__signature__",
+            inspect.Signature(
+                parameters=sig_params,
+                return_annotation=inspect.Parameter.empty,
+            ),
         )
 
         sub_app.command(name=_snake_to_kebab(func_name))(run_cmd)

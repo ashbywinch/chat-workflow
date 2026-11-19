@@ -70,7 +70,7 @@ class EvaluationCriteria(BaseModel):
         - Base output only on information explicitly provided by the user.
         - If the user is vague, ask clarifying questions.
         - If the user is uncooperative or refuses to provide useful information within max_turns,
-            use action="failure".
+            use intent="failure".
         """
         ...  # type: ignore[reportReturnType]
 

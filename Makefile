@@ -1,5 +1,5 @@
 # Makefile for chat-workflow test automation
-.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint format clean
+.PHONY: help setup test test-verbose evals evals-verbose evals-debug test-unit test-all coverage lint typecheck docs-check format clean
 
 # Variables
 PYTHON := .venv/bin/python
@@ -25,6 +25,8 @@ help:
 	@echo "  ${GREEN}make test-all${NC}     Run unit tests + evals"
 	@echo "  ${GREEN}make coverage${NC}     Run tests with coverage report"
 	@echo "  ${GREEN}make lint${NC}         Run code linting (black + ruff)"
+	@echo "  ${GREEN}make docs-check${NC}   Every relative markdown link resolves"
+	@echo "  ${GREEN}make typecheck${NC}    Pyrefly over the core, workflows, CLI and tests"
 	@echo "  ${GREEN}make format${NC}       Auto-fix linting issues"
 	@echo "  ${GREEN}make clean${NC}        Clean up generated files (removes .venv)"
 
@@ -37,17 +39,23 @@ run:
 
 test: setup lint test-unit
 
+docs-check: setup
+	@${UNITTEST} tests.unit.test_docs_links
+
 test-unit: setup
 	@${UNITTEST} discover tests/unit/
 
 test-verbose: setup lint
 	@${UNITTEST} discover tests/unit/ -v
 
+# Each eval carries its own alarm (tests/evals/helpers.eval_timeout). The
+# --timeout below is only a backstop for a hang between tests, so it sits
+# above the sum of one run's budgets: at 300s it killed a legal slow suite.
 evals: setup lint
-	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/
+	@${PYTHON} scripts/run_with_timeout.py --timeout 1200 -- ${UNITTEST} discover tests/evals/
 
 evals-verbose: setup lint
-	@${PYTHON} scripts/run_with_timeout.py --timeout 300 -- ${UNITTEST} discover tests/evals/ -v
+	@${PYTHON} scripts/run_with_timeout.py --timeout 1200 -- ${UNITTEST} discover tests/evals/ -v
 
 evals-debug: setup lint
 	@echo "${YELLOW}Running evals with LLM debug tracing...${NC}"
@@ -70,6 +78,9 @@ lint: setup
 # The gates the git hooks call. Neither target existed while the hooks called
 # them, so every commit and push failed after the tests had passed.
 lint-check: lint
+
+typecheck: setup
+	@.venv/bin/pyrefly check chat_workflow/ workflows/ tests/ chat_workflow_cli/
 check: lint
 
 # Auto-fix linting issues

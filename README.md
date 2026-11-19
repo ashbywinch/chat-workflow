@@ -8,7 +8,7 @@ Chat Workflow is a framework for developers to create guided conversation flows,
 - **Structured Output Generation**: Every flow produces valid, complete Pydantic objects or raises clear exceptions
 - **Validation-First Design**: Information about "What good output looks like" lives in Pydantic models and is validated programmatically
 - **Multi-Turn Conversation Management**: Stateful orchestrator handles dialogue flow with configurable turn limits
-- **Multi-Provider LLM Support**: Works with OpenAI, Google, OpenRouter, and other providers via litellm
+- **Multi-Provider LLM Support**: OpenAI-compatible services — the Cloudflare AI Gateway, OpenAI, OpenRouter, Groq, Together — and Azure, through one model layer (PydanticAI)
 - **Human-in-the-Loop Architecture**: LLMs act as coaches/facilitators, leveraging human knowledge and intuition
 - **Deterministic Control Flow**: Authors compose flows using standard Python control structures
 
@@ -30,18 +30,24 @@ make
 
 ```json
 {
-  "provider": "openrouter",
-  "model": "google/gemini-2.0-flash-lite-001",
-  "temperature": 0.7,
-  "max_retries": 3
+  "llm": {
+    "provider": "openrouter",
+    "model": "google/gemini-2.0-flash-lite-001",
+    "temperature": 0.7,
+    "max_retries": 3
+  }
 }
 ```
 
 2. **Set your API key** environment variable:
 
 ```bash
-export OPENROUTER_API_KEY=your-key-here  # or OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.
+export OPENROUTER_API_KEY=your-key-here  # or OPENAI_API_KEY, GROQ_API_KEY, etc.
 ```
+
+Google and Anthropic need their own PydanticAI SDK extra; this build installs
+the OpenAI-compatible one. Stick to the gateway or an OpenAI-compatible
+service unless you add the extra.
 
 ### Run the Example Workflow
 

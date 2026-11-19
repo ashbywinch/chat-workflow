@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .debug import StreamingDebug
-from .models import AgentResponse, TurnResult
+from .models import AgentResponse, FinalResponse, Success, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
 from .types_meta import resolve_return_type
 
@@ -27,12 +27,29 @@ def _build_system_prompt(
         system_prompt += params_section
 
     # Guide the LLM to respect field descriptions and constraints.
-    # Instructor injects the JSON schema automatically after this.
+    # The request's structured-output schema carries the shape and the
+    # descriptions; the prompt says how to treat them.
     system_prompt += (
         "\n\n## Output Format\n"
-        "The JSON schema below defines the expected output. "
+        "The request's JSON schema defines the expected output. "
         "Field descriptions and constraints communicate validation rules "
         "that your response must satisfy."
+    )
+
+    # The model now sees its own previous structured turns in the transcript,
+    # so the turn policy has to be stated rather than inferred: without it a
+    # cooperative "that's all, please finalize" gets another question and the
+    # step runs to its turn limit.
+    system_prompt += (
+        "\n\n## When to finish\n"
+        "Use intent='continue' only while you still need something from the "
+        "user. When the user says they are done, agrees with what you "
+        "proposed, or has supplied what the result needs, return "
+        "intent='success' — every value in the result must come from what "
+        "they told you. A question they left unanswered does not hold the "
+        "result back: finish with what they did give. If they are "
+        "uncooperative, or the turn limit is reached without that material, "
+        "return intent='failure': a result they did not supply is not theirs."
     )
     return system_prompt
 
@@ -47,25 +64,28 @@ def _setup_atomic_workflow(
     """Create and configure an AtomicWorkflow."""
     from .exceptions import AtomicWorkflowFailedError
 
+    def _on_success(response: Success[Any]) -> TurnResult[Any]:
+        return TurnResult[Any].success(response.result)
+
     return AtomicWorkflow(
         config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
             response_model=AgentResponse[actual_return_type],
+            final_response_model=FinalResponse[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
-            on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message or ""),
-            on_success=lambda response: TurnResult[actual_return_type].success(
-                response.result,
-                message="Completed successfully!",
-            ),
-            on_failure=lambda response: AtomicWorkflowFailedError(response.message or "No reason given"),
+            on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message),
+            on_success=_on_success,
+            on_failure=lambda response: AtomicWorkflowFailedError(response.message),
             debug=debug,
             model=session.config.model,
             provider=session.config.provider,
             api_base=session.config.api_base,
             api_key_env=session.config.api_key_env,
-            max_retries=session.config.max_retries,
+            transport_retries=session.config.max_retries,
             request_timeout_seconds=session.config.request_timeout_seconds,
+            extra_headers=getattr(session.config, "extra_headers", None),
+            temperature=getattr(session.config, "temperature", None),
         )
     )
 
@@ -128,5 +148,7 @@ def composite_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
 
         raise TypeError(f"Composite workflow '{func.__name__}' requires 'session' parameter")
 
-    wrapper._is_workflow = True  # pyright: ignore[reportAttributeAccessIssue]
+    # A marker the CLI's discovery reads; `setattr` because it is not part of
+    # the function's declared type.
+    setattr(wrapper, "_is_workflow", True)  # noqa: B010 — not part of the function's declared type
     return wrapper

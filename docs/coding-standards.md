@@ -4,14 +4,14 @@ These standards apply to all code in the chat-workflow library. They are designe
 
 ## Types
 
-- We use basedpyright to ensure comprehensive typing.
+- We use pyrefly (`make typecheck`) to ensure comprehensive typing.
 - Remember that the purpose of types is to help express to the reader (human or agent) what the code does. Make sure our typing is expressive. Multiple levels of nested dicts are not expressive.
 - Always use the narrowest type that applies.
 - If tempted to use "Any" or "object", double check whether a narrower type would be appropriate.
 - If tempted to provide several types in a union, it's likely that a better approach would be to standardise on the one most appropriate type. If the current code uses a variety of types, don't automatically assume that this was a good idea.
 - If tempted to put "| None" after your type, check that this isn't a cop-out. Are you sure we should really be allowing None?
 - If we read in untyped data (for example, json as a string), coerce it to the narrow type as near to the edge as possible (i.e. in a cli or in unit tests). If we write untyped data, de-type it as close to the edge as possible.
-- If tempted to #ignore a basedpyright error, think first. Is there a code or architecture smell that we should fix?
+- If tempted to suppress a pyrefly error, think first. Is there a code or architecture smell that we should fix?
 
 ## Principles
 
@@ -56,7 +56,7 @@ Each module should have one reason to change.
 - ``prompt_builder.py`` owns prompt formatting (docstring rendering, parameter section building)
 - ``metadata.py`` owns type introspection (type name formatting, return type resolution, parameter inspection)
 - ``atomic_workflow.py`` owns conversation orchestration (turn management, LLM calling, intent handling)
-- ``llm_interaction.py`` owns LLM provider abstraction
+- ``conversation.py`` owns the model call and its transcript; ``model_provider.py`` owns provider mapping
 
 If you find yourself adding a function to a module that doesn't match its stated purpose, create a new module.
 

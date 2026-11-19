@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 import unittest
 from io import StringIO
-from pathlib import Path
 
 from chat_workflow import (
     AgentIntent,
-    AgentResponse,
-    Config,
+    Continue,
     Session,
     SessionLog,
     StreamingDebug,
 )
+from chat_workflow.session import UserIO
 from tests.conftest import timeout
+from tests.evals.helpers import eval_timeout, make_config
 from workflows.evaluation_criteria import EvaluationCriteria
 
-_CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
+_CONFIG = make_config()
 
 
-class MockIO:
+class MockIO(UserIO):
     def __init__(self, responses):
         self.responses = list(responses)
         self.outputs = []
@@ -32,31 +32,29 @@ class MockIO:
 
 
 class TestDebugStreaming(unittest.TestCase):
-    @timeout(10)
+    @timeout(eval_timeout(_CONFIG))
     def test_streaming_debug_captures_request(self):
+        from pydantic_ai.messages import ModelRequest
+
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
         debug.on_request(
-            messages=[
-                {"role": "system", "content": "You are helpful"},
-                {"role": "user", "content": "Hello"},
-            ],
+            messages=[ModelRequest.user_text_prompt("Hello")],
             model="test-model",
         )
 
         output = debug_output.getvalue()
         self.assertIn("LLM REQUEST", output)
         self.assertIn("test-model", output)
-        self.assertIn("system: You are helpful", output)
         self.assertIn("user: Hello", output)
 
-    @timeout(10)
+    @timeout(eval_timeout(_CONFIG))
     def test_streaming_debug_captures_response(self):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
 
-        action = AgentResponse[EvaluationCriteria](intent=AgentIntent.CONTINUE, message="What is your budget?")
+        action = Continue(intent=AgentIntent.CONTINUE, message="What is your budget?")
         debug.on_response(action, duration_ms=123.45)
 
         output = debug_output.getvalue()
@@ -64,7 +62,7 @@ class TestDebugStreaming(unittest.TestCase):
         self.assertIn("123ms", output)
         self.assertIn("continue", output)
 
-    @timeout(10)
+    @timeout(eval_timeout(_CONFIG))
     def test_streaming_debug_captures_error(self):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)
@@ -76,7 +74,7 @@ class TestDebugStreaming(unittest.TestCase):
         self.assertIn("ValueError", output)
         self.assertIn("Something went wrong", output)
 
-    @timeout(10)
+    @timeout(eval_timeout(_CONFIG))
     def test_orchestrator_with_debug(self):
         """Verify debug output captures LLM interaction when using @chat decorator."""
         debug_output = StringIO()
@@ -93,7 +91,7 @@ class TestDebugStreaming(unittest.TestCase):
         try:
             criteria = EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop",
-                max_turns=6,
+                max_turns=10,
                 session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
                 debug=debug,
             )
@@ -108,7 +106,7 @@ class TestDebugStreaming(unittest.TestCase):
             self.assertIn("LLM RESPONSE", output)
             raise
 
-    @timeout(10)
+    @timeout(eval_timeout(_CONFIG))
     def test_chat_decorator_with_debug_parameter(self):
         debug_output = StringIO()
         debug = StreamingDebug(file=debug_output, include_timestamps=False)

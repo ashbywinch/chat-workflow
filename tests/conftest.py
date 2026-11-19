@@ -9,7 +9,16 @@ from functools import wraps
 from pathlib import Path
 from typing import Any
 
-from chat_workflow import AgentResponse, AtomicWorkflowConfig, AtomicWorkflowFailedError, TurnResult
+from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
+from pydantic_ai.models.function import FunctionModel
+
+from chat_workflow import (
+    AgentResponse,
+    AtomicWorkflowConfig,
+    AtomicWorkflowFailedError,
+    Conversation,
+    TurnResult,
+)
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 # Add the project root to Python path
@@ -65,6 +74,7 @@ class FakeConfig:
     max_retries = 3
     request_timeout_seconds = 30
     debug = False
+    extra_headers: dict[str, str] = {}
 
 
 def make_valid_criteria() -> EvaluationCriteria:
@@ -78,6 +88,13 @@ def make_valid_criteria() -> EvaluationCriteria:
     )
 
 
+def _success(action) -> TurnResult:
+    """The success callback: a success turn always carries a result."""
+    if action.result is None:
+        raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
+    return TurnResult[EvaluationCriteria].success(action.result)
+
+
 def make_atomic_workflow_config(
     response_model_override: type | None = None,
     max_turns: int = 10,
@@ -89,38 +106,65 @@ def make_atomic_workflow_config(
         response_model=response_model_override or AgentResponse[EvaluationCriteria],
         max_turns=max_turns,
         on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
-        on_success=lambda action: TurnResult[EvaluationCriteria].success(action.result),
+        on_success=_success,
         on_failure=lambda action: AtomicWorkflowFailedError(action.message or "No reason given"),
     )
     kwargs.update(overrides)
     return AtomicWorkflowConfig(**kwargs)
 
 
-class MockInstructorClient:
-    """Mock instructor client for testing LLM interactions."""
+def text_response(payload: Any) -> ModelResponse:
+    """A model response that calls the ``answer`` tool with *payload*.
 
-    def __init__(self, responses=None):
-        self.responses = responses or []
-        self.call_count = 0
-        self.last_call_args = None
-        self.last_call_kwargs = None
-        self.chat = self.MockChatCompletions(self)
+    The answer travels as a tool call: the endpoints behind this model enforce
+    a tool's schema and ignore ``response_format``. The schema wraps the
+    intents' union in an object under ``response``, so the arguments do too.
+    """
+    if isinstance(payload, dict) and "response" not in payload:
+        payload = {"response": payload}
+    return ModelResponse(parts=[ToolCallPart("answer", payload)])
 
-    class MockChatCompletions:
-        def __init__(self, parent):
-            self.parent = parent
-            self.completions = self
 
-        def create(self, model=None, messages=None, response_model=None, max_retries=None, **kwargs):
-            self.parent.call_count += 1
-            self.parent.last_call_args = (model, messages, response_model, max_retries)
-            self.parent.last_call_kwargs = kwargs
-            if self.parent.responses:
-                response = self.parent.responses.pop(0)
-                if isinstance(response, Exception):
-                    raise response
-                return response
-            return AgentResponse[EvaluationCriteria](intent="continue", message="Test question")
+class ScriptedModel:
+    """A FunctionModel body that replays scripted responses and counts calls.
 
-    def get_client(self, provider=None):
-        return self
+    An item may be a payload (serialised as the response text), a
+    ``ModelResponse`` (for blank or thinking-only responses), or a callable
+    returning either. The last item repeats once the script runs out.
+    """
+
+    def __init__(self, responses: list[Any]) -> None:
+        self.responses = list(responses)
+        self.calls: list[list[ModelMessage]] = []
+
+    def __call__(self, messages: list[ModelMessage], info: Any) -> ModelResponse:
+        del info
+        self.calls.append(list(messages))
+        index = min(len(self.calls) - 1, len(self.responses) - 1)
+        item = self.responses[index]
+        if callable(item):
+            item = item()
+        if isinstance(item, BaseException):
+            raise item
+        if isinstance(item, ModelResponse):
+            return item
+        return text_response(item)
+
+
+def make_conversation(
+    responses: list[Any],
+    *,
+    output_type: type | None = None,
+    **overrides: Any,
+) -> Any:
+    """A Conversation on a scripted model: no network, no provider."""
+    script = ScriptedModel(responses)
+    conversation = Conversation(
+        model="scripted-model",
+        instructions="Test instructions",
+        output_type=output_type or AgentResponse[EvaluationCriteria],
+        model_client=FunctionModel(script),
+        **overrides,
+    )
+    conversation.script = script  # type: ignore[attr-defined]  # tests read the calls
+    return conversation

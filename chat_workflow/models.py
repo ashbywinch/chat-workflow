@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 TResult = TypeVar("TResult")
+
+# The name of the tool that carries a step's answer. The endpoint enforces a
+# tool's schema where it ignores `response_format`, so the answer is a call.
+ANSWER_TOOL = "answer"
 
 
 class AgentIntent(StrEnum):
@@ -18,53 +22,54 @@ class AgentIntent(StrEnum):
     FAILURE = "failure"
 
 
-class AgentResponse(BaseModel, Generic[TResult]):
-    """The structured response from an LLM agent after one turn.
+class Continue(BaseModel):
+    """Ask the user another question; the answer is not ready this turn."""
 
-    The agent tells the framework what to do next via ``intent``:
-    - ``CONTINUE``: ask the user another question
-    - ``SUCCESS``: return the completed result
-    - ``FAILURE``: abort with an error message
-    """
+    model_config = ConfigDict(extra="forbid")
 
-    intent: AgentIntent
-    message: str | None = Field(
-        default=None,
-        description=(
-            'Message for the user. Required when intent is "continue" or "failure". '
-            'Must be null when intent is "success".'
-        ),
-    )
-    result: TResult | None = Field(
-        default=None,
-        description=(
-            'The final object. Required when intent is "success". '
-            'Must be null when intent is "continue" or "failure".'
-        ),
-    )
+    intent: Literal[AgentIntent.CONTINUE]
+    message: str = Field(min_length=1, description="The question for the user.")
 
-    @model_validator(mode="after")
-    def validate_intent_consistency(self):
-        if self.intent == AgentIntent.CONTINUE:
-            if not self.message:
-                raise ValueError(
-                    "CONTINUE intent requires a message field with your question for the user. "
-                    "Do not include a result field."
-                )
-            if self.result is not None:
-                raise ValueError(
-                    "CONTINUE intent cannot include result. "
-                    "Use SUCCESS intent if you have a complete result to return."
-                )
-        elif self.intent == AgentIntent.FAILURE:
-            if not self.message:
-                raise ValueError("FAILURE intent requires a message field explaining why.")
-            if self.result is not None:
-                raise ValueError("FAILURE intent cannot include result.")
-        elif self.intent == AgentIntent.SUCCESS:
-            if self.result is None:
-                raise ValueError("SUCCESS intent requires a result field with the complete object.")
-        return self
+
+class Success(BaseModel, Generic[TResult]):
+    """The finished object; the step is complete."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    intent: Literal[AgentIntent.SUCCESS]
+    result: TResult = Field(description="The complete object the caller asked for.")
+
+
+class Failure(BaseModel):
+    """The result cannot be produced; stop and say why."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    intent: Literal[AgentIntent.FAILURE]
+    message: str = Field(min_length=1, description="Why the result cannot be produced.")
+
+
+type AgentResponse[TResult] = Annotated[
+    Continue | Success[TResult] | Failure, Field(discriminator="intent")
+]
+"""What an agent returns after one turn, as three shapes, not one.
+
+The schema *is* the rule: a ``continue`` has no ``result`` property and a
+``success`` has no ``message``, with ``additionalProperties: false`` on each
+branch. An answer that both asks and answers is inexpressible, so it is never
+generated and never retried. A model validator could not do this: Pydantic
+does not translate validator logic into JSON Schema, so a rule written there
+reaches the model only as a rejection after the fact.
+"""
+
+type FinalResponse[TResult] = Annotated[
+    Success[TResult] | Failure, Field(discriminator="intent")
+]
+"""The answer when no turn remains: it cannot ask a question.
+
+A step that has run out of turns is offered these shapes only, so "ask
+another question" is not expressible and no retry has to argue about it.
+"""
 
 
 class TurnResult(BaseModel, Generic[TResult]):
