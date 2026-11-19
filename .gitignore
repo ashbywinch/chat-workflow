@@ -69,3 +69,6 @@ evaluation_criteria.json
 test-results/
 
 .lexicon
+
+# Generated component code left by an interrupted eval
+tests/evals/composite/tmp*.py
