@@ -174,6 +174,21 @@ class TestConfig(unittest.TestCase):
         finally:
             os.unlink(temp_path)
 
+    def test_overrides_merge_over_the_file(self):
+        """An eval states 'do not serve me the cache' without a second config file."""
+        temp_path = self._write_temp_config(
+            {"llm": {"provider": "openai", "model": "m", "temperature": 0.2}}
+        )
+        try:
+            cfg = Config(
+                Path(temp_path),
+                overrides={"llm": {"extra_headers": {"cf-aig-skip-cache": "true"}}},
+            )
+            self.assertEqual(cfg.temperature, 0.2)
+            self.assertEqual(cfg.extra_headers, {"cf-aig-skip-cache": "true"})
+        finally:
+            os.unlink(temp_path)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

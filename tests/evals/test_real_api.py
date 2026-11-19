@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import unittest
-from pathlib import Path
 
 from chat_workflow import (
     AgentIntent,
@@ -8,7 +7,6 @@ from chat_workflow import (
     AtomicWorkflow,
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
-    Config,
     Session,
     SessionLog,
     TurnLimitExceededError,
@@ -16,9 +14,10 @@ from chat_workflow import (
 )
 from chat_workflow.session import UserIO
 from tests.conftest import timeout
+from tests.evals.helpers import eval_timeout, make_config
 from workflows.evaluation_criteria import EvaluationCriteria
 
-_CONFIG = Config(Path(__file__).parent.parent.parent / "config.json")
+_CONFIG = make_config()
 
 
 
@@ -51,7 +50,7 @@ class MockIO(UserIO):
 
 
 class TestRealAPI(unittest.TestCase):
-    @timeout(60)
+    @timeout(eval_timeout(_CONFIG))
     def test_call_llm_returns_valid_action(self):
         orchestrator = AtomicWorkflow(
             config=AtomicWorkflowConfig(
@@ -116,7 +115,7 @@ class TestRealAPI(unittest.TestCase):
                 f"Criteria must include 'budget'. Found: {[c.name for c in action.result.criteria]}",
             )
 
-    @timeout(60)
+    @timeout(eval_timeout(_CONFIG))
     def test_multi_turn_conversation_with_real_llm(self):
         mock_io = MockIO(
             [
@@ -141,7 +140,7 @@ class TestRealAPI(unittest.TestCase):
             f"Criteria must include 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
-    @timeout(60)
+    @timeout(eval_timeout(_CONFIG))
     def test_single_turn_with_real_llm(self):
         orchestrator = AtomicWorkflow(
             config=AtomicWorkflowConfig(
@@ -186,7 +185,7 @@ class TestRealAPI(unittest.TestCase):
                 f"Criteria must include 'budget'. Found: {[c.name for c in result.result.criteria]}",
             )
 
-    @timeout(60)
+    @timeout(eval_timeout(_CONFIG))
     def test_conversation_flow_with_real_llm(self):
         mock_io = MockIO(
             [
@@ -213,7 +212,7 @@ class TestRealAPI(unittest.TestCase):
             f"Criteria missing 'budget'. Found: {[c.name for c in criteria.criteria]}",
         )
 
-    @timeout(60)
+    @timeout(eval_timeout(_CONFIG))
     def test_uncooperative_user_max_turns(self):
         mock_io = MockIO(
             [
@@ -230,7 +229,7 @@ class TestRealAPI(unittest.TestCase):
                 session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
             )
 
-    @timeout(60)
+    @timeout(eval_timeout(_CONFIG))
     def test_conversation_action_format(self):
         orchestrator = AtomicWorkflow(
             config=AtomicWorkflowConfig(

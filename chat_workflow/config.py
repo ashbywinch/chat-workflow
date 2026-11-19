@@ -12,11 +12,13 @@ class Config:
     """Configuration manager for LLM settings.
 
     The caller provides the path to config.json. No auto-discovery.
+    ``overrides`` is merged over the file, for an application that varies a
+    setting (an eval that must bypass a gateway cache) without a second file.
     """
 
     _VALID_PROVIDERS = PROVIDERS
 
-    def __init__(self, config_path: Path):
+    def __init__(self, config_path: Path, overrides: dict[str, Any] | None = None):
         from .exceptions import ConfigFileError, ConfigurationError
 
         self._config_data: dict[str, Any] = {
@@ -40,6 +42,9 @@ class Config:
             raise ConfigFileError(f"Invalid JSON in {config_path}: {e}") from e
         except OSError as e:
             raise ConfigFileError(f"Could not read {config_path}: {e}") from e
+
+        if overrides:
+            self._merge_config(self._config_data, overrides)
 
         if not self._config_data.get("llm", {}).get("provider"):
             raise ConfigurationError("Missing required field in config.json: llm.provider")
