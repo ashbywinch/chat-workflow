@@ -97,6 +97,10 @@ def _setup_atomic_workflow(
 def atomic_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
+    ``session``, ``debug``, ``max_turns``, ``tools`` and ``deps`` are the
+    decorator's own parameters: they are removed before the prompt's params
+    section is built, so a step cannot also name one of them.
+
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts a ``session`` parameter (:class:`~chat_workflow.session.Session`).
     """

@@ -296,6 +296,31 @@ class TestInstructions(unittest.TestCase):
         self.assertEqual(parts[0].content.count("Test instructions"), 1)
 
 
+class TestToolFailures(unittest.TestCase):
+    def test_a_tool_s_own_failure_is_passed_through_not_rewrapped(self):
+        from pydantic_ai import ToolFailed
+
+        def refuses(q: str) -> str:
+            """Refuse, saying why."""
+            raise ToolFailed("the archive is closed")
+
+        conversation = make_conversation(
+            [ModelResponse(parts=[ToolCallPart("refuses", {"q": "x"})]), VALID],
+            tools=[refuses],
+        )
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        returned = [
+            part
+            for message in conversation.messages
+            for part in message.parts
+            if isinstance(part, ToolReturnPart) and part.tool_name == "refuses"
+        ][0]
+        self.assertEqual(str(returned.content), "the archive is closed")
+
+
 class TestProviderLog(unittest.TestCase):
     def test_a_failure_names_the_endpoint_that_served_it(self):
         """The endpoints behind one model differ; a failure is diagnosable

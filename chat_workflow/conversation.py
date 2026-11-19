@@ -218,6 +218,9 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
         # own data), so no narrower set can be named.
         try:
             return tool(*args, **kwargs)
+        except ToolFailed:
+            # a tool that raised ToolFailed itself already says what failed
+            raise
         except Exception as exc:  # noqa: BLE001 — any failure is the tool's answer
             raise ToolFailed(f"{type(exc).__name__}: {exc}") from exc
 
