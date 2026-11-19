@@ -85,6 +85,11 @@ def make_tools(io, config: Config | None = None) -> Session:
     )
 
 
+def eval_timeout(config: Config) -> int:
+    """A ceiling for one eval, derived from the budget the workflow may spend."""
+    return int(config.request_timeout_seconds * (config.max_retries + 1)) + 15
+
+
 _DEFAULT_TRANSCRIPT_DIR = Path(__file__).parent.parent.parent / "test-results" / "transcripts"
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent

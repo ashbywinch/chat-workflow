@@ -229,18 +229,6 @@
    "severity": "error"
   },
   {
-   "line": 14,
-   "column": 33,
-   "stop_line": 14,
-   "stop_column": 45,
-   "path": "tests/evals/test_debug_streaming.py",
-   "code": -2,
-   "name": "missing-module-attribute",
-   "description": "Could not import `eval_timeout` from `tests.evals.helpers`",
-   "concise_description": "Could not import `eval_timeout` from `tests.evals.helpers`",
-   "severity": "error"
-  },
-  {
    "line": 25,
    "column": 9,
    "stop_line": 25,
@@ -262,18 +250,6 @@
    "name": "missing-override-decorator",
    "description": "Class member `MockIO.prompt` overrides a member in a parent class but is missing an `@override` decorator",
    "concise_description": "Class member `MockIO.prompt` overrides a member in a parent class but is missing an `@override` decorator",
-   "severity": "error"
-  },
-  {
-   "line": 17,
-   "column": 33,
-   "stop_line": 17,
-   "stop_column": 45,
-   "path": "tests/evals/test_real_api.py",
-   "code": -2,
-   "name": "missing-module-attribute",
-   "description": "Could not import `eval_timeout` from `tests.evals.helpers`",
-   "concise_description": "Could not import `eval_timeout` from `tests.evals.helpers`",
    "severity": "error"
   },
   {

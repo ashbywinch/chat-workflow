@@ -267,6 +267,45 @@ def _repair_diagram_outcome(diagram: str, outputs: Any) -> str:
     return "\n".join(lines)
 
 
+def _fallback_diagram(components: Any, outputs: Any) -> str:
+    """A valid diagram from the record when the model returned no participants.
+
+    The record names the component and the consumer; a diagram has to show the
+    work, a decision point, a return flow and the outcome. The refine step
+    gives the user the semantic correction; this keeps the mechanical contract
+    from failing the whole run when the model returns only ``sequenceDiagram``.
+    """
+    component_names = _item_field(components, "name")
+    consumer_names = _item_field(outputs, "consumer")
+    if not component_names or not consumer_names:
+        return ""
+    component = component_names[0]
+    consumer = consumer_names[0]
+    component_alias = re.sub(r"\W+", "", component.title()) or "Component"
+    consumer_alias = re.sub(r"\W+", "", consumer.title()) or "Consumer"
+    if consumer_alias == component_alias:
+        consumer_alias += "Receiver"
+    purpose = (_item_field(components, "purpose") or ["Do the work"])[0]
+    work = purpose.split(".")[0].strip()[:50] or "Do the work"
+    output_names = _item_field(outputs, "name")
+    outcome = f"Send the final {output_names[0]}" if output_names else "Send the final result"
+    if len(outcome) > 60:
+        outcome = "Send the final result"
+    return "\n".join(
+        [
+            "sequenceDiagram",
+            f'    participant {component_alias} as "{component}: Produce"',
+            f'    participant {consumer_alias} as "{consumer}: Receive"',
+            f"    {component_alias}->>{component_alias}: {work}",
+            "    opt Review needed",
+            f"        {component_alias}->>{consumer_alias}: Send the draft",
+            f"        {consumer_alias}->>{component_alias}: Return corrections",
+            "    end",
+            f"    {component_alias}->>{consumer_alias}: {outcome}",
+        ]
+    )
+
+
 class WorkflowSpec(BlobSyncMixin, LLMValidated):
     """A workflow specification.
 
@@ -306,8 +345,18 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
     def _repair_the_outcome_arrow(cls, data: Any) -> Any:
         """Make the last diagram message the outcome to the consumer."""
         if isinstance(data, dict) and isinstance(data.get("diagram"), str):
+            diagram = data["diagram"]
+            if not any(
+                line.strip().startswith("participant")
+                for line in diagram.splitlines()
+            ):
+                fallback = _fallback_diagram(
+                    data.get("components") or [], data.get("outputs") or []
+                )
+                if fallback:
+                    diagram = fallback
             repaired = _repair_diagram_outcome(
-                data["diagram"], data.get("outputs") or []
+                diagram, data.get("outputs") or []
             )
             if repaired != data["diagram"]:
                 data = {**data, "diagram": repaired}
