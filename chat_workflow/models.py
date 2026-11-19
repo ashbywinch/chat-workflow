@@ -62,6 +62,15 @@ does not translate validator logic into JSON Schema, so a rule written there
 reaches the model only as a rejection after the fact.
 """
 
+type FinalResponse[TResult] = Annotated[
+    Success[TResult] | Failure, Field(discriminator="intent")
+]
+"""The answer when no turn remains: it cannot ask a question.
+
+A step that has run out of turns is offered these shapes only, so "ask
+another question" is not expressible and no retry has to argue about it.
+"""
+
 
 class TurnResult(BaseModel, Generic[TResult]):
     """The outcome of processing a single turn in an atomic workflow."""

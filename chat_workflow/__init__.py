@@ -18,7 +18,15 @@ from .exceptions import (
     ValidationError,
 )
 from .model_provider import build_model, list_available_providers
-from .models import AgentIntent, AgentResponse, Continue, Failure, Success, TurnResult
+from .models import (
+    AgentIntent,
+    AgentResponse,
+    Continue,
+    Failure,
+    FinalResponse,
+    Success,
+    TurnResult,
+)
 from .session import Session
 from .session_log import SessionLog
 
@@ -37,6 +45,7 @@ __all__ = [
     "Conversation",
     "InvalidResponseError",
     "Failure",
+    "FinalResponse",
     "MaxRetriesExceededError",
     "ModelTurn",
     "ProviderNotFoundError",

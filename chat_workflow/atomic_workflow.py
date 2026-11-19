@@ -63,6 +63,7 @@ class AtomicWorkflow(Generic[TResult]):
             timeout_seconds=config.request_timeout_seconds,
             extra_headers=config.extra_headers,
             temperature=config.temperature,
+            final_output_type=config.final_response_model,
         )
 
     @property

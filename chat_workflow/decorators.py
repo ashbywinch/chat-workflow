@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .debug import StreamingDebug
-from .models import AgentResponse, Success, TurnResult
+from .models import AgentResponse, FinalResponse, Success, TurnResult
 from .prompt_builder import _build_params_section, _format_docstring
 from .types_meta import resolve_return_type
 
@@ -71,6 +71,7 @@ def _setup_atomic_workflow(
         config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
             response_model=AgentResponse[actual_return_type],
+            final_response_model=FinalResponse[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message),

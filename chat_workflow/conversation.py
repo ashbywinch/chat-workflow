@@ -233,6 +233,7 @@ class Conversation(Generic[T]):
         timeout_seconds: float = 30.0,
         temperature: float | None = None,
         extra_headers: Mapping[str, str] | None = None,
+        final_output_type: Any = None,
         thinking: bool = False,
         model_client: Model | None = None,
     ) -> None:
@@ -251,6 +252,7 @@ class Conversation(Generic[T]):
         self._timeout_seconds = timeout_seconds
         self._temperature = temperature
         self._extra_headers = dict(extra_headers) if extra_headers else None
+        self._final_output_type = final_output_type
         self._thinking = thinking
         # The injection seam for tests: a FunctionModel scripts a whole turn
         # without a network or a provider SDK. Production builds the real one
@@ -279,7 +281,11 @@ class Conversation(Generic[T]):
             )
         agent: Agent[Any, T] = Agent(
             self._model,
-            output_type=ToolOutput(self._output_type, name=ANSWER_TOOL, strict=True),
+            output_type=ToolOutput(
+                (self._final_output_type or self._output_type) if final_turn else self._output_type,
+                name=ANSWER_TOOL,
+                strict=True,
+            ),
             system_prompt=self._instructions
             + (
                 "\n\n## Final turn\n"

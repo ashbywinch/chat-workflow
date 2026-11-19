@@ -21,9 +21,10 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
-from chat_workflow import Conversation, MaxRetriesExceededError, Success
+from chat_workflow import Conversation, FinalResponse, MaxRetriesExceededError, Success
 from chat_workflow.models import AgentIntent
 from tests.conftest import make_conversation, make_valid_criteria
+from workflows.evaluation_criteria import EvaluationCriteria
 
 VALID = {"intent": "success", "result": make_valid_criteria().model_dump()}
 
@@ -292,6 +293,21 @@ class TestInstructions(unittest.TestCase):
         self.assertEqual(len(parts), 1)
         self.assertIn("Final turn", parts[0].content)
         self.assertEqual(parts[0].content.count("Test instructions"), 1)
+
+
+class TestTheLastTurn(unittest.TestCase):
+    def test_the_last_turn_cannot_ask_a_question(self):
+        """No `continue` shape is offered, so the model has nothing to ask
+        with: the same answer that was accepted mid-conversation is rejected."""
+        conversation = make_conversation(
+            [{"intent": "continue", "message": "One more question?"}, VALID],
+            final_output_type=FinalResponse[EvaluationCriteria],
+        )
+
+        turn = conversation.send("hello", final_turn=True)
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(len(conversation.script.calls), 2)
 
 
 class TestTheUserView(unittest.TestCase):

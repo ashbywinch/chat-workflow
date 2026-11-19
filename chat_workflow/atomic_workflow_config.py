@@ -53,3 +53,5 @@ class AtomicWorkflowConfig(Generic[TResult]):
     request_timeout_seconds: float = 30.0
     extra_headers: dict[str, str] | None = None
     temperature: float | None = None
+    # The answer shapes used on the last allowed turn (no `continue`).
+    final_response_model: Any = None
