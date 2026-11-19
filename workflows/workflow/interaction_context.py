@@ -100,6 +100,12 @@ def _format_interaction_context(draft: ComponentInteractionContext) -> str:
         lines.append("- Tone: " + draft.tone_preference)
     if draft.user_pain_points:
         lines.append("- I'll watch for: " + "; ".join(draft.user_pain_points))
+    lines.append("")
+    lines.append(
+        "What would you add to what I should always prioritize? What would you "
+        "like me to suggest proactively? What usually goes wrong that I should "
+        "catch?"
+    )
     return "\n".join(lines)
 
 
@@ -134,10 +140,9 @@ def _confirm_interaction_context(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentInteractionContext:
-    """The interaction proposal has been shown. Ask a targeted follow-up for each part.
+    """The proposal and the three questions have already been shown. Use the user's answers.
 
-Ask: "What would you add to what I should always prioritize? What would you like me to suggest proactively? What
-usually goes wrong that I should catch?" Even if the user volunteered answers, ask these once as follow-ups and
-confirm the proposal before returning. If they correct a value, update it and return the corrected context. If they
-confirm, return the draft. Do not re-present the whole proposal and do not ask what to call the artifact."""
+Ask only about a point they left unanswered. If they correct a value, update it and return the corrected context. If
+they confirm, return the draft. Do not re-present the whole proposal, repeat the three questions, or ask what to call
+the artifact."""
     ...  # type: ignore[reportReturnType]

@@ -15,15 +15,19 @@ from tests.evals.helpers import DEFAULT_JUDGE_RULES
 
 META_LEVEL_JUDGE_RULES: dict[str, str] = {
     **DEFAULT_JUDGE_RULES,
+    "Uses expertise": (
+        "The assistant proposes the shape of each output — its name, who it is "
+        "for, its format, the check it must pass, and where it goes — from "
+        "what the user said, rather than asking the user to define every field "
+        "from scratch."
+    ),
     "Stays at meta-level": (
-        "The assistant is helping the user define the SHAPE and STRUCTURE of their "
-        "outputs/inputs/process as design artifacts. This is a meta-level conversation "
-        "\u2014 the assistant defines what things look like, not their content. "
-        "The assistant does NOT drop into the object-level and start helping the user "
-        "achieve their real-world goal (e.g., generating business ideas, planning menus, "
-        "writing posts). When the user describes a goal, the assistant asks about structure "
-        "('what fields should each output have?') rather than trying to help achieve the "
-        "goal ('what skills do you have?')."
+        "The assistant defines the SHAPE of each output as a design artifact: "
+        "its name, who it is for, its format, the check it must pass, and where "
+        "it goes. It does not produce the actual content (it does not write the "
+        "minutes or invent action items) and it does not help the user achieve "
+        "their real-world goal. A concrete description of the artifact's shape "
+        "is meta-level."
     ),
 }
 
