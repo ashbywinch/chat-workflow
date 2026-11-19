@@ -143,6 +143,30 @@ The object invariants are not judged by the conversation judge. The checklist is
 not object quality. The procedure is not the checklist; the docstring describes
 how to do the work, the checklist evaluates whether the conversation was good.
 
+### One conversation, one session
+
+A conversation is one **session**. A meeting inside it is also a session,
+created by its parent. The same concept serves every depth: a receptionist is a
+step running in a session that creates child sessions for the meetings it
+routes to.
+
+- **Each session has its own context.** It accumulates what was said in that
+  session and does not inherit the parent's turns. What the child needs to know
+  is passed as parameters to the child's step. The tree of sessions is the whole
+  the user saw.
+- **The framework owns the opening and the closing.** A session begins with one
+  greeting that orients the user, and ends with one closing. A step running
+  inside a session never greets or signs off; only the session's wrapper does.
+  That is why the first response is always the opening, however the workflow was
+  entered.
+- **Each layer owns its part of the prompt.** The session owns the overall how —
+  talk in the user's words, one move at a time. The step owns its procedure. The
+  response schema owns the protocol. A prompt never restates another layer.
+- **Every rule has a how and a validation.** The how is the prompt; the
+  validation is the checklist. The checklist is declared on the step, rendered
+  into the prompt as its own demarcated section, and is the same list the judge
+  applies. The two complement each other; neither paraphrases the other.
+
 ### The epistemic principle
 
 The two apparently competing ideas — “propose one thing at a time” and “show the
@@ -199,12 +223,11 @@ declaring nothing gives the default.
 
 ### Conversation-level rules
 
-**Warm open** applies only to the first method in a conversation. The first
-assistant response must orient the user and explain what the conversation is
-for before substantive questioning. The conversation layer — not the individual
-workflow class — determines which response is first. A workflow class must be
-reusable mid-conversation without behaving as if it were the opening. The
-mechanism is a design decision (deferred).
+**Warm open** is the session's greeting. The session component owns it, so the
+first assistant response orients the user and explains what the conversation is
+for before substantive questioning. A step running mid-conversation never
+behaves as if it were the opening; the framework, not the individual workflow
+class, decides which response is first.
 
 ### Author additions
 

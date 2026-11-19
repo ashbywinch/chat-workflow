@@ -4,7 +4,7 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar, get_args, get_origin
+from typing import Any, Generic, TypeVar, cast, get_args, get_origin
 
 from .atomic_workflow_step_config import AtomicWorkflowStepConfig
 from .debug import _DebugTimer
@@ -69,6 +69,7 @@ class AtomicWorkflowStep(Generic[TResult]):
         self._api_base: str | None = config.api_base
         self._api_key_env: str | None = config.api_key_env
         self.chat = config.chat
+        self.single_turn = config.single_turn
         self.response_model = config.response_model
         self.on_continue: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_continue
         self.on_success: Callable[[AgentResponse[TResult]], TurnResult[TResult]] = config.on_success
@@ -106,6 +107,24 @@ class AtomicWorkflowStep(Generic[TResult]):
         self.turn_count += 1
         response = self._call_llm()
 
+        if self.single_turn and response.intent == AgentIntent.CONTINUE:
+            # A one-turn text step has no conversation to continue. The
+            # natural reply for "write one greeting" is a continue message;
+            # take it as the step's result instead of asking a user who is not
+            # part of this step.
+            self.events.append(
+                TranscriptEvent(
+                    type="result",
+                    content=None,
+                    turn=self.turn_count,
+                    meta={"status": "success"},
+                )
+            )
+            return cast(
+                TurnResult[TResult],
+                TurnResult[str].success(response.message or ""),
+            )
+
         message = response.message
         if message and response.intent != AgentIntent.SUCCESS:
             self.messages.append({"role": "assistant", "content": message})
@@ -114,7 +133,9 @@ class AtomicWorkflowStep(Generic[TResult]):
                     type="assistant",
                     content=message,
                     turn=self.turn_count,
-                    audience="user",
+                    # A chat-off step has no conversation: its continue message
+                    # is an intermediate attempt, not something the user saw.
+                    audience="user" if self.chat else "internal",
                 )
             )
 
@@ -156,6 +177,7 @@ class AtomicWorkflowStep(Generic[TResult]):
         from .exceptions import MaxRetriesExceededError
 
         client = self._client()
+        result_fields = _result_field_names(self.response_model)
         for attempt in range(self._validation_corrections + 1):
             try:
                 response = self._request_with_retry(client)
@@ -164,7 +186,10 @@ class AtomicWorkflowStep(Generic[TResult]):
                     exc, self.response_model
                 )
                 if response is None:
-                    failure = repaired_failure or _validation_failure(exc)
+                    failure = _as_answer_failure(
+                        repaired_failure or _validation_failure(exc),
+                        result_fields,
+                    )
                     if failure is None or attempt >= self._validation_corrections:
                         raise MaxRetriesExceededError(
                             self._max_retries,
@@ -270,7 +295,7 @@ class AtomicWorkflowStep(Generic[TResult]):
                     "content": "The conversation is in English. Reply in English.",
                 },
             )
-        messages = _request_messages(messages)
+        messages = _request_messages(messages, chat=self.chat)
         with timer:
             # Pass a copy: Instructor patches messages in place with the JSON
             # schema, and the conversation history must stay clean.
@@ -426,7 +451,9 @@ _FAILURE_GUIDANCE: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 
-def _request_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+def _request_messages(
+    messages: list[dict[str, str]], *, chat: bool = True
+) -> list[dict[str, str]]:
     """Shape the transcript for the wire, or raise on an invalid one.
 
     The rules and their sources live in :class:`chat_workflow.transcript.Transcript`.
@@ -438,6 +465,13 @@ def _request_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
         # The step opens the conversation; a chat request needs a turn to
         # answer, and a system-only request comes back empty.
         transcript.user("Start the conversation.")
+    elif transcript.turns[-1]["role"] != "user":
+        # The previous step left off with the assistant speaking. A chat
+        # request must end on a user turn, so give the model a neutral cue
+        # rather than sending an unanswered assistant turn.
+        transcript.user(
+            "Continue the conversation." if chat else "Produce the result now."
+        )
     return transcript.wire()
 
 
@@ -478,6 +512,58 @@ def _rule_text(message: str) -> str:
         if message.startswith(prefix):
             return message[len(prefix):]
     return message
+
+
+def _is_answer_shaped(text: str, result_fields: frozenset[str]) -> bool:
+    """True when *text* is a plausible answer to the conversation.
+
+    A plausible answer is an envelope (it has ``intent``) or a bare result
+    object (its keys belong to the result). A reasoning dump, another API's
+    object, or an empty object is not: echoing it back as an assistant turn
+    invites the model to keep explaining itself instead of answering.
+    """
+    stripped = text.lstrip()
+    if not stripped.startswith("{"):
+        return False
+    try:
+        data = json.loads(stripped)
+    except (ValueError, TypeError):
+        return False
+    if not isinstance(data, dict) or not data:
+        return False
+    if "intent" in data:
+        return True
+    if not (set(data) - result_fields):
+        return True
+    matches = set(data) & result_fields
+    if not matches:
+        return False
+    # A result object with one extra key is still a correctable envelope
+    # mistake. A reasoning dump has unrelated keys and fails this.
+    return len(matches) >= len(data) - 1
+
+
+def _as_answer_failure(
+    failure: ValidationFailure | None,
+    result_fields: frozenset[str],
+) -> ValidationFailure | None:
+    """Keep a correction useful: never feed a reasoning dump back to the model.
+
+    When the rejected text is not an answer, the model gets a conversation
+    correction — answer the user's last message — without its own reasoning
+    replayed as an assistant turn.
+    """
+    if failure is None or failure.rejected_text is None:
+        return failure
+    if _is_answer_shaped(failure.rejected_text, result_fields):
+        return failure
+    return ValidationFailure(
+        reason=(
+            "The last reply was not a reply to the user: it explained the "
+            "assistant's own reasoning instead of answering."
+        ),
+        kind="conversation_correction",
+    )
 
 
 def _validation_failure(exc: Exception) -> ValidationFailure | None:
@@ -522,6 +608,12 @@ def _validation_failure(exc: Exception) -> ValidationFailure | None:
 
 def _correction_prompt(failure: ValidationFailure) -> str:
     """The framework turn that tells the model how to repair its response."""
+    if failure.kind == "conversation_correction":
+        return (
+            "[framework] Your last message was not a reply to the user. Reply "
+            "to their last message now, in one turn. Do not explain your "
+            "reasoning or restate the task."
+        )
     return (
         "[framework] Your previous response was rejected by validation. "
         f"Fix exactly these violations:\n\n{failure.message()}\n\n"
@@ -688,7 +780,7 @@ def _returned_no_envelope(exc: BaseException, result_fields: frozenset[str]) -> 
         return False
     if not isinstance(data, dict):
         return False
-    return "intent" not in data and not (set(data) & result_fields)
+    return not _is_answer_shaped(stripped, result_fields)
 
 
 def _is_transient_provider_error(exc: BaseException) -> bool:

@@ -22,10 +22,11 @@ def generate_essay_from_topic(
 ```
 
 **How it works:**
-1. Uses the docstring as a prompt 
-2. Runs a multi-turn conversation, including validating the object returned by the LLM and retrying if it's invalid
-3. Provides the parameters and details of the expected return type (including validation) to the LLM under the hood
-4. Returns the object that the LLM provides, or raises an exception if the LLM was unable to create a valid object.
+1. Uses the docstring as the step's procedure, after the session's overall conversation instructions
+2. Prepends the session's existing conversation as history and appends only the new user and assistant turns
+3. Runs a multi-turn conversation, including validating the object returned by the LLM and retrying if it's invalid
+4. Provides the parameters and details of the expected return type (including validation) to the LLM under the hood
+5. Returns the object that the LLM provides, or raises an exception if the LLM was unable to create a valid object.
 
 **Required parameters:** `session` - provides the I/O interface for user interaction.
 
@@ -49,6 +50,43 @@ def generate_essay(
 ```
 
 **CLI auto-discovery**: Functions decorated with `@composite_workflow_step` and exported from the module are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_essay` → `generate-essay`).
+
+## The session and the prompt
+
+A step does not own the whole conversation. `SessionComponent.converse` wraps
+the top-level step — the CLI and the eval harness do this explicitly — and it
+sets the session's overall instructions, greets once, runs the step, and signs
+off. A nested step runs inside that session and never greets or signs off
+unless you call `converse` on a child session yourself.
+
+Put each thing where it belongs:
+
+| Thing | Where it lives |
+|---|---|
+| The overall how — the user's words, one move at a time | `SessionComponent.converse`'s docstring (the framework's) |
+| This step's procedure — what to ask, in what order, when to stop | Your step docstring |
+| The object's quality — fields, constraints, `_validation_rules` | The Pydantic model |
+| The conversation checklist — what a good conversation looks like | `conversation_validation_rules` on the step |
+| The response protocol — intent, message, result | `AgentResponse` and Instructor; never a prompt |
+
+Your docstring is the procedure, not the protocol and not the checklist. It does
+not greet (the session does), it does not restate a checklist rule, and it never
+says "return JSON", "put the text in `message`", or "never reply with plain
+text". The checklist is rendered into the prompt as `## Conversation checklist`
+and is the same list the judge applies; write falsifiable behaviours, not a
+paraphrase of the docstring.
+
+`Session.state.messages` is that session's conversation. A step sees it as
+history and appends only its new turns; its system prompt is not history. To run
+a meeting inside a conversation, spawn a child and wrap its step:
+
+```python
+child = session.spawn(title="Kick-off meeting", instructions="...")
+result = SessionComponent().converse(run_meeting, session=child)
+```
+
+The child starts with clean context; pass the brief as parameters to its step.
+The session tree is the whole the user saw.
 
 ## Pydantic Model Patterns
 

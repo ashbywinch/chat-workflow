@@ -21,6 +21,18 @@ from .design_spec import ComponentDesignSpec
 
 _BASE_MODEL_SOURCES = frozenset({"pydantic", "chat_workflow.mixins"})
 
+# Phrases that restate the response protocol. The envelope and Instructor own
+# these; a generated step docstring must describe the conversation instead.
+_PROTOCOL_PHRASES = (
+    "return json",
+    "return only a json",
+    "put the user-facing text in",
+    "put the text in `message`",
+    "never reply with plain text",
+    "set `intent`",
+    "set intent to",
+)
+
 
 def _basemodel_class_names(tree: ast.AST) -> set[str]:
     """Names bound to BaseModel (or a mixin that subclasses it)."""
@@ -903,6 +915,17 @@ class ComponentSourceCode(LLMValidated):
         "exhaustive. All fields and helpers must serve the one artifact.",
         "REJECT if the class docstring describes the model's fields, "
         "structure, or validation rules.",
+        "A generated step's docstring describes that step's conversation "
+        "procedure only. It does not define a greeting or a closing, and the "
+        "generated code does not define a SessionComponent or wrap a step in "
+        "one: the framework's session wrapper opens and closes the "
+        "conversation.",
+        "REJECT any generated docstring or prompt that states the response "
+        "format — JSON, intent, message, result, or 'never reply with plain "
+        "text'. The response schema owns the protocol.",
+        "The conversation checklist on a generated step complements its "
+        "docstring; it does not paraphrase it. Each rule names a behaviour "
+        "the judge can falsify.",
     ]
     _validation_rules_heading: ClassVar[str] = "Generated code validation rules"
 
@@ -1094,6 +1117,43 @@ class ComponentSourceCode(LLMValidated):
                 "Generated code must have at least one public method decorated with "
                 "@atomic_workflow_step or @composite_workflow_step (imported from chat_workflow)"
             )
+
+        # The framework supplies the session wrapper. A generated component
+        # defines its steps, not a second session concept.
+        if any(
+            isinstance(node, ast.ClassDef) and node.name == "SessionComponent"
+            for node in ast.walk(tree)
+        ):
+            raise ValidationError(
+                "Generated code must not define a SessionComponent. The "
+                "framework supplies the session wrapper; a component defines "
+                "its artifact and its steps only."
+            )
+        for node in workflow_methods:
+            is_atomic, _ = _workflow_kind(node)
+            if is_atomic and node.name in ("greet", "sign_off"):
+                raise ValidationError(
+                    f"Generated step '{node.name}' must not define the "
+                    "conversation's greeting or closing. The framework's "
+                    "session wrapper owns them; name the step for the "
+                    "artifact work it does."
+                )
+
+        # A chat-on docstring is a prompt. It must not restate the response
+        # protocol; the schema and Instructor own it.
+        for node in workflow_methods:
+            is_atomic, is_chat_off = _workflow_kind(node)
+            if not is_atomic or is_chat_off:
+                continue
+            docstring = (ast.get_docstring(node) or "").lower()
+            for phrase in _PROTOCOL_PHRASES:
+                if phrase in docstring:
+                    raise ValidationError(
+                        f"Workflow docstring for '{node.name}' states the "
+                        f"response protocol ({phrase!r}). The response schema "
+                        "owns the protocol; describe the conversation, not "
+                        "the format."
+                    )
 
         # One artifact: the model the workflow steps produce. Other models
         # are auxiliary — a nested value object reachable through the
@@ -1471,10 +1531,10 @@ class ComponentSourceCode(LLMValidated):
         workflow docstring; for example, if `sent_date` means "when the
         distribution email was sent", do not put that phrase in the docstring
         — describe what to ask. The agent acts as the domain_spec's
-        `expert_role`; open
-        with that role. Use `what_good_looks_like` to decide what to probe
+        `expert_role`; speak as that role, not as a named person. Use
+        `what_good_looks_like` to decide what to probe
         for, not as text to repeat. Use details the user already gave, never
-        ask for them again, confirm the draft once, then return success.
+        ask for them again, confirm the draft once, then finish.
         Ask at most two or three questions in the whole conversation. When the
         user gives a block of detail, extract every field you can from it and
         propose the draft; do not walk through the fields one by one.
@@ -1493,7 +1553,7 @@ class ComponentSourceCode(LLMValidated):
                 and draw out details they only implied.
 
                 When you have enough, show the draft once and ask if it is
-                right. On confirmation, return success.
+                right. On confirmation, finish.
 
                 Example:
                 User: We reviewed the Q3 plan with Sarah and Mike.

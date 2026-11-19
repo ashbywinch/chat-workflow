@@ -62,12 +62,13 @@ class TestVocabularyPrompt(unittest.TestCase):
         self.assertEqual(titles["orchestrating_component"]["title"], "who keeps things moving")
         self.assertEqual(titles["phases"]["title"], "the main stages")
 
-    def test_the_section_points_at_the_schema_title(self):
+    def test_the_section_points_at_the_field_title(self):
         section = _build_user_vocabulary_section(LabelledResult)
 
-        self.assertIn("its schema title", section)
+        self.assertIn("Each field's title is the phrase", section)
         self.assertIn("internal engineering text", section)
         self.assertNotIn("success_criteria", section)
+        self.assertNotIn("`message`", section)
 
     def test_parameter_and_type_names_get_the_same_treatment(self):
         """A parameter name and a model name are internal too, not user words."""

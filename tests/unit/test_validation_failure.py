@@ -66,6 +66,44 @@ class TestValidationFailureClassifier(unittest.TestCase):
 
         self.assertIsNone(_validation_failure(exc))
 
+    def test_a_reasoning_dump_is_not_replayed_to_the_model(self):
+        """The model's own reasoning is not an assistant turn to build on."""
+        from chat_workflow.atomic_workflow_step import _as_answer_failure
+
+        failure = ValidationFailure(
+            reason="rejected",
+            rejected_text='{"thinking": ["what next"], "fix": "answer"}',
+        )
+
+        adjusted = _as_answer_failure(failure, frozenset({"name"}))
+
+        assert adjusted is not None
+        self.assertEqual(adjusted.kind, "conversation_correction")
+        self.assertIsNone(adjusted.rejected_text)
+        prompt = _correction_prompt(adjusted)
+        self.assertIn("not a reply to the user", prompt)
+        self.assertNotIn("JSON", prompt)
+
+    def test_a_single_key_reasoning_dump_is_not_replayed(self):
+        from chat_workflow.atomic_workflow_step import _as_answer_failure
+
+        failure = ValidationFailure(
+            reason="rejected",
+            rejected_text='{"thinking": "the intent field is missing"}',
+        )
+
+        adjusted = _as_answer_failure(failure, frozenset({"name"}))
+
+        assert adjusted is not None
+        self.assertEqual(adjusted.kind, "conversation_correction")
+
+    def test_a_bare_result_is_still_a_correctable_envelope(self):
+        from chat_workflow.atomic_workflow_step import _as_answer_failure
+
+        failure = ValidationFailure(reason="rejected", rejected_text='{"name": "x"}')
+
+        self.assertIs(_as_answer_failure(failure, frozenset({"name"})), failure)
+
     def test_the_only_correction_is_for_a_rejected_value(self):
         """Nothing checks the message, so there is one correction path."""
         failure = ValidationFailure(reason="the result is missing a date")

@@ -59,7 +59,15 @@ def _make_components() -> list[ComponentSpec]:
             required_inputs=["Details"],
             component_type="artifact_producing",
             owner_role="Owner",
-        )
+        ),
+        ComponentSpec(
+            name="Warehouse",
+            purpose="Store orders",
+            scope_description="Store orders",
+            required_inputs=["Items"],
+            component_type="artifact_producing",
+            owner_role="Owner",
+        ),
     ]
 
 
@@ -159,7 +167,7 @@ class TestDiagramStructure(unittest.TestCase):
                 "sequenceDiagram\n"
                 'participant Order as "Order: Process"\n'
                 'participant Inventory as "Inventory: Receive"\n'
-                "Order->>Inventory: a message that is clearly too long for one line\n"
+                "Order->>Inventory: a message that is clearly far too long to fit on one line of the diagram\n"
                 "Inventory-->>Order: ack\n"
                 "opt may happen\n"
                 "Order->>Inventory: more\n"
@@ -174,11 +182,12 @@ class TestDiagramStructure(unittest.TestCase):
             self._check(
                 "sequenceDiagram\n"
                 'participant Order as "Order: Process"\n'
+                'participant Warehouse as "Warehouse: Store"\n'
                 'participant Inventory as "Inventory: Receive"\n'
                 "alt choice\n"
-                "Order->>Inventory: one\n"
+                "Order->>Warehouse: one\n"
                 "else other\n"
-                "Order->>Inventory: two\n"
+                "Order->>Warehouse: two\n"
                 "end\n"
                 "Order->>Inventory: outcome"
             )
@@ -273,6 +282,24 @@ class TestDiagramStructure(unittest.TestCase):
             "Order->>Attendees: more\n"
             "end\n"
             "Order->>Attendees: outcome",
+            _make_components(),
+            outputs,
+            _make_inputs(),
+        )
+
+    def test_a_single_word_consumer_may_be_shortened(self):
+        outputs = _make_outputs()
+        outputs[0] = outputs[0].model_copy(update={"consumer": "My team"})
+        _validate_diagram_structure(
+            "sequenceDiagram\n"
+            'participant Order as "Order: Process"\n'
+            'participant Team as "Team: Receive"\n'
+            "Order->>Team: start\n"
+            "Team-->>Order: ack\n"
+            "opt may happen\n"
+            "Order->>Team: more\n"
+            "end\n"
+            "Order->>Team: outcome",
             _make_components(),
             outputs,
             _make_inputs(),

@@ -25,7 +25,7 @@ Audience = Literal["user", "internal"]
 # the same name describes the failure and its correction.
 # A returned value failed validation. Nothing else is corrected: the message
 # is not checked at runtime, only the value the step returns.
-CorrectionKind = Literal["validation_correction"]
+CorrectionKind = Literal["validation_correction", "conversation_correction"]
 
 # Harness activity that has no user-facing content of its own.
 HarnessEventKind = Literal[
@@ -34,6 +34,7 @@ HarnessEventKind = Literal[
     "rejected_response",
     "provider_retry",
     "repaired_escape",
+    "child_session",
 ]
 
 TranscriptEventKind = CorrectionKind | HarnessEventKind
@@ -126,11 +127,19 @@ def _record_atomic_workflow_step[T](
 ) -> None:
     """Record an atomic workflow step's state into the session log.
 
-    Appends the step's typed events and messages, increments the turn count,
-    records the model name, and folds validation events into the audit log.
+    The step's conversation turns — the user's and the assistant's, in order —
+    are appended to the session's message history. The step's system prompt
+    and framework corrections are not: they belong to that one request, and a
+    later step must not inherit them as conversation. The typed events,
+    turn count and model are recorded for the audit log.
     """
-    log.events.extend(getattr(workflow, "events", []))
-    log.messages.extend(workflow.messages)
+    events = getattr(workflow, "events", [])
+    log.events.extend(events)
+    for event in events:
+        if event.type in ("user", "assistant") and event.audience == "user":
+            content = str(event.content or "").strip()
+            if content:
+                log.messages.append({"role": event.type, "content": content})
     log.turn_count += workflow.turn_count
     log.model = workflow.model
     for event in getattr(workflow, "validation_events", []):

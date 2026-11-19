@@ -46,8 +46,9 @@ layering change updates the test in the same commit.
 | Concept | Owner | Contract |
 |---|---|---|
 | `Config` | `chat_workflow/config.py` | Reads `config.json`; resolves the active preset into provider/model/api key env/api base |
-| `Session` | `chat_workflow/session.py` | IO + `SessionLog` + config for one CLI invocation |
-| `AtomicWorkflowStep` | `chat_workflow/atomic_workflow_step.py` | Drives one turn loop until success, failure, or the turn limit |
+| `Session` | `chat_workflow/session.py` | One conversation: IO, its own `SessionLog`, config, optional parent/children, `instructions`, `active`; `spawn` creates a clean child |
+| `SessionComponent` | `chat_workflow/session_component.py` | Runs a session: `greet`, `converse(step)`, `sign_off`; stateless and usable at any depth |
+| `AtomicWorkflowStep` | `chat_workflow/atomic_workflow_step.py` | Drives one turn loop until success, failure, or the turn limit; its system prompt is the session's instructions plus the step's prompt |
 | `CompositeWorkflow` | `chat_workflow/decorators.py` | Calls atomic and composite children with the same `Session` |
 | `AgentResponse` / `AgentIntent` | `chat_workflow/models.py` | The structured turn result: continue, success + value, or failure |
 | `LLMValidated` | `chat_workflow/mixins.py` | Runs `Validation(...)` rules through the model |
@@ -61,18 +62,63 @@ layering change updates the test in the same commit.
 is an atomic or composite workflow step. Further vocabulary:
 [domain concepts](reference/domain-concepts.md).
 
+## Session and prompt architecture
+
+There is one recursive `Session` concept. The top-level conversation and a
+meeting spawned inside it are the same class:
+
+- `parent`, `children`, `instructions`, `active` and `spawn` are the tree. A
+  child gets the same user and config, a new `SessionLog`, and empty
+  `state.messages`; the brief is passed as parameters to the child's step.
+- `active` is the one flag. The wrapper sets it while the session runs. The
+  greeting condition is `not state.messages`, not a second flag.
+- `SessionComponent` is behaviour, not a different session. `converse` sets
+  `session.instructions` from its docstring when the session has none, greets
+  when the session has no messages, runs the step, then signs off. The wrap is
+  explicit in the CLI and the eval harness; the decorators never auto-wrap a
+  nested step.
+- `greet` and `sign_off` are one-turn text steps (`chat=False`,
+  `single_turn=True`): a continue message is the text they produce, so they do
+  not ask a user who is not part of that step.
+
+The prompt and history come from the session:
+
+- `system_prompt` = `session.instructions` (the session's overall how) followed
+  by the step's prompt: its docstring (procedure), parameters, the
+  `## Conversation checklist`, the result model's class-level rules, and the
+  user-facing phrase for each internal name.
+- `initial_messages` = `session.state.messages`. After the step, only its new
+  user and assistant turns are appended; the step's system prompt and framework
+  corrections are not session history.
+- The checklist is declared on the step (`conversation_validation_rules`,
+  defaulting to `DEFAULT_RULES`). It is rendered as `## Conversation checklist`
+  and is the list the judge applies.
+- `AgentResponse` + Instructor own the protocol (`intent`, `message`,
+  `result`). No authored prompt says "return JSON", "put the text in message",
+  or "never reply with plain text". Repair turns may name the violation and
+  the field to fix; they are validation feedback, not authored prompts.
+- A response that is not an answer — the model's own reasoning, another API's
+  object, an empty object — is not replayed as an assistant turn. The framework
+  sends a conversation correction asking for a reply to the user; the schema
+  and Instructor still enforce the envelope. A truncated or non-answer sample
+  is retried as a fresh provider sample.
+
 ## Data flow
 
-1. The CLI discovers workflow entrypoints and constructs a `Session`.
-2. An atomic workflow step sends the accumulated messages plus the response
-   model to `get_client()`.
+1. The CLI discovers workflow entrypoints, constructs a root `Session`, and
+   runs the top-level step through `SessionComponent.converse`.
+2. An atomic workflow step assembles `session.instructions` + its own prompt,
+   appends the session's messages as `initial_messages`, and sends them plus the
+   response model to `get_client()`.
 3. `get_client()` resolves the credential from `api_key_env`, points litellm
    at `api_base` (or `OPENAI_BASE_URL`), and picks Instructor's JSON or
    TOOLS mode from `model_supports_tools`.
 4. The model returns an `AgentResponse`; a `success` intent runs the
    business-rule validator and the blob mixin, then returns the typed value.
 5. A composite workflow step loops over atomic children, feeds gaps back into
-   refinement steps, and returns the final typed result.
+   refinement steps, and returns the final typed result. Its children share the
+   session and its conversation; a child session created with `spawn` gets a
+   clean context.
 
 ## Decisions
 
@@ -80,6 +126,7 @@ is an atomic or composite workflow step. Further vocabulary:
 |---|---|---|
 | Cloudflare AI Gateway is the eval/CI provider | Direct OpenRouter/OpenCode keys per repo | R5: one credential, failover, analytics |
 | Instructor JSON mode by default | Forced tool calling | R5: DeepSeek V4 thinking mode rejects forced `tool_choice` |
+| Agent sampling keeps the provider default | An explicit `temperature=0.7` | Measured: 0.7 made the tuned model emit its reasoning as JSON across the eval suite; the default is stochastic and compliant |
 | `unittest` for the eval harness | pytest | Evals need module discovery and a wall-clock timeout wrapper |
 | Pyrefly with a both-direction baseline lock | basedpyright, mypy | A large existing codebase; the lock catches new and stale diagnostics |
 | No server or database | Web service | The library runs in the caller's process |

@@ -8,6 +8,7 @@ import typer
 from chat_workflow.config import Config
 from chat_workflow.exceptions import AtomicWorkflowStepFailedError, TurnLimitExceededError
 from chat_workflow.session import Session
+from chat_workflow.session_component import SessionComponent
 from chat_workflow.session_log import SessionLog
 from chat_workflow.session_logging import log_session
 
@@ -52,8 +53,15 @@ class WorkflowRunner:
                 typer.secho(f"\nFailed to log session: {log_err}", fg=typer.colors.YELLOW)
 
         try:
-            user_params["session"] = session
-            result = func(**user_params)
+            user_params.pop("session", None)
+
+            def run_step(*, session: Session) -> Any:
+                return func(**user_params, session=session)
+
+            # The closure hides the step's chat flag; carry it so a chat-off
+            # top-level step is not greeted or closed.
+            run_step._chat = getattr(func, "_chat", True)  # type: ignore[attr-defined]
+            result = SessionComponent().converse(run_step, session=session)
             if result is not None:
                 _log_and_exit(result_dict=result.model_dump(), default_success=True)
             else:

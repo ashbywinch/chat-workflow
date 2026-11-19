@@ -24,7 +24,7 @@ class Deliverable(LLMValidated):
     _validation_rules: ClassVar[list[str]] = [
         "The quality check is one someone can apply when the thing is "
         "produced — not an after-the-fact outcome like 'no one complains' or "
-        "'everyone is happy', and not just its shape.",
+        "'everyone is happy', and not just what it looks like.",
         "What happens to it next says who receives it and what they do with "
         "it, or that it stays with the user and is not handed on. Where it is "
         "kept says where. Neither restates what it contains.",
@@ -114,7 +114,7 @@ class Deliverable(LLMValidated):
     ) -> list[Deliverable]:
         """Describe the one thing the user makes.
 
-    Open with a short greeting and the question "What do you make?"; do not name the thing before they do. Then reflect back what they said and propose what it looks like and what it holds. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), propose its standard shape in that same turn, before asking anything else. Ask only for what is still missing or uncertain, once each.
+    The conversation has already opened. In your first turn ask "What do you make?"; do not greet again and do not name the thing before they do. Then reflect back what they said and propose what it looks like and what it holds. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), propose what it usually looks like in that same turn, before asking anything else. Ask only for what is still missing or uncertain, once each.
 
     Ask for a check they can apply the moment the thing exists, not an outcome: "Every action item has an owner and a due date", not "Everyone is happy". If they give an outcome, propose a concrete check from your domain knowledge and ask them to confirm. Keep the user's own words for a check: if they say "10 minutes of standing", say that, not the standard cooking term for it.
 

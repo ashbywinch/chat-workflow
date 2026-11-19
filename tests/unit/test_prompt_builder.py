@@ -47,7 +47,7 @@ class TestBuildParamsSection(unittest.TestCase):
 
 
 class TestBuildSystemPrompt(unittest.TestCase):
-    def test_includes_task_checklist_and_object_rules(self):
+    def test_includes_procedure_checklist_and_object_rules(self):
         prompt = _build_system_prompt(
             example_workflow,
             {"inner": InnerShape(name="x"), "max_turns": 3},
@@ -56,10 +56,28 @@ class TestBuildSystemPrompt(unittest.TestCase):
             chat=True,
         )
 
-        self.assertIn("## Task", prompt)
-        self.assertIn("InnerShape", prompt)
+        self.assertIn("Do the example task.", prompt)
         self.assertIn("## Conversation checklist", prompt)
         self.assertIn("No repetition", prompt)
+        self.assertNotIn("## Task", prompt)
+
+    def test_session_instructions_come_first(self):
+        prompt = _build_system_prompt(
+            example_workflow,
+            {"inner": InnerShape(name="x"), "max_turns": 3},
+            return_type=InnerShape,
+            conversation_rules={"No repetition": "Do not repeat."},
+            chat=True,
+            instructions="Hold one conversation about the user's work.",
+        )
+
+        self.assertTrue(
+            prompt.startswith("Hold one conversation about the user's work.")
+        )
+        self.assertLess(
+            prompt.index("Hold one conversation"),
+            prompt.index("Do the example task."),
+        )
 
     def test_chat_off_omits_conversation_checklist(self):
         prompt = _build_system_prompt(
@@ -70,33 +88,43 @@ class TestBuildSystemPrompt(unittest.TestCase):
             chat=False,
         )
 
-        self.assertIn("## Task", prompt)
+        self.assertIn("Do the example task.", prompt)
         self.assertNotIn("## Conversation checklist", prompt)
+        self.assertNotIn("## Task", prompt)
 
 
-class TestChatTaskSection(unittest.TestCase):
-    """The Task section states the protocol; the checklist states the rules."""
+class TestNoProtocolText(unittest.TestCase):
+    """The schema owns the protocol; an authored prompt never restates it."""
 
-    def task(self) -> str:
-        from chat_workflow.decorators import _build_task_section
+    def test_prompt_does_not_state_the_response_protocol(self):
+        prompt = _build_system_prompt(
+            example_workflow,
+            {"inner": InnerShape(name="x"), "max_turns": 3},
+            return_type=InnerShape,
+            conversation_rules={"No repetition": "Do not repeat."},
+            chat=True,
+        )
 
-        return _build_task_section(InnerShape, chat=True)
+        lowered = prompt.lower()
+        for phrase in (
+            "return json",
+            "put the user-facing text in `message`",
+            "never reply with plain text",
+            "set `intent`",
+        ):
+            self.assertNotIn(phrase, lowered)
 
-    def test_answering_comes_before_success(self):
-        """A success turn carries no message, so the answer is its own turn."""
-        task = self.task()
+    def test_vocabulary_section_does_not_name_the_message_field(self):
+        from chat_workflow.decorators import _build_user_vocabulary_section
 
-        self.assertIn("answer it in a continue turn", task)
-        self.assertIn("after their next turn", task)
-        self.assertNotIn("then return the result in the same response", task)
+        section = _build_user_vocabulary_section(
+            InnerShape,
+            (),
+            {"inner": "The inner shape"},
+        )
 
-    def test_rules_are_not_restated(self):
-        """Each conversation rule has one statement: the checklist."""
-        task = self.task()
-
-        self.assertNotIn("Ask each question once", task)
-        self.assertNotIn("thinking partner", task.lower())
-        self.assertNotIn("Your input parameters", task)
+        self.assertIn("## Use the user's words", section)
+        self.assertNotIn("`message`", section)
 
 
 class TestValidationSchema(unittest.TestCase):

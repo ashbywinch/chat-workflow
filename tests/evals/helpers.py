@@ -13,7 +13,7 @@ from typing import Any
 import litellm
 from pydantic import BaseModel, Field
 
-from chat_workflow import Config, Session, SessionLog
+from chat_workflow import Config, Session, SessionComponent, SessionLog
 from chat_workflow.conversation_rules import NO_REPETITION
 
 
@@ -328,33 +328,17 @@ def _jsonable(value: Any) -> Any:
     return repr(value)
 
 
-def format_transcript(
+def _render_session(
     session: Session,
-    result: Any = None,
     *,
-    audience: str | None = None,
-    given: dict[str, Any] | None = None,
-) -> str:
-    """Render the canonical event log as text.
-
-    ``audience="user"`` keeps only the entries the user saw: their turns, the
-    assistant's replies, and anything the harness echoed to the screen.
-    Corrections, validation feedback and the result JSON are internal, so they
-    stay out — a proofreader must not see text the user never saw. ``None``
-    keeps everything, for the audit view.
-
-    The audience is recorded on each event, so the projection is a property of
-    the data rather than of who is asking for it.
-
-    ``given`` is the non-session context the method already received (the
-    inputs from earlier phases). The judge needs it to tell "you already told
-    me" apart from "you said nothing"; it is rendered before the turns.
-
-    Sessions created before the event log (or tests that append directly to
-    ``messages``) fall back to the message-based rendering.
-    """
+    audience: str | None,
+    given: dict[str, Any] | None,
+    result: Any,
+    is_root: bool,
+) -> list[str]:
+    """Render one session, inlining its children where they were spawned."""
     parts: list[str] = []
-    if given:
+    if is_root and given:
         parts.append(
             "[given]\n"
             "Context the user already provided in earlier phases. It is "
@@ -367,6 +351,19 @@ def format_transcript(
 
     if events:
         for event in events:
+            if event.kind == "child_session":
+                child = session.child(str(event.meta.get("session", "")))
+                if child is not None:
+                    parts.extend(
+                        _render_session(
+                            child,
+                            audience=audience,
+                            given=None,
+                            result=child.state.final_result,
+                            is_root=False,
+                        )
+                    )
+                continue
             if event.type == "result":
                 has_result = True
                 continue
@@ -411,7 +408,45 @@ def format_transcript(
             )
             parts.append(f"[structured-result]\n{rendered}")
 
-    return "\n---\n".join(parts)
+    return parts
+
+
+def format_transcript(
+    session: Session,
+    result: Any = None,
+    *,
+    audience: str | None = None,
+    given: dict[str, Any] | None = None,
+) -> str:
+    """Render the canonical event log of a session tree as text.
+
+    ``audience="user"`` keeps only the entries the user saw: their turns, the
+    assistant's replies, and anything the harness echoed to the screen.
+    Corrections, validation feedback and the result JSON are internal, so they
+    stay out — a proofreader must not see text the user never saw. ``None``
+    keeps everything, for the audit view.
+
+    The audience is recorded on each event, so the projection is a property of
+    the data rather than of who is asking for it.
+
+    ``given`` is the non-session context the method already received (the
+    inputs from earlier phases). The judge needs it to tell "you already told
+    me" apart from "you said nothing"; it is rendered before the turns.
+
+    A child session is rendered where its parent spawned it, so the transcript
+    is the whole tree the user saw. Sessions created before the event log (or
+    tests that append directly to ``messages``) fall back to the message-based
+    rendering.
+    """
+    return "\n---\n".join(
+        _render_session(
+            session,
+            audience=audience,
+            given=given,
+            result=result,
+            is_root=True,
+        )
+    )
 
 
 def _has_conversation(session: Session) -> bool:
@@ -487,6 +522,24 @@ def _messages_as_events(session: Session) -> list[dict[str, Any]]:
     return events
 
 
+def _session_events(session: Session) -> list[dict[str, Any]]:
+    """Flatten the event log of a session tree, tagging each entry's session."""
+    events: list[dict[str, Any]] = []
+    for item in session.walk():
+        if getattr(item.state, "events", None):
+            source = [event.to_dict() for event in item.state.events]
+        elif item is session:
+            source = _messages_as_events(item)
+        else:
+            source = []
+        for event in source:
+            event["session"] = item.id
+            if item.title:
+                event["title"] = item.title
+            events.append(event)
+    return events
+
+
 @contextmanager
 def capture_on_failure(
     session: Session,
@@ -516,9 +569,7 @@ def capture_on_failure(
             status="judge_failed" if judge_result is not None else "error",
             transcript=transcript,
             events=(
-                [event.to_dict() for event in session.state.events]
-                if getattr(session.state, "events", None)
-                else _messages_as_events(session)
+                _session_events(session)
             ),
             result=_jsonable(result),
             judge=judge_result.model_dump(mode="json") if judge_result else None,
@@ -586,7 +637,8 @@ def run_multi_turn_eval(
 
     Args:
         model_method: The @atomic_workflow_step or @composite_workflow_step classmethod to test
-        method_kwargs: Keyword args to pass to model_method (must include session)
+        method_kwargs: Keyword args to pass to model_method. The harness creates
+            the root session and wraps the step in a SessionComponent.
         user_persona: Persona prompt for the AgentIO user bot
         judge_rules: Dict mapping rule labels to descriptions.
             Defaults to DEFAULT_JUDGE_RULES.
@@ -609,13 +661,15 @@ def run_multi_turn_eval(
     # Create session — state.messages records the conversation
     session = make_tools(user_bot, config=config)
 
-    # Inject session into method_kwargs if not present
-    kwargs = dict(method_kwargs)
-    kwargs.setdefault("session", session)
+    # The harness owns the root session and passes it to the step; a session
+    # in method_kwargs belongs to a prebuilt harness, not to this run.
+    kwargs = {
+        key: value for key, value in method_kwargs.items() if key != "session"
+    }
     given = {
         key: value
         for key, value in kwargs.items()
-        if key not in ("session", "max_turns") and value is not None
+        if key != "max_turns" and value is not None
     }
 
     # Auto-detect unittest test method name from call stack if not provided.
@@ -631,8 +685,23 @@ def run_multi_turn_eval(
             test_name = model_method.__name__
 
     started_at = time.time()
+
+    def run_step(*, session: Session) -> Any:
+        return model_method(**kwargs, session=session)
+
+    # The closure hides the step's chat flag; carry it so a chat-off top-level
+    # step is not greeted or closed.
+    run_step._chat = getattr(model_method, "_chat", True)  # type: ignore[attr-defined]
+
     try:
-        result = model_method(**kwargs)
+        # The harness wraps a real workflow step in a session: greet, run, sign
+        # off. A plain callable is a harness test double, not a workflow step;
+        # wrapping it would need a provider and would test the fake, not the
+        # harness.
+        if getattr(model_method, "_is_workflow_step", False):
+            result = SessionComponent().converse(run_step, session=session)
+        else:
+            result = run_step(session=session)
     except BaseException as exc:
         with capture_on_failure(
             session,

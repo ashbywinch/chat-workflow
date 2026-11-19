@@ -96,6 +96,43 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
         self.assertIn("at least one public method", str(ctx.exception))
 
 
+class TestSessionPromptPlacement(unittest.TestCase):
+    """The framework supplies the session wrapper; generated steps follow it."""
+
+    class _DeterministicOnly(ComponentSourceCode):
+        _skip_llm_validation = True
+
+    def test_protocol_text_in_a_step_docstring_is_rejected(self):
+        from chat_workflow.exceptions import ValidationError
+
+        code = VALID_COMPONENT_CODE.replace(
+            "When you have enough, show the draft once and ask if it is right.",
+            "Return JSON with intent and result.",
+        )
+        with self.assertRaises(ValidationError) as ctx:
+            self._DeterministicOnly(code=code)
+
+        self.assertIn("response protocol", str(ctx.exception))
+
+    def test_a_generated_session_component_is_rejected(self):
+        from chat_workflow.exceptions import ValidationError
+
+        code = VALID_COMPONENT_CODE + "\n\nclass SessionComponent:\n    pass\n"
+        with self.assertRaises(ValidationError) as ctx:
+            self._DeterministicOnly(code=code)
+
+        self.assertIn("must not define a SessionComponent", str(ctx.exception))
+
+    def test_a_generated_greeting_step_is_rejected(self):
+        from chat_workflow.exceptions import ValidationError
+
+        code = VALID_COMPONENT_CODE.replace("def create(", "def greet(")
+        with self.assertRaises(ValidationError) as ctx:
+            self._DeterministicOnly(code=code)
+
+        self.assertIn("greeting or closing", str(ctx.exception))
+
+
 class TestPrimaryArtifactRule(unittest.TestCase):
     """One primary artifact; nested BaseModels are allowed when used as fields."""
 

@@ -40,9 +40,11 @@ class Component(LLMValidated):
         "the owner_role; it is not a generic role ('MinutesDraft Expert' is "
         "vague; 'Meeting Minutes Administrator' is better).",
         "The owner_role is the capacity the artifact belongs to — the role "
-        "whose job includes it, which may be the user. 'Owner' only when the "
-        "artifact is the owner's own work; not the person who supplies the "
-        "input unless they are accountable.",
+        "whose job includes it, which may be the user. When the user does the "
+        "work end to end, their own answer ('me', 'I', 'myself') is the "
+        "capacity and is accepted; do not demand a job title. 'Owner' only "
+        "when the artifact is the owner's own work; not the person who "
+        "supplies the input unless they are accountable.",
         # Tier 1 — Core Structural Integrity
         "Single Artifact Type Rule: The component owns exactly one artifact — "
         "the set of data members of the model it defines. The purpose must "

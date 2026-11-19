@@ -32,12 +32,14 @@ class GapAnalysis(LLMValidated):
     """Analysis of missing elements, gaps, and recommendations."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "The things that are missing name specific domain concepts from the "
-        "user's work, not generic labels (e.g. 'InvoiceManager', not "
-        "'missing part').",
-        "The next steps are concrete and actionable, not vague suggestions "
-        "(e.g. 'Create an InvoiceManager part with its inputs and outputs', "
-        "not 'address the gap').",
+        "Where something is missing, it names a specific domain concept from "
+        "the user's work, not a generic label (e.g. 'InvoiceManager', not "
+        "'missing part'). When nothing is missing, the lists are empty and "
+        "that is valid.",
+        "The next steps, when there are gaps, are concrete and actionable, not "
+        "vague suggestions (e.g. 'Create an InvoiceManager part with its inputs "
+        "and outputs', not 'address the gap'). When nothing is missing, the "
+        "recommendations list is empty and that is valid.",
     ]
 
     missing_components: Annotated[

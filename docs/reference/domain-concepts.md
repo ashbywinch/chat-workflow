@@ -129,11 +129,21 @@ workflow spec lists the component specs that will define them.
 
 ## Session
 
-**What it is:** The runtime context passed to every workflow step. A session wraps three things: IO (how to talk to the user), state log (accumulated conversation history across all turns), and config (provider, model, timeout). It persists for the lifetime of a single CLI invocation.
+**What it is:** One conversation. A session wraps IO (how to talk to the user), its own state log (the messages and audit events of that conversation), and config (provider, model, timeout). A session may create child sessions: a meeting inside a conversation is the same concept at a deeper level. A child starts with clean context and receives its brief as parameters; it does not inherit the parent's messages. The tree of sessions is the whole the user saw.
 
-**Broadly known as:** *Session* is widely used (OpenAI SDK, Microsoft Agent Framework, Agent Client Protocol). It represents durable, multi-turn state that survives individual LLM calls. Other frameworks call the same concept *runtime context* or *invocation context*.
+**Broadly known as:** *Session* is widely used (OpenAI SDK, Microsoft Agent Framework, Agent Client Protocol). It represents durable, multi-turn state that survives individual LLM calls. Other frameworks call the same concept *runtime context* or *invocation context*; the recursive child session is their *sub-session* or *nested run*.
 
-**In the code:** `Session` (class), `SessionLog` (the accumulated transcript), injected as the `session` parameter in workflow steps.
+**Not:** A second message store. The conversation stays in `SessionLog.messages`; `Session` is the context that owns it. A child session is not a different class.
+
+**In the code:** `Session` (class), `SessionLog` (that session's transcript), `Session.spawn()` (a clean child), injected as the `session` parameter in workflow steps.
+
+## Session Component
+
+**What it is:** The behaviour that runs a session: it greets once, runs a step, and signs off. It is stateless and wraps any session at any depth. It owns the conversation's opening and closing so an individual workflow step never has to.
+
+**Broadly known as:** the *agent harness* or *conversation shell* around a step. Other frameworks put the greeting and closing in a runtime layer rather than in each task.
+
+**In the code:** `SessionComponent` (class), `greet`, `converse(step)`, `sign_off`.
 
 ## Agent Response
 
@@ -154,7 +164,8 @@ workflow spec lists the component specs that will define them.
 ## How These Fit Together
 
 ```
-Session (one CLI invocation)
+Session (one conversation; may spawn child sessions)
+  ├── SessionComponent (greet, run, sign off)
   └── Workflow
         └── Component (one artifact)
               ├── Atomic Workflow Step       ← has its own turn loop
@@ -165,7 +176,7 @@ Session (one CLI invocation)
                     └── (steps on this or other components)
 ```
 
-The outer container is a **Session** (one user session). Inside it, a **Workflow** is made of **Components**; each component owns one artifact and the workflow steps that produce and change it. An **Atomic Workflow Step** runs a **turn** loop until the LLM returns an **Agent Response** with `intent=SUCCESS` or `intent=FAILURE`. A **Composite Workflow Step** runs other steps. Each response is wrapped in a **Turn Result** and recorded in the session's log.
+The outer container is a **Session** (one conversation). A **SessionComponent** runs it: it greets, runs the workflow, and signs off. Inside it, a **Workflow** is made of **Components**; each component owns one artifact and the workflow steps that produce and change it. An **Atomic Workflow Step** runs a **turn** loop until the LLM returns an **Agent Response** with `intent=SUCCESS` or `intent=FAILURE`. A **Composite Workflow Step** runs other steps. Each response is wrapped in a **Turn Result** and recorded in the session's log. A step that routes to a meeting calls `Session.spawn()` and runs the child session's step through the same `SessionComponent`.
 
 ## Blob Field
 

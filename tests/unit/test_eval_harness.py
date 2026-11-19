@@ -327,6 +327,20 @@ class TestStructuredTranscript(unittest.TestCase):
         self.assertNotIn("intent", judge_text)
         self.assertIn("[framework]", human_text)
 
+    def test_a_child_session_is_rendered_where_it_was_spawned(self):
+        """The judge reads the whole tree, not just the root's messages."""
+        root = Session(io=self._FakeIO(), state=SessionLog())
+        root.state.record("user", "hello")
+        child = root.spawn(title="Meeting")
+        child.state.record("user", "in the meeting")
+        child.state.record("assistant", "noted")
+
+        text = format_transcript(root, audience="user")
+
+        self.assertIn("hello", text)
+        self.assertIn("in the meeting", text)
+        self.assertLess(text.index("hello"), text.index("in the meeting"))
+
     def test_record_json_contains_events_result_and_verdicts(self):
         session = self._session()
         verdict = JudgeResult(

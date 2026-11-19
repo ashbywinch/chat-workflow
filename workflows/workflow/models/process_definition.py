@@ -98,7 +98,7 @@ def _gather_notes(
 ) -> str:
     """Collect the user's description of how their work happens.
 
-Greet them, say what you are doing, and ask "What do you do?". If the description parameter already holds their answer,
+The conversation has already opened; do not greet again. Say what you are doing and ask "What do you do?". If the description parameter already holds their answer,
 start from it instead: it is what they already told you, so use it and ask only for what it leaves out.
 
 Listen, and let them talk. Ask at most one follow-up — "Is there anything else?" — then return what they told you, in

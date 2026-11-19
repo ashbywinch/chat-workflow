@@ -36,7 +36,7 @@ class MinutesDraft(LLMValidated):
         implied.
 
         When you have enough, show the draft once and ask if it is right. On
-        confirmation, return success.
+        confirmation, finish.
         """
         ...
 '''
@@ -172,7 +172,7 @@ class MeetingMinutes(LLMValidated):
         """You help someone turn sketchy notes into minutes. Start from what
         they already told you; ask only for what is missing. When you have
         enough, show the draft once and ask if it is right. On confirmation,
-        return success."""
+        finish."""
         ...
 '''
 
@@ -339,14 +339,14 @@ class MeetingMinutes(LLMValidated):
     @classmethod
     def create(cls) -> MeetingMinutes:
         """You help someone draft minutes. Ask what was decided, show the
-        draft once, and return success on confirmation."""
+        draft once, and finish on confirmation."""
         ...
 
     @atomic_workflow_step
     @classmethod
     def update(cls, minutes: MeetingMinutes) -> MeetingMinutes:
         """You help someone correct existing minutes. Ask what should change,
-        show the result once, and return success on confirmation."""
+        show the result once, and finish on confirmation."""
         ...
 '''
 
@@ -383,21 +383,21 @@ class MeetingMinutes(LLMValidated):
     @classmethod
     def create(cls) -> MeetingMinutes:
         """You help someone draft minutes. Ask what was decided, show the
-        draft once, and return success on confirmation."""
+        draft once, and finish on confirmation."""
         ...
 
     @atomic_workflow_step
     @classmethod
     def update(cls, minutes: MeetingMinutes) -> MeetingMinutes:
         """You help someone correct existing minutes. Ask what should change,
-        show the result once, and return success on confirmation."""
+        show the result once, and finish on confirmation."""
         ...
 
     @atomic_workflow_step
     @classmethod
     def summarize_revision(cls) -> RevisionSummary:
         """You help someone describe what a revision changed. Ask what
-        changed, then return success."""
+        changed, then finish."""
         ...
 '''
 
@@ -437,6 +437,6 @@ class MinutesDraft(LLMValidated):
     @classmethod
     def create(cls) -> MinutesDraft:
         """You help someone draft minutes. Ask what was decided, show the
-        draft once, and return success on confirmation."""
+        draft once, and finish on confirmation."""
         ...
 '''

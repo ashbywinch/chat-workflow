@@ -1,9 +1,9 @@
 {
  "errors": [
   {
-   "line": 73,
+   "line": 74,
    "column": 85,
-   "stop_line": 73,
+   "stop_line": 74,
    "stop_column": 103,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -13,9 +13,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 75,
    "column": 84,
-   "stop_line": 74,
+   "stop_line": 75,
    "stop_column": 101,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -25,9 +25,9 @@
    "severity": "error"
   },
   {
-   "line": 75,
+   "line": 76,
    "column": 74,
-   "stop_line": 75,
+   "stop_line": 76,
    "stop_column": 91,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -37,9 +37,9 @@
    "severity": "error"
   },
   {
-   "line": 146,
+   "line": 167,
    "column": 13,
-   "stop_line": 146,
+   "stop_line": 167,
    "stop_column": 26,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 146,
+   "line": 167,
    "column": 32,
-   "stop_line": 146,
+   "stop_line": 167,
    "stop_column": 45,
    "path": "chat_workflow/atomic_workflow_step.py",
    "code": -2,
@@ -61,9 +61,9 @@
    "severity": "error"
   },
   {
-   "line": 231,
+   "line": 188,
    "column": 17,
-   "stop_line": 231,
+   "stop_line": 188,
    "stop_column": 32,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -73,9 +73,9 @@
    "severity": "error"
   },
   {
-   "line": 307,
+   "line": 271,
    "column": 32,
-   "stop_line": 307,
+   "stop_line": 271,
    "stop_column": 50,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -85,9 +85,9 @@
    "severity": "error"
   },
   {
-   "line": 319,
+   "line": 285,
    "column": 9,
-   "stop_line": 319,
+   "stop_line": 285,
    "stop_column": 34,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -97,9 +97,9 @@
    "severity": "error"
   },
   {
-   "line": 320,
+   "line": 286,
    "column": 9,
-   "stop_line": 320,
+   "stop_line": 286,
    "stop_column": 22,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -109,9 +109,21 @@
    "severity": "error"
   },
   {
-   "line": 321,
+   "line": 287,
    "column": 9,
-   "stop_line": 321,
+   "stop_line": 287,
+   "stop_column": 29,
+   "path": "chat_workflow/decorators.py",
+   "code": -2,
+   "name": "missing-attribute",
+   "description": "Object of class `FunctionType` has no attribute `_single_turn`",
+   "concise_description": "Object of class `FunctionType` has no attribute `_single_turn`",
+   "severity": "error"
+  },
+  {
+   "line": 288,
+   "column": 9,
+   "stop_line": 288,
    "stop_column": 39,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -121,9 +133,9 @@
    "severity": "error"
   },
   {
-   "line": 348,
+   "line": 315,
    "column": 5,
-   "stop_line": 348,
+   "stop_line": 315,
    "stop_column": 30,
    "path": "chat_workflow/decorators.py",
    "code": -2,
@@ -812,8 +824,8 @@
    "path": "tests/unit/test_eval_harness.py",
    "code": -2,
    "name": "bad-argument-type",
-   "description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
-   "concise_description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
+   "description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['child_session', 'composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
+   "concise_description": "Argument `Literal['repetition_correction']` is not assignable to parameter `kind` with type `Literal['child_session', 'composite_echo', 'composite_prompt', 'provider_retry', 'rejected_response', 'repaired_escape', 'validation_correction'] | None` in function `chat_workflow.session_log.TranscriptEvent.__init__`",
    "severity": "error"
   },
   {

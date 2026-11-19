@@ -22,6 +22,10 @@ class AtomicWorkflowStepConfig(Generic[TResult]):
     on_failure: Callable[[AgentResponse[TResult]], Exception] | None = None
     conversation_validation_rules: dict[str, str] | None = None
     chat: bool = True
+    # A one-turn text step: a continue message is the result, and the step
+    # completes without asking the user. Used by the session's greeting and
+    # closing, which have no conversation of their own.
+    single_turn: bool = False
     debug: StreamingDebug | None = None
     model: str = "default-model"
     provider: ProviderType = "openrouter"

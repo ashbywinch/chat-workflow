@@ -83,21 +83,19 @@ def weekly_menu_deliverable() -> Deliverable:
     """What a restaurant kitchen produces: a menu for one week."""
     return Deliverable(
         name="Weekly Menu",
-        description=(
-            "The restaurant's menu for one week, with each dish and the station "
-            "that prepares it."
-        ),
+        description=None,
         consumer="The kitchen team and diners",
         format="A printed menu and a kitchen prep sheet",
         success_criteria=(
-            "Every day of the week has a menu, each dish lists its ingredients, "
-            "and each dish names the station that prepares it."
+            "Before the menu is printed, every day of the week has an entry, "
+            "every dish lists its ingredients, and every dish names the station "
+            "that prepares it."
         ),
         integration_points=(
-            "The chefs use it to prepare dishes; a printed copy goes to front "
-            "of house for guest questions."
+            "The kitchen team receives it to prepare the dishes; front of house "
+            "receives a printed copy to answer guest questions."
         ),
-        storage_requirements="Kitchen binder and the shared drive",
+        storage_requirements="Kept in the kitchen binder and on the shared drive.",
     )
 
 
@@ -105,7 +103,7 @@ def meal_planning_analysis() -> ProcessDefinition:
     return ProcessDefinition(
         phases=["Planning", "Shopping", "Cooking"],
         activities=["Plan meals", "Shop", "Cook", "Review"],
-        orchestrating_component="Meal Planner",
+        orchestrating_component="Home Cook",
         participants=["Cook", "Family Members"],
     )
 

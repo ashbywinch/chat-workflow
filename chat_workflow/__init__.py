@@ -19,6 +19,7 @@ from .interactive_entity import InteractiveEntity
 from .llm_interaction import get_client, list_available_providers
 from .models import AgentIntent, AgentResponse, TurnResult
 from .session import Session
+from .session_component import SessionComponent
 from .session_log import SessionLog
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "ProviderNotFoundError",
     "ProviderNotSupportedError",
     "Session",
+    "SessionComponent",
     "SessionLog",
     "StreamingDebug",
     "TurnLimitExceededError",

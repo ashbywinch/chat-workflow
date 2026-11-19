@@ -46,6 +46,7 @@ repo_context_files = [
     "docs/documentation-structure.md",
     "docs/ux-standards.md",
     "docs/UX.md",
+    "docs/workflow-authors/workflow-author-guide.md",
 ]
 
 [pr_reviewer]

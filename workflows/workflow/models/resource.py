@@ -24,12 +24,11 @@ class Resource(LLMValidated):
 
     _validation_rules: ClassVar[list[str]] = [
         "Where it comes from names a person or group of people, a system, a "
-        "document, or a place; its "
-        "shape is described separately. A person or group is a valid origin "
-        "(for example 'The organizer' with shape 'meeting agenda'). If the "
-        "thing is itself the material (for example handwritten notes), its "
-        "shape must describe the same kind of material, not a contradictory "
-        "one such as a database.",
+        "document, or a place; what it looks like is described separately. A "
+        "person or group is a valid origin (for example 'The organizer' with "
+        "'meeting agenda'). If the thing is itself the material (for example "
+        "handwritten notes), what it looks like must describe the same kind of "
+        "material, not a contradictory one such as a database.",
         "The check is one the user can apply to the finished thing — it says "
         "what must be there, not how they gather it, and not an after-the-fact "
         "outcome like 'no one complains'.",
@@ -48,7 +47,7 @@ class Resource(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "Its exact shape when it exists (e.g. 'handwritten list', 'CSV "
+            "What it looks like when it exists (e.g. 'handwritten list', 'CSV "
             "export', 'email thread'), not the action used to gather it"
         ),
         min_length=1,
@@ -90,14 +89,14 @@ class Resource(LLMValidated):
     ) -> list[Resource]:
         """List what the user starts with before they make the thing they make.
 
-    Open with one sentence on what you are doing, name the output from `deliverables`, and propose the things people
+    The conversation has already opened; do not greet again. In your first turn, name the thing they make from `deliverables`, and propose the things people
     usually start with for that kind of work; ask which of them they have.
 
     For each one, in the user's words:
-    - where it comes from: a person, place, system, or document, not the act of getting it ("The fridge and freezer",
-    not "Looking in the fridge"). If they know it from experience, the source is the person (them), and its shape says
-    it is in their head; never make the experience itself the source;
-    - what it looks like when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
+    - where it comes from: ask which person, place, system, or document it comes from, not the act of getting it ("The fridge and freezer",
+    not "Looking in the fridge"). If they know it from experience, it comes from them, and what form it takes is
+    "in their head"; never make the experience itself where it comes from;
+    - what form it takes when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
     feedback", not "Chatting to the sous");
     - what it needs first, if anything;
     - the check they apply: something true of the finished thing, not
@@ -110,14 +109,14 @@ class Resource(LLMValidated):
     answer with a state of mind or an outcome, propose the concrete check
     yourself and ask them to confirm it.
 
-    Work through one at a time: propose its shape and check, ask the user to confirm or correct, and only then move to
+    Work through one at a time: propose what it looks like and the check, ask the user to confirm or correct, and only then move to
     the next. When they name one, accept it; do not read back a longer list of alternatives. Do not put checks for
-    several in one message. Raw notes, and anything the user trusts as sent, still get a
-    minimal check on the thing itself; do not ask how they know their own notes are complete. If they have only one, do
+    several in one message. Raw notes, and anything the user trusts as sent, need no completeness
+    question: they are whatever the person wrote. Accept them and move on. If they have only one, do
     not ask for more.
 
-    Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply. When
-    they confirm the set, return it without summarising it again.
+    Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply and end
+    the reply with it — do not ask a question in that reply. When they confirm the set, return it without summarising it again.
 
     Describe each in the user's words. Say "what you start with". Stay at the
     level of what they start with, not its contents: if they describe their

@@ -38,9 +38,18 @@ def _matches_known(path: str, known: set[str]) -> bool:
         name_words = name.split()
         if words == name_words:
             return True
-        # A shortened party keeps at least two words; one generic word is not
-        # a participant, even when it starts a record phrase.
+        # A shortened party keeps at least two words when it is a prefix of
+        # the record phrase.
         if len(words) >= 2 and name_words[: len(words)] == words:
+            return True
+        # A single head noun may shorten the phrase: "Team" for "My team",
+        # "Attendees" for "Meeting attendees". Generic words are not parties.
+        if (
+            len(words) == 1
+            and words[0] not in {"you", "i", "we", "they", "user", "system", "actor"}
+            and name_words
+            and name_words[-1] == words[0]
+        ):
             return True
     return False
 
@@ -107,7 +116,7 @@ def _validate_diagram_structure(
             "or may not happen."
         )
     for _, _, message in arrows:
-        if len(message) > 40 and "<br/>" not in message:
+        if len(message) > 60 and "<br/>" not in message:
             raise ValidationError(
                 f"The message '{message[:60]}' is long; split it with `<br/>` "
                 "at a natural break."
@@ -131,7 +140,22 @@ def _validate_diagram_structure(
             )
 
     pairs = {(source, target) for source, target, _ in arrows}
-    if len(participants) > 1 and not any((target, source) in pairs for source, target, _ in arrows):
+    consumers = {_normalise_name(output.consumer) for output in outputs}
+    consumer_aliases = {
+        alias
+        for alias, label in participants.items()
+        if any(
+            _matches_known(label.split(":", 1)[0].strip(), {consumer})
+            for consumer in consumers
+        )
+    }
+    # A consumer receives the outcome; it is not a participant that exchanges
+    # work with the component. A solo process plus its consumer needs no
+    # artificial return arrow; a return flow is required only when more than
+    # one work-exchanging participant remains.
+    if len(set(participants) - consumer_aliases) > 1 and not any(
+        (target, source) in pairs for source, target, _ in arrows
+    ):
         raise ValidationError(
             "With more than one participant, the diagram needs a return flow: "
             "an arrow back to a participant who sent work earlier."
@@ -142,7 +166,6 @@ def _validate_diagram_structure(
             "The last message is a self-loop. Send the outcome to the "
             "participant who receives the work, not back to the same one."
         )
-    consumers = {_normalise_name(output.consumer) for output in outputs}
     target_path = participants[target].split(":", 1)[0].strip()
     if consumers and any(
         _matches_known(target_path, {consumer}) for consumer in consumers
@@ -330,16 +353,26 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
           do not substitute a synonym. The work is the component's own step,
           the outcome goes to that consumer, and the return flow comes back to
           the component.
-        - Use `alt` with an `else` branch for a choice between paths, or `opt`
-          for a step that may or may not happen; an `opt` needs no else branch.
-          Show the return flow as an arrow back to a participant who sent work
-          earlier. A business role may be a participant,
+        - Show a decision point: use `alt` with an `else` branch for a choice
+          between paths, or `opt` for a step that may or may not happen; an
+          `opt` needs no else branch. If the description names no explicit
+          choice, use an `opt` for a step the work implies could be skipped —
+          a review, a correction, or an action item that may be absent — and
+          say so in the user's words.
+        - With more than one participant, show the return flow: an arrow back
+          from the participant who received work to the one who sent it. When
+          the second participant is the output's consumer, show their
+          acknowledgement or feedback back to the component before the final
+          send. A business role may be a participant,
           but do not give it a flow unless a component owns that activity; if
           no component owns the acknowledgement, show it as a step of the
           component that owns the artifact.
         - Use `<br/>` to split any long message across lines.
         - Show the entry point, every activity from the analysis, and a clear
-          outcome.
+          outcome. End with the outcome: the last arrow sends the finished
+          artifact from the component that produced it to the output's
+          consumer, copied from `outputs`. A `Note` is not a message and does
+          not count as the outcome, and the last arrow must not be a self-loop.
 
         Record:
         - Copy names, purposes, scopes, and component types unchanged. Do not

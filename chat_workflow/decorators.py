@@ -21,16 +21,6 @@ from .prompt_builder import (
 from .types_meta import resolve_return_type
 
 
-def _return_type_name(return_type: Any) -> str:
-    """Render a return type for the task section (handles list[Model])."""
-    origin = get_origin(return_type)
-    if origin is list:
-        args = get_args(return_type)
-        if args:
-            return f"list[{_return_type_name(args[0])}]"
-    return getattr(return_type, "__name__", str(return_type))
-
-
 def _inner_model(return_type: Any) -> Any:
     """Return the result model behind a return type, unwrapping list[Model]."""
     origin = get_origin(return_type)
@@ -39,48 +29,6 @@ def _inner_model(return_type: Any) -> Any:
         if args:
             return args[0]
     return return_type
-
-
-def _build_task_section(return_type: Any, chat: bool) -> str:
-    name = _return_type_name(return_type)
-    if chat:
-        return (
-            "## Task\n"
-            "Help the user through the conversation below. The JSON schema defines "
-            "the output the framework needs; it is for you, not for the user. "
-            "Return that JSON object every turn: put the user-facing text in "
-            "`message`, set `intent` to continue, success, or failure, and never "
-            "reply with plain text.\n\n"
-            "If the conversation is empty, open with one short greeting and one "
-            "sentence on what you are here to help with, then make your first "
-            "move — a question or a proposal, whichever this step asks for; "
-            "never return success before the user has said anything.\n\n"
-            "Talk about the user's own work in their words. Write `message` as "
-            "you would say it out loud: short sentences and their everyday "
-            "words. If you need a name for the thing, ask what they call it; if "
-            "you need a word for how they work, ask that too. If the user uses a "
-            "word, use theirs; if they say a word is confusing, "
-            "use their word for it instead. Describe the picture in their words, "
-            "not as a list of field names or a schema. Acknowledge an off-topic "
-            "remark in one clause without praising it, then return to the "
-            "question; never develop their domain content.\n\n"
-            "Use continue only while you still need something from the user. When "
-            "they agree with the picture you described, return the result in that "
-            "same response — never re-present an unchanged draft or ask for a "
-            "second approval. Never return the result while the user's last message "
-            "asks you something: answer it in a continue turn, and return the "
-            "result after their next turn. When you check a draft, ask only 'Is "
-            "this right?' or 'Anything you want to change?'. Before using failure, "
-            "propose the thing in the user's own words; use failure only if they "
-            "reject every concrete proposal."
-        )
-    return (
-        "## Task\n"
-        f"Produce a `{name}` from the parameters below. "
-        "The JSON schema below defines the expected output; field descriptions "
-        "and constraints communicate the rules your response must satisfy. "
-        "Use success when the output is complete; use failure if it cannot be produced."
-    )
 
 
 def _build_checklist_section(rules: dict[str, str]) -> str:
@@ -103,7 +51,7 @@ def _build_validation_rules_section(return_type: Any) -> str:
     heading = getattr(model, "_validation_rules_heading", "Quality rules for the result")
     lines = [
         f"## {heading}",
-        "These describe the result you return. They are not a request to "
+        "These describe the finished thing. They are not a request to "
         "review, grade, or report on it.",
     ]
     lines.extend(f"- {rule}" for rule in rules)
@@ -145,11 +93,10 @@ def _build_user_vocabulary_section(
         return ""
     lines = [
         "## Use the user's words",
-        "The JSON keys, type names, parameter names, their descriptions and the "
-        "rule text above are internal engineering text. In `message`, use the "
-        "phrase shown beside each field (its schema title), or the user's own "
-        "word if they have one. Refer to a parameter by its description, and to "
-        "a type by the thing itself.",
+        "Each field's title is the phrase to use for it; the key and the type "
+        "names are internal engineering text. Refer to a parameter by its "
+        "description, and to a type by the thing itself. Never say a field "
+        "name, a parameter name, or a type name aloud.",
     ]
     if parameter_labels:
         lines.append("Parameters are how the step receives what it was given:")
@@ -169,11 +116,19 @@ def _build_system_prompt(
     return_type: Any,
     conversation_rules: dict[str, str],
     chat: bool,
+    instructions: str | None = None,
 ) -> str:
-    """Build the system prompt from the task, skill, checklists and parameters."""
+    """Build the system prompt from the session, the step and its rules.
+
+    ``instructions`` is the session's overall how — the session component's
+    docstring — and comes first. The step contributes its docstring (the
+    procedure), its parameters, the conversation checklist, the result model's
+    class-level rules, and the user's words for the internal names.
+    """
     sections: list[str] = []
 
-    sections.append(_build_task_section(return_type, chat))
+    if instructions and instructions.strip():
+        sections.append(instructions.strip())
 
     docstring = _format_docstring(raw_func.__doc__, **kwargs).strip()
     if docstring:
@@ -214,8 +169,10 @@ def _setup_atomic_workflow_step(
     max_turns: int,
     debug: Any,
     session: Any,
+    initial_messages: list[dict[str, str]] | None = None,
     conversation_validation_rules: dict[str, str] | None = None,
     chat: bool = True,
+    single_turn: bool = False,
 ) -> AtomicWorkflowStep:
     """Create and configure an AtomicWorkflowStep."""
     from .exceptions import AtomicWorkflowStepFailedError
@@ -225,7 +182,7 @@ def _setup_atomic_workflow_step(
             system_prompt=system_prompt,
             response_model=AgentResponse[actual_return_type],
             max_turns=max_turns,
-            initial_messages=None,
+            initial_messages=initial_messages,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(response.message or ""),
             on_success=lambda response: TurnResult[actual_return_type].success(
                 response.result,
@@ -243,6 +200,7 @@ def _setup_atomic_workflow_step(
             extra_headers=getattr(session.config, "extra_headers", None),
             conversation_validation_rules=conversation_validation_rules,
             chat=chat,
+            single_turn=single_turn,
         )
     )
 
@@ -252,6 +210,7 @@ def atomic_workflow_step(
     *,
     conversation_validation_rules: list[tuple[str, str]] | None = None,
     chat: bool = True,
+    single_turn: bool = False,
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow step using its docstring as system prompt.
 
@@ -262,6 +221,10 @@ def atomic_workflow_step(
     LLM call with the parameters and no user prompts. A ``continue`` intent is
     treated as an in-context error; the framework appends a correction and
     retries within the turn budget.
+
+    ``single_turn=True`` is a one-turn text step: a ``continue`` message is
+    the step's result, so it completes without asking the user. It is how the
+    session's greeting and closing are produced.
     """
     from .exceptions import AtomicWorkflowStepFailedError
 
@@ -300,13 +263,16 @@ def atomic_workflow_step(
                 return_type=actual_return_type,
                 conversation_rules=merged_rules,
                 chat=chat,
+                instructions=session.instructions,
             )
             max_turns = kwargs.pop("max_turns", 10)
 
             workflow_step = _setup_atomic_workflow_step(
                 system_prompt, actual_return_type, max_turns, debug, session,
+                initial_messages=list(state.messages),
                 conversation_validation_rules=merged_rules,
                 chat=chat,
+                single_turn=single_turn,
             )
             result = session.run(workflow_step=workflow_step, first_user_input="")
             state.initial_result = result
@@ -318,6 +284,7 @@ def atomic_workflow_step(
 
         wrapper._is_workflow_step = True  # pyright: ignore[reportAttributeAccessIssue]
         wrapper._chat = chat  # pyright: ignore[reportAttributeAccessIssue]
+        wrapper._single_turn = single_turn  # pyright: ignore[reportAttributeAccessIssue]
         wrapper.__conversation_rules__ = merged_rules  # pyright: ignore[reportAttributeAccessIssue]
 
         return wrapper

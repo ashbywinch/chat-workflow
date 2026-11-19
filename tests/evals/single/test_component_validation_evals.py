@@ -57,7 +57,11 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         config = make_config()
         transcript = self._transcript(
             name="InvoiceStore",
-            purpose="Stores invoice data in a database table with fields for amount, date, and status",
+            purpose=(
+                "Stores invoice data in a database table with fields for amount, "
+                "date, and status; it exists only to store rows and does not "
+                "create, interpret, or improve an invoice"
+            ),
             expert_role="Invoice Processing Clerk",
         )
         result: JudgeResult = llm_judge(self._RULE_PURPOSE_DOMAIN, transcript, config)
@@ -113,7 +117,7 @@ class TestComponentValidationRulesEval(unittest.TestCase):
         transcript = self._transcript(
             name="Invoice",
             purpose="Creates invoices from start to finish",
-            expert_role="Invoice Expert",
+            expert_role="Expert",
         )
         result: JudgeResult = llm_judge(self._RULE_EXPERT_SPECIFIC, transcript, config)
         for v in result.verdicts:

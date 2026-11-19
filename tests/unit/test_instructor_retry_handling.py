@@ -313,6 +313,16 @@ class TestCallLlmInstructorRetryHandling(unittest.TestCase):
                 frozenset({"name", "description"}),
             )
         )
+        # A reasoning dump that happens to mention one field is not an answer.
+        self.assertTrue(
+            _returned_no_envelope(
+                rejected(
+                    '{"error": "not valid JSON", "context": "proposing a check", '
+                    '"format": "bullet list", "response": "..."}'
+                ),
+                frozenset({"name", "description", "format"}),
+            )
+        )
         # A real envelope, even a wrong intent, is content.
         self.assertFalse(
             _returned_no_envelope(
