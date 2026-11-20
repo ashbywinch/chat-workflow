@@ -137,5 +137,54 @@ class TestSessionComponent(unittest.TestCase):
         self.assertEqual(len(session.state.messages), 3)
 
 
+
+class TestPresentation(unittest.TestCase):
+    """The wrapper describes a result from its own fields, without a model."""
+
+    def test_a_list_names_each_items_shape(self):
+        text = SessionComponent().present(
+            [
+                {
+                    "name": "Minutes",
+                    "consumer": "Attendees",
+                    "format": "Shared doc",
+                    "success_criteria": "Every decision has an owner",
+                    "storage_requirements": "Team drive",
+                },
+                {
+                    "name": "Action Items",
+                    "consumer": "Owners",
+                    "format": "Table",
+                    "success_criteria": "Every item has a due date",
+                    "storage_requirements": "Tracker",
+                },
+            ]
+        )
+
+        self.assertIn("Minutes", text)
+        self.assertIn("Attendees", text)
+        self.assertIn("Shared doc", text)
+        self.assertIn("Every decision has an owner", text)
+        self.assertIn("Action Items", text)
+        self.assertIn("Tracker", text)
+
+    def test_a_process_names_the_stages_and_steps(self):
+        text = SessionComponent().present(
+            {
+                "phases": ["Capture", "Write"],
+                "activities": ["Scribble notes", "Type them up"],
+                "orchestrating_component": "Note Taker",
+                "participants": ["Note Taker", "Attendees"],
+            }
+        )
+
+        self.assertIn("stages: Capture; Write", text)
+        self.assertIn("steps: Scribble notes; Type them up", text)
+        self.assertIn("in charge: Note Taker", text)
+
+    def test_a_string_result_is_its_own_description(self):
+        self.assertEqual(SessionComponent().present("the result"), "the result")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
