@@ -180,6 +180,46 @@ class Draft(LLMValidated):
         self.assertIn("LLMValidated", str(ctx.exception))
 
 
+class TestAllOptionalNestedModel(unittest.TestCase):
+    """A nested model with no required field accepts an empty object."""
+
+    def test_an_all_optional_nested_model_is_rejected(self):
+        code = '''
+from typing import ClassVar
+
+from pydantic import Field
+
+from chat_workflow import atomic_workflow_step
+from chat_workflow.mixins import LLMValidated
+
+
+class Item(LLMValidated):
+    """One item."""
+
+    label: str | None = Field(default=None, description="Label")
+
+
+class Draft(LLMValidated):
+    """The artifact."""
+
+    items: list[Item] = Field(..., description="Items")
+
+    _validation_rules: ClassVar[list[str]] = ["Items are specific"]
+
+    @atomic_workflow_step
+    @classmethod
+    def create(cls) -> "Draft":
+        """Collect the items."""
+        ...
+'''
+
+        with self.assertRaises(PydanticValidationError) as ctx:
+            ComponentSourceCode(code=code)
+
+        self.assertIn("Item", str(ctx.exception))
+        self.assertIn("empty object", str(ctx.exception))
+
+
 class TestPrimaryArtifactRule(unittest.TestCase):
     """One primary artifact; nested BaseModels are allowed when used as fields."""
 

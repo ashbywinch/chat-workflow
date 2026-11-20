@@ -688,6 +688,44 @@ def _is_plain_data_type(node: ast.ClassDef) -> bool:
     )
 
 
+def _is_all_optional(node: ast.ClassDef | None) -> bool:
+    """True when every public field of a model has a default."""
+    if node is None:
+        return False
+    fields = [
+        statement
+        for statement in node.body
+        if isinstance(statement, ast.AnnAssign)
+        and isinstance(statement.target, ast.Name)
+        and not statement.target.id.startswith("_")
+        and "ClassVar" not in _annotation_names(statement.annotation)
+    ]
+    return bool(fields) and all(_field_has_default(statement) for statement in fields)
+
+
+def _field_has_default(statement: ast.AnnAssign) -> bool:
+    """True when the annotated field has a default value."""
+    value = statement.value
+    if value is None:
+        return False
+    if isinstance(value, ast.Call):
+        name = (
+            value.func.id
+            if isinstance(value.func, ast.Name)
+            else getattr(value.func, "attr", "")
+        )
+        if name == "Field":
+            if any(keyword.arg in {"default", "default_factory"} for keyword in value.keywords):
+                return True
+            if value.args:
+                first = value.args[0]
+                return not (
+                    isinstance(first, ast.Constant) and first.value is Ellipsis
+                )
+            return False
+    return True
+
+
 def _plain_nested_types(
     node: ast.ClassDef | None, plain_names: set[str]
 ) -> list[str]:
@@ -1322,6 +1360,19 @@ class ComponentSourceCode(LLMValidated):
                 + ", ".join(inaccessible)
                 + ". That class must inherit LLMValidated (or BaseModel) "
                 "so it can be a field of the artifact."
+            )
+
+        all_optional = [
+            name
+            for name in sorted(base_names - {primary_name})
+            if _is_all_optional(class_nodes.get(name))
+        ]
+        if all_optional:
+            raise ValidationError(
+                "Nested model(s) must require at least one field: "
+                + ", ".join(all_optional)
+                + ". A model whose fields are all optional accepts an empty "
+                "object, which is never an item of the artifact."
             )
 
         for node in workflow_methods:

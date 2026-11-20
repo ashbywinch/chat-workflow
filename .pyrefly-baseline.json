@@ -901,9 +901,9 @@
    "severity": "error"
   },
   {
-   "line": 966,
+   "line": 1004,
    "column": 30,
-   "stop_line": 966,
+   "stop_line": 1004,
    "stop_column": 49,
    "path": "workflows/workflow/component_source_code.py",
    "code": -2,
