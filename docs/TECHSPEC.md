@@ -63,6 +63,27 @@ layering change updates the test in the same commit.
 is an atomic or composite workflow step. Further vocabulary:
 [domain concepts](reference/domain-concepts.md).
 
+## Rendering a typed result
+
+A result record is internal; the proposal is for a person. The record renders
+itself — `Renderable.render(context)` in `chat_workflow/rendering.py` — so the
+shape and the user's words live together instead of in a parallel formatter.
+
+- **Context** — `RenderContext(surface, audience, references)`: `chat` or
+  `cli`; `user` or `developer`; and related records the value cannot see (a
+  structural design renders its fields with the domain's type hints).
+- **Format** — line-oriented plain text. `- ` bullets, no tables, colour,
+  HTML, markdown emphasis or headings, or code fences. Long lines wrap at word
+  boundaries to `max_line`.
+- **Guardrail** — `render_result` validates every block before it reaches the
+  transcript: control characters, HTML, markup, and (on the user surface) the
+  schema's own field names and Python type expressions are rejected. A list
+  renders item by item; an empty list renders nothing.
+- **An empty list is the component's decision.** A step that needs at least
+  one item declares `Annotated[list[X], Field(min_length=1)]`; a plain
+  `list[X]` allows an empty answer, and the step's success message says why.
+  The framework imposes neither rule.
+
 ## The model path
 
 There is one path from the library to a model: `Conversation.send()` in
@@ -71,7 +92,9 @@ user simulation are all conversations. Nothing else imports a provider SDK.
 
 - The answer is a forced `answer` tool call (`ToolOutput(..., strict=True)`).
   `response_format` is not used: the endpoints behind this model accept it and
-  ignore it; a tool's schema is enforced on the same route.
+  ignore it; a tool's schema is enforced on the same route. A `success`
+  carries both the words the user reads (`message`) and the typed `result`, so
+  a conversational step cannot finish silently.
 - The transcript is PydanticAI's message list — thinking, tool calls, tool
   returns, retry prompts and the final answer. `transcript.render` is the one
   projection into the audit view and the user view.
@@ -95,22 +118,16 @@ meeting spawned inside it are the same class:
   greeting condition is `not state.messages`, not a second flag.
 - `SessionComponent` is behaviour, not a different session. `converse` sets
   `session.instructions` from its docstring when the session has none, greets
-  when the session has no messages, runs the step, gives the result a
-  presentation turn if the step answered without speaking, then signs off. The
-  wrap is explicit in the CLI and the eval harness; the decorators never
-  auto-wrap a nested step.
-- A step whose result is a derived artifact uses the same shape: a chat-off
-  one-turn step derives the value from its inputs, the composite shows it in
-  the user's words, and a chat-on step asks one confirm-or-correct question.
-  This keeps the model from asking the user to define what it can derive. The
-  composite marks the presentation (`session.present`), so the wrapper does
-  not describe the same result a second time; if the user replies and the
-  step returns silently, the result is the answer and the wrapper states it.
-- A deterministic presentation reads the result's own fields, never a model
-  completion: it cannot truncate. When the user's last message asks for a
-  suggestion, the presentation is the suggestion (a concrete format and
-  check), not the list again. A structural design caches the domain's type
-  hints on the session so a later recap keeps "date", not "str".
+  when the session has no messages, runs the step, then signs off. It does not
+  describe the result: a chat-on step's success message is the last thing the
+  user reads, and the model writes it. The wrap is explicit in the CLI and the
+  eval harness; the decorators never auto-wrap a nested step.
+- A step whose result is a derived artifact has three turns: a chat-off step
+  derives the value from its inputs; the composite renders that value as the
+  proposal turn, ending with one confirm question; a chat-on step reads the
+  reply and returns the value. Its success message says what changed, or that
+  it is confirmed. This keeps the model from asking the user to define what it
+  can derive, and leaves one voice on every turn.
 - `greet` and `sign_off` are one-turn text steps (`chat=False`,
   `single_turn=True`): a continue message is the text they produce, so they do
   not ask a user who is not part of that step. They start from an explicit

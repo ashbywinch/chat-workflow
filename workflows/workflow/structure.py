@@ -12,6 +12,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
+from chat_workflow.rendering import RenderContext, plain_type, render_result
 
 from .domain_spec import ComponentDomainSpec
 
@@ -94,6 +95,31 @@ class ComponentStructure(BaseModel):
         description="Additional Python imports needed by the generated code",
     )
 
+    def render(self, context: RenderContext) -> str:
+        """Say the shape, using the domain's words when it has them."""
+        domain = context.reference("domain_spec")
+        hints = {
+            field.name: field.field_type_hint
+            for field in getattr(domain, "fields", [])
+        }
+        descriptions = {
+            field.name: field.domain_description
+            for field in getattr(domain, "fields", [])
+        }
+        lines = [
+            f"{field.name.replace('_', ' ')}: "
+            f"{hints.get(field.name) or plain_type(field.type_expr)}"
+            + (
+                f" — {descriptions[field.name]}"
+                if field.name in descriptions
+                else ""
+            )
+            for field in self.fields
+        ]
+        if self.model_validators:
+            lines.extend(f"Rule: {validator.rule}" for validator in self.model_validators)
+        return "\n".join(lines)
+
     @composite_workflow_step
     @classmethod
     def design(
@@ -110,7 +136,12 @@ class ComponentStructure(BaseModel):
     ) -> ComponentStructure:
         """Derive the structure from the domain spec, then confirm it."""
         draft = _draft_structure(domain_spec=domain_spec, session=session)
-        session.say(_format_structure(draft, domain_spec))
+        session.say(
+            render_result(
+                draft,
+                RenderContext(references={"domain_spec": domain_spec}),
+            )
+        )
         return _confirm_structure(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
@@ -139,38 +170,6 @@ def _plain_type(type_expr: str) -> str:
         )
         plain = spaced.replace("_", " ").strip().casefold()
     return plain
-
-
-def _format_structure(
-    draft: ComponentStructure, domain_spec: ComponentDomainSpec
-) -> str:
-    """Present the derived structure in the user's words."""
-    hints = {field.name: field.field_type_hint for field in domain_spec.fields}
-    descriptions = {
-        field.name: field.domain_description for field in domain_spec.fields
-    }
-    lines = ["Now I'll turn what we agreed into a concrete shape.", "The parts:"]
-    # Every field in the domain spec is part of the shape. The draft usually
-    # carries them all; when it drops one, the domain's own hint still shows
-    # it rather than presenting a partial list.
-    drafted = {field.name: field for field in draft.fields}
-    ordered = [field.name for field in domain_spec.fields]
-    ordered += [name for name in drafted if name not in ordered]
-    for name in ordered:
-        drafted_field = drafted.get(name)
-        hint = hints.get(name) or (
-            _plain_type(drafted_field.type_expr) if drafted_field else "text"
-        )
-        description = descriptions.get(name)
-        line = f"- {name.replace('_', ' ')}: {hint}"
-        if description:
-            line += f" — {description}"
-        lines.append(line)
-    if draft.model_validators:
-        lines.append("The rules:")
-        lines.extend(f"- {validator.rule}" for validator in draft.model_validators)
-    lines.append("Does this capture it, or would you change a part?")
-    return "\n".join(lines)
 
 
 @atomic_workflow_step(chat=False, single_turn=True)

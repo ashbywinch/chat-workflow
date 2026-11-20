@@ -9,6 +9,7 @@ from chat_workflow import atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.conversation_rules import WARM_OPEN
 from chat_workflow.mixins import LLMValidated
+from chat_workflow.rendering import RenderContext, render_result
 
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
@@ -118,6 +119,16 @@ class ProcessDefinition(LLMValidated):
         return self
 
 
+    def render(self, context: RenderContext) -> str:
+        """Say the breakdown in the user's words."""
+        return (
+            f"Stages: {' → '.join(self.phases)}\n"
+            f"Steps: {'; '.join(self.activities)}\n"
+            f"Who's involved: {', '.join(self.participants)}\n"
+            f"In charge: {self.orchestrating_component}"
+        )
+
+
 class GatheredNotes(BaseModel):
     """What the user told us about their work, in their own words."""
 
@@ -170,21 +181,6 @@ project" — is not a participant; leave it out. An example is not a fact.
 
 Return the complete ProcessDefinition."""
     ...  # type: ignore[reportReturnType]
-
-
-def _format_process_definition(draft: ProcessDefinition) -> str:
-    """Present a derived breakdown in the user's words, without field names."""
-    stages = " → ".join(draft.phases)
-    steps = "; ".join(draft.activities)
-    people = ", ".join(draft.participants)
-    return (
-        "Now I'll pull together the stages and steps from what you've told me.\n\n"
-        "Here's the picture I've got from what you told me:\n"
-        f"- Stages: {stages}\n"
-        f"- Steps: {steps}\n"
-        f"- Who's involved: {people}\n"
-        f"- In charge: {draft.orchestrating_component}"
-    )
 
 
 @atomic_workflow_step(
@@ -253,7 +249,7 @@ def generate_from_chat(
     # The proposal is the model's own draft, shown in the user's words before
     # the confirmation turn. A confirmation turn that skips the presentation
     # would leave the user (and the judge) with no proposal at all.
-    session.say(_format_process_definition(draft))
+    session.say(render_result(draft, RenderContext()))
     return _confirm_process_definition(
         draft=draft, session=session, max_turns=min(max_turns, 4)
     )

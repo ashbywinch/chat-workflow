@@ -8,6 +8,7 @@ from pydantic import Field
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
+from chat_workflow.rendering import RenderContext, render_result
 
 from .deliverable import Deliverable
 from .process_definition import ProcessDefinition
@@ -80,6 +81,14 @@ class Resource(LLMValidated):
         min_length=1,
     )
 
+    def render(self, context: RenderContext) -> str:
+        """Say one starting material in the user's words."""
+        lines = [f"{self.source} — {self.format}"]
+        if self.dependencies:
+            lines.append(f"Needs {'; '.join(self.dependencies)} first.")
+        lines.append(f"Ready when {self.validation_criteria}.")
+        return "\n".join(lines)
+
     @composite_workflow_step
     @classmethod
     def generate_from_chat(
@@ -91,33 +100,17 @@ class Resource(LLMValidated):
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
-    ) -> list[Resource]:
+    ) -> Annotated[list[Resource], Field(min_length=1)]:
         """Derive the typical starting materials, then confirm the list."""
         draft = _draft_resources(
             deliverables=deliverables,
             analysis=analysis,
             session=session,
         )
-        session.say(_format_resources(draft, deliverables))
+        session.say(render_result(draft, RenderContext()))
         return _confirm_resources(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
-
-
-def _format_resources(draft: list[Resource], deliverables: list[Deliverable]) -> str:
-    """Present the typical starting materials in the user's words."""
-    thing = deliverables[0].name if deliverables else "the thing you make"
-    lines = [f"Let's list what you start with before you make {thing}.", ""]
-    for resource in draft:
-        line = f"- {resource.source} — which is {resource.format}"
-        if resource.dependencies:
-            line += f"; you need {'; '.join(resource.dependencies)} first"
-        if resource.validation_criteria:
-            line += f"; you know it is ready when {resource.validation_criteria}"
-        lines.append(line)
-    lines.append("")
-    lines.append("Which of these do you have, and what else do you start with?")
-    return "\n".join(lines)
 
 
 @atomic_workflow_step(chat=True, single_turn=True)
@@ -128,7 +121,7 @@ def _draft_resources(
         "What the person has already told you about how their work happens",
     ] = None,
     max_turns: Annotated[int, "Maximum turns"] = 1,
-) -> list[Resource]:
+) -> Annotated[list[Resource], Field(min_length=1)]:
     """Derive the things people usually start with for this kind of work.
 
 The deliverables and any analysis are established. A single deliverable is enough: use its name and description to
@@ -157,7 +150,7 @@ def _confirm_resources(
         "The complete list of typical starting materials already shown to the user",
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-) -> list[Resource]:
+) -> Annotated[list[Resource], Field(min_length=1)]:
     """The starting materials have been shown. Ask which ones they have.
 
 If they add one, include it; if they say one does not apply, remove it. If they say the list is wrong or they do not

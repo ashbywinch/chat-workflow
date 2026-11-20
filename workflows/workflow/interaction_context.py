@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
+from chat_workflow.rendering import RenderContext, render_result
 
 from .domain_spec import ComponentDomainSpec
 from .structure import ComponentStructure
@@ -59,6 +60,19 @@ class ComponentInteractionContext(BaseModel):
         description=("Common pitfalls the assistant should watch for, e.g. 'Users often forget to list attendees'"),
     )
 
+    def render(self, context: RenderContext) -> str:
+        """Say how the assistant proposes to work with the user."""
+        lines: list[str] = []
+        if self.must_prioritize:
+            lines.append("Always cover: " + "; ".join(self.must_prioritize))
+        if self.auto_suggest:
+            lines.append("Suggest: " + "; ".join(self.auto_suggest))
+        if self.tone_preference:
+            lines.append(f"Tone: {self.tone_preference}")
+        if self.user_pain_points:
+            lines.append("Watch for: " + "; ".join(self.user_pain_points))
+        return "\n".join(lines)
+
     @composite_workflow_step
     @classmethod
     def gather(
@@ -83,30 +97,10 @@ class ComponentInteractionContext(BaseModel):
             structure=structure,
             session=session,
         )
-        session.say(_format_interaction_context(draft))
+        session.say(render_result(draft, RenderContext()))
         return _confirm_interaction_context(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
-
-
-def _format_interaction_context(draft: ComponentInteractionContext) -> str:
-    """Present the interaction proposal in the user's words."""
-    lines = ["Now I'll propose how I should work with you.", "", "Here's how I'd work with you:"]
-    if draft.must_prioritize:
-        lines.append("- I'll always cover: " + "; ".join(draft.must_prioritize))
-    if draft.auto_suggest:
-        lines.append("- I'll suggest: " + "; ".join(draft.auto_suggest))
-    if draft.tone_preference:
-        lines.append("- Tone: " + draft.tone_preference)
-    if draft.user_pain_points:
-        lines.append("- I'll watch for: " + "; ".join(draft.user_pain_points))
-    lines.append("")
-    lines.append(
-        "What would you add to what I should always prioritize? What would you "
-        "like me to suggest proactively? What usually goes wrong that I should "
-        "catch?"
-    )
-    return "\n".join(lines)
 
 
 @atomic_workflow_step(chat=False, single_turn=True)

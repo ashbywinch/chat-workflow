@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin
 
 from pydantic import BaseModel, TypeAdapter
 
@@ -26,6 +26,8 @@ from .types_meta import resolve_return_type
 def _inner_model(return_type: Any) -> Any:
     """Return the result model behind a return type, unwrapping list[Model]."""
     origin = get_origin(return_type)
+    if origin is Annotated:
+        return _inner_model(get_args(return_type)[0])
     if origin is list:
         args = get_args(return_type)
         if args:
@@ -207,18 +209,6 @@ def _build_system_prompt(
     return "\n\n".join(sections)
 
 
-def _at_least_one(return_type: Any) -> Any:
-    """A list-shaped result must carry at least one item."""
-    from typing import Annotated, get_args, get_origin
-
-    from pydantic import Field
-
-    if get_origin(return_type) is list:
-        (item_type,) = get_args(return_type) or (Any,)
-        return Annotated[list[item_type], Field(min_length=1)]
-    return return_type
-
-
 def _setup_atomic_workflow(
     system_prompt: str,
     actual_return_type: Any,
@@ -240,16 +230,12 @@ def _setup_atomic_workflow(
     """
     from .exceptions import AtomicWorkflowFailedError
 
-    # A step that returns a list returns at least one item. An empty list is
-    # not a completed answer, and it validates otherwise; constraining the
-    # schema makes the model retry with a real item instead of "finishing".
-    answer_type = _at_least_one(actual_return_type)
     conversation = Conversation(
         model=session.config.model,
         provider=session.config.provider,
         instructions=system_prompt,
-        output_type=AgentResponse[answer_type],
-        final_output_type=FinalResponse[answer_type],
+        output_type=AgentResponse[actual_return_type],
+        final_output_type=FinalResponse[actual_return_type],
         messages=list(session.state.messages) if chat else [],
         api_base=session.config.api_base,
         api_key_env=session.config.api_key_env,
@@ -268,8 +254,8 @@ def _setup_atomic_workflow(
     return AtomicWorkflow(
         config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
-            response_model=AgentResponse[answer_type],
-            final_response_model=FinalResponse[answer_type],
+            response_model=AgentResponse[actual_return_type],
+            final_response_model=FinalResponse[actual_return_type],
             max_turns=max_turns,
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(

@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
+from chat_workflow.rendering import RenderContext, render_result
 
 from .component_spec import ComponentSpec
 
@@ -112,6 +113,19 @@ class ComponentDomainSpec(LLMValidated):
         min_length=1,
     )
 
+    def render(self, context: RenderContext) -> str:
+        """Say what the artifact is and what makes it good."""
+        fields = "; ".join(
+            f"{field.name} — {field.domain_description}" for field in self.fields
+        )
+        lines = [
+            f"{self.name} — {self.description}",
+            f"Fields: {fields}",
+            "What makes it good: " + "; ".join(self.what_good_looks_like),
+            f"The role is {self.expert_role}.",
+        ]
+        return "\n".join(lines)
+
     @field_validator("name")
     @classmethod
     def _name_is_a_component_name(cls, value: str) -> str:
@@ -157,24 +171,10 @@ class ComponentDomainSpec(LLMValidated):
             deliverables=deliverables,
             session=session,
         )
-        session.say(_format_domain_spec(draft))
+        session.say(render_result(draft, RenderContext()))
         return _confirm_domain_spec(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
-
-
-def _format_domain_spec(draft: ComponentDomainSpec) -> str:
-    """Present the derived domain spec in the user's words."""
-    fields = "; ".join(
-        f"{field.name} — {field.domain_description}" for field in draft.fields
-    )
-    quality = "; ".join(draft.what_good_looks_like)
-    return (
-        f"I see we're working on {draft.name} — {draft.description}\n"
-        f"Here are the parts I'd capture: {fields}\n"
-        f"What makes it good: {quality}\n"
-        f"I'd act as {draft.expert_role}."
-    )
 
 
 @atomic_workflow_step(chat=False, single_turn=True)

@@ -9,6 +9,7 @@ from pydantic import Field, field_validator
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
+from chat_workflow.rendering import RenderContext, render_result
 from chat_workflow.transcript import entries
 
 # Activity nouns the model reaches for when it should name the artifact.
@@ -156,6 +157,15 @@ class ComponentSpec(LLMValidated):
         description=("Any incidental details the user mentioned about how the work is done"),
     )
 
+    def render(self, context: RenderContext) -> str:
+        """Say one part of the work in the user's words."""
+        lines = [f"{self.name} — {self.purpose}"]
+        if self.scope_description:
+            lines.append(f"Covers: {self.scope_description}")
+        if self.owner_role:
+            lines.append(f"Owned by: {self.owner_role}")
+        return "\n".join(lines)
+
     @field_validator("name")
     @classmethod
     def _name_is_a_concrete_artifact(cls, value: str) -> str:
@@ -192,7 +202,7 @@ class ComponentSpec(LLMValidated):
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
-    ) -> list[ComponentSpec]:
+    ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
         """Derive the parts of the user's work, then confirm the set.
 
         The parts are derived from the analysis and the outputs, shown to the
@@ -210,7 +220,17 @@ class ComponentSpec(LLMValidated):
             # The gap resolution asks again with the set it already confirmed.
             # Showing and confirming the same parts a second time is repetition.
             return draft
-        session.say(_format_components(draft, existing_components))
+        shown = [
+            part
+            for part in draft
+            if part.name.strip().casefold()
+            not in {name.strip().casefold() for name in already_shown}
+        ]
+        text = render_result(shown or draft, RenderContext())
+        if already_shown:
+            text = "Thanks — here's what I'd add or change:\n" + text
+            text += "\n\nEverything else stays as we agreed."
+        session.say(text)
         confirmed = _confirm_components(
             draft=draft, session=session, max_turns=min(max_turns, 6)
         )
@@ -257,36 +277,6 @@ from .models.process_definition import ProcessDefinition  # noqa: E402
 from .models.resource import Resource  # noqa: E402
 
 
-def _format_components(
-    draft: list[ComponentSpec], existing: list[str] | None = None
-) -> str:
-    """Present the derived parts in the user's words, without internal labels.
-
-    On a second pass, show only what is new or renamed; the rest was already
-    agreed, and re-listing it reads as repetition.
-    """
-    agreed = {name.strip().casefold() for name in existing or []}
-    shown = [part for part in draft if part.name.strip().casefold() not in agreed]
-    if agreed and shown:
-        opening = "Thanks — here's what I'd add or change:"
-    elif agreed:
-        return ""
-    else:
-        opening = "Now I'll map the parts of your work from what you've told me."
-    lines = [opening, "", "Here are the parts I see:", ""]
-    for index, part in enumerate(shown, 1):
-        line = f"{index}. {part.name} — {part.purpose}"
-        if part.scope_description:
-            line += f" {part.scope_description}"
-        if part.owner_role:
-            line += f" This part is responsible for {part.purpose} and belongs to {part.owner_role}."
-        lines.append(line)
-    if agreed:
-        lines.append("")
-        lines.append("Everything else stays as we agreed.")
-    return "\n".join(lines)
-
-
 @atomic_workflow_step(chat=False, single_turn=True)
 def _draft_components(
     analysis: Annotated[
@@ -300,7 +290,7 @@ def _draft_components(
         "Parts already identified; include them and add any that are missing",
     ] = None,
     max_turns: Annotated[int, "Maximum turns"] = 1,
-) -> list[ComponentSpec]:
+) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
     """Derive the parts of the user's work from the analysis.
 
 The analysis, inputs and outputs are established facts. The parts are derived from its activities. The owner of each
@@ -326,7 +316,7 @@ def _confirm_components(
         "The complete set of parts already derived from the analysis",
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-) -> list[ComponentSpec]:
+) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
     """The parts have already been shown to the user. Ask one confirm-or-correct question.
 
 Do not re-present the whole set. When the user confirms, return the set in the same response; do not ask for a

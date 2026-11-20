@@ -8,6 +8,7 @@ from pydantic import Field, model_validator
 from chat_workflow import atomic_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
+from chat_workflow.rendering import RenderContext
 
 from .process_definition import ProcessDefinition
 
@@ -94,6 +95,19 @@ class Deliverable(LLMValidated):
         min_length=1,
     )
 
+    def render(self, context: RenderContext) -> str:
+        """Say one thing the user makes, in the user's words."""
+        lines = [
+            f"{self.name} — {self.description}",
+            f"For {self.consumer}; {self.format}.",
+            f"Ready when {self.success_criteria}.",
+        ]
+        if self.integration_points:
+            lines.append(f"Next: {self.integration_points}")
+        if self.storage_requirements:
+            lines.append(f"Kept: {self.storage_requirements}")
+        return "\n".join(lines)
+
     @model_validator(mode="after")
     def _consumer_is_a_party(self) -> Deliverable:
         """The consumer is a person, role, or team — not the artifact itself."""
@@ -125,7 +139,7 @@ class Deliverable(LLMValidated):
             "What the person has already told you about how their work happens",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-    ) -> list[Deliverable]:
+    ) -> Annotated[list[Deliverable], Field(min_length=1)]:
         """Describe the one thing the user makes.
 
     What they make may be personal — a meal plan, a trip plan, a letter — not only a work document. Do not refuse because it is not for a job.
