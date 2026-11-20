@@ -5,12 +5,28 @@ import unittest
 from chat_workflow.confirmation import confirm_draft
 
 
+class _Draft:
+    """A minimal Renderable: what the user sees is its text."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def render(self, context) -> str:
+        return self.text
+
+
 class _Session:
     def __init__(self) -> None:
-        self.proposals: list[object] = []
+        self.proposals: list[_Draft] = []
         self.said: list[str] = []
 
-    def propose(self, result: object) -> None:
+    def propose(
+        self,
+        result: _Draft,
+        *,
+        changed: bool = False,
+        note: str | None = None,
+    ) -> None:
         self.proposals.append(result)
 
     def say(self, text: str) -> None:
@@ -24,23 +40,23 @@ class TestConfirmDraft(unittest.TestCase):
         def step(*, draft, session, max_turns):
             return draft
 
-        result = confirm_draft(session=session, draft={"a": 1}, step=step)
+        result = confirm_draft(session=session, draft=_Draft("one"), step=step)
 
-        self.assertEqual(result, {"a": 1})
+        self.assertEqual(result.text, "one")
         self.assertEqual(session.proposals, [])
         self.assertEqual(session.said, [])
 
     def test_a_changed_draft_is_presented_then_confirmed(self):
         session = _Session()
-        replies = [{"a": 2}, {"a": 2}]
+        replies = [_Draft("two"), _Draft("two")]
 
         def step(*, draft, session, max_turns):
             return replies.pop(0)
 
-        result = confirm_draft(session=session, draft={"a": 1}, step=step)
+        result = confirm_draft(session=session, draft=_Draft("one"), step=step)
 
-        self.assertEqual(result, {"a": 2})
-        self.assertEqual(session.proposals, [{"a": 2}])
+        self.assertEqual(result.text, "two")
+        self.assertEqual([p.text for p in session.proposals], ["two"])
         self.assertEqual(session.said, [])
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
@@ -22,6 +22,8 @@ class ComponentInteractionContext(BaseModel):
     schema, so the framework asks them; the model derives the picture from the
     answer, the renderer shows it, and a confirmation step settles it.
     """
+
+    model_config = ConfigDict(title="how I should work with you")
 
     must_prioritize: Annotated[
         list[str],
@@ -144,7 +146,8 @@ def _confirm_interaction_context(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentInteractionContext:
     """
-The proposal has been shown. Confirm it, or correct it.
+The proposal was shown with one confirm-or-correct question, and the user is
+answering it. Do not show it again and do not repeat that question.
 
 If the user confirms, return the draft. If they correct a point, update it and return the corrected context; the
 framework shows the change. Ask only about a point they left unanswered. Do not re-present the whole proposal or ask

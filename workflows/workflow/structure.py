@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.confirmation import confirm_draft
@@ -85,6 +85,8 @@ class ComponentStructure(BaseModel):
     the artifact description, base class, fields, validators, and extra imports.
     This is a pure data model — no LLM functionality.
     """
+
+    model_config = ConfigDict(title="the shape")
 
     description: str = Field(
         ...,
@@ -182,7 +184,8 @@ def _confirm_structure(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentStructure:
     """
-The structure has been shown. Ask one confirm-or-correct question.
+The structure was shown with one confirm-or-correct question, and the user is
+answering it. Do not show it again and do not repeat that question.
 
 If the user confirms, return the draft. If they correct a type or a rule, update it and return the corrected
 structure; the framework shows the change. Ask only about a gap the draft cannot fill; do not re-present the whole

@@ -75,14 +75,17 @@ class EvaluationCriteria(BaseModel):
           hours, a processor model) before accepting a factor.
         - A weight or ideal value the user does not give takes the schema's
           default; never interrogate for an optional field. A named factor is
-          enough: do not ask what it means or for a sub-detail of it.
+          enough: do not ask what it means or for a sub-detail of it. Never ask
+          for weights: a missing weight is not a missing value and is never a
+          reason to fail.
         - If the user says "that's all", "please finalize", or otherwise asks
           to finish, return intent="success" with the criteria from the answers
           they gave; do not ask another question.
         - If the user is vague, ask clarifying questions. If they answer a
-          question with a vague non-answer, ask once more; if they still give
-          no value, return intent="failure" rather than inventing one from the
-          context.
+          question with a vague non-answer, ask once more; if they still name no
+          factor, return intent="failure" rather than inventing one from the
+          context. Return failure only when no factor was named at all or the
+          user refuses to engage — a thin answer is not a failure.
         - If the user is uncooperative or refuses to provide useful information within max_turns,
             use intent="failure".
         """

@@ -11,30 +11,38 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol, TypeVar
 
+from .rendering import RenderContext, render_result
+
 T = TypeVar("T")
 
 
 class ConfirmationSession(Protocol):
     """What a confirmation needs from a session: show, and speak."""
 
-    def propose(self, result: Any) -> None: ...
+    def propose(
+        self,
+        result: Any,
+        *,
+        changed: bool = False,
+        note: str | None = None,
+    ) -> None: ...
 
     def say(self, text: str) -> None: ...
+
 
 # One correction round plus its confirmation. A user who keeps changing the
 # draft is in a different task, not a confirmation.
 _MAX_CHANGES = 2
 
 
-def _same(left: Any, right: Any) -> bool:
-    def dump(value: Any) -> Any:
-        if hasattr(value, "model_dump"):
-            return value.model_dump()
-        if isinstance(value, (list, tuple)):
-            return [dump(item) for item in value]
-        return value
+def _rendered(value: Any) -> str:
+    return render_result(value, RenderContext())
 
-    return dump(left) == dump(right)
+
+def _same(left: Any, right: Any) -> bool:
+    # The user sees the rendering, not the model dump. A change that does not
+    # alter a word of the proposal is not a new proposal.
+    return _rendered(left) == _rendered(right)
 
 
 def confirm_draft(
@@ -52,5 +60,5 @@ def confirm_draft(
             return confirmed
         current = confirmed
         # The proposal turn carries its own lead-in and confirm question.
-        session.propose(current)
+        session.propose(current, changed=True)
     return current

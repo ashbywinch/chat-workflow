@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar, Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from chat_workflow import atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
@@ -18,19 +24,12 @@ _NO_EXECUTOR_MODE: tuple[str, str] = (
     "content or execute the work for the user.",
 )
 
-_OPENS_WITH_THE_DRAFT: tuple[str, str] = (
-    "Opens with the draft",
-    "The assistant's first response presents the complete breakdown derived "
-    "from the notes, in the user's words. It does not ask the user to name the "
-    "stages, the steps, the role, or the participants that the notes already "
-    "establish.",
-)
-
-_CONFIRMS_THE_DRAFT: tuple[str, str] = (
-    "Confirms the draft",
-    "The assistant presents the complete draft breakdown in its first "
-    "response and returns the result only after the user confirms it or "
-    "corrects a value.",
+_CONFIRMS_THE_SHOWN_DRAFT: tuple[str, str] = (
+    "Confirms the draft already shown",
+    "The complete breakdown was shown to the user in the previous turn, and "
+    "this turn answers their reaction to it. The assistant does not present "
+    "the whole breakdown again and does not repeat the question the user has "
+    "just answered; it returns the draft, or the part they corrected.",
 )
 
 
@@ -58,6 +57,8 @@ class ProcessStage(BaseModel):
 
 class ProcessDefinition(LLMValidated):
     """The stages of the user's work, each with its concrete steps."""
+
+    model_config = ConfigDict(title="the stages of your work")
 
     _validation_rules: ClassVar[list[str]] = [
         "The stages are broad; each stage lists the concrete steps inside it, "
@@ -201,6 +202,18 @@ class GatheredNotes(BaseModel):
         ),
     )
 
+    @field_validator("notes")
+    @classmethod
+    def _notes_are_a_description(cls, value: str) -> str:
+        """A question is not the user's description."""
+        if value.strip().endswith("?"):
+            raise ValueError(
+                "The notes are a question, not the user's description. Answer "
+                "their question, then ask what they do and record what they "
+                "tell you."
+            )
+        return value
+
 
 @atomic_workflow_step(
     explore=True,
@@ -217,7 +230,8 @@ def _gather_notes(
 The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
 it is what they already told you: do not ask "What do you do?" again; ask only "Is there anything else?" once, then return. Otherwise
 ask "What do you do?" once; after their first answer, return what they told you, in their words. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
-do you actually do, step by step?" — and return their answer.
+do you actually do, step by step?" — and return their answer. If they ask for a template or an example rather than
+describing their work, say the template comes after you understand the work, and ask what they do step by step.
 
 Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown.
 
@@ -250,8 +264,7 @@ Return the complete ProcessDefinition."""
 @atomic_workflow_step(
     conversation_validation_rules=[
         _NO_EXECUTOR_MODE,
-        _OPENS_WITH_THE_DRAFT,
-        _CONFIRMS_THE_DRAFT,
+        _CONFIRMS_THE_SHOWN_DRAFT,
     ]
 )
 def _confirm_process_definition(
@@ -262,10 +275,9 @@ def _confirm_process_definition(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
     """
-The draft has been shown. Ask one confirm-or-correct question.
+The draft has been shown with one confirm-or-correct question, and the user is answering it. Do not show the draft again and do not repeat that question.
 
-If the draft leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask
-about that gap and offer one concrete possibility: "Is the approver your manager, or someone else?" If the user says
+If the draft leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask about that gap and offer one concrete possibility: "Is the approver your manager, or someone else?" If the user says
 they do not handle a step, propose a concrete role for it and ask them to confirm. Name one concrete improvement
 grounded in the breakdown — a capture format, a template, or a checklist — and ask whether it fits; keep it to a
 practice and do not invent a tool the user did not mention. If the user asks what the output looks like, say in one

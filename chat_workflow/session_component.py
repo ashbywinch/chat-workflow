@@ -55,9 +55,9 @@ class SessionComponent:
 
         The conversation already happened; you are only closing it, and its
         transcript is not shown to you. Say in one short sentence that you
-        have what the user needs to give. Do not ask a question, offer another
-        step, describe what the conversation produced, or say there was no
-        conversation.
+        have what you need — for example "I have what I need." Do not ask a
+        question, offer another step, describe what the conversation produced,
+        or say there was no conversation.
         """
         ...  # type: ignore[reportReturnType]
 

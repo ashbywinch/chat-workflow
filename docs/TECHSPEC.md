@@ -65,7 +65,7 @@ is an atomic or composite workflow step. Further vocabulary:
 
 ## Turn contracts
 
-Three rules shape a conversation, independent of any one step's prompt:
+Five rules shape a conversation, independent of any one step's prompt:
 
 - **A success says what it did.** `Success` carries `message`, and the session
   speaks it for a chat-on step. A silent completion is not expressible.
@@ -73,10 +73,20 @@ Three rules shape a conversation, independent of any one step's prompt:
   number of model turns before a result is accepted. A gather step that must
   ask or propose first declares two; a success on the first turn is fed back
   as a correction ("do the task's next step"), not accepted as a summary.
-- **Changed drafts are confirmed; unchanged drafts finish.** A confirmation
-  step that changes a value states the change and asks the user to confirm it.
-  A step that returns the draft unchanged finishes; it does not ask for a
-  second approval.
+- **Changed drafts are shown again; unchanged drafts finish.** A confirmation
+  step returns the draft it was given or a corrected one. The framework shows
+  a changed draft through the same proposal turn and asks once more; an
+  unchanged draft closes, with no second approval.
+- **A proposal is one turn.** `Session.propose` says one lead-in, the rendered
+  body, and one confirm question. The renderer only renders the body, so a
+  deterministic proposal reads as a proposal rather than a field dump.
+- **A listening step declares it.** `explore=True` opens with one open
+  question and does not propose a structure; a step that derives from
+  established inputs leaves it false and proposes from them.
+- **The confirmation answers the proposal.** The proposal turn already asked
+  the confirm question, so the confirmation step handles the user's answer —
+  it corrects a value or confirms, and never re-presents the draft or repeats
+  the question the user is answering.
 
 A question the schema already fixes (the three interaction preferences) is
 asked by the framework, not left to the model: the answer is a parameter to

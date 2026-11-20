@@ -5,21 +5,20 @@ summary turns are for a person, so the record itself renders them — it knows
 its own shape and the words the user uses. The framework owns the contract:
 
 - **surface** — a line-oriented chat transcript, or a terminal. Both are plain
-  text; the chat has no tables, colour, or markup it cannot display.
-- **audience** — the user, or a developer reading a debug view. The user view
-  never contains a schema field name or a Python type expression.
+  text, so a rendering is wrapped to a line width and printed literally.
+- **audience** — the user. The record speaks the user's words; the renderer
+  never exposes a schema field name or a Python type expression, and never
+  censors what the user wrote.
 - **guardrail** — ``render_result`` validates every rendering before it can
-  reach the transcript: no control characters, no HTML, no markdown the chat
-  cannot show, bounded line length, and (for the user) none of the internal
-  vocabulary below.
+  reach the transcript: no control characters, no HTML, and no line wider than
+  the surface. It checks **display**, not vocabulary: a user's domain may
+  legitimately contain "**", "#", or "|", and those are shown as typed.
 
 Every render is for the user. The renderer prints the record's own values and
-fixed user-facing labels; it must not add schema labels of its own, but it must
-not censor the user's words either — a user's domain may legitimately contain
-"consumer" or "format". The guard therefore checks **display**, not
-vocabulary. Each result model implements :class:`Renderable`; a list of
-records renders item by item. A step that allows an empty list renders nothing,
-and its own success message says why.
+fixed user-facing labels; it must not add schema labels of its own. Each result
+model implements :class:`Renderable`; a list of records renders item by item. A
+step that allows an empty list renders nothing, and its own success message says
+why.
 """
 
 from __future__ import annotations
@@ -59,6 +58,11 @@ class Renderable(Protocol):
     """A record that can describe itself to a person."""
 
     def render(self, context: RenderContext) -> str: ...
+
+
+def without_full_stop(text: str) -> str:
+    """A value used mid-sentence, so appending a full stop does not double it."""
+    return text.strip().rstrip(".")
 
 
 def plain_type(type_expr: Any) -> str:
@@ -144,13 +148,4 @@ def validate_rendering(text: str, context: RenderContext) -> str:
         raise RenderError("A rendering must not carry control characters.")
     if re.search(r"<[a-zA-Z/]", text):
         raise RenderError("A rendering must not contain HTML.")
-    if "**" in text or "`" in text:
-        raise RenderError("A rendering must not contain markdown emphasis or code.")
-    for line in text.splitlines():
-        if line.lstrip().startswith("#"):
-            raise RenderError("A rendering must not contain markdown headings.")
-        if "|" in line:
-            raise RenderError(
-                "A rendering must not contain a table; the chat cannot align one."
-            )
     return text

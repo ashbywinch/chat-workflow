@@ -119,14 +119,29 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         text = render_result(_deliverable(), RenderContext())
 
         self.assertIn("Meeting Minutes — The written record", text)
-        self.assertIn("For Meeting attendees; A shared document", text)
-        self.assertIn("Ready when", text)
+        # The document's shape is separate from the facts about its use: a flat
+        # block reads as if "where it is kept" were another section.
+        self.assertIn("It looks like: A shared document.", text)
+        self.assertIn("For: Meeting attendees.", text)
+        self.assertIn("Ready when: Every decision has an owner.", text)
+        self.assertIn("Who gets it: Attendees receive it by email.", text)
+        self.assertIn("Where it is kept: Shared drive.", text)
+
+    def test_a_full_stop_is_not_doubled(self, _rules):
+        deliverable = _deliverable().model_copy(
+            update={"format": "A shared document.", "success_criteria": "Every decision has an owner."}
+        )
+
+        text = render_result(deliverable, RenderContext())
+
+        self.assertIn("A shared document.\n", text)
+        self.assertNotIn("..", text)
 
     def test_a_component(self, _rules):
         text = render_result(_component(), RenderContext())
 
         self.assertIn("Meeting Minutes — Write up", text)
-        self.assertIn("Covers: Does not cover the agenda", text)
+        self.assertIn("What it does and doesn't cover: Does not cover the agenda", text)
         self.assertIn("Owned by: You", text)
         self.assertNotIn("component owns", text)
 
@@ -211,9 +226,14 @@ class TestTheGuardrail(unittest.TestCase):
     def test_control_characters_and_markup_are_rejected(self):
         self._rejects("hello\x1b[31m", "control")
         self._rejects("<b>hello</b>", "HTML")
-        self._rejects("**bold**", "markdown")
-        self._rejects("# Heading", "headings")
-        self._rejects("a | b", "table")
+
+    def test_the_users_punctuation_is_not_censored(self):
+        # A user's words may contain emphasis, a hash, or a pipe. The chat
+        # shows them literally; they do not break it.
+        text = validate_rendering("**urgent** | decision #2", RenderContext())
+
+        self.assertIn("**urgent**", text)
+        self.assertIn("|", text)
 
     def test_a_long_line_is_wrapped(self):
         text = validate_rendering(

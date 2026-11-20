@@ -216,13 +216,15 @@ def _build_system_prompt(
         "person or say 'the user'. Do not list the result's values there; "
         "they are in `result`. If the user's last message asked something, "
         "answer it in `message` before you finish.\n\n"
-        "When the user corrects or adds something, update the result, say in "
-        "one sentence what changed, and ask them to confirm the change before "
-        "you finish — a changed draft is a new proposal. When the result is "
-        "unchanged, finish now; never ask for a second approval of the same "
-        "draft. If they ask what a word or type means, explain it in their "
-        "own words before you finish. Do not comment on the quality of what "
-        "they said."
+        "When the user corrects or adds something, update the result and say in "
+        "one sentence what changed. The framework shows a changed draft to the "
+        "user and asks for confirmation, so do not present the result yourself, "
+        "do not announce it ('here it is', 'here's your …'), and do not ask "
+        "for a second approval of it. When the result is "
+        "unchanged, finish now; never re-present it or repeat a question the "
+        "user has already answered. If they ask what a word or type means, "
+        "explain it in their own words before you finish. Do not comment on "
+        "the quality of what they said."
     )
     if not chat and getattr(_inner_model(return_type), "__name__", "") != "TextReply":
         sections.append(

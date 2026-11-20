@@ -131,22 +131,38 @@ class Session:
         """Find a descendant session by id."""
         return next((item for item in self.walk() if item.id == session_id), None)
 
-    def propose(self, result: Any) -> None:
+    def propose(
+        self,
+        result: Any,
+        *,
+        changed: bool = False,
+        note: str | None = None,
+    ) -> None:
         """Render a derived result as the proposal turn, if it has anything to say.
 
         This is the only path a composite uses to show a draft: the rendering
         is validated before it reaches the transcript, and an empty result
-        (a list a step is allowed to leave empty) says nothing.
+        (a list a step is allowed to leave empty) says nothing. A changed
+        proposal asks about the change, not the same question again. ``note``
+        says what the proposal leaves out — "everything else stays as we
+        agreed" — without becoming a second message.
         """
         from .rendering import RenderContext, render_result
 
         text = render_result(result, RenderContext())
-        if text:
-            self.say(
-                "Here's what I propose — tell me what you'd change:\n\n"
-                f"{text}\n\n"
-                "Does that capture it, or would you adjust anything?"
-            )
+        if not text:
+            return
+        if changed:
+            head = "Here's the updated proposal"
+            question = "Does this capture the change?"
+        else:
+            head = "Here's what I propose — tell me what you'd change"
+            question = "Does that capture it, or would you adjust anything?"
+        parts = [f"{head}:\n\n{text}"]
+        if note:
+            parts.append(note)
+        parts.append(question)
+        self.say("\n\n".join(parts))
 
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""

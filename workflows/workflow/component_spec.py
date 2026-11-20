@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.confirmation import confirm_draft
 from chat_workflow.mixins import LLMValidated
-from chat_workflow.rendering import RenderContext, render_result
+from chat_workflow.rendering import RenderContext
 from chat_workflow.transcript import entries
 
 # Activity nouns the model reaches for when it should name the artifact.
@@ -32,6 +32,8 @@ _ABSTRACT_ACTIVITY_NAMES = frozenset(
 
 class ComponentSpec(LLMValidated):
     """The component spec: what a component is responsible for in the user's domain."""
+
+    model_config = ConfigDict(title="a part of the work")
 
     _validation_rules: ClassVar[list[str]] = [
         # The name is enforced by the `_name_is_a_concrete_artifact` field
@@ -162,7 +164,9 @@ class ComponentSpec(LLMValidated):
         """Say one part of the work in the user's words."""
         lines = [f"{self.name} — {self.purpose}"]
         if self.scope_description:
-            lines.append(f"Covers: {self.scope_description}")
+            # The value may state what is *out* of scope ("Does not cover the
+            # agenda"), so a "Covers:" label would contradict it.
+            lines.append(f"What it does and doesn't cover: {self.scope_description}")
         if self.owner_role:
             lines.append(f"Owned by: {self.owner_role}")
         return "\n".join(lines)
@@ -227,11 +231,13 @@ class ComponentSpec(LLMValidated):
             if part.name.strip().casefold()
             not in {name.strip().casefold() for name in already_shown}
         ]
-        text = render_result(shown or draft, RenderContext())
-        if already_shown:
-            text = "Thanks — here's what I'd add or change:\n" + text
-            text += "\n\nEverything else stays as we agreed."
-        session.say(text)
+        # The proposal is one turn, whether it is the whole set or only the
+        # parts added to a set the user already confirmed.
+        session.propose(
+            shown or draft,
+            changed=bool(already_shown),
+            note="Everything else stays as we agreed." if already_shown else None,
+        )
         confirmed = confirm_draft(
             session=session,
             draft=draft,
@@ -297,13 +303,17 @@ def _draft_components(
 ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
     """Derive the parts of the user's work from the analysis.
 
-The analysis, inputs and outputs are established facts. The parts are derived from its activities. The owner of each
-part is the person or role whose job includes producing or maintaining that part. `analysis.orchestrating_component` is
-the owner only when that role does the work; use `analysis.participants` for a part another participant produces — a
+The analysis, inputs and outputs are established facts. The parts are derived from its stages and steps. The owner of
+each part is the person or role whose job includes producing or maintaining that part.
+`analysis.orchestrating_component` is the owner only when that role does the work; use
+`analysis.participants` for a part another participant produces — a
 note-taker's notes belong to the note-taker, while the minutes belong to the coordinator. If the analysis says "I" or
 "me", use the role the notes or participants describe; if there is no role name, use "You". Never return failure because
-the role is written as a pronoun. Include the parts in `existing_components` and add any that are missing. Do not ask
-the user anything: derive the complete set and return it.
+the role is written as a pronoun, and never return failure because the analysis
+does not name the parts directly: each stage is work on some part, and naming
+that part is your job. Include the parts in `existing_components` and add any
+that are missing. Do not ask the user anything: derive the complete set and
+return it.
 
 Each part is one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
 reviews or sends another part's thing belongs to that part. Name each part after its thing ("Approval Record", not
@@ -322,14 +332,15 @@ def _confirm_components(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
     """
-The parts have been shown. Ask one confirm-or-correct question.
+The parts were shown with one confirm-or-correct question, and the user is
+answering it. Do not show the set again and do not repeat that question.
 
 Do not re-present the whole set. When the user confirms, return the set in the same response; do not ask for a second
 confirmation. If they correct a part, or add a requirement that belongs to an existing part, update that part and
 return the corrected set; the framework shows the change. If the requirement is a new artifact, propose a new part. If
 the user says the parts are not separate jobs, explain that those jobs are steps inside the one part and return the
 set. If they ask about the flow, handoffs, or decision points, answer in one or two sentences in a continue message,
-using the analysis' phases, and wait for their response. If they give new information, use a continue turn to propose
+using the analysis' stages, and wait for their response. If they give new information, use a continue turn to propose
 the new or updated parts; you are not out of turns. Ask only about a gap the draft cannot fill; do not ask the user to
 name a part, say who owns it, or describe a stage the analysis already lists. Never say the schema words "consumer",
 "owner_role", "scope_description", "purpose", or "component_type"; say "who it is for", "who owns it", "what it covers",

@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from typing import Annotated, ClassVar
 
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.confirmation import confirm_draft
 from chat_workflow.mixins import LLMValidated
-from chat_workflow.rendering import RenderContext
+from chat_workflow.rendering import RenderContext, without_full_stop
 
 from .deliverable import Deliverable
 from .process_definition import ProcessDefinition
@@ -23,6 +23,8 @@ _NO_EXECUTOR_MODE: tuple[str, str] = (
 
 class Resource(LLMValidated):
     """A single workflow resource."""
+
+    model_config = ConfigDict(title="what you start with")
 
     _validation_rules: ClassVar[list[str]] = [
         "Where it comes from names a person or group of people, a system, a "
@@ -87,7 +89,7 @@ class Resource(LLMValidated):
         lines = [f"{self.source} — {self.format}"]
         if self.dependencies:
             lines.append(f"Needs {'; '.join(self.dependencies)} first.")
-        lines.append(f"Ready when {self.validation_criteria}.")
+        lines.append(f"Ready when {without_full_stop(self.validation_criteria)}.")
         return "\n".join(lines)
 
     @composite_workflow_step
@@ -117,7 +119,7 @@ class Resource(LLMValidated):
         )
 
 
-@atomic_workflow_step(chat=True, single_turn=True)
+@atomic_workflow_step(chat=False, single_turn=True)
 def _draft_resources(
     deliverables: Annotated[list[Deliverable], "What the person makes"],
     analysis: Annotated[
@@ -130,13 +132,12 @@ def _draft_resources(
 
 The deliverables and any analysis are established. A single deliverable is enough: use its name and description to
 propose the materials people usually start with. A starting material is a concrete thing the person begins from — the notes
-they took, the agenda, the attendee list, the ingredients they bought, a
-recording. Use what the user already told you in this conversation: their limits, the food they have, the tools
-they own. It is not an activity ("the meetings I attend", "the meeting
-happening") and never the deliverable itself, the people it is for, or its
-format: "the family" is who the plan is for, and "one-page plan" is the plan's
-format, not something you start with. Use a noun phrase a person could hand
-you. Do not ask the user anything and do not return
+they took, the agenda, the attendee list, the ingredients they bought, a recording. Use what the deliverable and the
+analysis say: what it is made from, and what the person would already have for that kind of work. It is not an activity
+("the meetings I attend", "the meeting happening") and never the deliverable itself, the people it is for, or its
+format: "the family" is who the plan is for, and "one-page plan" is the plan's format, not something you start with.
+A template, a blank form, or the headings are the deliverable's format, not a material. A person, a role, or a meeting is
+not a material. Use a noun phrase a person could hand you. Do not ask the user anything and do not return
 failure because there is no process description. For each, in the user's words:
 - where it comes from: the person, place, system, or document, not the act of getting it;
 - what form it takes when it exists: a list, a document, a recording, not the act of gathering it;
@@ -156,7 +157,7 @@ def _confirm_resources(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[Resource], Field(min_length=1)]:
     """
-The starting materials have been shown. Ask which ones they have.
+The starting materials were shown with one confirm-or-correct question, and the user is answering it. Do not show the list again and do not repeat that question.
 
 If they add one, include it; if they say one does not apply, remove it. If they say the list is wrong or they do not
 have an item, replace it with what they say they do have; never return failure because the list needs correction. If

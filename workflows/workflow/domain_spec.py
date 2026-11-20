@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
@@ -55,6 +55,8 @@ class ComponentDomainSpec(LLMValidated):
     fields it contains, holistic quality criteria, and who owns it.
     The name must match the corresponding ComponentSpec.name.
     """
+
+    model_config = ConfigDict(title="the artifact")
 
     _validation_rules: ClassVar[list[str]] = [
         "The expert_role is the agent's domain expertise — the role the agent "
@@ -210,7 +212,8 @@ def _confirm_domain_spec(
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentDomainSpec:
     """
-The domain spec has been shown. Ask one question about a field or quality check.
+The domain spec was shown with one confirm-or-correct question, and the user is
+answering it. Do not show it again and do not repeat that question.
 
 If the user confirms, return the draft. If they correct or add a field or check — including a section, a table, or a
 length limit — update the fields or what_good_looks_like and return the corrected spec; the framework shows the change.

@@ -40,6 +40,16 @@ def _session() -> Session:
     return Session(io=_IO(), state=SessionLog(), config=FakeConfig())
 
 
+class _Draft:
+    """A minimal Renderable: what the user sees is its text."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def render(self, context) -> str:
+        return self.text
+
+
 class TestRecursiveSession(unittest.TestCase):
     def test_spawn_creates_a_child_with_clean_context(self):
         root = _session()
@@ -103,6 +113,27 @@ class TestRecursiveSession(unittest.TestCase):
         session.propose([])
 
         self.assertEqual(session.state.messages, [])
+
+    def test_a_proposal_is_one_turn_with_one_question(self):
+        session = _session()
+
+        session.propose([_Draft("first"), _Draft("second")], note="The rest stays as we agreed.")
+
+        text = str(session.state.messages[-1])
+        self.assertEqual(len(session.state.messages), 1)
+        self.assertIn("Here's what I propose", text)
+        self.assertIn("first", text)
+        self.assertIn("The rest stays as we agreed.", text)
+        self.assertEqual(text.count("?"), 1)
+
+    def test_a_changed_proposal_asks_about_the_change(self):
+        session = _session()
+
+        session.propose([_Draft("first")], changed=True)
+
+        text = str(session.state.messages[-1])
+        self.assertIn("updated proposal", text)
+        self.assertIn("Does this capture the change?", text)
 
 
 class TestTheSuccessMessage(unittest.TestCase):
