@@ -208,7 +208,7 @@ approver?" Name one concrete improvement grounded in the breakdown — a capture
 format, a template, or a checklist they could adopt — and ask whether it fits. Do not invent a tool or product they did
 not mention; keep the improvement to a practice. If the user asks what the output looks like, say in one sentence that
 the output's shape comes next and return to the stages and steps. If they describe their domain content (a specific
-article, dish, or idea), acknowledge it in one clause without praising it and return to the stages and steps; never
+article, dish, or idea), do not comment on it; say "Noted." and return to the stages and steps. Never praise it or
 develop the content. If they confirm, return the draft. If they correct a value, update it and return the corrected
 result. Do not re-present the whole draft and do not ask them to name the stages or steps; the draft already has
 them."""

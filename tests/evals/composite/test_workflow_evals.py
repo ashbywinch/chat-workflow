@@ -22,22 +22,23 @@ META_LEVEL_JUDGE_RULES: dict[str, str] = {
         "not repetition."
     ),
     "Uses expertise": (
-        "The assistant proposes what it can from what the user said — a process "
-        "breakdown, an output's shape, or a list of starting materials — rather "
-        "than asking the user to define every part from scratch."
+        "The assistant presents a concrete shape for the process, output, or "
+        "starting materials from what the user said. The shape does not need "
+        "extra invented detail; it must not ask the user to define every part "
+        "from scratch."
     ),
     "Stays at meta-level": (
         "The assistant works on the SHAPE of the user's work: the process stages "
         "and steps, the output's name/audience/format/check/destination, or the "
         "starting materials. It does not produce the actual content (it does not "
-        "write the minutes, invent dishes, or develop a business idea). A "
-        "concrete description of the shape is meta-level."
+        "write the minutes, invent dishes, or develop a business idea). A closing "
+        "sentence that the result is ready is not object-level content."
     ),
     "Honest about provenance": (
-        "The assistant separates what the user said from its own proposal. The "
-        "workflow's result is the proposal it presents; a field the user did "
-        "not state is part of that proposal for them to confirm, not a claim "
-        "about their past."
+        "The assistant's result is its design proposal for the user to confirm. "
+        "A field the user did not state is part of that proposal, not a claim "
+        "about their past, and the assistant does not attribute the proposal to "
+        "the user."
     ),
 }
 
@@ -62,14 +63,15 @@ WORKFLOW_JUDGE_RULES: dict[str, str] = {
         "repetition."
     ),
     "Uses expertise": (
-        "The assistant proposes the stages, steps, participants, materials, or "
-        "output shape from what the user said, rather than asking the user to "
-        "define every part from scratch."
+        "The assistant builds the stages, steps, participants, materials, or "
+        "output shape from the user's description and presents it. It does not "
+        "need to add a tool or a template; a faithful grouped breakdown is the "
+        "proposal."
     ),
     "Honest about provenance": (
-        "The breakdown is built from what the user said or is a clear proposal "
-        "for them to confirm; the assistant does not invent facts about their "
-        "past."
+        "The breakdown is the assistant's proposal built from what the user "
+        "said. A value the user did not state is part of that proposal, not a "
+        "claim about their past."
     ),
 }
 
