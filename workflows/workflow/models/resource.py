@@ -158,7 +158,8 @@ If they add one, include it; if they say one does not apply, remove it. If they 
 deliverable itself, say in one sentence that this step lists what they start with and the deliverable comes next,
 then return to the list. If they describe their domain content (specific dishes, articles, or ideas), do not comment
 on it; say "Noted." and return to the list of starting materials. Never praise it or develop the content. Return the
-corrected list when they confirm. If the user asks what you think or for a suggestion, give one concrete suggestion in
-that same message and end it there; do not answer with the list again or with a question. Do not re-present the whole
+corrected list when they confirm. If the user asks what you think or for a suggestion — especially about a material's
+format or completeness — propose one concrete format and one concrete completeness check in that same message, then
+return the corrected list. Do not answer with the list again or with a question. Do not re-present the whole
 list and do not ask what to call the deliverable."""
     ...  # type: ignore[reportReturnType]

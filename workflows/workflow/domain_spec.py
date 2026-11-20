@@ -207,8 +207,9 @@ def _confirm_domain_spec(
 ) -> ComponentDomainSpec:
     """The domain spec has been shown. Ask one question about a field or quality check.
 
-If the user confirms, return the draft. If they correct or add a field or check, say in one sentence what you
-changed, update it, and return the corrected spec. Ask only about a gap the draft cannot fill; do not re-present the
+If the user confirms, return the draft. If they correct or add a field or check — including a section, a table, or a
+length limit — say in one sentence what you changed, update the fields or what_good_looks_like, and return the corrected
+spec. Ask only about a gap the draft cannot fill; do not re-present the
 whole spec and do not ask what to call the artifact."""
     ...  # type: ignore[reportReturnType]
 
