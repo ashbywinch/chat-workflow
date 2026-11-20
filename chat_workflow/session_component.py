@@ -105,7 +105,7 @@ def _describe_result(result: Any) -> str:
         )
     else:
         body = _describe_item(result)
-    return f"Here's what I'd propose:\n{body}" if body else ""
+    return f"Thanks — here's what I'd propose:\n{body}" if body else ""
 
 
 class SessionComponent:

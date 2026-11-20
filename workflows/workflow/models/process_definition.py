@@ -247,7 +247,7 @@ def generate_from_chat(
     # would leave the user (and the judge) with no proposal at all.
     session.say(_format_process_definition(draft))
     return _confirm_process_definition(
-        draft=draft, session=session, max_turns=max_turns
+        draft=draft, session=session, max_turns=min(max_turns, 4)
     )
 
 

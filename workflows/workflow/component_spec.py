@@ -197,7 +197,9 @@ class ComponentSpec(LLMValidated):
             session=session,
         )
         session.say(_format_components(draft))
-        return _confirm_components(draft=draft, session=session, max_turns=max_turns)
+        return _confirm_components(
+            draft=draft, session=session, max_turns=min(max_turns, 4)
+        )
 
 
 from .models.deliverable import Deliverable  # noqa: E402
@@ -259,7 +261,8 @@ def _confirm_components(
 ) -> list[ComponentSpec]:
     """The parts have already been shown to the user. Ask one confirm-or-correct question.
 
-Do not re-present the whole set. If the user confirms, return the draft. If they correct a part, or add a requirement
+Do not re-present the whole set. When the user confirms, return the set in the same response; do not ask for a
+second confirmation. If they correct a part, or add a requirement
 that belongs to an existing part, say in one sentence that you added it to that part, update the part, and return the
 corrected set. If the requirement is a new artifact, propose a new part. If the user says the parts are not separate
 jobs, explain that those jobs are steps inside the one part, not separate parts, and return the set. If the user asks

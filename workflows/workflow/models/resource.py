@@ -100,7 +100,7 @@ class Resource(LLMValidated):
         )
         session.say(_format_resources(draft, deliverables))
         return _confirm_resources(
-            draft=draft, session=session, max_turns=max_turns
+            draft=draft, session=session, max_turns=min(max_turns, 4)
         )
 
 

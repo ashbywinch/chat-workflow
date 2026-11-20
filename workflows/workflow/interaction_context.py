@@ -85,7 +85,7 @@ class ComponentInteractionContext(BaseModel):
         )
         session.say(_format_interaction_context(draft))
         return _confirm_interaction_context(
-            draft=draft, session=session, max_turns=max_turns
+            draft=draft, session=session, max_turns=min(max_turns, 4)
         )
 
 

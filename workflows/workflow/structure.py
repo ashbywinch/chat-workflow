@@ -112,7 +112,7 @@ class ComponentStructure(BaseModel):
         draft = _draft_structure(domain_spec=domain_spec, session=session)
         session.say(_format_structure(draft, domain_spec))
         return _confirm_structure(
-            draft=draft, session=session, max_turns=max_turns
+            draft=draft, session=session, max_turns=min(max_turns, 4)
         )
 
 
