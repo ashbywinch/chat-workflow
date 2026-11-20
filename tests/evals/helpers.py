@@ -96,6 +96,22 @@ _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.json"
 
 
+def _looks_garbled(text: str) -> bool:
+    """True for a completion that is not a sentence a person would write."""
+    words = text.split()
+    if not words:
+        return True
+    stars = text.count("*")
+    if stars > 20:
+        return True
+    weird = sum(
+        1
+        for word in words
+        if not any(character.isalnum() for character in word) or len(word) > 40
+    )
+    return len(words) >= 5 and weird / len(words) > 0.4
+
+
 class AgentIO:
     """UserIO implementation backed by an LLM — plays a realistic user role.
 
@@ -152,12 +168,21 @@ class AgentIO:
             )
 
     def prompt(self, label: str) -> str:
-        """Generate the user's reply to the workflow's last message."""
-        turn = self._conversation.send(None)
-        text = turn.output.strip()
-        if not text:
-            raise RuntimeError(f"User bot returned an empty reply for {label!r}")
-        return text
+        """Generate the user's reply, resampling a corrupted completion.
+
+        The gateway occasionally returns a completion that decodes to a wall of
+        asterisks and broken words. It is a valid string, so the output retry
+        does not see it; the eval would then feed it to the workflow as the
+        user's turn. Resample from the same history instead.
+        """
+        before = list(self._conversation.messages)
+        for _ in range(3):
+            turn = self._conversation.send(None)
+            text = turn.output.strip()
+            if text and not _looks_garbled(text):
+                return text
+            self._conversation.messages = list(before)
+        raise RuntimeError(f"User bot returned an unusable reply for {label!r}")
 
 
 class JudgeVerdict(BaseModel):
