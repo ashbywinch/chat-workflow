@@ -77,7 +77,7 @@ def _plain_type(type_expr: Any) -> str:
     return plain + (" (optional)" if optional else "")
 
 
-def _describe_item(item: Any) -> str:
+def _describe_item(item: Any, hints: dict[str, str] | None = None) -> str:
     if isinstance(item, str):
         return item
     if hasattr(item, "model_dump"):
@@ -124,7 +124,8 @@ def _describe_item(item: Any) -> str:
 
     if "fields" in data and "model_validators" in data:
         field_text = "; ".join(
-            f"{field.get('name')} is {_plain_type(field.get('type_expr'))}"
+            f"{field.get('name')} is "
+            f"{(hints or {}).get(str(field.get('name')), _plain_type(field.get('type_expr')))}"
             for field in data["fields"]
             if isinstance(field, dict)
         )
@@ -230,7 +231,9 @@ def _suggest_from_item(item: Any) -> str:
     return ""
 
 
-def _describe_result(result: Any, *, question: str = "") -> str:
+def _describe_result(
+    result: Any, *, question: str = "", hints: dict[str, str] | None = None
+) -> str:
     if result is None:
         return ""
     if isinstance(result, str):
@@ -243,10 +246,10 @@ def _describe_result(result: Any, *, question: str = "") -> str:
                 return suggestion
     if isinstance(result, (list, tuple)):
         body = "\n".join(
-            line for line in (_describe_item(item) for item in result) if line
+            line for line in (_describe_item(item, hints) for item in result) if line
         )
     else:
-        body = _describe_item(result)
+        body = _describe_item(result, hints)
     return f"Thanks — here's what I'd propose:\n{body}" if body else ""
 
 
@@ -281,7 +284,13 @@ class SessionComponent:
         """
         ...  # type: ignore[reportReturnType]
 
-    def present(self, result: Any, *, question: str = "") -> str:
+    def present(
+        self,
+        result: Any,
+        *,
+        question: str = "",
+        hints: dict[str, str] | None = None,
+    ) -> str:
         """Describe the result in the user's words, without a model call.
 
         The result's own fields are already in the user's words. A deterministic
@@ -289,7 +298,7 @@ class SessionComponent:
         completion can. When the user's last message asked for a suggestion,
         the reply is the suggestion itself, not the list again.
         """
-        return _describe_result(result, question=question)
+        return _describe_result(result, question=question, hints=hints)
 
     @composite_workflow
     def converse(self, step: Callable[..., T], *, session: Session) -> T:
@@ -365,7 +374,9 @@ class SessionComponent:
                 and _needs_presentation(session.state.messages, before)
             ):
                 presented = self.present(
-                    result, question=_last_user_text(session.state.messages)
+                    result,
+                    question=_last_user_text(session.state.messages),
+                    hints=session.presented_hints,
                 )
                 if presented:
                     session.say(presented)

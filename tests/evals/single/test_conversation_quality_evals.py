@@ -60,7 +60,8 @@ CONFUSION_JUDGE_RULES = {
         " business or technical terms that the user wouldn't understand or"
         " wouldn't use themselves — like 'output', 'deliverable', 'workflow',"
         " 'consumer', 'input', 'resource', 'stakeholder'. Matching the user's"
-        " own language is always fine. Judge only the assistant's messages to"
+        " own language is always fine, and the name of the user's own output is"
+        " not jargon. Judge only the assistant's messages to"
         " the user; the structured result is internal and is not part of the"
         " conversation. PASS otherwise."
     ),

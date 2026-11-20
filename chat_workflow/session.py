@@ -88,6 +88,9 @@ class Session:
     # with the wrong vocabulary).
     presented: bool = False
     presented_at: int = 0
+    # The domain's own words for each field, cached by a structural-design
+    # presentation so a later recap does not fall back to Python types.
+    presented_hints: dict[str, str] = dataclasses.field(default_factory=dict)
     id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex[:8])
     title: str | None = None
     _raw_io: UserIO = dataclasses.field(init=False, repr=False)
