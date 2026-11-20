@@ -110,6 +110,21 @@ _SPLIT_DESCRIPTION = re.compile(
 )
 
 
+_TRAILING_GARBAGE = frozenset({"}", ")", "]", "to", "the", "and"})
+
+
+def _trim_trailing_garbage(code: str) -> str:
+    """Drop stray lines a model leaves after a complete module."""
+    lines = code.splitlines()
+    changed = False
+    while lines and lines[-1].strip() in _TRAILING_GARBAGE:
+        lines.pop()
+        changed = True
+    if not changed:
+        return code
+    return "\n".join(lines) + ("\n" if code.endswith("\n") else "")
+
+
 def _join_split_descriptions(code: str) -> str:
     """Join a description string the model split into two positional strings.
 
@@ -962,7 +977,7 @@ class ComponentSourceCode(LLMValidated):
         return type check, and business validation presence check.
         """
         code = self.code
-        repaired = _join_split_descriptions(code)
+        repaired = _trim_trailing_garbage(_join_split_descriptions(code))
         if repaired != code:
             self.code = SourceLines(repaired)
             code = repaired

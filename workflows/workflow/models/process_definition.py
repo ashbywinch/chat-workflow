@@ -141,7 +141,7 @@ def _gather_notes(
 
 The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
 it is what they already told you: do not ask "What do you do?" again; ask only "Is there anything else?" once, then return. Otherwise
-ask "What do you do?" once; after their first answer, ask at most "Is there anything else?" once, then return what they told you, in
+ask "What do you do?" once; after their first answer, ask "Is there anything else?" once, then return what they told you, in
 their words. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
 do you actually do, step by step?" — and return their answer.
 
@@ -159,8 +159,9 @@ def _draft_process_definition(
     """Turn the user's description into the stages and steps of their work.
 
 The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Keep their names for
-the stages and steps. Group the concrete steps into a few broad stages; a stage is not one of the steps repeated as a
-heading, and no step may appear both as a stage and as an activity. List only the people or roles the notes actually
+the stages and steps. If the notes name the stages, use those names as the stages and the actions inside them as the
+steps. Group the concrete steps into broad stages only when the notes give steps without stages; a stage is not one of
+the steps repeated as a heading, and no step may appear both as a stage and as an activity. List only the people or roles the notes actually
 name; a step that says "submit for approval" does not name an approver, so leave the approver out and let the
 confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
 say the user does it all, the orchestrating component and the sole participant are the user. Do not invent people or

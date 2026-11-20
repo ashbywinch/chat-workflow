@@ -70,6 +70,9 @@ class EvaluationCriteria(BaseModel):
         - Base output only on information explicitly provided by the user.
           `context` names the topic; it is not the user's answers and is not
           enough to fill the criteria.
+        - If the user says "that's all", "please finalize", or otherwise asks
+          to finish, return intent="success" with the criteria from the answers
+          they gave; do not ask another question.
         - If the user is vague, ask clarifying questions. If they answer a
           question with a vague non-answer, ask once more; if they still give
           no value, return intent="failure" rather than inventing one from the

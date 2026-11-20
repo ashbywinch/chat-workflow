@@ -53,13 +53,14 @@ _DISPLAY_LABELS: dict[str, str] = {
 
 def _describe_item(item: Any) -> str:
     if isinstance(item, str):
-        return f"- {item}"
+        return item
     if hasattr(item, "model_dump"):
         data = item.model_dump()
     elif isinstance(item, dict):
         data = item
     else:
         return ""
+
     if data.get("phases") and data.get("activities"):
         phases = "; ".join(str(value) for value in data["phases"])
         steps = "; ".join(str(value) for value in data["activities"])
@@ -80,14 +81,81 @@ def _describe_item(item: Any) -> str:
         elif owner:
             sentence += f" {owner} keeps it moving."
         return sentence
+
+    if "fields" in data and "what_good_looks_like" in data:
+        field_text = "; ".join(
+            f"{field.get('name')} is {field.get('domain_description')}"
+            for field in data["fields"]
+            if isinstance(field, dict)
+        )
+        quality = "; ".join(str(value) for value in data["what_good_looks_like"])
+        name = data.get("name") or "The thing"
+        description = data.get("description") or ""
+        return (
+            f"{name}: {description} You capture {field_text}. What makes it good: "
+            f"{quality}. The role is {data.get('expert_role') or 'not stated'}."
+        )
+
+    if "fields" in data and "model_validators" in data:
+        field_text = "; ".join(
+            f"{field.get('name')} is {field.get('type_expr')}"
+            for field in data["fields"]
+            if isinstance(field, dict)
+        )
+        rules = "; ".join(
+            str(validator.get("rule"))
+            for validator in data["model_validators"]
+            if isinstance(validator, dict)
+        )
+        return f"The shape is {field_text}. The rules are {rules}."
+
+    if "must_prioritize" in data:
+        return (
+            "I'll always cover "
+            + "; ".join(str(value) for value in data["must_prioritize"])
+            + ". I'll suggest "
+            + "; ".join(str(value) for value in data.get("auto_suggest") or [])
+            + ". I'll watch for "
+            + "; ".join(str(value) for value in data.get("user_pain_points") or [])
+            + "."
+        )
+
+    if "source" in data:
+        sentence = f"You start with {data['source']}"
+        if data.get("format"):
+            sentence += f", in the form of {data['format']}"
+        if data.get("dependencies"):
+            sentence += f"; it needs {'; '.join(data['dependencies'])} first"
+        if data.get("validation_criteria"):
+            sentence += f". The check is {data['validation_criteria']}"
+        return sentence + "."
+
+    if "consumer" in data:
+        name = data.get("name") or "It"
+        sentence = f"{name} is {data.get('description') or 'the thing you make'}."
+        if data.get("consumer"):
+            sentence += f" It is for {data['consumer']}."
+        if data.get("format"):
+            sentence += f" It is a {data['format']}."
+        if data.get("success_criteria"):
+            sentence += f" The check is {data['success_criteria']}."
+        if data.get("integration_points"):
+            sentence += f" After that, {data['integration_points']}."
+        if data.get("storage_requirements"):
+            sentence += f" It is kept {data['storage_requirements']}."
+        return sentence
+
+    if "scope_description" in data:
+        sentence = f"{data.get('name') or 'This part'}: {data.get('purpose') or ''}"
+        if data.get("scope_description"):
+            sentence += f" {data['scope_description']}"
+        if data.get("owner_role"):
+            sentence += f" Owned by {data['owner_role']}."
+        return sentence
+
     heading = data.get("name") or data.get("text") or ""
-    # A component was already shown in full by the composite's own
-    # presentation; the closing recap names it and its owner, not its scope
-    # again.
-    keys = ("owner_role",) if "scope_description" in data else _DISPLAY_LABELS
     parts: list[str] = []
-    for key in keys:
-        label = _DISPLAY_LABELS[key]
+    for key, label in _DISPLAY_LABELS.items():
         value = data.get(key)
         if value in (None, "", []):
             continue
@@ -97,10 +165,8 @@ def _describe_item(item: Any) -> str:
             value = "; ".join(str(entry) for entry in value)
         parts.append(f"{label}: {value}")
     if heading and parts:
-        return f"- {heading} — " + "; ".join(parts)
-    if heading:
-        return f"- {heading}"
-    return "- " + "; ".join(parts) if parts else ""
+        return f"{heading}: " + "; ".join(parts)
+    return "; ".join(parts) if parts else ""
 
 
 def _describe_result(result: Any) -> str:
