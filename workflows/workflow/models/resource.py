@@ -109,11 +109,11 @@ def _format_resources(draft: list[Resource], deliverables: list[Deliverable]) ->
     thing = deliverables[0].name if deliverables else "the thing you make"
     lines = [f"Let's list what you start with before you make {thing}.", ""]
     for resource in draft:
-        line = f"- {resource.source} — form: {resource.format}"
+        line = f"- {resource.source} — which is {resource.format}"
         if resource.dependencies:
-            line += f"; needs first: {'; '.join(resource.dependencies)}"
+            line += f"; you need {'; '.join(resource.dependencies)} first"
         if resource.validation_criteria:
-            line += f"; the check: {resource.validation_criteria}"
+            line += f"; you know it is ready when {resource.validation_criteria}"
         lines.append(line)
     lines.append("")
     lines.append("Which of these do you have, and what else do you start with?")

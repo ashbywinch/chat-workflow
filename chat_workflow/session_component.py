@@ -123,11 +123,11 @@ def _describe_item(item: Any) -> str:
     if "source" in data:
         sentence = f"You start with {data['source']}"
         if data.get("format"):
-            sentence += f", in the form of {data['format']}"
+            sentence += f", which is {data['format']}"
         if data.get("dependencies"):
-            sentence += f"; it needs {'; '.join(data['dependencies'])} first"
+            sentence += f"; you need {'; '.join(data['dependencies'])} first"
         if data.get("validation_criteria"):
-            sentence += f". The check is {data['validation_criteria']}"
+            sentence += f". You know it is ready when {data['validation_criteria']}"
         return sentence + "."
 
     if "consumer" in data:
@@ -138,7 +138,7 @@ def _describe_item(item: Any) -> str:
         if data.get("format"):
             sentence += f" It is a {data['format']}."
         if data.get("success_criteria"):
-            sentence += f" The check is {data['success_criteria']}."
+            sentence += f" You know it is ready when {data['success_criteria']}."
         if data.get("integration_points"):
             sentence += f" After that, {data['integration_points']}."
         if data.get("storage_requirements"):

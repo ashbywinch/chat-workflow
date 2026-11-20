@@ -141,13 +141,24 @@ def _gather_notes(
 
 The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
 it is what they already told you: do not ask "What do you do?" again; ask only "Is there anything else?" once, then return. Otherwise
-ask "What do you do?" once; after their first answer, ask "Is there anything else?" once, then return what they told you, in
-their words. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
+ask "What do you do?" once; after their first answer, return what they told you, in their words. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
 do you actually do, step by step?" — and return their answer.
 
 Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown.
 
 Put the user's description in `notes`, in their words — not your reply to them. If you still need an answer, ask the question as a continue; never put a question in `notes`."""
+    ...  # type: ignore[reportReturnType]
+
+
+@atomic_workflow_step
+def _ask_anything_else(
+    notes: Annotated[GatheredNotes, "What the person told you so far"],
+    max_turns: Annotated[int, "Maximum turns"] = 2,
+) -> GatheredNotes:
+    """Ask one open invitation, then return the complete notes.
+
+Ask exactly "Is there anything else?" once. After their answer, add it to the notes in their words and return the
+complete GatheredNotes. Do not name stages or structure what they say."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -243,6 +254,7 @@ def generate_from_chat(
         )
     else:
         gathered = _gather_notes(session=session, max_turns=gather_turns)
+    gathered = _ask_anything_else(notes=gathered, session=session, max_turns=2)
     draft = _draft_process_definition(notes=gathered.notes, session=session)
     # The proposal is the model's own draft, shown in the user's words before
     # the confirmation turn. A confirmation turn that skips the presentation
