@@ -163,7 +163,8 @@ steps. Group the concrete steps into broad stages only when the notes give steps
 the steps repeated as a heading, and no step may appear both as a stage and as an activity. List only the people or roles the notes actually
 name; a step that says "submit for approval" does not name an approver, so leave the approver out and let the
 confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
-say the user does it all, the orchestrating component and the sole participant are the user. Do not invent people or
+say the user does it all, the orchestrating component and the sole participant are "You"; do not invent a job title
+such as "Meal Planner" for the user. Do not invent people or
 steps the notes do not support. A name the notes say the user is unsure about — "I don't know if JD is John or a
 project" — is not a participant; leave it out. An example is not a fact.
 

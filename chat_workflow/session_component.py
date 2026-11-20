@@ -237,7 +237,22 @@ def _suggest_from_item(item: Any) -> str:
     if not isinstance(data, dict):
         return ""
     if data.get("source"):
-        sentence = f"Here's what I'd suggest: keep {data['source']} as {data.get('format', 'a simple list')}"
+        form = str(data.get("format") or "a simple list")
+        structure_words = (
+            "bullet",
+            "list",
+            "table",
+            "heading",
+            "section",
+            "template",
+            "timestamp",
+            "line",
+            "column",
+            "one per",
+        )
+        if not any(word in form.casefold() for word in structure_words):
+            form += ", written as short lines, one per point, in the order they come up"
+        sentence = f"Here's what I'd suggest: keep {data['source']} as {form}"
         if data.get("dependencies"):
             sentence += f", and have {'; '.join(data['dependencies'])} ready first"
         sentence += "."
@@ -286,8 +301,9 @@ class SessionComponent:
         """Open the conversation.
 
         Give one short greeting, say in one sentence what you are here to help
-        with — describing their work so it can be built into something they can
-        use — and ask what they would like help with. Keep it warm and plain:
+        with — describing what they do so it can be built into something they
+        can use — and ask what they would like help with. They may describe a
+        personal routine, not only a job. Keep it warm and plain:
         no list of questions, no form, no jargon. Do not ask the user to
         introduce themselves.
         """

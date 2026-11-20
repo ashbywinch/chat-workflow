@@ -128,6 +128,8 @@ class Deliverable(LLMValidated):
     ) -> list[Deliverable]:
         """Describe the one thing the user makes.
 
+    What they make may be personal — a meal plan, a trip plan, a letter — not only a work document. Do not refuse because it is not for a job.
+
     The conversation has already opened. If the `analysis` or the conversation already names the thing the user makes, use that name and go straight to proposing what it looks like; do not ask what they call it. Only if neither names it, ask "What do you make?" in your first turn. Then reflect back what they said and propose what it looks like and what it holds. Give them a draft to correct, not a form to fill in. If they name something common (meeting minutes, invoices), propose what it usually looks like in that same turn, before asking anything else. Ask only for what is still missing or uncertain, once each.
 
 A private working copy the user never shares is not one of the things they make; it is an input to the thing they make. Do not return it as a deliverable. When several things are produced, the final one is the artifact the consumer receives; the others are its sections or its supporting records.

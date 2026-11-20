@@ -134,7 +134,8 @@ def _draft_resources(
 The deliverables and any analysis are established. A single deliverable is enough: use its name and description to
 propose the materials people usually start with. A starting material is a concrete thing the person begins from — the notes
 they took, the agenda, the attendee list, the ingredients they bought, a
-recording. It is not an activity ("the meetings I attend", "the meeting
+recording. Use what the user already told you in this conversation: their limits, the food they have, the tools
+they own. It is not an activity ("the meetings I attend", "the meeting
 happening") and never the deliverable itself, the people it is for, or its
 format: "the family" is who the plan is for, and "one-page plan" is the plan's
 format, not something you start with. Use a noun phrase a person could hand
@@ -159,7 +160,8 @@ def _confirm_resources(
 ) -> list[Resource]:
     """The starting materials have been shown. Ask which ones they have.
 
-If they add one, include it; if they say one does not apply, remove it. If they ask you to format or write the
+If they add one, include it; if they say one does not apply, remove it. If they say the list is wrong or they do not
+have an item, replace it with what they say they do have; never return failure because the list needs correction. If they ask you to format or write the
 deliverable itself, say in one sentence that this step lists what they start with and the deliverable comes next,
 then return to the list. If they describe their domain content (specific dishes, articles, or ideas), do not comment
 on it; say "Noted." and return to the list of starting materials. Never praise it or develop the content. Return the
