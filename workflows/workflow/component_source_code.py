@@ -660,22 +660,32 @@ def _returned_model_names(
     return returned
 
 
-def _plain_nested_types(model: type) -> list[str]:
-    """Field annotation classes defined in the module that are not models."""
-    from dataclasses import is_dataclass
-    from typing import get_args
+def _is_plain_data_type(node: ast.ClassDef) -> bool:
+    """True for an Enum, dataclass, or TypedDict — a valid field type."""
+    for base in node.bases:
+        name = base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
+        if name in {"Enum", "StrEnum", "IntEnum", "TypedDict", "NamedTuple"}:
+            return True
+    return any(
+        (isinstance(d, ast.Name) and d.id == "dataclass")
+        or (isinstance(d, ast.Attribute) and d.attr == "dataclass")
+        for d in node.decorator_list
+    )
 
-    from pydantic import BaseModel
+
+def _plain_nested_types(model: type, plain_names: set[str]) -> list[str]:
+    """Field annotation classes the module defines as plain classes.
+
+    ``plain_names`` are the module's class definitions that are not a
+    BaseModel; a field annotation that names one of them compiles but fails
+    when Pydantic builds the schema.
+    """
+    from typing import get_args
 
     found: list[str] = []
     for field in model.model_fields.values():
         for candidate in get_args(field.annotation):
-            if (
-                isinstance(candidate, type)
-                and candidate.__module__ == model.__module__
-                and not issubclass(candidate, BaseModel)
-                and not is_dataclass(candidate)
-            ):
+            if isinstance(candidate, type) and candidate.__name__ in plain_names:
                 found.append(candidate.__name__)
     return found
 
@@ -1282,7 +1292,14 @@ class ComponentSourceCode(LLMValidated):
             # A nested field type must be a model Pydantic can build. A plain
             # class here imports but fails at schema generation, after the
             # component has been accepted.
-            plain_nested = _plain_nested_types(main_cls)
+            plain_names = {
+                name
+                for name, node in class_nodes.items()
+                if name not in base_names
+                and name != primary_name
+                and not _is_plain_data_type(node)
+            }
+            plain_nested = _plain_nested_types(main_cls, plain_names)
             if plain_nested:
                 raise ValidationError(
                     "Field type(s) must be Pydantic models, not plain classes: "

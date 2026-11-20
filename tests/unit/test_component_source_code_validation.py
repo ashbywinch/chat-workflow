@@ -144,6 +144,42 @@ class TestSessionPromptPlacement(unittest.TestCase):
         self.assertIn("greeting or closing", str(ctx.exception))
 
 
+class TestNestedPlainClass(unittest.TestCase):
+    """A field naming a plain class must fail before the import does."""
+
+    def test_a_plain_nested_class_is_rejected(self):
+        code = '''
+from typing import ClassVar
+
+from pydantic import Field
+
+from chat_workflow import atomic_workflow_step
+from chat_workflow.mixins import LLMValidated
+
+
+class Item:
+    description = ""
+
+
+class Draft(LLMValidated):
+    items: list[Item] = Field(..., description="Items")
+
+    _validation_rules: ClassVar[list[str]] = ["Items are specific"]
+
+    @atomic_workflow_step
+    @classmethod
+    def create(cls) -> "Draft":
+        """Collect the items."""
+        ...
+'''
+
+        with self.assertRaises(PydanticValidationError) as ctx:
+            ComponentSourceCode(code=code)
+
+        self.assertIn("Item", str(ctx.exception))
+        self.assertIn("LLMValidated", str(ctx.exception))
+
+
 class TestPrimaryArtifactRule(unittest.TestCase):
     """One primary artifact; nested BaseModels are allowed when used as fields."""
 
