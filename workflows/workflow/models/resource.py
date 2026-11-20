@@ -160,6 +160,7 @@ then return to the list. If they describe their domain content (specific dishes,
 on it; say "Noted." and return to the list of starting materials. Never praise it or develop the content. Return the
 corrected list when they confirm. If the user asks what you think or for a suggestion — especially about a material's
 format or completeness — propose one concrete format and one concrete completeness check in that same message, then
-return the corrected list. Do not answer with the list again or with a question. Do not re-present the whole
+say in one sentence what changed, and ask them to confirm the change; return after they confirm. Do not answer with
+the list again or with a question. Do not re-present the whole
 list and do not ask what to call the deliverable."""
     ...  # type: ignore[reportReturnType]

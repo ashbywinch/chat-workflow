@@ -203,19 +203,25 @@ def _build_system_prompt(
         "the user as 'you'; never describe the conversation in the third "
         "person or say 'the user'. Do not list the result's values there; "
         "they are in `result`. If the user's last message asked something, "
-        "answer it in `message` before you finish. When the user has just "
-        "confirmed or corrected a draft, name what changed or restate the "
-        "confirmed shape in one sentence — for example, 'I've added those "
-        "four steps under Topic selection.' Do not comment on the quality of "
-        "what they said, and do not finish with only 'I have what you need.'"
+        "answer it in `message` before you finish.\n\n"
+        "When the user corrects or adds something, update the result, say in "
+        "one sentence what changed, and ask them to confirm the change before "
+        "you finish — a changed draft is a new proposal. When the result is "
+        "unchanged, finish now; never ask for a second approval of the same "
+        "draft. If they ask what a word or type means, explain it in their "
+        "own words before you finish. Do not comment on the quality of what "
+        "they said."
     )
     if not chat and getattr(_inner_model(return_type), "__name__", "") != "TextReply":
         sections.append(
             "## One-shot derivation\n"
             "This step has no user to ask. Return your best draft from the "
             "inputs. Uncertainty is not a failure: a draft is a proposal the "
-            "user confirms or corrects in the next step. Return failure only "
-            "when the inputs contain nothing relevant to the result at all."
+            "user confirms or corrects in the next step. When the inputs name "
+            "the work but not its steps, propose the steps people usually take "
+            "for that work; when they name the work but not its inputs, "
+            "propose what people usually start with. Return failure only when "
+            "the inputs contain nothing relevant to the result at all."
         )
 
     return "\n\n".join(sections)
@@ -231,6 +237,7 @@ def _setup_atomic_workflow(
     chat: bool,
     tools: Any = (),
     deps: Any = None,
+    min_turns: int = 1,
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow on the session's transcript.
 
@@ -269,6 +276,7 @@ def _setup_atomic_workflow(
             response_model=AgentResponse[actual_return_type],
             final_response_model=FinalResponse[actual_return_type],
             max_turns=max_turns,
+            min_turns=min(min_turns, max_turns),
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(
                 response.message
@@ -295,6 +303,7 @@ def atomic_workflow(
     conversation_validation_rules: list[tuple[str, str]] | None = None,
     chat: bool = True,
     single_turn: bool = False,
+    min_turns: int = 1,
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
@@ -310,6 +319,10 @@ def atomic_workflow(
 
     ``single_turn=True`` is a one-turn text step: a ``continue`` is not
     offered, so it completes without asking the user.
+
+    ``min_turns`` is the minimum number of model turns the task needs before
+    it may return a result. A task that must ask or propose first declares
+    two; a success on the first turn is fed back as a correction.
     """
     from .exceptions import AtomicWorkflowFailedError
 
@@ -371,6 +384,7 @@ def atomic_workflow(
                 chat=chat,
                 tools=tools,
                 deps=deps,
+                min_turns=min_turns,
             )
             result = session.run(
                 workflow=workflow,
@@ -390,6 +404,7 @@ def atomic_workflow(
             setattr(wrapper, marker, True)
         wrapper._chat = chat  # type: ignore[attr-defined]
         wrapper._single_turn = single_turn  # type: ignore[attr-defined]
+        wrapper._min_turns = min_turns  # type: ignore[attr-defined]
         wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]
         return wrapper
 

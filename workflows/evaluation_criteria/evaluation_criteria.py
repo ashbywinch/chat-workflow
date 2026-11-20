@@ -73,6 +73,9 @@ class EvaluationCriteria(BaseModel):
         - Each factor the user names is already a criterion: use their words
           for its name and description. Do not ask for sub-details (a number of
           hours, a processor model) before accepting a factor.
+        - A weight or ideal value the user does not give takes the schema's
+          default; never interrogate for an optional field. A named factor is
+          enough: do not ask what it means or for a sub-detail of it.
         - If the user says "that's all", "please finalize", or otherwise asks
           to finish, return intent="success" with the criteria from the answers
           they gave; do not ask another question.

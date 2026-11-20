@@ -322,7 +322,8 @@ def _confirm_components(
 Do not re-present the whole set. When the user confirms, return the set in the same response; do not ask for a
 second confirmation. If they correct a part, or add a requirement
 that belongs to an existing part, say in one sentence that you added it to that part, update the part, and return the
-corrected set. If the requirement is a new artifact, propose a new part. If the user says the parts are not separate
+corrected set; when you have changed a part, say in one sentence what changed and ask them to confirm the change
+before returning. If the requirement is a new artifact, propose a new part. If the user says the parts are not separate
 jobs, explain that those jobs are steps inside the one part, not separate parts, and return the set. If the user asks
 about the flow, handoffs, or decision points, answer it in one or two sentences in a continue message, using the
 analysis' phases, and wait for their response before returning the set. If the user gives new information, use a

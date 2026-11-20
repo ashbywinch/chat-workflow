@@ -235,7 +235,7 @@ class TestSessionComponent(unittest.TestCase):
             SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
 
         self.assertTrue(
-            any("what are you working on" in str(m) for m in session.state.messages)
+            any("here to help you describe" in str(m) for m in session.state.messages)
         )
 
     def test_a_failed_or_questioning_closing_is_a_statement(self):

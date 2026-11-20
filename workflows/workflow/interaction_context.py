@@ -1,4 +1,4 @@
-"""ComponentInteractionContext model — domain considerations for assistant interaction."""
+"""ComponentInteractionContext — how the assistant should work with the user."""
 
 from __future__ import annotations
 
@@ -15,11 +15,11 @@ from .structure import ComponentStructure
 
 
 class ComponentInteractionContext(BaseModel):
-    """Domain considerations for how the assistant interacts with the user
-    during artifact creation.
+    """What the assistant should prioritize, suggest, and watch for.
 
-    This captures what the assistant should prioritize, suggest, and watch
-    for — pure domain language, not code or prompt implementation.
+    This is preference data from the user. The questions are fixed by this
+    schema, so the framework asks them; the model derives the picture from the
+    answer, the renderer shows it, and a confirmation step settles it.
     """
 
     must_prioritize: Annotated[
@@ -91,13 +91,20 @@ class ComponentInteractionContext(BaseModel):
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> ComponentInteractionContext:
-        """Derive how the assistant should interact, then confirm it."""
+        """Ask the three fixed questions, show the derived picture, confirm it."""
+        answer = session.io.prompt(
+            "When I help you create this, what should I always cover? "
+            "What would you like me to suggest proactively? "
+            "What usually goes wrong that I should catch?"
+        )
         draft = _draft_interaction_context(
             domain_spec=domain_spec,
             structure=structure,
+            answer=answer,
             session=session,
         )
         session.propose(draft)
+        session.say("Does that capture it, or would you adjust anything?")
         return _confirm_interaction_context(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
@@ -113,16 +120,15 @@ def _draft_interaction_context(
         ComponentStructure,
         "What fields and rules the artifact follows",
     ],
+    answer: Annotated[str, "The user's answer to the three questions"],
     max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> ComponentInteractionContext:
-    """Derive how the assistant should interact with the user.
+    """Derive the interaction picture from the user's answer.
 
-The domain spec and structure are established. Derive all four parts yourself; do not ask the user anything:
-1. What the assistant should always cover.
-2. What it should suggest proactively.
-3. The tone, only if the user volunteered one; otherwise leave it empty.
-4. What usually goes wrong that the assistant should catch.
-Never ask what to call the artifact; the domain spec names it. Return the complete context."""
+The three questions are what the assistant should always cover, what it should suggest proactively, and what usually
+goes wrong; the user's answer is in `answer`. Derive all four parts from it, using the domain spec and structure for
+the artifact. If the answer leaves one part empty, propose the usual answer for this kind of work. Do not ask the user
+anything. Leave the tone empty unless the user gave one. Return the complete context."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -134,9 +140,9 @@ def _confirm_interaction_context(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentInteractionContext:
-    """The proposal and the three questions have already been shown. Use the user's answers.
+    """The proposal has been shown. Confirm it, or correct it.
 
-Ask only about a point they left unanswered. If they correct a value, say in one sentence what you changed, update it,
-and return the corrected context. If they confirm, return the draft. Do not re-present the whole proposal, repeat the
-three questions, or ask what to call the artifact."""
+If the user confirms, return the draft. If they correct a point, update it, say in one sentence what changed, and ask
+them to confirm the change; return after they confirm. Ask only about a point they left unanswered. Do not re-present
+the whole proposal or ask what to call the artifact."""
     ...  # type: ignore[reportReturnType]

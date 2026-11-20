@@ -22,7 +22,10 @@ from .session import Session
 
 T = TypeVar("T")
 
-_FALLBACK_GREETING = "Hi there — what are you working on?"
+_FALLBACK_GREETING = (
+    "Hi there — I am here to help you describe what you do so it can be "
+    "built into something you can use. What are you working on?"
+)
 _FALLBACK_CLOSING = "I have what I need."
 
 

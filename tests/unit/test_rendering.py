@@ -26,7 +26,6 @@ from workflows.workflow.domain_spec import (
     ComponentDomainField,
     ComponentDomainSpec,
 )
-from workflows.workflow.interaction_context import ComponentInteractionContext
 from workflows.workflow.models.deliverable import Deliverable
 from workflows.workflow.models.process_definition import (
     ProcessDefinition,
@@ -168,20 +167,6 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("When it happened", text)
         self.assertIn("attendees: list of person names", text)
         self.assertIn("Rule: Every action item has an owner", text)
-
-    def test_an_interaction_proposal(self, _rules):
-        text = render_result(
-            ComponentInteractionContext(
-                must_prioritize=["Decisions"],
-                auto_suggest=["Owners"],
-                tone_preference="Direct",
-                user_pain_points=["Missing attendees"],
-            ),
-            RenderContext(),
-        )
-
-        self.assertIn("Always cover: Decisions", text)
-        self.assertIn("Watch for: Missing attendees", text)
 
     def test_a_list_and_an_empty_list(self, _rules):
         text = render_result(

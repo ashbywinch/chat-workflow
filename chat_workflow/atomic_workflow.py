@@ -39,6 +39,7 @@ class AtomicWorkflow(Generic[TResult]):
         config: AtomicWorkflowConfig[TResult],
     ):
         self.turn_count = 0
+        self.min_turns = max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
         self.model = config.model
         self.response_model = config.response_model
@@ -92,6 +93,13 @@ class AtomicWorkflow(Generic[TResult]):
         if response.intent == AgentIntent.CONTINUE:
             return self.on_continue(response)
         if response.intent == AgentIntent.SUCCESS:
+            if self.turn_count < self.min_turns:
+                # The task declared that it must ask or propose first. Feed the
+                # early finish back as a correction; it is not a completion.
+                return self.process_turn(
+                    "You are finishing too early. Do the task's next step "
+                    "before returning the result."
+                )
             return self.on_success(response)
         if response.intent == AgentIntent.FAILURE:
             error = self.on_failure(response)

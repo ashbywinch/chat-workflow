@@ -250,8 +250,12 @@ def _repair_generic_participants(diagram: str, components: Any, outputs: Any) ->
     contract requires a component or artifact path; the alias can stay, so
     only the label's path is replaced.
     """
-    component_names = _item_field(components, "name")
-    component = component_names[0] if component_names else "Component"
+    component_names = [
+        name
+        for name in _item_field(components, "name")
+        if name.strip().casefold() not in _GENERIC_PARTICIPANTS
+    ]
+    component = component_names[0] if component_names else "Artifact"
     lines: list[str] = []
     for line in diagram.splitlines():
         match = _PARTICIPANT_LINE.match(line.strip())
