@@ -22,18 +22,16 @@ META_LEVEL_JUDGE_RULES: dict[str, str] = {
         "not repetition."
     ),
     "Uses expertise": (
-        "The assistant proposes the shape of each output — its name, who it is "
-        "for, its format, the check it must pass, and where it goes — from "
-        "what the user said, rather than asking the user to define every field "
-        "from scratch."
+        "The assistant proposes what it can from what the user said — a process "
+        "breakdown, an output's shape, or a list of starting materials — rather "
+        "than asking the user to define every part from scratch."
     ),
     "Stays at meta-level": (
-        "The assistant defines the SHAPE of each output as a design artifact: "
-        "its name, who it is for, its format, the check it must pass, and where "
-        "it goes. It does not produce the actual content (it does not write the "
-        "minutes or invent action items) and it does not help the user achieve "
-        "their real-world goal. A concrete description of the artifact's shape "
-        "is meta-level."
+        "The assistant works on the SHAPE of the user's work: the process stages "
+        "and steps, the output's name/audience/format/check/destination, or the "
+        "starting materials. It does not produce the actual content (it does not "
+        "write the minutes, invent dishes, or develop a business idea). A "
+        "concrete description of the shape is meta-level."
     ),
     "Honest about provenance": (
         "The assistant separates what the user said from its own proposal. The "
@@ -53,6 +51,25 @@ REDIRECT_JUDGE_RULES: dict[str, str] = {
         "come back to that. What would a good business idea output look like?' is "
         "acceptable. A response like 'Oh, that's a great idea! Have you thought about "
         "the target market?' is NOT \u2014 that's joining in."
+    ),
+}
+
+
+WORKFLOW_JUDGE_RULES: dict[str, str] = {
+    "No repetition": (
+        "The assistant does not repeat a question the user already answered. A "
+        "first follow-up about a field the user has not specified is not "
+        "repetition."
+    ),
+    "Uses expertise": (
+        "The assistant proposes the stages, steps, participants, materials, or "
+        "output shape from what the user said, rather than asking the user to "
+        "define every part from scratch."
+    ),
+    "Honest about provenance": (
+        "The breakdown is built from what the user said or is a clear proposal "
+        "for them to confirm; the assistant does not invent facts about their "
+        "past."
     ),
 }
 
@@ -89,6 +106,7 @@ class TestProcessDefinitionEval(unittest.TestCase):
                 max_turns=14,
             ),
             user_persona=user_persona,
+            judge_rules=WORKFLOW_JUDGE_RULES,
         )
         self.assertIsInstance(result, ProcessDefinition)
 
@@ -146,6 +164,7 @@ class TestResourceEval(unittest.TestCase):
                 max_turns=14,
             ),
             user_persona=user_persona,
+            judge_rules=WORKFLOW_JUDGE_RULES,
         )
         self.assertIsInstance(result, list)
         self.assertGreaterEqual(len(result), 1)

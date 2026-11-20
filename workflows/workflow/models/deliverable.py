@@ -140,7 +140,7 @@ A private working copy the user never shares is not one of the things they make;
 
     When the user asks for a template, a structure, or a list of sections, put the actual list in the reply message — one item per line — before you ask anything else. Never say "here are the sections" or "here is a template" without listing them; a promise is not a template.
 
-    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause and return to what it looks like, using their word for it.
+    Stay at the level of the thing they make, not its contents. If they describe their domain (dishes, articles, marketing), acknowledge it in a clause without praising it — never say "that sounds like a cool idea" — and return to what it looks like, using their word for it. Do not develop their domain content.
 
     When they confirm, return the result. Do not summarise it again or ask for a second approval."""
         ...  # type: ignore[reportReturnType]

@@ -154,6 +154,7 @@ def _confirm_resources(
 
 If they add one, include it; if they say one does not apply, remove it. If they ask you to format or write the
 deliverable itself, say in one sentence that this step lists what they start with and the deliverable comes next,
-then return to the list. Return the corrected list when they confirm. Do not re-present the whole list and do not ask
-what to call the deliverable."""
+then return to the list. If they describe their domain content (specific dishes, articles, or ideas), acknowledge it in
+one clause without praising it and return to the list of starting materials; never develop the content. Return the
+corrected list when they confirm. Do not re-present the whole list and do not ask what to call the deliverable."""
     ...  # type: ignore[reportReturnType]

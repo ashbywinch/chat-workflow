@@ -206,9 +206,12 @@ leaves a gap the notes imply but do not name — for example, "submit for approv
 and offer one concrete possibility in the question: "Is the approver your manager, or someone else?" not "Who is the
 approver?" Name one concrete improvement grounded in the breakdown — a capture
 format, a template, or a checklist they could adopt — and ask whether it fits. Do not invent a tool or product they did
-not mention; keep the improvement to a practice. If they confirm, return the draft. If they correct a value, update it
-and return the corrected result. Do not re-present the whole draft and do not ask them to name the stages or steps; the
-draft already has them."""
+not mention; keep the improvement to a practice. If the user asks what the output looks like, say in one sentence that
+the output's shape comes next and return to the stages and steps. If they describe their domain content (a specific
+article, dish, or idea), acknowledge it in one clause without praising it and return to the stages and steps; never
+develop the content. If they confirm, return the draft. If they correct a value, update it and return the corrected
+result. Do not re-present the whole draft and do not ask them to name the stages or steps; the draft already has
+them."""
     ...  # type: ignore[reportReturnType]
 
 
