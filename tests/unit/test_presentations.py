@@ -153,10 +153,9 @@ class TestPresentations(unittest.TestCase):
         text = _format_structure(
             ComponentStructure(
                 description="The artifact",
-                fields=[
-                    StructField(name="meeting_date", type_expr="str"),
-                    StructField(name="attendees", type_expr="list[str]"),
-                ],
+                # The draft dropped `attendees`; the domain's field still
+                # appears in the presentation.
+                fields=[StructField(name="meeting_date", type_expr="str")],
                 model_validators=[
                     StructValidator(
                         rule="Every action item has an owner.",

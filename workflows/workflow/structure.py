@@ -153,10 +153,19 @@ def _format_structure(
         field.name: field.domain_description for field in domain_spec.fields
     }
     lines = ["Now I'll turn what we agreed into a concrete shape.", "The parts:"]
-    for field in draft.fields:
-        hint = hints.get(field.name) or _plain_type(field.type_expr)
-        description = descriptions.get(field.name)
-        line = f"- {field.name.replace('_', ' ')}: {hint}"
+    # Every field in the domain spec is part of the shape. The draft usually
+    # carries them all; when it drops one, the domain's own hint still shows
+    # it rather than presenting a partial list.
+    drafted = {field.name: field for field in draft.fields}
+    ordered = [field.name for field in domain_spec.fields]
+    ordered += [name for name in drafted if name not in ordered]
+    for name in ordered:
+        drafted_field = drafted.get(name)
+        hint = hints.get(name) or (
+            _plain_type(drafted_field.type_expr) if drafted_field else "text"
+        )
+        description = descriptions.get(name)
+        line = f"- {name.replace('_', ' ')}: {hint}"
         if description:
             line += f" — {description}"
         lines.append(line)
