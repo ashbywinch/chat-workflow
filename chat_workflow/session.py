@@ -131,6 +131,19 @@ class Session:
         """Find a descendant session by id."""
         return next((item for item in self.walk() if item.id == session_id), None)
 
+    def propose(self, result: Any) -> None:
+        """Render a derived result as the proposal turn, if it has anything to say.
+
+        This is the only path a composite uses to show a draft: the rendering
+        is validated before it reaches the transcript, and an empty result
+        (a list a step is allowed to leave empty) says nothing.
+        """
+        from .rendering import RenderContext, render_result
+
+        text = render_result(result, RenderContext())
+        if text:
+            self.say(text)
+
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""
         clean = text.removeprefix("\nAssistant: ").strip()

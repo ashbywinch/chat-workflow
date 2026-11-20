@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field, TypeAdapter
 
 from chat_workflow.models import AgentResponse
 from chat_workflow.rendering import (
-    RenderAudience,
     RenderContext,
     RenderError,
     RenderSurface,
@@ -135,8 +134,17 @@ class TestRecordsRenderThemselves(unittest.TestCase):
             ComponentStructure(
                 description="The artifact",
                 fields=[
-                    StructField(name="meeting_date", type_expr="str"),
-                    StructField(name="attendees", type_expr="list[str]"),
+                    StructField(
+                        name="meeting_date",
+                        type_expr="str",
+                        field_type_hint="date",
+                        field_def_kwargs={"description": "When it happened"},
+                    ),
+                    StructField(
+                        name="attendees",
+                        type_expr="list[str]",
+                        field_type_hint="list of person names",
+                    ),
                 ],
                 model_validators=[
                     StructValidator(
@@ -145,11 +153,12 @@ class TestRecordsRenderThemselves(unittest.TestCase):
                     )
                 ],
             ),
-            RenderContext(references={"domain_spec": _domain()}),
+            RenderContext(),
         )
 
         self.assertIn("meeting date: date", text)
-        self.assertIn("attendees: ", text)
+        self.assertIn("When it happened", text)
+        self.assertIn("attendees: list of person names", text)
         self.assertIn("Rule: Every action item has an owner", text)
 
     def test_an_interaction_proposal(self, _rules):
@@ -197,12 +206,15 @@ class TestTheGuardrail(unittest.TestCase):
             validate_rendering(text, RenderContext(**context))
         self.assertIn(message, str(ctx.exception))
 
-    def test_a_schema_word_is_rejected(self):
-        self._rejects("Who is the consumer?", "schema word 'consumer'")
+    def test_the_users_own_words_are_never_censored(self):
+        # A user's domain may legitimately use a word that is also a field
+        # name; the guard checks display, not vocabulary.
+        text = validate_rendering(
+            "The consumer of this report is the finance team.",
+            RenderContext(),
+        )
 
-    def test_a_python_type_is_rejected(self):
-        self._rejects("meeting_date: str", "Python type")
-        self._rejects("attendees: list[str]", "Python type")
+        self.assertIn("consumer", text)
 
     def test_control_characters_and_markup_are_rejected(self):
         self._rejects("hello\x1b[31m", "control")
@@ -210,13 +222,6 @@ class TestTheGuardrail(unittest.TestCase):
         self._rejects("**bold**", "markdown")
         self._rejects("# Heading", "headings")
         self._rejects("a | b", "table")
-
-    def test_a_developer_view_may_name_types(self):
-        text = validate_rendering(
-            "meeting_date: str",
-            RenderContext(audience=RenderAudience.DEVELOPER),
-        )
-        self.assertEqual(text, "meeting_date: str")
 
     def test_a_long_line_is_wrapped(self):
         text = validate_rendering(

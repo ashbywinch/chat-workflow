@@ -69,16 +69,22 @@ A result record is internal; the proposal is for a person. The record renders
 itself — `Renderable.render(context)` in `chat_workflow/rendering.py` — so the
 shape and the user's words live together instead of in a parallel formatter.
 
-- **Context** — `RenderContext(surface, audience, references)`: `chat` or
-  `cli`; `user` or `developer`; and related records the value cannot see (a
-  structural design renders its fields with the domain's type hints).
+- **Audience** — always the user. A developer reads the transcript; there is
+  no separate developer rendering.
+- **Context** — `RenderContext(surface, max_line)`: `chat` or `cli`, and the
+  width a line may reach. A record that needs another record's words carries
+  them itself: `StructField.field_type_hint` is the domain spec's phrase for
+  the type, copied when the structure is derived.
 - **Format** — line-oriented plain text. `- ` bullets, no tables, colour,
   HTML, markdown emphasis or headings, or code fences. Long lines wrap at word
   boundaries to `max_line`.
 - **Guardrail** — `render_result` validates every block before it reaches the
-  transcript: control characters, HTML, markup, and (on the user surface) the
-  schema's own field names and Python type expressions are rejected. A list
-  renders item by item; an empty list renders nothing.
+  transcript and rejects what would display incorrectly: control characters,
+  HTML, markup, table pipes, and an unbreakable word wider than the line. It
+  does **not** police vocabulary: a renderer must not add schema labels, but a
+  user's own domain may legitimately say "consumer" or "format", and censoring
+  it would be wrong. A list renders item by item; an empty list renders
+  nothing.
 - **An empty list is the component's decision.** A step that needs at least
   one item declares `Annotated[list[X], Field(min_length=1)]`; a plain
   `list[X]` allows an empty answer, and the step's success message says why.

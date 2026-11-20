@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
-from chat_workflow.rendering import RenderContext, render_result
+from chat_workflow.rendering import RenderContext
 
 from .component_spec import ComponentSpec
 
@@ -171,7 +171,7 @@ class ComponentDomainSpec(LLMValidated):
             deliverables=deliverables,
             session=session,
         )
-        session.say(render_result(draft, RenderContext()))
+        session.propose(draft)
         return _confirm_domain_spec(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )

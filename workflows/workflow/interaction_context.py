@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
-from chat_workflow.rendering import RenderContext, render_result
+from chat_workflow.rendering import RenderContext
 
 from .domain_spec import ComponentDomainSpec
 from .structure import ComponentStructure
@@ -97,7 +97,7 @@ class ComponentInteractionContext(BaseModel):
             structure=structure,
             session=session,
         )
-        session.say(render_result(draft, RenderContext()))
+        session.propose(draft)
         return _confirm_interaction_context(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )

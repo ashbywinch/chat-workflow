@@ -12,7 +12,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
-from chat_workflow.rendering import RenderContext, plain_type, render_result
+from chat_workflow.rendering import RenderContext, plain_type
 
 from .domain_spec import ComponentDomainSpec
 
@@ -39,6 +39,14 @@ class StructField(BaseModel):
         default_factory=dict,
         description=(
             "Pydantic Field kwargs as string key-value pairs (e.g. {'description': '...', 'min_length': '1'})"
+        ),
+    )
+    field_type_hint: str = Field(
+        "",
+        description=(
+            "The user's words for this field's type, copied from the domain "
+            "spec (for example 'date' or 'list of person names'). Empty means "
+            "the type expression is described instead."
         ),
     )
 
@@ -96,26 +104,17 @@ class ComponentStructure(BaseModel):
     )
 
     def render(self, context: RenderContext) -> str:
-        """Say the shape, using the domain's words when it has them."""
-        domain = context.reference("domain_spec")
-        hints = {
-            field.name: field.field_type_hint
-            for field in getattr(domain, "fields", [])
-        }
-        descriptions = {
-            field.name: field.domain_description
-            for field in getattr(domain, "fields", [])
-        }
-        lines = [
-            f"{field.name.replace('_', ' ')}: "
-            f"{hints.get(field.name) or plain_type(field.type_expr)}"
-            + (
-                f" — {descriptions[field.name]}"
-                if field.name in descriptions
-                else ""
+        """Say the shape in the domain's words, carried by each field."""
+        lines = []
+        for field in self.fields:
+            description = field.field_def_kwargs.get("description")
+            line = (
+                f"{field.name.replace('_', ' ')}: "
+                f"{field.field_type_hint or plain_type(field.type_expr)}"
             )
-            for field in self.fields
-        ]
+            if description:
+                line += f" — {description}"
+            lines.append(line)
         if self.model_validators:
             lines.extend(f"Rule: {validator.rule}" for validator in self.model_validators)
         return "\n".join(lines)
@@ -136,40 +135,10 @@ class ComponentStructure(BaseModel):
     ) -> ComponentStructure:
         """Derive the structure from the domain spec, then confirm it."""
         draft = _draft_structure(domain_spec=domain_spec, session=session)
-        session.say(
-            render_result(
-                draft,
-                RenderContext(references={"domain_spec": domain_spec}),
-            )
-        )
+        session.propose(draft)
         return _confirm_structure(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
-
-
-def _plain_type(type_expr: str) -> str:
-    """Say a type in business words, not Python syntax."""
-    text = type_expr.strip()
-    text = text.replace("| None", "").strip()
-    if text.startswith("Optional[") and text.endswith("]"):
-        text = text[len("Optional[") : -1]
-    if text == "str":
-        plain = "text"
-    elif text in {"int", "float"}:
-        plain = "a number"
-    elif text == "bool":
-        plain = "yes or no"
-    elif text.startswith("list[") and text.endswith("]"):
-        plain = "a list of " + _plain_type(text[len("list[") : -1])
-    elif text.startswith("dict[") or text == "dict":
-        plain = "a set of values"
-    else:
-        spaced = "".join(
-            f" {character}" if character.isupper() else character
-            for character in text
-        )
-        plain = spaced.replace("_", " ").strip().casefold()
-    return plain
 
 
 @atomic_workflow_step(chat=False, single_turn=True)
@@ -183,7 +152,9 @@ def _draft_structure(
     """Derive the structure from the domain spec.
 
 The domain spec already lists the fields and the type hints. Derive the complete ComponentStructure yourself; do not
-ask the user anything. For each field, choose the type and any structurally enforceable rule. Translate the business
+ask the user anything. For each field, copy its `field_type_hint` from the domain spec into the structure field; that
+is the user's own word for the type. Then choose the Python type and any structurally enforceable rule. Translate
+the business
 language into the technical structure silently. For dates, use a str with an ISO format or a pre-validator; never a
 date/datetime field. Include a validator for every rule a field can enforce structurally; return an empty list only
 when nothing is structurally enforceable. Do not define a second independent artifact."""

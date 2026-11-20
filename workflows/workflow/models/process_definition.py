@@ -9,7 +9,7 @@ from chat_workflow import atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.conversation_rules import WARM_OPEN
 from chat_workflow.mixins import LLMValidated
-from chat_workflow.rendering import RenderContext, render_result
+from chat_workflow.rendering import RenderContext
 
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
@@ -249,7 +249,7 @@ def generate_from_chat(
     # The proposal is the model's own draft, shown in the user's words before
     # the confirmation turn. A confirmation turn that skips the presentation
     # would leave the user (and the judge) with no proposal at all.
-    session.say(render_result(draft, RenderContext()))
+    session.propose(draft)
     return _confirm_process_definition(
         draft=draft, session=session, max_turns=min(max_turns, 4)
     )

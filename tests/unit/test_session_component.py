@@ -77,6 +77,31 @@ class TestRecursiveSession(unittest.TestCase):
         self.assertEqual(len(session.state.messages), 1)
         self.assertTrue(any("Hi there!" in echo for echo in io.echoes))
 
+    def test_propose_renders_and_says_a_non_empty_result(self):
+        session = _session()
+
+        from workflows.workflow.models.process_definition import (
+            ProcessDefinition,
+        )
+
+        session.propose(
+            ProcessDefinition(
+                phases=["Capture"],
+                activities=["Scribble"],
+                participants=["You"],
+                orchestrating_component="You",
+            )
+        )
+
+        self.assertTrue(any("Stages: Capture" in str(m) for m in session.state.messages))
+
+    def test_propose_says_nothing_for_an_empty_list(self):
+        session = _session()
+
+        session.propose([])
+
+        self.assertEqual(session.state.messages, [])
+
 
 class TestTheSuccessMessage(unittest.TestCase):
     """A conversational step's completion is something the user reads."""

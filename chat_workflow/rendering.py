@@ -13,52 +13,21 @@ its own shape and the words the user uses. The framework owns the contract:
   cannot show, bounded line length, and (for the user) none of the internal
   vocabulary below.
 
-Each result model implements :class:`Renderable`; a list of records renders
-item by item. A step that allows an empty list renders nothing, and its own
-success message says why.
+Every render is for the user. The renderer prints the record's own values and
+fixed user-facing labels; it must not add schema labels of its own, but it must
+not censor the user's words either — a user's domain may legitimately contain
+"consumer" or "format". The guard therefore checks **display**, not
+vocabulary. Each result model implements :class:`Renderable`; a list of
+records renders item by item. A step that allows an empty list renders nothing,
+and its own success message says why.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
-
-# Names that exist because the result is a Pydantic model. They are never the
-# user's words, so the user surface must not contain them.
-_FORBIDDEN_USER_TERMS = frozenset(
-    {
-        "consumer",
-        "owner_role",
-        "scope_description",
-        "validation_criteria",
-        "integration_points",
-        "storage_requirements",
-        "orchestrating_component",
-        "what_good_looks_like",
-        "expert_role",
-        "must_prioritize",
-        "auto_suggest",
-        "user_pain_points",
-        "field_type_hint",
-        "type_expr",
-        "component_type",
-        "incidental_notes",
-        "required_inputs",
-        "model_validators",
-        "domain_description",
-    }
-)
-
-_PYTHON_TYPE_TOKENS = (
-    re.compile(r"\bstr\b"),
-    re.compile(r"\blist\["),
-    re.compile(r"\bdict\["),
-    re.compile(r"\bOptional\["),
-    re.compile(r"\|\s*None\b"),
-)
 
 
 class RenderSurface(StrEnum):
@@ -68,33 +37,21 @@ class RenderSurface(StrEnum):
     CLI = "cli"
 
 
-class RenderAudience(StrEnum):
-    """Who reads the text."""
-
-    USER = "user"
-    DEVELOPER = "developer"
-
-
 class RenderError(ValueError):
-    """A rendering that would display incorrectly or leak internal vocabulary."""
+    """A rendering that would display incorrectly."""
 
 
 @dataclass(frozen=True)
 class RenderContext:
-    """The surface, audience, and related records a rendering may need.
+    """Where the text is displayed, and how wide a line may be.
 
-    ``references`` carries records the value cannot see itself — for example a
-    structural design renders its fields with the domain's own type hints, and
-    the domain spec is the reference.
+    The audience is always the user: a developer reads the transcript, not a
+    rendering. A record that needs another record's words carries them itself
+    (``StructField.field_type_hint``) rather than reaching through a context.
     """
 
     surface: RenderSurface = RenderSurface.CHAT
-    audience: RenderAudience = RenderAudience.USER
-    references: Mapping[str, Any] = field(default_factory=dict)
     max_line: int = 120
-
-    def reference(self, name: str) -> Any:
-        return self.references.get(name)
 
 
 @runtime_checkable
@@ -196,17 +153,4 @@ def validate_rendering(text: str, context: RenderContext) -> str:
             raise RenderError(
                 "A rendering must not contain a table; the chat cannot align one."
             )
-    if context.audience is RenderAudience.USER:
-        lowered = text.casefold()
-        for term in _FORBIDDEN_USER_TERMS:
-            if re.search(rf"\b{re.escape(term)}\b", lowered):
-                raise RenderError(
-                    f"A user-facing rendering must not contain the schema word "
-                    f"'{term}'."
-                )
-        for token in _PYTHON_TYPE_TOKENS:
-            if token.search(text):
-                raise RenderError(
-                    "A user-facing rendering must not contain a Python type."
-                )
     return text
