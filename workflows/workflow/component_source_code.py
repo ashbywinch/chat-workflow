@@ -660,6 +660,26 @@ def _returned_model_names(
     return returned
 
 
+def _plain_nested_types(model: type) -> list[str]:
+    """Field annotation classes defined in the module that are not models."""
+    from dataclasses import is_dataclass
+    from typing import get_args
+
+    from pydantic import BaseModel
+
+    found: list[str] = []
+    for field in model.model_fields.values():
+        for candidate in get_args(field.annotation):
+            if (
+                isinstance(candidate, type)
+                and candidate.__module__ == model.__module__
+                and not issubclass(candidate, BaseModel)
+                and not is_dataclass(candidate)
+            ):
+                found.append(candidate.__name__)
+    return found
+
+
 def _resolve_primary_model(
     workflow_methods: list[ast.FunctionDef | ast.AsyncFunctionDef],
     returned: set[str],
@@ -1257,6 +1277,18 @@ class ComponentSourceCode(LLMValidated):
                     "Required string field(s) must declare min_length=1 "
                     "(or min_length=0 if empty is intentionally allowed): "
                     + ", ".join(missing_min_length)
+                )
+
+            # A nested field type must be a model Pydantic can build. A plain
+            # class here imports but fails at schema generation, after the
+            # component has been accepted.
+            plain_nested = _plain_nested_types(main_cls)
+            if plain_nested:
+                raise ValidationError(
+                    "Field type(s) must be Pydantic models, not plain classes: "
+                    + ", ".join(plain_nested)
+                    + ". Class ActionItem must inherit LLMValidated (or BaseModel) "
+                    "so it can be a field of the artifact."
                 )
 
         for node in workflow_methods:
