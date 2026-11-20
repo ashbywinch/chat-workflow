@@ -1308,9 +1308,6 @@ class ComponentSourceCode(LLMValidated):
                 + ". That class must inherit LLMValidated (or BaseModel) "
                 "so it can be a field of the artifact."
             )
-            # A nested field type must be a model Pydantic can build. A plain
-            # class here imports but fails at schema generation, after the
-            # component has been accepted.
 
         for node in workflow_methods:
             is_atomic, _ = _workflow_kind(node)
