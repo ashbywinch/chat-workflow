@@ -212,21 +212,6 @@ _SUGGESTION_MARKERS = (
 )
 
 
-def _same_result(left: Any, right: Any) -> bool:
-    """True when two results carry the same values."""
-    if left is None or right is None:
-        return False
-
-    def _dump(value: Any) -> Any:
-        if hasattr(value, "model_dump"):
-            return value.model_dump()
-        if isinstance(value, (list, tuple)):
-            return [_dump(item) for item in value]
-        return value
-
-    return _dump(left) == _dump(right)
-
-
 def _asks_for_a_suggestion(question: str) -> bool:
     text = question.casefold()
     return any(marker in text for marker in _SUGGESTION_MARKERS)
@@ -403,19 +388,15 @@ class SessionComponent:
             # wrapper must say it — unless it is the same result the user has
             # already seen, which would be repetition.
             question = _last_user_text(session.state.messages)
-            already_presented = (
-                session.presented
-                and len(session.state.messages) == session.presented_at
-            )
-            unchanged = (
-                session.presented
-                and _same_result(result, session.presented_result)
-                and not _asks_for_a_suggestion(question)
+            # A composite already showed its derived result. Re-stating it is
+            # repetition; only a direct request for a suggestion earns
+            # another turn.
+            already_presented = session.presented and not _asks_for_a_suggestion(
+                question
             )
             if (
                 result is not None
                 and not already_presented
-                and not unchanged
                 and _needs_presentation(session.state.messages, before)
             ):
                 presented = self.present(

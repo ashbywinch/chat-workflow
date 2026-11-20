@@ -87,7 +87,6 @@ class Session:
     # The wrapper then does not describe the same result a second time (and
     # with the wrong vocabulary).
     presented: bool = False
-    presented_at: int = 0
     # The domain's own words for each field, cached by a structural-design
     # presentation so a later recap does not fall back to Python types.
     presented_hints: dict[str, str] = dataclasses.field(default_factory=dict)
@@ -147,7 +146,6 @@ class Session:
         self.presented = True
         self.presented_result = result
         self.say(text)
-        self.presented_at = len(self.state.messages)
 
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""
