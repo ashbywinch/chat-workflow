@@ -102,7 +102,15 @@ meeting spawned inside it are the same class:
 - A step whose result is a derived artifact uses the same shape: a chat-off
   one-turn step derives the value from its inputs, the composite shows it in
   the user's words, and a chat-on step asks one confirm-or-correct question.
-  This keeps the model from asking the user to define what it can derive.
+  This keeps the model from asking the user to define what it can derive. The
+  composite marks the presentation (`session.present`), so the wrapper does
+  not describe the same result a second time; if the user replies and the
+  step returns silently, the result is the answer and the wrapper states it.
+- A deterministic presentation reads the result's own fields, never a model
+  completion: it cannot truncate. When the user's last message asks for a
+  suggestion, the presentation is the suggestion (a concrete format and
+  check), not the list again. A structural design caches the domain's type
+  hints on the session so a later recap keeps "date", not "str".
 - `greet` and `sign_off` are one-turn text steps (`chat=False`,
   `single_turn=True`): a continue message is the text they produce, so they do
   not ask a user who is not part of that step. They start from an explicit
