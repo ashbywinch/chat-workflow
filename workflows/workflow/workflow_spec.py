@@ -389,7 +389,9 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
     diagram: Annotated[
         str,
         Blob(".mmd"),
-        Validation("Every activity in the process should be represented in the sequence flow"),
+        Validation(
+            "The diagram shows the process as a sequence with a clear hand-off and a final outcome"
+        ),
     ] = Field(
         ...,
         description=(
