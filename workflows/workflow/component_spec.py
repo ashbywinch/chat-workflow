@@ -342,5 +342,7 @@ about the flow, handoffs, or decision points, answer it in one or two sentences 
 analysis' phases, and wait for their response before returning the set. If the user gives new information, use a
 continue turn to propose the new or updated parts and ask for confirmation; you are not out of turns, so do not return
 failure because you need to ask. Ask only about a gap the draft cannot fill; do not ask the user to name a part, say
-who owns it, or describe a stage the analysis already lists."""
+who owns it, or describe a stage the analysis already lists. Never say the schema words "consumer", "owner_role",
+"scope_description", "purpose", or "component_type"; say "who it is for", "who owns it", "what it covers", and "what it
+does"."""
     ...  # type: ignore[reportReturnType]
