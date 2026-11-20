@@ -38,7 +38,8 @@ META_LEVEL_JUDGE_RULES: dict[str, str] = {
         "The assistant's result is its design proposal for the user to confirm. "
         "A field the user did not state is part of that proposal, not a claim "
         "about their past, and the assistant does not attribute the proposal to "
-        "the user."
+        "the user. A closing sentence that the result is ready is not a "
+        "provenance claim."
     ),
 }
 

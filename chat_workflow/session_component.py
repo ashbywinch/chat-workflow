@@ -63,12 +63,21 @@ def _describe_item(item: Any) -> str:
     if data.get("phases") and data.get("activities"):
         phases = "; ".join(str(value) for value in data["phases"])
         steps = "; ".join(str(value) for value in data["activities"])
-        people = "; ".join(str(value) for value in data.get("participants") or [])
+        self_words = {"the user", "user", "me", "i", "myself"}
+        people = [
+            str(value)
+            for value in data.get("participants") or []
+            if str(value).strip().casefold() not in self_words
+        ]
         owner = data.get("orchestrating_component") or ""
         sentence = f"The work moves through {phases}. The steps are {steps}."
         if people:
-            sentence += f" {people} are involved."
-        if owner:
+            sentence += f" {'; '.join(people)} are involved."
+        else:
+            sentence += " You are involved."
+        if owner.strip().casefold() in self_words:
+            sentence += " You keep it moving."
+        elif owner:
             sentence += f" {owner} keeps it moving."
         return sentence
     heading = data.get("name") or data.get("text") or ""
