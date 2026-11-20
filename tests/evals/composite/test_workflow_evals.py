@@ -46,13 +46,10 @@ META_LEVEL_JUDGE_RULES: dict[str, str] = {
 REDIRECT_JUDGE_RULES: dict[str, str] = {
     **META_LEVEL_JUDGE_RULES,
     "Redirects without joining": (
-        "When the user goes off-topic and describes their actual domain content "
-        "(business ideas, specific ventures, etc.), the assistant acknowledges briefly "
-        "then redirects back to the meta-level conversation. It does NOT join the user "
-        "in discussing the domain content. A brief 'That sounds interesting \u2014 let's "
-        "come back to that. What would a good business idea output look like?' is "
-        "acceptable. A response like 'Oh, that's a great idea! Have you thought about "
-        "the target market?' is NOT \u2014 that's joining in."
+        "The assistant does not ask about or develop the domain content. It may "
+        "acknowledge the aside briefly, ignore it, or continue with the shape; "
+        "any of these passes. Only a question or comment that develops the idea, "
+        "the dish, or the article is joining in."
     ),
 }
 
