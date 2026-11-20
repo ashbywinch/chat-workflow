@@ -18,6 +18,7 @@ from pydantic_ai.messages import (
     RetryPromptPart,
     SystemPromptPart,
     TextPart,
+    ToolCallPart,
     ToolReturnPart,
 )
 
@@ -159,6 +160,17 @@ class TestUnusableResponses(unittest.TestCase):
         self.assertEqual(turn.resends[0].cause, "token limit reached before the answer finished")
         self.assertEqual(_retry_parts(conversation), [])
 
+    def test_a_call_whose_arguments_are_not_json_is_resent(self):
+        """An endpoint that treats the tool schema as a hint returns
+        `{"response":Got it — a…}`. Nothing there is an answer to correct."""
+        malformed = ModelResponse(parts=[ToolCallPart("answer", '{"response":Got it — a…}')])
+        conversation = make_conversation([malformed, VALID])
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        self.assertEqual(turn.resends[0].cause, "tool arguments were not JSON")
+
     def test_a_stall_of_whitespace_is_resent(self):
         """The gateway's model can emit the opening token and then newlines to
         the token limit (measured: 5,392 lines). Nothing visible is an answer,
@@ -293,6 +305,88 @@ class TestInstructions(unittest.TestCase):
         self.assertEqual(len(parts), 1)
         self.assertIn("Final turn", parts[0].content)
         self.assertEqual(parts[0].content.count("Test instructions"), 1)
+
+
+class TestToolFailures(unittest.TestCase):
+    def test_a_tool_s_own_failure_is_passed_through_not_rewrapped(self):
+        from pydantic_ai import ToolFailed
+
+        def refuses(q: str) -> str:
+            """Refuse, saying why."""
+            raise ToolFailed("the archive is closed")
+
+        conversation = make_conversation(
+            [ModelResponse(parts=[ToolCallPart("refuses", {"q": "x"})]), VALID],
+            tools=[refuses],
+        )
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        returned = [
+            part
+            for message in conversation.messages
+            for part in message.parts
+            if isinstance(part, ToolReturnPart) and part.tool_name == "refuses"
+        ][0]
+        self.assertEqual(str(returned.content), "the archive is closed")
+
+
+class TestProviderLog(unittest.TestCase):
+    def test_a_failure_names_the_endpoint_that_served_it(self):
+        """The endpoints behind one model differ; a failure is diagnosable
+        only when the message says who answered."""
+        from chat_workflow.conversation import _ProviderLog
+
+        log = _ProviderLog()
+        log.provider = "DeepInfra"
+        log.model = "deepseek/deepseek-v4-flash"
+
+        self.assertEqual(log.suffix(), " (served by DeepInfra, deepseek/deepseek-v4-flash)")
+        self.assertEqual(_ProviderLog().suffix(), "")
+
+    def test_a_model_without_a_client_records_nothing(self):
+
+        conversation = make_conversation([VALID])
+
+        self.assertEqual(conversation._provider_log.suffix(), "")
+
+
+class TestStepTools(unittest.TestCase):
+    def test_a_step_can_call_its_own_tool(self):
+        seen: list[str] = []
+
+        def lookup(q: str) -> str:
+            """Look a thing up."""
+            seen.append(q)
+            return "found"
+
+        conversation = make_conversation(
+            [ModelResponse(parts=[ToolCallPart("lookup", {"q": "budget"})]), VALID],
+            tools=[lookup],
+        )
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(seen, ["budget"])
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
+        parts = [type(part).__name__ for message in conversation.messages for part in message.parts]
+        self.assertIn("ToolCallPart", parts)
+        self.assertIn("ToolReturnPart", parts)
+
+    def test_a_failing_tool_is_a_result_not_an_exception(self):
+        def broken(q: str) -> str:
+            """Break on purpose."""
+            raise RuntimeError("down")
+
+        conversation = make_conversation(
+            [ModelResponse(parts=[ToolCallPart("broken", {"q": "x"})]), VALID],
+            tools=[broken],
+        )
+
+        turn = conversation.send("hello")
+
+        self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
 
 
 class TestTheLastTurn(unittest.TestCase):

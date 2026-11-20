@@ -409,9 +409,9 @@
    "severity": "warn"
   },
   {
-   "line": 43,
+   "line": 44,
    "column": 49,
-   "stop_line": 43,
+   "stop_line": 44,
    "stop_column": 64,
    "path": "tests/unit/test_conversation.py",
    "code": -2,
@@ -875,18 +875,6 @@
    "description": "Missing argument `component_type` in function `workflows.workflow.component.Component.__init__`",
    "concise_description": "Missing argument `component_type` in function `workflows.workflow.component.Component.__init__`",
    "severity": "error"
-  },
-  {
-   "line": 101,
-   "column": 46,
-   "stop_line": 101,
-   "stop_column": 58,
-   "path": "tools/check_review_posted.py",
-   "code": -2,
-   "name": "implicit-import",
-   "description": "Module `urllib.error` exists, but was not imported explicitly. You are relying on other modules to load it.",
-   "concise_description": "Module `urllib.error` exists, but was not imported explicitly. You are relying on other modules to load it.",
-   "severity": "warn"
   },
   {
    "line": 16,

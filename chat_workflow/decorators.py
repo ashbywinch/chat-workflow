@@ -205,6 +205,8 @@ def _setup_atomic_workflow(
     session: Any,
     *,
     chat: bool,
+    tools: Any = (),
+    deps: Any = None,
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow on the session's transcript.
 
@@ -230,6 +232,8 @@ def _setup_atomic_workflow(
         timeout_seconds=session.config.request_timeout_seconds,
         extra_headers=getattr(session.config, "extra_headers", None),
         temperature=getattr(session.config, "temperature", None),
+        tools=tools,
+        deps=deps,
     )
 
     def _on_success(response: Success[Any]) -> TurnResult[Any]:
@@ -270,6 +274,10 @@ def atomic_workflow(
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
+    ``session``, ``debug``, ``max_turns``, ``tools`` and ``deps`` are the
+    decorator's own parameters: they are removed before the prompt's params
+    section is built, so a step cannot also name one of them.
+
     Return type must be a Pydantic model. Docstring supports {param} interpolation.
     Accepts a ``session`` parameter (:class:`~chat_workflow.session.Session`).
 
@@ -293,6 +301,10 @@ def atomic_workflow(
         def wrapper(*args, **kwargs):
             session = kwargs.pop("session", None)
             debug = kwargs.pop("debug", None)
+            # A step's tools are not prompt parameters: they never render into
+            # the params section.
+            tools = kwargs.pop("tools", ())
+            deps = kwargs.pop("deps", None)
             # A one-shot step has no conversation to open. The wrapper's
             # caller may name the first input; otherwise Session supplies the
             # "produce the result" prompt below.
@@ -333,6 +345,8 @@ def atomic_workflow(
                 debug,
                 session,
                 chat=chat,
+                tools=tools,
+                deps=deps,
             )
             result = session.run(
                 workflow=workflow,

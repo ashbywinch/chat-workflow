@@ -166,6 +166,11 @@ The prompt and history come from the session:
 | Decision | Alternatives | Requirement |
 |---|---|---|
 | Cloudflare AI Gateway is the eval/CI provider | Direct OpenRouter/OpenCode keys per repo | R5: one credential, failover, analytics |
+- **A step's tools** (`conversation.py`, `atomic_workflow_config.py`): plain
+  functions passed as `tools=[...]`; the signature is the schema the model is
+  given, and `deps` is what a tool receives from the caller. A tool that raises
+  becomes a `ToolFailed` result the model reads and adapts to; a malformed call
+  is a retried tool return under the answer's budget.
 | The answer is a forced `answer` tool call | `response_format` / JSON-mode prompting | The endpoints accept `response_format` and ignore it; a tool's schema is enforced on the same route |
 | Agent sampling uses the configured temperature | Pinning to 0 for determinism | The model is stochastic; the eval must resemble production, and 0 is not deterministic anyway |
 | `unittest` for the eval harness | pytest | Evals need module discovery and a wall-clock timeout wrapper |

@@ -23,12 +23,14 @@ accumulate across turns.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+import json
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import wraps
 from typing import Any, Generic, TypeVar, override
 
 import pydantic_ai
-from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, UsageLimits
+from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, ToolFailed, UsageLimits
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import (
@@ -173,8 +175,13 @@ def _has_usable_content(response: ModelResponse) -> bool:
     """
     if response.finish_reason == "length":
         return False
-    if any(isinstance(part, ToolCallPart) for part in response.parts):
-        return True
+    calls = [part for part in response.parts if isinstance(part, ToolCallPart)]
+    if calls:
+        # A call whose arguments are not JSON is an encoding failure, not an
+        # answer: measured as `{"response":Got it — a…}` from an endpoint
+        # that treats the tool schema as a hint. Correcting it is not the
+        # model's job; the same request is sampled again.
+        return all(_arguments_are_object(part) for part in calls)
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     # A stall emits the opening token and then whitespace to the token limit
     # (measured on the gateway: `{"response":` followed by 5,392 lines of
@@ -183,9 +190,28 @@ def _has_usable_content(response: ModelResponse) -> bool:
     return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
 
 
+def _arguments_are_object(part: ToolCallPart) -> bool:
+    """Whether a tool call's arguments are an object, not raw model prose.
+
+    A tool's arguments are always an object, so anything else — a list, a
+    number, unparseable text — is not a call the schema could have produced.
+    """
+    args = part.args
+    if isinstance(args, dict):
+        return True
+    if not isinstance(args, str):
+        return True
+    try:
+        return isinstance(json.loads(args), dict)
+    except ValueError:
+        return False
+
+
 def _unusable_cause(response: ModelResponse) -> str:
     if response.finish_reason == "length":
         return "token limit reached before the answer finished"
+    if any(isinstance(part, ToolCallPart) and not _arguments_are_object(part) for part in response.parts):
+        return "tool arguments were not JSON"
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
     if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
         return "whitespace instead of an answer"
@@ -200,6 +226,83 @@ def _has_user_turn(messages: Sequence[ModelMessage]) -> bool:
         and any(isinstance(part, UserPromptPart) for part in message.parts)
         for message in messages
     )
+
+
+def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
+    """A tool that raises returns a failure the model can read.
+
+    The model adapts in the same run; a raised exception would end the turn
+    and tell it nothing. A tool that fails is a result, not a retry — the
+    retry budget is for a call the model got wrong.
+    """
+
+    @wraps(tool)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        # Evidence for the blind catch: the contract of a step's tool is "return
+        # an answer or fail"; PydanticAI turns ToolFailed into a result the model
+        # reads, while any other exception ends the turn with nothing to read.
+        # A caller's tool may raise anything (an SDK error, a KeyError from its
+        # own data), so no narrower set can be named.
+        try:
+            return tool(*args, **kwargs)
+        except ToolFailed:
+            # a tool that raised ToolFailed itself already says what failed
+            raise
+        except Exception as exc:  # noqa: BLE001 — any failure is the tool's answer
+            raise ToolFailed(f"{type(exc).__name__}: {exc}") from exc
+
+    return wrapper
+
+
+class _ProviderLog:
+    """Which upstream endpoint answered, recorded for the failure message.
+
+    The gateway names its own upstream in ``cf-aig-provider`` — on the house
+    route that is always ``openrouter``, which says nothing about who actually
+    answered. OpenRouter puts the serving endpoint in the response body's
+    ``provider``, and its generation id in ``id`` (the id also answers at
+    ``/api/v1/generation``). The endpoints behind one model differ: some enforce
+    the request's tool schema, some treat it as a hint, so the log records both.
+    Attaching is best-effort: a model without an httpx client records nothing.
+    """
+
+    def __init__(self) -> None:
+        self.provider: str | None = None
+        self.model: str | None = None
+        self.generation: str | None = None
+
+    @classmethod
+    def attach(cls, model: Model) -> _ProviderLog:
+        log = cls()
+
+        async def record(response: Any) -> None:
+            log.provider = response.headers.get("cf-aig-provider")
+            log.model = response.headers.get("cf-aig-model")
+            try:
+                # The body is buffered (requests are not streamed), so reading
+                # it here does not consume what the transport reads next.
+                await response.aread()
+                body = response.json()
+            except Exception:  # noqa: BLE001 — a log must never break a call
+                return
+            if isinstance(body, dict):
+                log.provider = body.get("provider") or log.provider
+                log.model = body.get("model") or log.model
+                log.generation = body.get("id") or log.generation
+
+        client = getattr(model, "client", None)
+        http = getattr(client, "_client", None)
+        hooks = getattr(http, "event_hooks", None)
+        if isinstance(hooks, dict) and isinstance(hooks.get("response"), list):
+            hooks["response"].append(record)
+        return log
+
+    def suffix(self) -> str:
+        """`` (served by X, model Y)``, or nothing when nothing was recorded."""
+        if not self.provider and not self.model:
+            return ""
+        parts = [part for part in (self.provider, self.model) if part]
+        return f" (served by {', '.join(parts)})"
 
 
 class Conversation(Generic[T]):
@@ -236,6 +339,8 @@ class Conversation(Generic[T]):
         temperature: float | None = None,
         extra_headers: Mapping[str, str] | None = None,
         final_output_type: Any = None,
+        tools: Sequence[Callable[..., Any]] = (),
+        deps: Any = None,
         thinking: bool = False,
         model_client: Model | None = None,
     ) -> None:
@@ -255,6 +360,9 @@ class Conversation(Generic[T]):
         self._temperature = temperature
         self._extra_headers = dict(extra_headers) if extra_headers else None
         self._final_output_type = final_output_type
+        self._tools = tuple(_failed_as_result(tool) for tool in tools)
+        self._deps = deps
+        self._provider_log = _ProviderLog()
         self._thinking = thinking
         # The injection seam for tests: a FunctionModel scripts a whole turn
         # without a network or a provider SDK. Production builds the real one
@@ -281,6 +389,7 @@ class Conversation(Generic[T]):
                 api_base=self._api_base,
                 api_key_env=self._api_key_env,
             )
+        self._provider_log = _ProviderLog.attach(self._model)
         output_type = (
             (self._final_output_type or self._output_type)
             if final_turn
@@ -296,6 +405,7 @@ class Conversation(Generic[T]):
         )
         agent: Agent[Any, T] = Agent(
             self._model,
+            tools=self._tools,
             output_type=output_spec,
             system_prompt=self._instructions
             + (
@@ -313,7 +423,9 @@ class Conversation(Generic[T]):
         try:
             result = self._run_with_transport_retries(agent, prompt, final_turn=final_turn)
         except UnexpectedModelBehavior as exc:
-            raise MaxRetriesExceededError(self._output_retries, reason=str(exc)) from exc
+            raise MaxRetriesExceededError(
+                self._output_retries, reason=f"{exc}{self._provider_log.suffix()}"
+            ) from exc
 
         turn = ModelTurn(
             output=result.output,
@@ -369,6 +481,7 @@ class Conversation(Generic[T]):
                 prompt,
                 message_history=history,
                 model_settings=self.model_settings(),
+                deps=self._deps,
                 usage_limits=UsageLimits(request_limit=self._max_requests),
             )
 
