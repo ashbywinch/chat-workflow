@@ -142,7 +142,11 @@ class Session:
 
         text = render_result(result, RenderContext())
         if text:
-            self.say(text)
+            self.say(
+                "Here's what I propose — tell me what you'd change:\n\n"
+                f"{text}\n\n"
+                "Does that capture it, or would you adjust anything?"
+            )
 
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""

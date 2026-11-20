@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
+from chat_workflow.confirmation import confirm_draft
 from chat_workflow.rendering import RenderContext
 
 from .domain_spec import ComponentDomainSpec
@@ -104,9 +105,11 @@ class ComponentInteractionContext(BaseModel):
             session=session,
         )
         session.propose(draft)
-        session.say("Does that capture it, or would you adjust anything?")
-        return _confirm_interaction_context(
-            draft=draft, session=session, max_turns=min(max_turns, 4)
+        return confirm_draft(
+            session=session,
+            draft=draft,
+            step=_confirm_interaction_context,
+            max_turns=min(max_turns, 4),
         )
 
 
@@ -140,9 +143,12 @@ def _confirm_interaction_context(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentInteractionContext:
-    """The proposal has been shown. Confirm it, or correct it.
+    """
+The proposal has been shown. Confirm it, or correct it.
 
-If the user confirms, return the draft. If they correct a point, update it, say in one sentence what changed, and ask
-them to confirm the change; return after they confirm. Ask only about a point they left unanswered. Do not re-present
-the whole proposal or ask what to call the artifact."""
+If the user confirms, return the draft. If they correct a point, update it and return the corrected context; the
+framework shows the change. Ask only about a point they left unanswered. Do not re-present the whole proposal or ask
+what to call the artifact.
+    
+    """
     ...  # type: ignore[reportReturnType]

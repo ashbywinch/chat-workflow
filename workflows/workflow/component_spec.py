@@ -8,6 +8,7 @@ from pydantic import Field, field_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
+from chat_workflow.confirmation import confirm_draft
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext, render_result
 from chat_workflow.transcript import entries
@@ -231,8 +232,11 @@ class ComponentSpec(LLMValidated):
             text = "Thanks — here's what I'd add or change:\n" + text
             text += "\n\nEverything else stays as we agreed."
         session.say(text)
-        confirmed = _confirm_components(
-            draft=draft, session=session, max_turns=min(max_turns, 6)
+        confirmed = confirm_draft(
+            session=session,
+            draft=draft,
+            step=_confirm_components,
+            max_turns=min(max_turns, 6),
         )
         # The user may say there are no separate roles at all. That is a fact
         # about the work, not a new part: make them the owner and say so.
@@ -317,19 +321,19 @@ def _confirm_components(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
-    """The parts have already been shown to the user. Ask one confirm-or-correct question.
+    """
+The parts have been shown. Ask one confirm-or-correct question.
 
-Do not re-present the whole set. When the user confirms, return the set in the same response; do not ask for a
-second confirmation. If they correct a part, or add a requirement
-that belongs to an existing part, say in one sentence that you added it to that part, update the part, and return the
-corrected set; when you have changed a part, say in one sentence what changed and ask them to confirm the change
-before returning. If the requirement is a new artifact, propose a new part. If the user says the parts are not separate
-jobs, explain that those jobs are steps inside the one part, not separate parts, and return the set. If the user asks
-about the flow, handoffs, or decision points, answer it in one or two sentences in a continue message, using the
-analysis' phases, and wait for their response before returning the set. If the user gives new information, use a
-continue turn to propose the new or updated parts and ask for confirmation; you are not out of turns, so do not return
-failure because you need to ask. Ask only about a gap the draft cannot fill; do not ask the user to name a part, say
-who owns it, or describe a stage the analysis already lists. Never say the schema words "consumer", "owner_role",
-"scope_description", "purpose", or "component_type"; say "who it is for", "who owns it", "what it covers", and "what it
-does"."""
+Do not re-present the whole set. When the user confirms, return the set in the same response; do not ask for a second
+confirmation. If they correct a part, or add a requirement that belongs to an existing part, update that part and
+return the corrected set; the framework shows the change. If the requirement is a new artifact, propose a new part. If
+the user says the parts are not separate jobs, explain that those jobs are steps inside the one part and return the
+set. If they ask about the flow, handoffs, or decision points, answer in one or two sentences in a continue message,
+using the analysis' phases, and wait for their response. If they give new information, use a continue turn to propose
+the new or updated parts; you are not out of turns. Ask only about a gap the draft cannot fill; do not ask the user to
+name a part, say who owns it, or describe a stage the analysis already lists. Never say the schema words "consumer",
+"owner_role", "scope_description", "purpose", or "component_type"; say "who it is for", "who owns it", "what it covers",
+and "what it does".
+    
+    """
     ...  # type: ignore[reportReturnType]

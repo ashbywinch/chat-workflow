@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
+from chat_workflow.confirmation import confirm_draft
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext
 
@@ -172,8 +173,11 @@ class ComponentDomainSpec(LLMValidated):
             session=session,
         )
         session.propose(draft)
-        return _confirm_domain_spec(
-            draft=draft, session=session, max_turns=min(max_turns, 4)
+        return confirm_draft(
+            session=session,
+            draft=draft,
+            step=_confirm_domain_spec,
+            max_turns=min(max_turns, 4),
         )
 
 
@@ -205,12 +209,14 @@ def _confirm_domain_spec(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentDomainSpec:
-    """The domain spec has been shown. Ask one question about a field or quality check.
+    """
+The domain spec has been shown. Ask one question about a field or quality check.
 
 If the user confirms, return the draft. If they correct or add a field or check — including a section, a table, or a
-length limit — update the fields or what_good_looks_like, say in one sentence what changed, and ask them to confirm the
-change; return after they confirm. Ask only about a gap the draft cannot fill; do not re-present the
-whole spec and do not ask what to call the artifact."""
+length limit — update the fields or what_good_looks_like and return the corrected spec; the framework shows the change.
+Ask only about a gap the draft cannot fill; do not re-present the whole spec and do not ask what to call the artifact.
+    
+    """
     ...  # type: ignore[reportReturnType]
 
 

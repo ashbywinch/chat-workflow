@@ -74,15 +74,10 @@ class SessionComponent:
         return to the question; never develop their domain content. Describe
         the picture in their words, not as a list of field names.
 
-        The step's inputs are established facts. Open the step by proposing
-        what you can already see from them — the result, or the part of it they
-        cover — and ask for a reaction. Do not ask the user to supply or
-        confirm something the inputs already contain. Before the first
-        question, say in one sentence what you are doing and why. The task at
-        hand asks for something specific: do that task's work, not the next
-        one's. When the user agrees with the picture you described, finish in
-        the same response; never re-present an unchanged draft or ask for a
-        second approval. If their last message asks you something, answer it
+        The task at hand asks for something specific: do that task's work, not
+        the next one's. When the user agrees with a draft you presented, finish
+        in the same response if it is unchanged; a changed draft is a new
+        proposal and is confirmed once. If their last message asks you something, answer it
         before finishing. When they ask for a suggestion or say "you tell me",
         the reply is the suggestion itself: name the concrete sections,
         fields, or format in that message, and do not answer with a question.

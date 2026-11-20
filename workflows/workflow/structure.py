@@ -12,6 +12,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
+from chat_workflow.confirmation import confirm_draft
 from chat_workflow.rendering import RenderContext, plain_type
 
 from .domain_spec import ComponentDomainSpec
@@ -47,6 +48,13 @@ class StructField(BaseModel):
             "The user's words for this field's type, copied from the domain "
             "spec (for example 'date' or 'list of person names'). Empty means "
             "the type expression is described instead."
+        ),
+    )
+    field_description: str = Field(
+        "",
+        description=(
+            "What the field means in the user's world, copied from the domain "
+            "spec's field description."
         ),
     )
 
@@ -107,13 +115,13 @@ class ComponentStructure(BaseModel):
         """Say the shape in the domain's words, carried by each field."""
         lines = []
         for field in self.fields:
-            description = field.field_def_kwargs.get("description")
-            line = (
-                f"{field.name.replace('_', ' ')}: "
-                f"{field.field_type_hint or plain_type(field.type_expr)}"
+            description = field.field_description or field.field_def_kwargs.get(
+                "description"
             )
+            hint = field.field_type_hint or plain_type(field.type_expr)
+            line = f"{field.name.replace('_', ' ')}: {description or hint}"
             if description:
-                line += f" — {description}"
+                line += f" ({hint})"
             lines.append(line)
         if self.model_validators:
             lines.extend(f"Rule: {validator.rule}" for validator in self.model_validators)
@@ -136,8 +144,11 @@ class ComponentStructure(BaseModel):
         """Derive the structure from the domain spec, then confirm it."""
         draft = _draft_structure(domain_spec=domain_spec, session=session)
         session.propose(draft)
-        return _confirm_structure(
-            draft=draft, session=session, max_turns=min(max_turns, 4)
+        return confirm_draft(
+            session=session,
+            draft=draft,
+            step=_confirm_structure,
+            max_turns=min(max_turns, 4),
         )
 
 
@@ -152,8 +163,9 @@ def _draft_structure(
     """Derive the structure from the domain spec.
 
 The domain spec already lists the fields and the type hints. Derive the complete ComponentStructure yourself; do not
-ask the user anything. For each field, copy its `field_type_hint` from the domain spec into the structure field; that
-is the user's own word for the type. Then choose the Python type and any structurally enforceable rule. Translate
+ask the user anything. For each field, copy its `field_type_hint` and `field_description` from the domain spec into the
+structure field; those are the user's own words for the type and its meaning. Then choose the Python type and any
+structurally enforceable rule. Translate
 the business
 language into the technical structure silently. For dates, use a str with an ISO format or a pre-validator; never a
 date/datetime field. Include a validator for every rule a field can enforce structurally; return an empty list only
@@ -169,11 +181,13 @@ def _confirm_structure(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentStructure:
-    """The structure has been shown. Ask one confirm-or-correct question.
+    """
+The structure has been shown. Ask one confirm-or-correct question.
 
-If the user confirms, return the draft. If they correct a type or a rule, update it, say in one sentence what
-changed, and ask them to confirm the change; return after they confirm. Ask only about a gap the draft cannot fill;
-do not re-present the whole
-structure or ask the user to choose code types. Say the types in business words — "text", "a list of names",
-"an optional date" — never "str", "list[str]", or "| None"."""
+If the user confirms, return the draft. If they correct a type or a rule, update it and return the corrected
+structure; the framework shows the change. Ask only about a gap the draft cannot fill; do not re-present the whole
+structure or ask the user to choose code types. Say the types in business words — "text", "a list of names", "an
+optional date" — never "str", "list[str]", or "| None".
+    
+    """
     ...  # type: ignore[reportReturnType]

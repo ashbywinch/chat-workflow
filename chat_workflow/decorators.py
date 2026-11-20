@@ -120,6 +120,7 @@ def _build_system_prompt(
     conversation_rules: dict[str, str],
     chat: bool,
     instructions: str | None = None,
+    explore: bool = False,
 ) -> str:
     """Build the system prompt from the session, the step and its rules.
 
@@ -146,18 +147,29 @@ def _build_system_prompt(
         sections.append(params_section.strip())
 
     if chat:
-        sections.append(
-            "## Start of the step\n"
-            "Say in one sentence what this step is doing and why. Then make "
-            "your first substantive move: if the step was given inputs, "
-            "propose what you can already see from them — the result, or the "
-            "part of it they cover — and ask for a reaction. Do not ask the "
-            "user to name a thing the inputs already name, and do not ask "
-            "them to supply or confirm something the inputs already contain. "
-            "Do not return the complete result in the first response unless "
-            "the inputs already contain all of it and the user has confirmed "
-            "it."
-        )
+        if explore:
+            start = (
+                "## Start of the step\n"
+                "Say in one sentence what this step is doing and why. Then ask "
+                "one open question about the user's own work and listen. This "
+                "step does not name stages, steps, or fields, and does not "
+                "propose a structure; the user describes, the next step "
+                "structures."
+            )
+        else:
+            start = (
+                "## Start of the step\n"
+                "Say in one sentence what this step is doing and why. Then make "
+                "your first substantive move: if the step was given inputs, "
+                "propose what you can already see from them — the result, or "
+                "the part of it they cover — and ask for a reaction. Do not "
+                "ask the user to name a thing the inputs already name, and do "
+                "not ask them to supply or confirm something the inputs "
+                "already contain. Do not return the complete result in the "
+                "first response unless the inputs already contain all of it "
+                "and the user has confirmed it."
+            )
+        sections.append(start)
 
     if chat and conversation_rules:
         sections.append(_build_checklist_section(conversation_rules))
@@ -304,6 +316,7 @@ def atomic_workflow(
     chat: bool = True,
     single_turn: bool = False,
     min_turns: int = 1,
+    explore: bool = False,
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
@@ -323,6 +336,10 @@ def atomic_workflow(
     ``min_turns`` is the minimum number of model turns the task needs before
     it may return a result. A task that must ask or propose first declares
     two; a success on the first turn is fed back as a correction.
+
+    ``explore=True`` is a listening step: it opens with one open question
+    about the user's own work, not a proposal. A step that derives from
+    established inputs leaves it false.
     """
     from .exceptions import AtomicWorkflowFailedError
 
@@ -405,6 +422,7 @@ def atomic_workflow(
         wrapper._chat = chat  # type: ignore[attr-defined]
         wrapper._single_turn = single_turn  # type: ignore[attr-defined]
         wrapper._min_turns = min_turns  # type: ignore[attr-defined]
+        wrapper._explore = explore  # type: ignore[attr-defined]
         wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]
         return wrapper
 

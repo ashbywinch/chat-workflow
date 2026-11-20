@@ -63,6 +63,25 @@ layering change updates the test in the same commit.
 is an atomic or composite workflow step. Further vocabulary:
 [domain concepts](reference/domain-concepts.md).
 
+## Turn contracts
+
+Three rules shape a conversation, independent of any one step's prompt:
+
+- **A success says what it did.** `Success` carries `message`, and the session
+  speaks it for a chat-on step. A silent completion is not expressible.
+- **A step declares the turns its task needs.** `min_turns` is the minimum
+  number of model turns before a result is accepted. A gather step that must
+  ask or propose first declares two; a success on the first turn is fed back
+  as a correction ("do the task's next step"), not accepted as a summary.
+- **Changed drafts are confirmed; unchanged drafts finish.** A confirmation
+  step that changes a value states the change and asks the user to confirm it.
+  A step that returns the draft unchanged finishes; it does not ask for a
+  second approval.
+
+A question the schema already fixes (the three interaction preferences) is
+asked by the framework, not left to the model: the answer is a parameter to
+the derivation, so the question cannot be skipped or paraphrased away.
+
 ## Rendering a typed result
 
 A result record is internal; the proposal is for a person. The record renders

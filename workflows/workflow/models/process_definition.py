@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from chat_workflow import atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
+from chat_workflow.confirmation import confirm_draft
 from chat_workflow.conversation_rules import WARM_OPEN
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext
@@ -201,7 +202,10 @@ class GatheredNotes(BaseModel):
     )
 
 
-@atomic_workflow_step(conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE])
+@atomic_workflow_step(
+    explore=True,
+    conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE],
+)
 def _gather_notes(
     process_description: Annotated[
         str, "What the person already told you about how their work happens"
@@ -257,22 +261,20 @@ def _confirm_process_definition(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
-    """Present the draft breakdown and ask the user to confirm or correct it.
+    """
+The draft has been shown. Ask one confirm-or-correct question.
 
-The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. If the draft
-leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask about that gap
-and offer one concrete possibility in the question: "Is the approver your manager, or someone else?" not "Who is the
-approver?" If the user says they do not handle a step, propose a concrete role for that step and ask them to confirm it,
-then say in one sentence what changed and ask them to confirm the change; return after they confirm. Name one
-concrete improvement grounded in the breakdown — a capture
-format, a template, or a checklist they could adopt — and ask whether it fits. Do not invent a tool or product they did
-not mention; keep the improvement to a practice. If the user asks what the output looks like, say in one sentence that
-the output's shape comes next and return to the stages and steps. If they describe their domain content (a specific
-article, dish, or idea), do not comment on it; say "Noted." and return to the stages and steps. Never praise it or
-develop the content. If they confirm, return the draft. If they correct a value, update it, say what changed, and ask
-them to confirm the change; return after they confirm.
-result. Do not re-present the whole draft and do not ask them to name the stages or steps; the draft already has
-them."""
+If the draft leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask
+about that gap and offer one concrete possibility: "Is the approver your manager, or someone else?" If the user says
+they do not handle a step, propose a concrete role for it and ask them to confirm. Name one concrete improvement
+grounded in the breakdown — a capture format, a template, or a checklist — and ask whether it fits; keep it to a
+practice and do not invent a tool the user did not mention. If the user asks what the output looks like, say in one
+sentence that the shape comes next and return to the stages and steps. If they describe domain content, do not comment
+on it; say "Noted." and return. If they confirm, return the draft. If they correct a value, update it and return the
+corrected result; the framework shows the change and asks for confirmation. Do not re-present the whole draft and do not
+ask them to name the stages or steps.
+    
+    """
     ...  # type: ignore[reportReturnType]
 
 
@@ -291,9 +293,10 @@ def generate_from_chat(
     ProcessDefinition from the gathered notes. When `process_description` is
     provided, start from it instead of asking the user to repeat it.
     """
-    # Gathering is a short step by contract: ask once, invite elaboration
-    # once, return. A larger budget here only lets the model ask again.
-    gather_turns = min(max_turns, 4)
+    # Exploration follows the user's threads: one question per new part of
+    # the work, and it stops when they have nothing new. It is not an
+    # interrogation, so it is bounded well below the overall turn budget.
+    gather_turns = min(max_turns, 6)
     if process_description:
         gathered = _gather_notes(
             process_description=process_description,
@@ -312,8 +315,11 @@ def generate_from_chat(
     # the confirmation turn. A confirmation turn that skips the presentation
     # would leave the user (and the judge) with no proposal at all.
     session.propose(draft)
-    return _confirm_process_definition(
-        draft=draft, session=session, max_turns=min(max_turns, 4)
+    return confirm_draft(
+        session=session,
+        draft=draft,
+        step=_confirm_process_definition,
+        max_turns=min(max_turns, 4),
     )
 
 

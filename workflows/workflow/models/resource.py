@@ -7,6 +7,7 @@ from pydantic import Field
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
+from chat_workflow.confirmation import confirm_draft
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext
 
@@ -108,8 +109,11 @@ class Resource(LLMValidated):
             session=session,
         )
         session.propose(draft)
-        return _confirm_resources(
-            draft=draft, session=session, max_turns=min(max_turns, 4)
+        return confirm_draft(
+            session=session,
+            draft=draft,
+            step=_confirm_resources,
+            max_turns=min(max_turns, 4),
         )
 
 
@@ -151,16 +155,17 @@ def _confirm_resources(
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[Resource], Field(min_length=1)]:
-    """The starting materials have been shown. Ask which ones they have.
+    """
+The starting materials have been shown. Ask which ones they have.
 
 If they add one, include it; if they say one does not apply, remove it. If they say the list is wrong or they do not
-have an item, replace it with what they say they do have; never return failure because the list needs correction. If they ask you to format or write the
-deliverable itself, say in one sentence that this step lists what they start with and the deliverable comes next,
-then return to the list. If they describe their domain content (specific dishes, articles, or ideas), do not comment
-on it; say "Noted." and return to the list of starting materials. Never praise it or develop the content. Return the
-corrected list when they confirm. If the user asks what you think or for a suggestion — especially about a material's
-format or completeness — propose one concrete format and one concrete completeness check in that same message, then
-say in one sentence what changed, and ask them to confirm the change; return after they confirm. Do not answer with
-the list again or with a question. Do not re-present the whole
-list and do not ask what to call the deliverable."""
+have an item, replace it with what they say they do have; never return failure because the list needs correction. If
+they ask you to format or write the deliverable itself, say in one sentence that this step lists what they start with
+and the deliverable comes next, then return to the list. If they describe domain content, say "Noted." and return to
+the list. If they ask what you think or for a suggestion — especially about a material's format or completeness —
+propose one concrete format and one concrete completeness check in that same message, then return the corrected list.
+If they confirm, return the list; if they correct it, return the corrected list and the framework shows the change. Do
+not re-present the whole list and do not ask what to call the deliverable.
+    
+    """
     ...  # type: ignore[reportReturnType]

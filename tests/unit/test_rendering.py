@@ -145,7 +145,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
                         name="meeting_date",
                         type_expr="str",
                         field_type_hint="date",
-                        field_def_kwargs={"description": "When it happened"},
+                        field_description="When it happened",
                     ),
                     StructField(
                         name="attendees",
@@ -163,8 +163,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
             RenderContext(),
         )
 
-        self.assertIn("meeting date: date", text)
-        self.assertIn("When it happened", text)
+        self.assertIn("meeting date: When it happened (date)", text)
         self.assertIn("attendees: list of person names", text)
         self.assertIn("Rule: Every action item has an owner", text)
 

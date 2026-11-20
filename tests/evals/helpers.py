@@ -113,6 +113,24 @@ def _looks_garbled(text: str) -> bool:
         return True
     if any(character in "（）［］｛｝" for character in text):
         return True
+    # The gateway also decodes into another script entirely: CJK, kana,
+    # Hangul, or Cyrillic in an English persona's reply is a decode fault.
+    if any(
+        "\u0400" <= character <= "\u04ff"
+        or "\u3040" <= character <= "\u30ff"
+        or "\u4e00" <= character <= "\u9fff"
+        or "\uac00" <= character <= "\ud7af"
+        for character in text
+    ):
+        return True
+    # "ceslsOTEL" / "WTEA" style tokens: internal capitals are a decode fault,
+    # not a word a person typed.
+    if any(
+        len(word) > 4 and any(c.islower() for c in word[:2])
+        and any(c.isupper() for c in word[2:])
+        for word in words
+    ):
+        return True
     weird = sum(
         1
         for word in words
