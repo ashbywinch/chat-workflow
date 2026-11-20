@@ -203,6 +203,12 @@ _SUGGESTION_MARKERS = (
     "suggest",
     "should i",
     "recommend",
+    "a rule",
+    "checklist",
+    "minimum number",
+    "how do i know",
+    "when is it ready",
+    "complete enough",
 )
 
 
