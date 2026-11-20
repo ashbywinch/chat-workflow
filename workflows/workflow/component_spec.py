@@ -261,6 +261,8 @@ that belongs to an existing part, say in one sentence that you added it to that 
 corrected set. If the requirement is a new artifact, propose a new part. If the user says the parts are not separate
 jobs, explain that those jobs are steps inside the one part, not separate parts, and return the set. If the user asks
 about the flow, handoffs, or decision points, answer it in one or two sentences in a continue message, using the
-analysis' phases, and wait for their response before returning the set. Ask only about a gap the draft cannot fill; do
-not ask the user to name a part, say who owns it, or describe a stage the analysis already lists."""
+analysis' phases, and wait for their response before returning the set. If the user gives new information, use a
+continue turn to propose the new or updated parts and ask for confirmation; you are not out of turns, so do not return
+failure because you need to ask. Ask only about a gap the draft cannot fill; do not ask the user to name a part, say
+who owns it, or describe a stage the analysis already lists."""
     ...  # type: ignore[reportReturnType]
