@@ -87,6 +87,7 @@ class Session:
     # The wrapper then does not describe the same result a second time (and
     # with the wrong vocabulary).
     presented: bool = False
+    presented_at: int = 0
     id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex[:8])
     title: str | None = None
     _raw_io: UserIO = dataclasses.field(init=False, repr=False)
@@ -139,6 +140,7 @@ class Session:
         """Speak a derived result and record that it has been shown."""
         self.presented = True
         self.say(text)
+        self.presented_at = len(self.state.messages)
 
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""

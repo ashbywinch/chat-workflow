@@ -309,9 +309,17 @@ class SessionComponent:
             # A step that answered without ever speaking left the user with
             # nothing to react to. The wrapper owns the presentation turn, so
             # the result is described in the user's words before the close.
+            # A composite's own presentation counts only while it is still
+            # the last thing said. If the user replied and the step returned
+            # without speaking, the result is the answer to that reply and the
+            # wrapper must say it.
+            already_presented = (
+                session.presented
+                and len(session.state.messages) == session.presented_at
+            )
             if (
                 result is not None
-                and not session.presented
+                and not already_presented
                 and _needs_presentation(session.state.messages, before)
             ):
                 presented = self.present(result)
