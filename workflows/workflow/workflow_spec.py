@@ -528,7 +528,10 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
     )
 
     _validation_rules: ClassVar[list[str]] = [
-        "All component names must be nouns",
+        "All component names in `components` must be nouns",
+        "A diagram participant label is `path: playbook`; the playbook "
+        "(Produce, Receive) is not part of the component name and does not "
+        "make the name a verb",
         "All component names must be concepts from the user's domain",
         "Every input must be consumed by a component that needs it to make decisions",
         "REJECT if any activity lacks proper component ownership",
