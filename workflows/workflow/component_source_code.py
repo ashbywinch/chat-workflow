@@ -1028,6 +1028,10 @@ class ComponentSourceCode(LLMValidated):
         "Reserve the generated model's _validation_rules for domain-quality "
         "criteria that cannot be expressed structurally — specificity, domain "
         "fit, and excellence by the user's standards.",
+        "A rule must be satisfiable with what the user can reasonably supply in "
+        "the conversation. REJECT a rule that demands an identifier the user "
+        "would not have — a last name, an email address, an employee number — "
+        "when a name they already gave identifies the person in their context.",
         "REJECT a _validation_rules entry that repeats a field constraint or "
         "a @model_validator; for example, do not list 'blockers must have an "
         "unblocker' when the validator already checks it.",

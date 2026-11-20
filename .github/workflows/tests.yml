@@ -68,11 +68,11 @@ jobs:
           path: code-coverage-results.md
 
   conversation-evals:
-    # The full conversation suite calls real models and an LLM judge. It runs
-    # on every PR to give a signal, but it is not a *required* merge check:
-    # the judge is non-deterministic, so it cannot decide every merge. A
-    # release tag requires a green run; the PRD makes that a release
-    # requirement.
+    # The full conversation suite calls real models and an LLM judge. It is a
+    # required merge check and a release requirement: a PR does not merge with
+    # a red run, and a release tag requires green. A judge sample is not
+    # deterministic, so a failure is investigated and re-run; it is never
+    # merged past unexamined.
     if: >-
       (github.event_name == 'pull_request' &&
        github.event.pull_request.head.repo.fork != true &&

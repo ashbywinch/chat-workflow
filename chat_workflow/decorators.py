@@ -203,7 +203,11 @@ def _build_system_prompt(
         "the user as 'you'; never describe the conversation in the third "
         "person or say 'the user'. Do not list the result's values there; "
         "they are in `result`. If the user's last message asked something, "
-        "answer it in `message` before you finish."
+        "answer it in `message` before you finish. When the user has just "
+        "confirmed or corrected a draft, name what changed or restate the "
+        "confirmed shape in one sentence — for example, 'I've added those "
+        "four steps under Topic selection.' Do not comment on the quality of "
+        "what they said, and do not finish with only 'I have what you need.'"
     )
     if not chat and getattr(_inner_model(return_type), "__name__", "") != "TextReply":
         sections.append(

@@ -91,13 +91,13 @@ Examples: modifying tests → check [the testing guide](docs/contributors/testin
 | Full verification | `make evals` | Runs all evals |
 | Unsure | `make evals-incremental` | Safe default, auto-detects |
 
-CI runs the deterministic gate (unit, lint, types, docs, coverage) on every
-PR and on main. The full conversation suite (`make evals`) calls real models
-and runs on every PR and weekly, but it is **not a required merge check** —
-a non-deterministic judge cannot decide every merge. It is the **release
-gate**: a release is not cut with a failing conversation run, and that
-requirement is in the PRD. A red conversation run on a PR is investigated.
-While developing, use targeted evals (`make evals-test TEST=...`).
+CI runs the deterministic gate (unit, lint, types, docs, coverage) and the
+full conversation suite (`make evals`) on every PR and on main. **Both are
+required merge checks**: a PR does not merge with a failing conversation run,
+and a release does not ship with one. The suite calls real models, so a
+failure is investigated and re-run when it is a judge sample; it is never
+merged past unexamined. While developing, use targeted evals
+(`make evals-test TEST=...`), and run the full suite before pushing.
 
 ### Tool Selection
 

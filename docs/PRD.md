@@ -304,13 +304,12 @@ come from the environment. House traffic goes through Cloudflare AI Gateway.
   schema vocabulary, unanswered suggestions, silent completions, or a
   fabricated value are release blockers, not prompt preferences. The
   conversation suite is the evidence for that requirement.
-- **The gates are split by kind.** The per-merge gate is deterministic: unit
-  tests, lint, types, docs links, and coverage. The full conversation suite
-  calls real models. It runs on every PR for signal, but it is not a
-  *required* merge check, because a non-deterministic judge cannot decide every
-  merge. It is the **release gate**: a green run is required before a release
-  is cut, and its failure blocks the release. A red conversation run on a PR
-  is investigated, not ignored.
+- **The conversation suite is a required merge check.** A PR does not merge
+  while it is red, and a release does not ship with it red. It runs on every
+  PR and before a release. Unit tests, lint, types, docs links, and coverage
+  run with it. A judge sample is not deterministic, so a failure is
+  investigated and re-run when it is a sample; it is never merged past
+  unexamined.
 
 ### L9 — Blobs and large artifacts are first-class
 
@@ -354,9 +353,9 @@ opinion and it is not optional for conversation quality.
 
 - **Cost:** development and CI evals call a real model. Every run is bounded
   (turn limits, timeouts, token reporting); incremental evals are the local
-  default. The full conversation suite runs on every PR and weekly, and
-  it is the release gate. It is not a required merge check; a release without
-  a green conversation run is not a release.
+  default. The full conversation suite runs on every PR, before
+  release, and weekly. It is a required merge check: a PR and a release both
+  need a green run.
 - **Longevity:** the library is version 0.1 and explicitly unstable. Public API
   changes are allowed; there is no backward-compatibility promise.
 - **Backups:** the library holds no user data. Generated artifacts and eval
