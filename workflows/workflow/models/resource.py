@@ -5,7 +5,7 @@ from typing import Annotated, ClassVar
 
 from pydantic import Field
 
-from chat_workflow import atomic_workflow_step
+from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
 
@@ -80,7 +80,7 @@ class Resource(LLMValidated):
         min_length=1,
     )
 
-    @atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
+    @composite_workflow_step
     @classmethod
     def generate_from_chat(
         cls,
@@ -90,46 +90,70 @@ class Resource(LLMValidated):
             "What the person has already told you about how their work happens",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> list[Resource]:
-        """List what the user starts with before they make the thing they make.
+        """Derive the typical starting materials, then confirm the list."""
+        draft = _draft_resources(
+            deliverables=deliverables,
+            analysis=analysis,
+            session=session,
+        )
+        session.say(_format_resources(draft, deliverables))
+        return _confirm_resources(
+            draft=draft, session=session, max_turns=max_turns
+        )
 
-    The conversation has already opened; do not greet again. Start your first reply with "Let's list what you start with before you make {deliverables[0].name}." Then, in one sentence,
-    say what you are doing: listing what they start with before they make the thing. If the conversation already lists what they start with, use that list and do not ask which ones they have. Otherwise, in your first turn, name the thing they make from `deliverables`, propose the things people
-    usually start with for that kind of work, and ask which of them they have. The deliverables already name what they make; use that name and do not ask what to call it or what the notes are called.
 
-    For each one, in the user's words:
-    - where it comes from: ask which person, place, system, or document it comes from, not the act of getting it ("The fridge and freezer",
-    not "Looking in the fridge"). If they know it from experience, it comes from them, and what form it takes is
-    "in their head"; never make the experience itself where it comes from;
-    - what form it takes when it exists: a list, a document, a recording, not the act of gathering it ("Verbal
-    feedback", not "Chatting to the sous");
-    - what it needs first, if anything;
-    - the check they apply: something true of the finished thing, not
-    an action, not an outcome, and never a state of mind. "The list includes
-    every item on every shelf, flagged if it is near expiry" - not "I know what
-    is on every shelf", not "I can list every item", not "Every shelf has been
-    checked", not "No one complains". Name what must be present, not a general
-    description of the contents: "Every day of the week has an entry" is a
-    check; "It contains a typical number of days" is a description. A check starts with the
-    thing, not with "you": "the calendar shows every shift", not "you have seen every shift".
-    If they
-    answer with a state of mind or an outcome, propose the concrete check
-    yourself and ask them to confirm it.
+def _format_resources(draft: list[Resource], deliverables: list[Deliverable]) -> str:
+    """Present the typical starting materials in the user's words."""
+    thing = deliverables[0].name if deliverables else "the thing you make"
+    lines = [f"Let's list what you start with before you make {thing}.", ""]
+    for resource in draft:
+        line = f"- {resource.source} — form: {resource.format}"
+        if resource.dependencies:
+            line += f"; needs first: {'; '.join(resource.dependencies)}"
+        if resource.validation_criteria:
+            line += f"; the check: {resource.validation_criteria}"
+        lines.append(line)
+    lines.append("")
+    lines.append("Which of these do you have, and what else do you start with?")
+    return "\n".join(lines)
 
-    Name the typical materials in the reply message itself, one per line, before asking which they have. Never answer with
-    only a description of the output; a list of starting materials is the proposal.
 
-    Work through one thing at a time: propose where it comes from, what form it takes, what it needs first, and the check in one
-    draft, then ask one confirm-or-correct question. Do not ask a list of separate questions about one thing, and do not put
-    checks for several things in one message. When they name one, accept it; do not read back a longer list of alternatives.
-    When they confirm one thing, accept it and move to the next; do not summarise it back or ask again. Raw notes, and anything
-    the user trusts as sent, need no completeness question: they are whatever the person wrote. Accept them and move on. If
-    they have only one, do not ask for more.
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_resources(
+    deliverables: Annotated[list[Deliverable], "What the person makes"],
+    analysis: Annotated[
+        ProcessDefinition | None,
+        "What the person has already told you about how their work happens",
+    ] = None,
+    max_turns: Annotated[int, "Maximum turns"] = 1,
+) -> list[Resource]:
+    """Derive the things people usually start with for this kind of work.
 
-    Ask once and accept the answer. When they ask for a suggestion, give one concrete option in that same reply and end
-    the reply with it — do not ask a question in that reply. When they confirm the set, return it without summarising it again.
+The deliverables and any analysis are established. Propose the typical starting materials yourself; do not ask the
+user anything. For each, in the user's words:
+- where it comes from: the person, place, system, or document, not the act of getting it;
+- what form it takes when it exists: a list, a document, a recording, not the act of gathering it;
+- what it needs first, if anything;
+- the check they apply: something true of the finished thing, not an action, an outcome, or a state of mind. Start
+  the check with the thing, not with "you".
+Use the deliverable's name; do not ask what to call it. Return the complete list."""
+    ...  # type: ignore[reportReturnType]
 
-    Describe each in the user's words. Say "what you start with". Stay at the
-    level of what they start with, not its contents: if they describe their
-    domain, acknowledge it in a clause and return to them."""
-        ...  # type: ignore[reportReturnType]
+
+@atomic_workflow_step
+def _confirm_resources(
+    draft: Annotated[
+        list[Resource],
+        "The complete list of typical starting materials already shown to the user",
+    ],
+    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
+) -> list[Resource]:
+    """The starting materials have been shown. Ask which ones they have.
+
+If they add one, include it; if they say one does not apply, remove it. If they ask you to format or write the
+deliverable itself, say in one sentence that this step lists what they start with and the deliverable comes next,
+then return to the list. Return the corrected list when they confirm. Do not re-present the whole list and do not ask
+what to call the deliverable."""
+    ...  # type: ignore[reportReturnType]

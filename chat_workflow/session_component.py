@@ -61,8 +61,13 @@ def _describe_item(item: Any) -> str:
     else:
         return ""
     heading = data.get("name") or data.get("text") or ""
+    # A component was already shown in full by the composite's own
+    # presentation; the closing recap names it and its owner, not its scope
+    # again.
+    keys = ("owner_role",) if "scope_description" in data else _DISPLAY_LABELS
     parts: list[str] = []
-    for key, label in _DISPLAY_LABELS.items():
+    for key in keys:
+        label = _DISPLAY_LABELS[key]
         value = data.get(key)
         if value in (None, "", []):
             continue
