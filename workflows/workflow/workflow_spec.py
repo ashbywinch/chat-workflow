@@ -251,9 +251,7 @@ def _repair_generic_participants(diagram: str, components: Any, outputs: Any) ->
     only the label's path is replaced.
     """
     component_names = _item_field(components, "name")
-    primary = _primary_output(outputs, components)
     component = component_names[0] if component_names else "Component"
-    consumer = primary[1] if primary else "Consumer"
     lines: list[str] = []
     for line in diagram.splitlines():
         match = _PARTICIPANT_LINE.match(line.strip())
@@ -265,11 +263,9 @@ def _repair_generic_participants(diagram: str, components: Any, outputs: Any) ->
         if path.strip().casefold() not in _GENERIC_PARTICIPANTS:
             lines.append(line)
             continue
-        replacement = (
-            consumer
-            if path.strip().casefold() in {"you", "user", "i", "we", "they"}
-            else component
-        )
+        # A component or artifact path is always safe. The consumer can be
+        # the user ("I", "You"), which would still fail the contract.
+        replacement = component
         lines.append(
             f'    participant {alias} as "{replacement}: {playbook.strip() or "Receive"}"'
         )
