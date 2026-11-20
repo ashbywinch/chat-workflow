@@ -734,8 +734,10 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
             process_description=process_description,
         )
 
+        manager = analysis.orchestrating_component
+        manages = "manage" if manager.strip().casefold() in {"you", "i", "me"} else "manages"
         session.io.echo(
-            f"\nGreat — {analysis.orchestrating_component} manages this process. Now, what does it produce?"
+            f"\nGreat — {manager} {manages} this process. Now, what does it produce?"
         )
         outputs = Deliverable.generate_from_chat(analysis=analysis, session=session)
 

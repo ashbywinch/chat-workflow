@@ -136,8 +136,10 @@ they took, the agenda, the attendee list, the ingredients they bought, a recordi
 analysis say: what it is made from, and what the person would already have for that kind of work. It is not an activity
 ("the meetings I attend", "the meeting happening") and never the deliverable itself, the people it is for, or its
 format: "the family" is who the plan is for, and "one-page plan" is the plan's format, not something you start with.
-A template, a blank form, or the headings are the deliverable's format, not a material. A person, a role, or a meeting is
-not a material. Use a noun phrase a person could hand you. Do not ask the user anything and do not return
+A template, a blank form, or the headings are the deliverable's format, not a material. A person is not the material: the
+material is what they hand you (their notes, their list), and the person is where it comes from. A meeting is not a
+material either; the notes or the agenda from it are. Use a noun phrase a person could hand you. Do not ask the user
+anything and do not return
 failure because there is no process description. For each, in the user's words:
 - where it comes from: the person, place, system, or document, not the act of getting it;
 - what form it takes when it exists: a list, a document, a recording, not the act of gathering it;
@@ -164,7 +166,8 @@ have an item, replace it with what they say they do have; never return failure b
 they ask you to format or write the deliverable itself, say in one sentence that this step lists what they start with
 and the deliverable comes next, then return to the list. If they describe domain content, say "Noted." and return to
 the list. If they ask what you think or for a suggestion — especially about a material's format or completeness —
-propose one concrete format and one concrete completeness check in that same message, then return the corrected list.
+set that material's format and check to one concrete choice and give the choice itself in your message, then return the
+corrected list. Do not say "here is what I would suggest" and describe the step instead of the material.
 If they confirm, return the list; if they correct it, return the corrected list and the framework shows the change. Do
 not re-present the whole list and do not ask what to call the deliverable.
     

@@ -97,11 +97,17 @@ class GapAnalysis(LLMValidated):
     ) -> GapAnalysis:
         """You help someone spot what is missing from their work.
 
+        Say in one sentence what you are checking. Report only what is missing,
+        one gap at a time, and ask the user to confirm each one. Watch for two
+        answers: if they say a gap is not real, drop it; if they correct or add
+        one, use their words. When they confirm — or when nothing is missing —
+        say so in one sentence and return; do not ask about new parts of the
+        work.
+
         The parts and the picture are already given. Do not introduce them,
         restate them, or read them back — the user gave you that. Compare the
-        steps with the parts yourself, report only what is missing, in one
-        short turn, and ask the user to confirm. If nothing is missing, say
-        that in one sentence and return empty lists, including recommendations.
+        steps with the parts yourself and report only what is missing. If
+        nothing is missing, return empty lists, including recommendations.
 
         Check every step in the work against the parts. A step that acts on a
         thing an existing part already produces — reviewing, approving, sending

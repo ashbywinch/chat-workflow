@@ -29,7 +29,9 @@ class Deliverable(LLMValidated):
     _validation_rules: ClassVar[list[str]] = [
         "The quality check is one someone can apply when the thing is "
         "produced — not an after-the-fact outcome like 'no one complains' or "
-        "'everyone is happy', and not just what it looks like.",
+        "'everyone is happy'. A completeness check (the required fields are "
+        "present) is valid when that is the user's standard, even for a "
+        "personal record that may be saved with only a name.",
         "The consumer is a person, role, or team — not the artifact itself. "
         "What happens to it next says who receives it and what they do with it, "
         "or that it stays with the user and is not handed on. Where it is kept "
