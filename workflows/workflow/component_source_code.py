@@ -105,6 +105,21 @@ def _absolute_index(code: str, lineno: int, column: int) -> int:
     )
 
 
+_SPLIT_DESCRIPTION = re.compile(
+    r'(description\s*=\s*"[^"]*")\s*,\s*\n(\s*)(")'
+)
+
+
+def _join_split_descriptions(code: str) -> str:
+    """Join a description string the model split into two positional strings.
+
+    ``description="one part",`` followed by ``" another part"`` is a syntax
+    error: the continuation is parsed as a positional argument after a keyword.
+    Adjacent string literals are valid, so removing the comma is enough.
+    """
+    return _SPLIT_DESCRIPTION.sub(r"\1\n\2\3", code)
+
+
 def _ensure_min_length(code: str, tree: ast.AST) -> str:
     """Add ``min_length=1`` to required ``str`` fields that lack it.
 
@@ -947,6 +962,10 @@ class ComponentSourceCode(LLMValidated):
         return type check, and business validation presence check.
         """
         code = self.code
+        repaired = _join_split_descriptions(code)
+        if repaired != code:
+            self.code = SourceLines(repaired)
+            code = repaired
 
         try:
             tree = ast.parse(code)
