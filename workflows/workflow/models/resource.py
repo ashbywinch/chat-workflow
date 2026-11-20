@@ -120,7 +120,7 @@ def _format_resources(draft: list[Resource], deliverables: list[Deliverable]) ->
     return "\n".join(lines)
 
 
-@atomic_workflow_step(chat=False, single_turn=True)
+@atomic_workflow_step(chat=True, single_turn=True)
 def _draft_resources(
     deliverables: Annotated[list[Deliverable], "What the person makes"],
     analysis: Annotated[

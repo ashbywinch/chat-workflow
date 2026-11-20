@@ -51,6 +51,28 @@ _DISPLAY_LABELS: dict[str, str] = {
 }
 
 
+def _plain_type(type_expr: Any) -> str:
+    """Say a type expression in business words."""
+    text = str(type_expr).strip()
+    optional = text.endswith("| None") or text.startswith("Optional[")
+    text = text.replace("| None", "").strip()
+    if text.startswith("Optional[") and text.endswith("]"):
+        text = text[len("Optional[") : -1]
+    if text == "str":
+        plain = "text"
+    elif text in {"int", "float"}:
+        plain = "a number"
+    elif text == "bool":
+        plain = "yes or no"
+    elif text.startswith("list[") and text.endswith("]"):
+        plain = "a list of " + _plain_type(text[len("list[") : -1])
+    elif text.startswith("dict[") or text == "dict":
+        plain = "a set of values"
+    else:
+        plain = text.replace("_", " ").casefold()
+    return plain + (" (optional)" if optional else "")
+
+
 def _describe_item(item: Any) -> str:
     if isinstance(item, str):
         return item
@@ -98,7 +120,7 @@ def _describe_item(item: Any) -> str:
 
     if "fields" in data and "model_validators" in data:
         field_text = "; ".join(
-            f"{field.get('name')} is {field.get('type_expr')}"
+            f"{field.get('name')} is {_plain_type(field.get('type_expr'))}"
             for field in data["fields"]
             if isinstance(field, dict)
         )
