@@ -195,11 +195,52 @@ def _describe_item(item: Any) -> str:
     return "; ".join(parts) if parts else ""
 
 
-def _describe_result(result: Any) -> str:
+_SUGGESTION_MARKERS = (
+    "you tell me",
+    "what do you think",
+    "what works best",
+    "suggest",
+    "should i",
+    "recommend",
+)
+
+
+def _asks_for_a_suggestion(question: str) -> bool:
+    text = question.casefold()
+    return any(marker in text for marker in _SUGGESTION_MARKERS)
+
+
+def _suggest_from_item(item: Any) -> str:
+    data = item.model_dump() if hasattr(item, "model_dump") else item
+    if not isinstance(data, dict):
+        return ""
+    if data.get("source"):
+        sentence = f"Here's what I'd suggest: keep {data['source']} as {data.get('format', 'a simple list')}"
+        if data.get("dependencies"):
+            sentence += f", and have {'; '.join(data['dependencies'])} ready first"
+        sentence += "."
+        if data.get("validation_criteria"):
+            sentence += f" You know it's ready when {data['validation_criteria']}."
+        return sentence
+    if data.get("consumer"):
+        sentence = f"Here's what I'd suggest: {data.get('name') or 'it'} as {data.get('format', 'a simple document')}."
+        if data.get("success_criteria"):
+            sentence += f" It is done when {data['success_criteria']}."
+        return sentence
+    return ""
+
+
+def _describe_result(result: Any, *, question: str = "") -> str:
     if result is None:
         return ""
     if isinstance(result, str):
         return result
+    if _asks_for_a_suggestion(question):
+        candidates = result if isinstance(result, (list, tuple)) else [result]
+        for item in candidates:
+            suggestion = _suggest_from_item(item)
+            if suggestion:
+                return suggestion
     if isinstance(result, (list, tuple)):
         body = "\n".join(
             line for line in (_describe_item(item) for item in result) if line
@@ -240,14 +281,15 @@ class SessionComponent:
         """
         ...  # type: ignore[reportReturnType]
 
-    def present(self, result: Any) -> str:
+    def present(self, result: Any, *, question: str = "") -> str:
         """Describe the result in the user's words, without a model call.
 
         The result's own fields are already in the user's words. A deterministic
         summary is complete and cannot be cut off mid-sentence the way a model
-        completion can.
+        completion can. When the user's last message asked for a suggestion,
+        the reply is the suggestion itself, not the list again.
         """
-        return _describe_result(result)
+        return _describe_result(result, question=question)
 
     @composite_workflow
     def converse(self, step: Callable[..., T], *, session: Session) -> T:
@@ -322,7 +364,9 @@ class SessionComponent:
                 and not already_presented
                 and _needs_presentation(session.state.messages, before)
             ):
-                presented = self.present(result)
+                presented = self.present(
+                    result, question=_last_user_text(session.state.messages)
+                )
                 if presented:
                     session.say(presented)
             try:
@@ -344,6 +388,14 @@ class SessionComponent:
             return result
         finally:
             session.active = False
+
+
+def _last_user_text(messages: list[Any]) -> str:
+    """The last turn a person typed, ignoring framework prompts."""
+    for kind, text in reversed(entries(messages)):
+        if kind == "user":
+            return text
+    return ""
 
 
 def _needs_presentation(messages: list[Any], before: int) -> bool:

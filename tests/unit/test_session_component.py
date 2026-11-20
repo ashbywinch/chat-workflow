@@ -185,6 +185,17 @@ class TestPresentation(unittest.TestCase):
     def test_a_string_result_is_its_own_description(self):
         self.assertEqual(SessionComponent().present("the result"), "the result")
 
+    def test_a_suggestion_answers_the_question(self):
+        text = SessionComponent().present(
+            [{"source": "Raw notes", "format": "Bullet points", "validation_criteria": "Every decision is captured"}],
+            question="You tell me — what format works best?",
+        )
+
+        self.assertIn("Here's what I'd suggest", text)
+        self.assertIn("Bullet points", text)
+        self.assertIn("Every decision is captured", text)
+        self.assertNotIn("here's what I'd propose", text)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
