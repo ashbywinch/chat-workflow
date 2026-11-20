@@ -673,21 +673,23 @@ def _is_plain_data_type(node: ast.ClassDef) -> bool:
     )
 
 
-def _plain_nested_types(model: type, plain_names: set[str]) -> list[str]:
-    """Field annotation classes the module defines as plain classes.
+def _plain_nested_types(
+    node: ast.ClassDef | None, plain_names: set[str]
+) -> list[str]:
+    """Field annotations that name a plain class the module defines.
 
     ``plain_names`` are the module's class definitions that are not a
     BaseModel; a field annotation that names one of them compiles but fails
     when Pydantic builds the schema.
     """
-    from typing import get_args
-
-    found: list[str] = []
-    for field in model.model_fields.values():
-        for candidate in get_args(field.annotation):
-            if isinstance(candidate, type) and candidate.__name__ in plain_names:
-                found.append(candidate.__name__)
-    return found
+    if node is None:
+        return []
+    found: set[str] = set()
+    for statement in node.body:
+        if not isinstance(statement, ast.AnnAssign):
+            continue
+        found |= _annotation_names(statement.annotation) & plain_names
+    return sorted(found)
 
 
 def _resolve_primary_model(
@@ -1289,24 +1291,26 @@ class ComponentSourceCode(LLMValidated):
                     + ", ".join(missing_min_length)
                 )
 
+        plain_names = {
+            name
+            for name, node in class_nodes.items()
+            if name not in base_names
+            and name != primary_name
+            and not _is_plain_data_type(node)
+        }
+        inaccessible = _plain_nested_types(
+            class_nodes.get(primary_name), plain_names
+        )
+        if inaccessible:
+            raise ValidationError(
+                "Field type(s) must be Pydantic models, not plain classes: "
+                + ", ".join(inaccessible)
+                + ". That class must inherit LLMValidated (or BaseModel) "
+                "so it can be a field of the artifact."
+            )
             # A nested field type must be a model Pydantic can build. A plain
             # class here imports but fails at schema generation, after the
             # component has been accepted.
-            plain_names = {
-                name
-                for name, node in class_nodes.items()
-                if name not in base_names
-                and name != primary_name
-                and not _is_plain_data_type(node)
-            }
-            plain_nested = _plain_nested_types(main_cls, plain_names)
-            if plain_nested:
-                raise ValidationError(
-                    "Field type(s) must be Pydantic models, not plain classes: "
-                    + ", ".join(plain_nested)
-                    + ". Class ActionItem must inherit LLMValidated (or BaseModel) "
-                    "so it can be a field of the artifact."
-                )
 
         for node in workflow_methods:
             is_atomic, _ = _workflow_kind(node)
