@@ -238,6 +238,44 @@ def _primary_output(outputs: Any, components: Any = None) -> tuple[str, str] | N
     return pairs[0]
 
 
+_GENERIC_PARTICIPANTS = frozenset(
+    {"you", "i", "we", "they", "user", "system", "actor"}
+)
+
+
+def _repair_generic_participants(diagram: str, components: Any, outputs: Any) -> str:
+    """Give a participant that is a pronoun a real component or consumer name.
+
+    The model sometimes writes `participant You as "You: Note-taker"`. The
+    contract requires a component or artifact path; the alias can stay, so
+    only the label's path is replaced.
+    """
+    component_names = _item_field(components, "name")
+    primary = _primary_output(outputs, components)
+    component = component_names[0] if component_names else "Component"
+    consumer = primary[1] if primary else "Consumer"
+    lines: list[str] = []
+    for line in diagram.splitlines():
+        match = _PARTICIPANT_LINE.match(line.strip())
+        if not match:
+            lines.append(line)
+            continue
+        alias, label = match.group(1), match.group(2)
+        path, _, playbook = label.partition(":")
+        if path.strip().casefold() not in _GENERIC_PARTICIPANTS:
+            lines.append(line)
+            continue
+        replacement = (
+            consumer
+            if path.strip().casefold() in {"you", "user", "i", "we", "they"}
+            else component
+        )
+        lines.append(
+            f'    participant {alias} as "{replacement}: {playbook.strip() or "Receive"}"'
+        )
+    return "\n".join(lines)
+
+
 def _repair_diagram_outcome(diagram: str, outputs: Any, components: Any = None) -> str:
     """Make the final message the outcome to the consumer.
 
@@ -384,6 +422,11 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
                 )
                 if fallback:
                     diagram = fallback
+            diagram = _repair_generic_participants(
+                diagram,
+                data.get("components") or [],
+                data.get("outputs") or [],
+            )
             repaired = _repair_diagram_outcome(
                 diagram,
                 data.get("outputs") or [],
