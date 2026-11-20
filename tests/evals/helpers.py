@@ -172,6 +172,10 @@ class AgentIO:
                     "repeat the helper's words."
                 )
             )
+            # A long pipeline outgrows the user bot's context. The bot needs
+            # the recent exchange and its persona, not every earlier turn.
+            if len(self._conversation.messages) > 16:
+                self._conversation.messages = self._conversation.messages[-16:]
 
     def prompt(self, label: str) -> str:
         """Generate the user's reply, resampling a corrupted completion.
