@@ -210,10 +210,7 @@ class ComponentSpec(LLMValidated):
             # The gap resolution asks again with the set it already confirmed.
             # Showing and confirming the same parts a second time is repetition.
             return draft
-        session.present(
-            result=draft,
-            text=_format_components(draft, existing_components),
-        )
+        session.say(_format_components(draft, existing_components))
         confirmed = _confirm_components(
             draft=draft, session=session, max_turns=min(max_turns, 6)
         )
@@ -226,9 +223,8 @@ class ComponentSpec(LLMValidated):
             confirmed = [
                 part.model_copy(update={"owner_role": "You"}) for part in confirmed
             ]
-            session.present(
-                result=confirmed,
-                text="Got it — it's all you. I've made you the owner of every part.",
+            session.say(
+                "Got it — it's all you. I've made you the owner of every part."
             )
         return confirmed
 

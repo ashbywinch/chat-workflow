@@ -157,7 +157,7 @@ class ComponentDomainSpec(LLMValidated):
             deliverables=deliverables,
             session=session,
         )
-        session.present(result=draft, text=_format_domain_spec(draft))
+        session.say(_format_domain_spec(draft))
         return _confirm_domain_spec(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )

@@ -28,7 +28,9 @@ def _continuing(action) -> TurnResult:
 def _success(action) -> TurnResult:
     if action.result is None:
         raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
-    return TurnResult[EvaluationCriteria].success(action.result)
+    return TurnResult[EvaluationCriteria].success(
+        action.result, message=action.message
+    )
 
 
 def _failure(action) -> AtomicWorkflowFailedError:

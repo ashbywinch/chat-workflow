@@ -193,6 +193,14 @@ def _build_system_prompt(
         "material, return intent='failure': a result they did not supply is "
         "not theirs."
     )
+    sections.append(
+        "## The success message\n"
+        "A success is still a turn: `message` is what the user reads when the "
+        "step ends. Say what you decided, what changed, or that it is "
+        "confirmed, in one or two sentences in the user's words. Do not list "
+        "the result's values there; they are in `result`. If the user's last "
+        "message asked something, answer it in `message` before you finish."
+    )
 
     return "\n\n".join(sections)
 
@@ -237,7 +245,7 @@ def _setup_atomic_workflow(
     )
 
     def _on_success(response: Success[Any]) -> TurnResult[Any]:
-        return TurnResult[Any].success(response.result)
+        return TurnResult[Any].success(response.result, message=response.message)
 
     return AtomicWorkflow(
         config=AtomicWorkflowConfig(

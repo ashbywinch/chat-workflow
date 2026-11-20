@@ -92,7 +92,9 @@ def _success(action) -> TurnResult:
     """The success callback: a success turn always carries a result."""
     if action.result is None:
         raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
-    return TurnResult[EvaluationCriteria].success(action.result)
+    return TurnResult[EvaluationCriteria].success(
+        action.result, message=action.message
+    )
 
 
 def make_atomic_workflow_config(
@@ -122,6 +124,12 @@ def text_response(payload: Any) -> ModelResponse:
     """
     if isinstance(payload, dict) and "response" not in payload:
         payload = {"response": payload}
+    response = payload.get("response") if isinstance(payload, dict) else None
+    if isinstance(response, dict) and response.get("intent") == "success":
+        # A success is a turn: it says what it did. Scripted tests focus on
+        # the result, so the helper supplies the words; the protocol test
+        # below covers the rejection of a silent success.
+        response.setdefault("message", "Done.")
     return ModelResponse(parts=[ToolCallPart("answer", payload)])
 
 

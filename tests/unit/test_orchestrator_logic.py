@@ -44,7 +44,11 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_process_turn_success(self, mock_call_llm):
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
-        action = Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria())
+        action = Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=make_valid_criteria(),
+            )
         mock_call_llm.return_value = action
 
         result = orchestrator.process_turn("Let's create criteria")
@@ -123,7 +127,11 @@ class TestAtomicWorkflow(unittest.TestCase):
         responses = [
             Continue(intent=AgentIntent.CONTINUE, message="Question 1"),
             Continue(intent=AgentIntent.CONTINUE, message="Question 2"),
-            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=make_valid_criteria()),
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=make_valid_criteria(),
+            ),
         ]
         mock_call_llm.side_effect = responses
 
@@ -194,7 +202,8 @@ class TestWorkflowIntegration(unittest.TestCase):
         from chat_workflow import SessionLog
 
         mock_call_llm.return_value = Success[EvaluationCriteria](
-            intent=AgentIntent.SUCCESS, result=make_valid_criteria()
+            intent=AgentIntent.SUCCESS,
+            message="Done.", result=make_valid_criteria()
         )
 
         mock_io = Mock()
@@ -215,7 +224,8 @@ class TestWorkflowIntegration(unittest.TestCase):
         from chat_workflow import SessionLog
 
         mock_call_llm.return_value = Success[EvaluationCriteria](
-            intent=AgentIntent.SUCCESS, result=make_valid_criteria()
+            intent=AgentIntent.SUCCESS,
+            message="Done.", result=make_valid_criteria()
         )
 
         mock_io = Mock()
@@ -238,7 +248,8 @@ class TestWorkflowIntegration(unittest.TestCase):
         from workflows.evaluation_criteria import generate_reviewed_criteria
 
         mock_call_llm.return_value = Success[EvaluationCriteria](
-            intent=AgentIntent.SUCCESS, result=make_valid_criteria()
+            intent=AgentIntent.SUCCESS,
+            message="Done.", result=make_valid_criteria()
         )
 
         mock_io = Mock()
@@ -279,9 +290,21 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         mock_call_llm.side_effect = [
-            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=initial_criteria),
-            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
-            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=refined_criteria),
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=initial_criteria,
+            ),
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=refined_criteria,
+            ),
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=refined_criteria,
+            ),
         ]
 
         mock_io = Mock()
@@ -394,7 +417,11 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
             patch.object(AtomicWorkflow, "__init__", tracking_init),
             patch.object(AtomicWorkflow, "_call_llm") as mock_call_llm,
         ):
-            mock_call_llm.return_value = Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
+            mock_call_llm.return_value = Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=criteria,
+            )
 
             mock_io = Mock()
             mock_io.echo = Mock()
@@ -522,7 +549,7 @@ class TestAutoParamInjection(unittest.TestCase):
             mock_call_llm.return_value = type(
                 "MockAction",
                 (),
-                {"intent": AgentIntent.SUCCESS, "message": None, "result": valid_criteria},
+                {"intent": AgentIntent.SUCCESS, "message": "Done.", "result": valid_criteria},
             )()
 
             mock_io = Mock()
@@ -575,7 +602,7 @@ class TestAutoParamInjection(unittest.TestCase):
             mock_call_llm.return_value = type(
                 "MockAction",
                 (),
-                {"intent": AgentIntent.SUCCESS, "message": None, "result": criteria},
+                {"intent": AgentIntent.SUCCESS, "message": "Done.", "result": criteria},
             )()
 
             mock_io = Mock()
@@ -638,7 +665,7 @@ class TestTheStepOnTheTranscript(unittest.TestCase):
 
         session.run(workflow=orchestrator, first_user_input="hello")
 
-        self.assertEqual(len(state.messages), 3)  # request, answer call, its return
+        self.assertEqual(len(state.messages), 4)  # request, answer call, return, words
         self.assertEqual(state.usage.requests, 1)
         self.assertEqual(state.turn_count, 1)
 

@@ -37,6 +37,14 @@ class Success(BaseModel, Generic[TResult]):
     model_config = ConfigDict(extra="forbid")
 
     intent: Literal[AgentIntent.SUCCESS]
+    message: str = Field(
+        min_length=1,
+        description=(
+            "What the user reads when the step ends: one or two sentences in "
+            "their own words saying what you decided, what changed, or that it "
+            "is confirmed. Do not list the result's values here."
+        ),
+    )
     result: TResult = Field(description="The complete object the caller asked for.")
 
 
@@ -54,12 +62,13 @@ type AgentResponse[TResult] = Annotated[
 ]
 """What an agent returns after one turn, as three shapes, not one.
 
-The schema *is* the rule: a ``continue`` has no ``result`` property and a
-``success`` has no ``message``, with ``additionalProperties: false`` on each
-branch. An answer that both asks and answers is inexpressible, so it is never
-generated and never retried. A model validator could not do this: Pydantic
-does not translate validator logic into JSON Schema, so a rule written there
-reaches the model only as a rejection after the fact.
+The schema *is* the rule: a ``continue`` has no ``result`` property, and a
+``success`` carries both the words the user reads and the object, with
+``additionalProperties: false`` on each branch. An answer that both asks and
+answers is inexpressible, so it is never generated and never retried. A model
+validator could not do this: Pydantic does not translate validator logic into
+JSON Schema, so a rule written there reaches the model only as a rejection
+after the fact.
 """
 
 type FinalResponse[TResult] = Annotated[

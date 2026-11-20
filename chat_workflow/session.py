@@ -83,16 +83,6 @@ class Session:
     # The one flag: the wrapper sets it while this session is being run. The
     # greeting condition is ``not state.messages``, not a second flag.
     active: bool = False
-    # True once a composite has shown its derived result in the user's words.
-    # The wrapper then does not describe the same result a second time (and
-    # with the wrong vocabulary).
-    presented: bool = False
-    # The domain's own words for each field, cached by a structural-design
-    # presentation so a later recap does not fall back to Python types.
-    presented_hints: dict[str, str] = dataclasses.field(default_factory=dict)
-    # The value the composite presented. A confirmation that returns it
-    # unchanged must not be presented a second time.
-    presented_result: Any = None
     id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex[:8])
     title: str | None = None
     _raw_io: UserIO = dataclasses.field(init=False, repr=False)
@@ -141,12 +131,6 @@ class Session:
         """Find a descendant session by id."""
         return next((item for item in self.walk() if item.id == session_id), None)
 
-    def present(self, text: str, *, result: Any = None) -> None:
-        """Speak a derived result and record that it has been shown."""
-        self.presented = True
-        self.presented_result = result
-        self.say(text)
-
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""
         clean = text.removeprefix("\nAssistant: ").strip()
@@ -169,6 +153,7 @@ class Session:
         has no user to ask: a ``continue`` is fed back as an in-context
         correction and retried within the turn budget.
         """
+        result: TurnResult[TResult] | None = None
         try:
             first = first_user_input
             if not first and not chat:
@@ -200,7 +185,13 @@ class Session:
                     )
                 if not result.is_complete:
                     self._raw_io.echo(f"\nAssistant: {result.message}")
-
-            return result
         finally:
             _record_atomic_workflow(self.state, workflow)
+
+        assert result is not None
+        # A conversational step does not finish silently: the success message
+        # is the last thing the user reads, and it is the model's own words.
+        # A one-shot step has no user to show it to.
+        if chat and result.result is not None and result.message:
+            self.say(result.message)
+        return result
