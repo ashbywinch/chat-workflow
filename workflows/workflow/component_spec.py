@@ -167,6 +167,14 @@ class ComponentSpec(LLMValidated):
             )
         return value
 
+    @field_validator("owner_role")
+    @classmethod
+    def _owner_is_a_capacity(cls, value: str) -> str:
+        """A first-person owner is the user; say "You", not "I"."""
+        if value.strip().casefold() in {"i", "me", "myself", "the user", "user"}:
+            return "You"
+        return value
+
     @composite_workflow_step
     @classmethod
     def identify_from_chat(
@@ -244,9 +252,10 @@ def _draft_components(
 The analysis, inputs and outputs are established facts. The parts are derived from its activities. The owner of each
 part is the person or role whose job includes producing or maintaining that part. `analysis.orchestrating_component` is
 the owner only when that role does the work; use `analysis.participants` for a part another participant produces — a
-note-taker's notes belong to the note-taker, while the minutes belong to the coordinator. Include the parts in
-`existing_components` and add any that are missing. Do not ask the user anything: derive the complete set and return
-it.
+note-taker's notes belong to the note-taker, while the minutes belong to the coordinator. If the analysis says "I" or
+"me", use the role the notes or participants describe; if there is no role name, use "You". Never return failure because
+the role is written as a pronoun. Include the parts in `existing_components` and add any that are missing. Do not ask
+the user anything: derive the complete set and return it.
 
 Each part is one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
 reviews or sends another part's thing belongs to that part. Name each part after its thing ("Approval Record", not
