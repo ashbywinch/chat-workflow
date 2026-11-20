@@ -664,7 +664,22 @@ def _is_plain_data_type(node: ast.ClassDef) -> bool:
     """True for an Enum, dataclass, or TypedDict — a valid field type."""
     for base in node.bases:
         name = base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
-        if name in {"Enum", "StrEnum", "IntEnum", "TypedDict", "NamedTuple"}:
+        if name in {
+            "Enum",
+            "StrEnum",
+            "IntEnum",
+            "TypedDict",
+            "NamedTuple",
+            "str",
+            "int",
+            "float",
+            "bool",
+            "list",
+            "dict",
+            "set",
+            "tuple",
+            "bytes",
+        }:
             return True
     return any(
         (isinstance(d, ast.Name) and d.id == "dataclass")

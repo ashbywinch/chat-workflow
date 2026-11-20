@@ -125,5 +125,26 @@ class TestStoredForm(unittest.TestCase):
         self.assertIn("validation", kinds)
 
 
+class TestRetryArtifacts(unittest.TestCase):
+    """A rejected output attempt is not shown twice."""
+
+    def test_identical_consecutive_assistant_turns_are_one(self):
+        messages = [
+            ModelRequest.user_text_prompt("hello"),
+            ModelResponse(parts=[TextPart("same words")]),
+            ModelResponse(parts=[TextPart("same words")]),
+            ModelResponse(parts=[TextPart("after")]),
+        ]
+
+        self.assertEqual(
+            entries(messages),
+            [
+                ("user", "hello"),
+                ("assistant", "same words"),
+                ("assistant", "after"),
+            ],
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

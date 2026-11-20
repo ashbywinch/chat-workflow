@@ -76,7 +76,20 @@ def entries(messages: Sequence[ModelMessage]) -> list[tuple[str, str]]:
             result.extend(_request_entries(message))
         elif isinstance(message, ModelResponse):
             result.extend(_response_entries(message, is_answer=index == last_answer))
-    return result
+    # An output retry can leave the same assistant text twice in a row: the
+    # rejected attempt and the accepted one. A person saw it once, so the
+    # transcript shows it once.
+    deduped: list[tuple[str, str]] = []
+    for kind, text in result:
+        if (
+            deduped
+            and kind == "assistant"
+            and deduped[-1][0] == "assistant"
+            and deduped[-1][1].strip() == text.strip()
+        ):
+            continue
+        deduped.append((kind, text))
+    return deduped
 
 
 def render(

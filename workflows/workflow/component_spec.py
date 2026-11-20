@@ -9,6 +9,7 @@ from pydantic import Field, field_validator
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.annotations import UserLabel
 from chat_workflow.mixins import LLMValidated
+from chat_workflow.transcript import entries
 
 # Activity nouns the model reaches for when it should name the artifact.
 # A deterministic guard: the LLM judge handles the general case, but these
@@ -213,9 +214,46 @@ class ComponentSpec(LLMValidated):
             result=draft,
             text=_format_components(draft, existing_components),
         )
-        return _confirm_components(
+        confirmed = _confirm_components(
             draft=draft, session=session, max_turns=min(max_turns, 6)
         )
+        # The user may say there are no separate roles at all. That is a fact
+        # about the work, not a new part: make them the owner and say so.
+        if _says_self_only(_last_user_text(session)) and any(
+            part.owner_role.strip().casefold() not in {"you", "me", "i"}
+            for part in confirmed
+        ):
+            confirmed = [
+                part.model_copy(update={"owner_role": "You"}) for part in confirmed
+            ]
+            session.present(
+                result=confirmed,
+                text="Got it — it's all you. I've made you the owner of every part.",
+            )
+        return confirmed
+
+
+def _last_user_text(session: Session) -> str:
+    for kind, text in reversed(entries(session.state.messages)):
+        if kind == "user":
+            return text
+    return ""
+
+
+def _says_self_only(text: str) -> bool:
+    lowered = text.casefold()
+    return any(
+        marker in lowered
+        for marker in (
+            "just me",
+            "only me",
+            "no separate roles",
+            "i do it all",
+            "i do everything",
+            "that's me",
+            "all me",
+        )
+    )
 
 
 from .models.deliverable import Deliverable  # noqa: E402
