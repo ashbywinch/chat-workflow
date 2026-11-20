@@ -234,9 +234,12 @@ def _draft_components(
 ) -> list[ComponentSpec]:
     """Derive the parts of the user's work from the analysis.
 
-The analysis, inputs and outputs are established facts. The owner is `analysis.orchestrating_component`; the parts
-are derived from its activities. Include the parts in `existing_components` and add any that are missing.
-Do not ask the user anything: derive the complete set and return it.
+The analysis, inputs and outputs are established facts. The parts are derived from its activities. The owner of each
+part is the person or role whose job includes producing or maintaining that part. `analysis.orchestrating_component` is
+the owner only when that role does the work; use `analysis.participants` for a part another participant produces — a
+note-taker's notes belong to the note-taker, while the minutes belong to the coordinator. Include the parts in
+`existing_components` and add any that are missing. Do not ask the user anything: derive the complete set and return
+it.
 
 Each part is one thing: the thing itself, and the work of producing and changing it. A stage that merely drafts,
 reviews or sends another part's thing belongs to that part. Name each part after its thing ("Approval Record", not

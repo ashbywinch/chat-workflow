@@ -89,9 +89,12 @@ def _describe_result(result: Any) -> str:
     if isinstance(result, str):
         return result
     if isinstance(result, (list, tuple)):
-        lines = [_describe_item(item) for item in result]
-        return "\n".join(line for line in lines if line)
-    return _describe_item(result)
+        body = "\n".join(
+            line for line in (_describe_item(item) for item in result) if line
+        )
+    else:
+        body = _describe_item(result)
+    return f"Here's what I'd propose:\n{body}" if body else ""
 
 
 class SessionComponent:

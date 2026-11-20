@@ -71,8 +71,8 @@ def weekly_meal_plan_deliverable() -> Deliverable:
         consumer="Family",
         format="One-page plan",
         success_criteria=(
-            "Before the plan is finalized, each day of the week lists a dinner, "
-            "and every ingredient in it is on the family's allowed list."
+            "The plan shows each day with a dinner, and every ingredient in it "
+            "is on the family's allowed list."
         ),
         integration_points=(
             "The family receives the plan and reads it before shopping and "
@@ -90,9 +90,8 @@ def weekly_menu_deliverable() -> Deliverable:
         consumer="The kitchen team and diners",
         format="A printed menu and a kitchen prep sheet",
         success_criteria=(
-            "Before the menu is printed, every day of the week has an entry, "
-            "every dish lists its ingredients, and every dish names the station "
-            "that prepares it."
+            "The printed menu shows every day with its dishes, each dish lists "
+            "its ingredients, and each dish names the station that prepares it."
         ),
         integration_points=(
             "The kitchen team receives it to prepare the dishes; front of house "

@@ -62,12 +62,6 @@ WORKFLOW_JUDGE_RULES: dict[str, str] = {
         "first follow-up about a field the user has not specified is not "
         "repetition."
     ),
-    "Uses expertise": (
-        "The assistant builds the stages, steps, participants, materials, or "
-        "output shape from the user's description and presents it. It does not "
-        "need to add a tool or a template; a faithful grouped breakdown is the "
-        "proposal."
-    ),
     "Honest about provenance": (
         "The breakdown is the assistant's proposal built from what the user "
         "said. A value the user did not state is part of that proposal, not a "
