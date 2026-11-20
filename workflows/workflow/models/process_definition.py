@@ -252,7 +252,7 @@ def generate_from_chat(
     # The proposal is the model's own draft, shown in the user's words before
     # the confirmation turn. A confirmation turn that skips the presentation
     # would leave the user (and the judge) with no proposal at all.
-    session.say(_format_process_definition(draft))
+    session.present(_format_process_definition(draft))
     return _confirm_process_definition(
         draft=draft, session=session, max_turns=min(max_turns, 4)
     )

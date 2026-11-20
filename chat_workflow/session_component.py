@@ -69,7 +69,11 @@ def _plain_type(type_expr: Any) -> str:
     elif text.startswith("dict[") or text == "dict":
         plain = "a set of values"
     else:
-        plain = text.replace("_", " ").casefold()
+        spaced = "".join(
+            f" {character}" if character.isupper() else character
+            for character in text
+        )
+        plain = spaced.replace("_", " ").strip().casefold()
     return plain + (" (optional)" if optional else "")
 
 
@@ -299,13 +303,16 @@ class SessionComponent:
                     greeting = _FALLBACK_GREETING
                 session.say(greeting or _FALLBACK_GREETING)
             before = len(session.state.messages)
+            session.presented = False
             result = step(session=session)
             session.state.final_result = result
             # A step that answered without ever speaking left the user with
             # nothing to react to. The wrapper owns the presentation turn, so
             # the result is described in the user's words before the close.
-            if result is not None and _needs_presentation(
-                session.state.messages, before
+            if (
+                result is not None
+                and not session.presented
+                and _needs_presentation(session.state.messages, before)
             ):
                 presented = self.present(result)
                 if presented:

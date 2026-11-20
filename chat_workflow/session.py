@@ -83,6 +83,10 @@ class Session:
     # The one flag: the wrapper sets it while this session is being run. The
     # greeting condition is ``not state.messages``, not a second flag.
     active: bool = False
+    # True once a composite has shown its derived result in the user's words.
+    # The wrapper then does not describe the same result a second time (and
+    # with the wrong vocabulary).
+    presented: bool = False
     id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex[:8])
     title: str | None = None
     _raw_io: UserIO = dataclasses.field(init=False, repr=False)
@@ -130,6 +134,11 @@ class Session:
     def child(self, session_id: str) -> Session | None:
         """Find a descendant session by id."""
         return next((item for item in self.walk() if item.id == session_id), None)
+
+    def present(self, text: str) -> None:
+        """Speak a derived result and record that it has been shown."""
+        self.presented = True
+        self.say(text)
 
     def say(self, text: str) -> None:
         """Speak an assistant turn that the user sees and the transcript keeps."""

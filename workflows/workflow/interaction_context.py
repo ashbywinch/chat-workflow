@@ -83,7 +83,7 @@ class ComponentInteractionContext(BaseModel):
             structure=structure,
             session=session,
         )
-        session.say(_format_interaction_context(draft))
+        session.present(_format_interaction_context(draft))
         return _confirm_interaction_context(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )

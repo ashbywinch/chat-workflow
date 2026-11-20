@@ -193,7 +193,10 @@ class AgentIO:
             if text and not _looks_garbled(text):
                 return text
             self._conversation.messages = list(before)
-        raise RuntimeError(f"User bot returned an unusable reply for {label!r}")
+        # Three corrupted completions in a row is a bad route, not a reason to
+        # fail the workflow. A short clarification is still a plausible user
+        # turn and lets the conversation continue.
+        return "Sorry, I'm not sure I followed that. Can you say it in plain words?"
 
 
 class JudgeVerdict(BaseModel):

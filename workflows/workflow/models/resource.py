@@ -98,7 +98,7 @@ class Resource(LLMValidated):
             analysis=analysis,
             session=session,
         )
-        session.say(_format_resources(draft, deliverables))
+        session.present(_format_resources(draft, deliverables))
         return _confirm_resources(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
@@ -133,7 +133,9 @@ def _draft_resources(
 
 The deliverables and any analysis are established. A single deliverable is enough: use its name and description to
 propose the materials people usually start with. A starting material is what the person begins from — ingredients,
-notes, a list — not the deliverable itself, its consumer, or its format. Do not ask the user anything and do not return
+notes, a list, a recording, an agenda. It is never the deliverable itself, the
+people it is for, or its format: "the family" is who the plan is for, and
+"one-page plan" is the plan's format, not something you start with. Do not ask the user anything and do not return
 failure because there is no process description. For each, in the user's words:
 - where it comes from: the person, place, system, or document, not the act of getting it;
 - what form it takes when it exists: a list, a document, a recording, not the act of gathering it;
