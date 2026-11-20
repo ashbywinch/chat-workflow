@@ -82,19 +82,19 @@ class TestRecursiveSession(unittest.TestCase):
 
         from workflows.workflow.models.process_definition import (
             ProcessDefinition,
+            ProcessStage,
         )
 
         session.propose(
             ProcessDefinition(
-                phases=["Capture"],
-                activities=["Scribble"],
+                stages=[ProcessStage(name="Capture", steps=["Scribble"])],
                 participants=["You"],
                 orchestrating_component="You",
             )
         )
 
         self.assertTrue(
-            any("runs through Capture" in str(m) for m in session.state.messages)
+            any("Stage 1 — Capture" in str(m) for m in session.state.messages)
         )
 
     def test_propose_says_nothing_for_an_empty_list(self):

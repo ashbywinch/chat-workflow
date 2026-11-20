@@ -469,33 +469,21 @@
    "severity": "error"
   },
   {
-   "line": 32,
+   "line": 35,
    "column": 30,
-   "stop_line": 32,
+   "stop_line": 35,
    "stop_column": 32,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
    "name": "missing-argument",
-   "description": "Missing argument `phases` in function `workflows.workflow.models.process_definition.ProcessDefinition.__init__`",
-   "concise_description": "Missing argument `phases` in function `workflows.workflow.models.process_definition.ProcessDefinition.__init__`",
+   "description": "Missing argument `stages` in function `workflows.workflow.models.process_definition.ProcessDefinition.__init__`",
+   "concise_description": "Missing argument `stages` in function `workflows.workflow.models.process_definition.ProcessDefinition.__init__`",
    "severity": "error"
   },
   {
-   "line": 32,
+   "line": 35,
    "column": 30,
-   "stop_line": 32,
-   "stop_column": 32,
-   "path": "tests/unit/test_sub_models.py",
-   "code": -2,
-   "name": "missing-argument",
-   "description": "Missing argument `activities` in function `workflows.workflow.models.process_definition.ProcessDefinition.__init__`",
-   "concise_description": "Missing argument `activities` in function `workflows.workflow.models.process_definition.ProcessDefinition.__init__`",
-   "severity": "error"
-  },
-  {
-   "line": 32,
-   "column": 30,
-   "stop_line": 32,
+   "stop_line": 35,
    "stop_column": 32,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -505,9 +493,9 @@
    "severity": "error"
   },
   {
-   "line": 32,
+   "line": 35,
    "column": 30,
-   "stop_line": 32,
+   "stop_line": 35,
    "stop_column": 32,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -517,9 +505,9 @@
    "severity": "error"
   },
   {
-   "line": 56,
+   "line": 59,
    "column": 21,
-   "stop_line": 56,
+   "stop_line": 59,
    "stop_column": 23,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -529,9 +517,9 @@
    "severity": "error"
   },
   {
-   "line": 56,
+   "line": 59,
    "column": 21,
-   "stop_line": 56,
+   "stop_line": 59,
    "stop_column": 23,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -541,9 +529,9 @@
    "severity": "error"
   },
   {
-   "line": 56,
+   "line": 59,
    "column": 21,
-   "stop_line": 56,
+   "stop_line": 59,
    "stop_column": 23,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -553,9 +541,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 77,
    "column": 24,
-   "stop_line": 74,
+   "stop_line": 77,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -565,9 +553,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 77,
    "column": 24,
-   "stop_line": 74,
+   "stop_line": 77,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -577,9 +565,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 77,
    "column": 24,
-   "stop_line": 74,
+   "stop_line": 77,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -589,9 +577,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 77,
    "column": 24,
-   "stop_line": 74,
+   "stop_line": 77,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -601,9 +589,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 77,
    "column": 24,
-   "stop_line": 74,
+   "stop_line": 77,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -613,9 +601,9 @@
    "severity": "error"
   },
   {
-   "line": 74,
+   "line": 77,
    "column": 24,
-   "stop_line": 74,
+   "stop_line": 77,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -625,9 +613,9 @@
    "severity": "error"
   },
   {
-   "line": 126,
+   "line": 129,
    "column": 26,
-   "stop_line": 126,
+   "stop_line": 129,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -637,9 +625,9 @@
    "severity": "error"
   },
   {
-   "line": 126,
+   "line": 129,
    "column": 26,
-   "stop_line": 126,
+   "stop_line": 129,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -649,9 +637,9 @@
    "severity": "error"
   },
   {
-   "line": 126,
+   "line": 129,
    "column": 26,
-   "stop_line": 126,
+   "stop_line": 129,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -661,9 +649,9 @@
    "severity": "error"
   },
   {
-   "line": 126,
+   "line": 129,
    "column": 26,
-   "stop_line": 126,
+   "stop_line": 129,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -673,9 +661,9 @@
    "severity": "error"
   },
   {
-   "line": 126,
+   "line": 129,
    "column": 26,
-   "stop_line": 126,
+   "stop_line": 129,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -685,9 +673,9 @@
    "severity": "error"
   },
   {
-   "line": 126,
+   "line": 129,
    "column": 26,
-   "stop_line": 126,
+   "stop_line": 129,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -697,9 +685,9 @@
    "severity": "error"
   },
   {
-   "line": 158,
+   "line": 161,
    "column": 58,
-   "stop_line": 158,
+   "stop_line": 161,
    "stop_column": 62,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -709,9 +697,9 @@
    "severity": "error"
   },
   {
-   "line": 163,
+   "line": 166,
    "column": 32,
-   "stop_line": 163,
+   "stop_line": 166,
    "stop_column": 34,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,

@@ -28,7 +28,10 @@ from workflows.workflow.domain_spec import (
 )
 from workflows.workflow.interaction_context import ComponentInteractionContext
 from workflows.workflow.models.deliverable import Deliverable
-from workflows.workflow.models.process_definition import ProcessDefinition
+from workflows.workflow.models.process_definition import (
+    ProcessDefinition,
+    ProcessStage,
+)
 from workflows.workflow.models.resource import Resource
 from workflows.workflow.structure import (
     ComponentStructure,
@@ -82,8 +85,10 @@ class TestRecordsRenderThemselves(unittest.TestCase):
     def test_a_process(self, _rules):
         text = render_result(
             ProcessDefinition(
-                phases=["Capture", "Write"],
-                activities=["Scribble notes", "Type them up"],
+                stages=[
+                    ProcessStage(name="Capture", steps=["Scribble notes"]),
+                    ProcessStage(name="Write", steps=["Type them up"]),
+                ],
                 orchestrating_component="You",
                 participants=["You"],
             ),
@@ -91,10 +96,11 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         )
 
         flat = " ".join(text.split())
-        self.assertIn("The work runs through Capture and Write", flat)
-        self.assertIn("The steps are Scribble notes and Type them up", flat)
+        self.assertIn("The work has 2 stages", flat)
+        self.assertIn("Stage 1 — Capture: Scribble notes", flat)
+        self.assertIn("Stage 2 — Write: Type them up", flat)
+        self.assertIn("You are the only person involved", flat)
         self.assertIn("You keep it moving", flat)
-        self.assertNotIn("Stages:", text)
 
     def test_a_resource(self, _rules):
         text = render_result(

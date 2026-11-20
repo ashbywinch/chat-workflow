@@ -33,14 +33,37 @@ _CONFIRMS_THE_DRAFT: tuple[str, str] = (
 )
 
 
+class ProcessStage(BaseModel):
+    """One broad stage of the work, with the concrete steps inside it."""
+
+    name: Annotated[str, UserLabel("the stage", "stage")] = Field(
+        ...,
+        description=(
+            "A broad stage of the work, named as the user names it (for "
+            "example 'Plan', 'Shop', 'Cook')."
+        ),
+        min_length=1,
+    )
+    steps: Annotated[list[str], UserLabel("the steps", "steps")] = Field(
+        ...,
+        description=(
+            "The concrete steps inside this stage, in the user's words (for "
+            "example 'check the fridge', 'write a list'). A step is not the "
+            "stage's name repeated."
+        ),
+        min_length=1,
+    )
+
+
 class ProcessDefinition(LLMValidated):
-    """The stages and concrete steps of the user's work."""
+    """The stages of the user's work, each with its concrete steps."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "The stages are broad; the steps are concrete and can be assigned "
-        "to a part of the work.",
+        "The stages are broad; each stage lists the concrete steps inside it, "
+        "and can be assigned to a part of the work.",
         "Every step is concrete enough that one part of the work could "
         "produce it.",
+        "No stage name is repeated as one of the steps.",
         "The person in charge is the person or role that keeps the work moving. The user's own role is valid when they do the work end "
         "to end (for example 'Freelance Writer' or 'Meal Planner'); a job "
         "title the user states, such as 'Project Manager', is their own role "
@@ -54,30 +77,28 @@ class ProcessDefinition(LLMValidated):
         "title. A separate coordinator is optional.",
     ]
 
-    phases: Annotated[
-        list[str],
-        UserLabel("the main stages", "phases", guard=False),
+    stages: Annotated[
+        list[ProcessStage],
+        UserLabel("the main stages", "stages", guard=False),
     ] = Field(
         ...,
         description=(
-            "The broad stages of the work, in order, named as the user names "
-            "them (for example 'Plan', 'Shop', 'Cook'). A stage groups several "
-            "concrete steps; it is not itself one of those steps."
+            "The broad stages of the work, in order, each with the concrete "
+            "steps inside it. A stage is not itself one of those steps."
         ),
         min_length=1,
     )
-    activities: Annotated[
-        list[str],
-        UserLabel("the things you do", "activities", guard=False),
-    ] = Field(
-        ...,
-        description=(
-            "The concrete steps inside those stages, in the user's words (for "
-            "example 'check the fridge', 'write a list', 'buy groceries'). No "
-            "step may appear both here and as a stage."
-        ),
-        min_length=1,
-    )
+
+    @property
+    def phases(self) -> list[str]:
+        """The stage names, for consumers that need the flat order."""
+        return [stage.name for stage in self.stages]
+
+    @property
+    def activities(self) -> list[str]:
+        """Every step, in stage order, for consumers that need the flat list."""
+        return [step for stage in self.stages for step in stage.steps]
+
     orchestrating_component: Annotated[
         str,
         UserLabel(
@@ -105,16 +126,21 @@ class ProcessDefinition(LLMValidated):
     )
 
     @model_validator(mode="after")
-    def _stages_are_broader_than_steps(self) -> Self:
-        """A stage groups steps; the same phrase cannot be both."""
-        stages = {phase.strip().casefold() for phase in self.phases}
+    def _stages_are_distinct_from_steps(self) -> Self:
+        """A stage groups steps; a stage name is not one of the steps."""
+        names = [stage.name.strip().casefold() for stage in self.stages]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(
+                "Stage names must be distinct; these repeat: "
+                + ", ".join(duplicates)
+            )
         steps = {step.strip().casefold() for step in self.activities}
-        overlap = sorted(stages & steps)
+        overlap = sorted(set(names) & steps)
         if overlap:
             raise ValueError(
-                "A stage cannot also be a concrete step. Group the steps "
-                "under broader stages; these appear in both: "
-                + ", ".join(overlap)
+                "A stage cannot also be a concrete step. Put the steps inside "
+                "the stage; these appear as both: " + ", ".join(overlap)
             )
         return self
 
@@ -128,7 +154,7 @@ class ProcessDefinition(LLMValidated):
             if person.strip().casefold() not in self_words
         ]
         if not others:
-            people = "It is all you."
+            people = "You are the only person involved."
         elif len(others) == 1:
             people = f"You and {others[0]} are involved."
         else:
@@ -141,10 +167,12 @@ class ProcessDefinition(LLMValidated):
             else f"{owner} keeps it moving."
         )
 
-        return (
-            f"The work runs through {_series(self.phases)}. "
-            f"The steps are {_series(self.activities)}. "
-            f"{people} {keeps}"
+        stages = [
+            f"Stage {index} — {stage.name}: {'; '.join(stage.steps)}."
+            for index, stage in enumerate(self.stages, 1)
+        ]
+        return f"The work has {len(stages)} stages. " + " ".join(
+            [*stages, f"{people} {keeps}"]
         )
 
 
@@ -197,10 +225,10 @@ def _draft_process_definition(
 ) -> ProcessDefinition:
     """Turn the user's description into the stages and steps of their work.
 
-The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Keep their names for
-the stages and steps. If the notes name the stages, use those names as the stages and the actions inside them as the
-steps. Group the concrete steps into broad stages only when the notes give steps without stages; a stage is not one of
-the steps repeated as a heading, and no step may appear both as a stage and as an activity. List only the people or roles the notes actually
+The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Return each stage with
+the steps inside it: `stages: [{name, steps}]`. Keep their names for stages and steps. If the notes name the stages, use
+those names and put the actions inside them as steps. When the notes give only steps, group them into a few broad
+stages. A stage is not one of its steps repeated as a heading. List only the people or roles the notes actually
 name; a step that says "submit for approval" does not name an approver, so leave the approver out and let the
 confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
 say the user does it all, the orchestrating component and the sole participant are "You"; do not invent a job title

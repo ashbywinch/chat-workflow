@@ -14,7 +14,12 @@ input to a step tests the wrong thing.
 from __future__ import annotations
 
 from workflows.workflow.component_spec import ComponentSpec
-from workflows.workflow.models import Deliverable, ProcessDefinition, Resource
+from workflows.workflow.models import (
+    Deliverable,
+    ProcessDefinition,
+    ProcessStage,
+    Resource,
+)
 
 
 def meeting_minutes_deliverable() -> Deliverable:
@@ -103,8 +108,11 @@ def weekly_menu_deliverable() -> Deliverable:
 
 def meal_planning_analysis() -> ProcessDefinition:
     return ProcessDefinition(
-        phases=["Planning", "Shopping", "Cooking"],
-        activities=["Plan meals", "Shop", "Cook", "Review"],
+        stages=[
+            ProcessStage(name="Planning", steps=["Plan meals"]),
+            ProcessStage(name="Shopping", steps=["Shop"]),
+            ProcessStage(name="Cooking", steps=["Cook", "Review"]),
+        ],
         orchestrating_component="Home Cook",
         participants=["Cook", "Family Members"],
     )
@@ -112,12 +120,13 @@ def meal_planning_analysis() -> ProcessDefinition:
 
 def meeting_analysis() -> ProcessDefinition:
     return ProcessDefinition(
-        phases=["Note-taking", "Review & Clarify", "Draft Minutes"],
-        activities=[
-            "Take meeting notes",
-            "Review notes for clarity",
-            "Identify action items",
-            "Write minutes draft",
+        stages=[
+            ProcessStage(name="Note-taking", steps=["Take meeting notes"]),
+            ProcessStage(
+                name="Review & Clarify",
+                steps=["Review notes for clarity", "Identify action items"],
+            ),
+            ProcessStage(name="Draft Minutes", steps=["Write minutes draft"]),
         ],
         orchestrating_component="Meeting Minutes Coordinator",
         participants=["Meeting Attendees", "Note Taker", "Reviewers"],

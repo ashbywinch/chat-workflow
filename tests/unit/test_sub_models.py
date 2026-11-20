@@ -11,6 +11,7 @@ from workflows.workflow.models import (
     Deliverable,
     GapAnalysis,
     ProcessDefinition,
+    ProcessStage,
     Resource,
 )
 from workflows.workflow.models.gap_analysis import IntegrationGap, OwnershipGap
@@ -19,8 +20,10 @@ from workflows.workflow.models.gap_analysis import IntegrationGap, OwnershipGap
 class TestProcessDefinition(unittest.TestCase):
     def test_valid_instance(self):
         model = ProcessDefinition(
-            phases=["Intake", "Review"],
-            activities=["Receive request", "Check completeness"],
+            stages=[
+                ProcessStage(name="Intake", steps=["Receive request"]),
+                ProcessStage(name="Review", steps=["Check completeness"]),
+            ],
             orchestrating_component="Case Management",
             participants=["Case Worker", "Manager"],
         )
