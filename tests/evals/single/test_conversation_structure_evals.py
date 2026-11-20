@@ -99,49 +99,33 @@ WARM_OPEN_RULES: dict[str, str] = {
 OUTPUT_DOMAIN_PROPOSAL_RULES: dict[str, str] = {
     "Proposes from knowledge": (
         "When the user mentions a common, well-known document type (like "
-        "meeting minutes, invoices, reports, blog posts), the assistant "
-        "proposes a structure based on what that document typically contains, "
-        "rather than asking the user to define it from scratch.\n\n"
-        "GOOD: 'Great, meeting minutes! Those typically capture the date, "
-        "attendees, discussion points, decisions, and action items. Does "
-        "that align with what you need?'\n\n"
-        "BAD: 'What information should be included in the minutes?' — this "
-        "asks the user to define something that is already commonly known."
+        "meeting minutes, invoices, reports, blog posts), the assistant's "
+        "conversation includes a concrete shape for it — who it is for, its "
+        "format, the check it must pass, and where it goes — rather than "
+        "leaving the user without a proposal. It may ask about a part first, "
+        "but it does not end without saying what the document looks like."
     ),
     "No forced field-mapping": (
-        "The assistant does not mechanically ask about every data model field "
-        "when it does not make sense for the user's domain. If a question "
-        "would not apply to the specific output or input the user is describing, "
-        "the assistant recognizes this and moves on, rather than pressing or "
-        "rephrasing.\n\n"
-        "For example, asking 'how do you know when your notes are complete?' "
-        "does not make sense for meeting notes — they are notes, they are "
-        "whatever the person wrote. If the user pushes back on such a question, "
-        "the assistant should acknowledge it does not apply and move on."
+        "A single question about a success check is not forced field-mapping "
+        "when the user answers it and the assistant moves on. The failure is "
+        "pressing after the user says it does not apply, or rephrasing the "
+        "same question."
     ),
 }
 
 RESOURCE_DOMAIN_PROPOSAL_RULES: dict[str, str] = {
     "Proposes typical starting materials": (
         "When the user mentions a common workflow (like writing meeting minutes), "
-        "the assistant proposes the typical starting materials — handwritten "
-        "notes, the agenda, a recording, an attendee list — rather than asking "
-        "the user to define what they start with from scratch.\n\n"
-        "GOOD: 'For minutes, people usually start with their handwritten notes, "
-        "the agenda, and maybe a recording. Which of those do you have?'\n\n"
-        "BAD: 'What do you start with?' — this asks the user to define "
-        "something the assistant could propose."
+        "the assistant's conversation includes a concrete list of typical "
+        "starting materials — handwritten notes, the agenda, a recording, an "
+        "attendee list — rather than leaving the user without a proposal. The "
+        "list may arrive in the final summary, as long as it is there."
     ),
     "No forced field-mapping": (
-        "The assistant does not mechanically ask about every data model field "
-        "when it does not make sense for the user's domain. If a question "
-        "would not apply to the specific output or input the user is describing, "
-        "the assistant recognizes this and moves on, rather than pressing or "
-        "rephrasing.\n\n"
-        "For example, asking 'how do you know when your notes are complete?' "
-        "does not make sense for meeting notes — they are notes, they are "
-        "whatever the person wrote. If the user pushes back on such a question, "
-        "the assistant should acknowledge it does not apply and move on."
+        "A single question about a success check is not forced field-mapping "
+        "when the user answers it and the assistant moves on. The failure is "
+        "pressing after the user says it does not apply, or rephrasing the "
+        "same question."
     ),
 }
 

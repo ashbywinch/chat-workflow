@@ -57,8 +57,10 @@ class SessionComponent:
         """Describe what the workflow produced, in the user's words.
 
         Say what it is and name its main parts by name, using the words the
-        user gave; a count is not a name. For each part, say who it is for, its
-        format, the check it must pass, and where it goes, in the user's words.
+        user gave; a count is not a name. If the result is a list, name every
+        item in it, one per line, with its key fields. For each part, say who
+        it is for, its format, the check it must pass, and where it goes, in
+        the user's words.
         If the conversation already covered it, one short sentence that it is
         captured is enough; do not repeat the details. Do not ask a question,
         do not list field names or JSON, and do not mention the internal
