@@ -37,9 +37,9 @@
    "severity": "warn"
   },
   {
-   "line": 224,
+   "line": 225,
    "column": 9,
-   "stop_line": 224,
+   "stop_line": 225,
    "stop_column": 35,
    "path": "chat_workflow/mixins.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 290,
+   "line": 291,
    "column": 5,
-   "stop_line": 290,
+   "stop_line": 291,
    "stop_column": 35,
    "path": "chat_workflow/mixins.py",
    "code": -2,

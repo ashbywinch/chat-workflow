@@ -65,7 +65,7 @@ is an atomic or composite workflow step. Further vocabulary:
 
 ## Turn contracts
 
-Five rules shape a conversation, independent of any one step's prompt:
+Six rules shape a conversation, independent of any one step's prompt:
 
 - **A success says what it did.** `Success` carries `message`, and the session
   speaks it for a chat-on step. A silent completion is not expressible.

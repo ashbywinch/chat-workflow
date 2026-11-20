@@ -47,6 +47,21 @@ class TestVerdictCoherence(unittest.TestCase):
 
         self.assertFalse(_verdict_claims_the_rule_passes(verdict))
 
+    def test_a_shouted_pass_conclusion_is_discarded(self):
+        """A judge that argues its way to PASS and still says false is malformed."""
+        verdict = RuleVerdict(
+            rule="The assistant does not repeat a question",
+            passed=False,
+            explanation=(
+                "The assistant asked a different follow-up, so this is not a "
+                "repetition of the earlier question. So PASS."
+            ),
+            evidence="Is there anything else?",
+        )
+
+        self.assertTrue(_verdict_claims_the_rule_passes(verdict))
+        self.assertFalse(_is_actionable_failure(verdict))
+
     def test_technically_satisfied_conclusion_is_discarded(self):
         verdict = RuleVerdict(
             rule="If the name alone is ambiguous, the description explains it",

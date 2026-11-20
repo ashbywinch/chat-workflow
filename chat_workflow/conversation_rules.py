@@ -123,8 +123,12 @@ INPUTS_ARE_CONTEXT: tuple[str, str] = (
 
 USES_USER_LANGUAGE: tuple[str, str] = (
     "Uses the user's language",
-    "The assistant does not introduce framework or model jargon the user "
-    "has not used.",
+    "The assistant does not introduce framework or model jargon the user has "
+    "not used. It never says a type expression or an implementation word in a "
+    "message — 'str', 'int', 'list[str]', 'Optional', '| None', 'Pydantic', "
+    "'validator', 'model' — but says what the value is in the user's words: "
+    "'text', 'a list of names', 'an optional date', 'a rule that checks ...'. "
+    "A user asking what a term means gets plain words, not the term again.",
 )
 
 

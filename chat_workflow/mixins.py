@@ -132,6 +132,7 @@ def _verdict_claims_the_rule_passes(verdict: _VerdictLike) -> bool:
     conclusion = sentences[-1] if sentences else text
     positive = (
         "passes",
+        " pass",
         "satisfied",
         "is valid",
         "meets the rule",

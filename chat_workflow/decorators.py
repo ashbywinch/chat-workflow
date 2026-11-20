@@ -154,10 +154,12 @@ def _build_system_prompt(
                 "one open question about the user's own work and listen. This "
                 "step does not name stages, steps, or fields, and does not "
                 "propose a structure; the user describes, the next step "
-                "structures. If the user asks for a shape, a section list, or a "
-                "suggestion, say in one sentence that the next step shows one "
-                "and finish — do not answer with a promised list or a message "
-                "that ends with a colon."
+                "structures. Do not summarize the work back for confirmation and "
+                "do not offer to structure it: acknowledge in one clause and ask "
+                "the next open question. If the user asks for a shape, a section "
+                "list, or a suggestion, say in one sentence that the next step "
+                "shows one and finish — do not answer with a promised list or a "
+                "message that ends with a colon."
             )
         else:
             start = (
