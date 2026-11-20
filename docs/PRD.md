@@ -299,6 +299,16 @@ come from the environment. House traffic goes through Cloudflare AI Gateway.
   fails at that stage, immediately, with the generated code preserved.
 - The judge never runs before the workflow produced a valid typed result. A
   workflow failure is never reported as a conversation-quality failure.
+- **Conversation validity is a release requirement.** A release must not ship
+  a workflow whose conversations violate the checklist above: repetition,
+  schema vocabulary, unanswered suggestions, silent completions, or a
+  fabricated value are release blockers, not prompt preferences. The
+  conversation suite is the evidence for that requirement.
+- **The gates are split by kind.** The per-merge gate is deterministic: unit
+  tests, lint, types, docs links, and coverage. The full conversation suite
+  calls real models and is the **release gate** — it runs before a release is
+  cut and its failure blocks the release. It is not a per-PR gate, because a
+  non-deterministic judge cannot decide every merge.
 
 ### L9 — Blobs and large artifacts are first-class
 
@@ -342,7 +352,9 @@ opinion and it is not optional for conversation quality.
 
 - **Cost:** development and CI evals call a real model. Every run is bounded
   (turn limits, timeouts, token reporting); incremental evals are the local
-  default. The full eval suite is a scheduled/manual run, not a per-PR gate.
+  default. The full conversation suite is a scheduled/manual run and the
+  release gate, not a per-PR gate. A release without a green conversation run
+  is not a release.
 - **Longevity:** the library is version 0.1 and explicitly unstable. Public API
   changes are allowed; there is no backward-compatibility promise.
 - **Backups:** the library holds no user data. Generated artifacts and eval

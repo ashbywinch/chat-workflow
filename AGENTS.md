@@ -91,11 +91,13 @@ Examples: modifying tests → check [the testing guide](docs/contributors/testin
 | Full verification | `make evals` | Runs all evals |
 | Unsure | `make evals-incremental` | Safe default, auto-detects |
 
-CI runs the unit/lint/coverage gate and the full eval suite (`make evals`) on
-every PR and on main. The full suite is never weekly/manual; its runtime is an
-optimization target. Real-model output is non-deterministic, so use targeted
-evals (`make evals-test TEST=...`) while developing, and run the full suite in
-CI (or locally before pushing) as the gate.
+CI runs the deterministic gate (unit, lint, types, docs, coverage) on every
+PR and on main. The full conversation suite (`make evals`) calls real models,
+is non-deterministic, and is the **release gate**: it runs on a tag, on
+`workflow_dispatch`, and weekly. A release is not cut with a failing
+conversation run; that requirement is in the PRD. While developing, use
+targeted evals (`make evals-test TEST=...`), and run `make evals` locally
+before a release.
 
 ### Tool Selection
 

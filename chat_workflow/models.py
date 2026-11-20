@@ -42,7 +42,9 @@ class Success(BaseModel, Generic[TResult]):
         description=(
             "What the user reads when the step ends: one or two sentences in "
             "their own words saying what you decided, what changed, or that it "
-            "is confirmed. Do not list the result's values here."
+            "is confirmed. Speak to the user as 'you'; never describe the "
+            "conversation in the third person or say 'the user'. Do not list "
+            "the result's values here."
         ),
     )
     result: TResult = Field(description="The complete object the caller asked for.")

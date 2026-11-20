@@ -197,12 +197,26 @@ def _build_system_prompt(
         "## The success message\n"
         "A success is still a turn: `message` is what the user reads when the "
         "step ends. Say what you decided, what changed, or that it is "
-        "confirmed, in one or two sentences in the user's words. Do not list "
-        "the result's values there; they are in `result`. If the user's last "
-        "message asked something, answer it in `message` before you finish."
+        "confirmed, in one or two sentences in the user's words. Speak to "
+        "the user as 'you'; never describe the conversation in the third "
+        "person or say 'the user'. Do not list the result's values there; "
+        "they are in `result`. If the user's last message asked something, "
+        "answer it in `message` before you finish."
     )
 
     return "\n\n".join(sections)
+
+
+def _at_least_one(return_type: Any) -> Any:
+    """A list-shaped result must carry at least one item."""
+    from typing import Annotated, get_args, get_origin
+
+    from pydantic import Field
+
+    if get_origin(return_type) is list:
+        (item_type,) = get_args(return_type) or (Any,)
+        return Annotated[list[item_type], Field(min_length=1)]
+    return return_type
 
 
 def _setup_atomic_workflow(
@@ -226,12 +240,16 @@ def _setup_atomic_workflow(
     """
     from .exceptions import AtomicWorkflowFailedError
 
+    # A step that returns a list returns at least one item. An empty list is
+    # not a completed answer, and it validates otherwise; constraining the
+    # schema makes the model retry with a real item instead of "finishing".
+    answer_type = _at_least_one(actual_return_type)
     conversation = Conversation(
         model=session.config.model,
         provider=session.config.provider,
         instructions=system_prompt,
-        output_type=AgentResponse[actual_return_type],
-        final_output_type=FinalResponse[actual_return_type],
+        output_type=AgentResponse[answer_type],
+        final_output_type=FinalResponse[answer_type],
         messages=list(session.state.messages) if chat else [],
         api_base=session.config.api_base,
         api_key_env=session.config.api_key_env,
@@ -250,8 +268,8 @@ def _setup_atomic_workflow(
     return AtomicWorkflow(
         config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
-            response_model=AgentResponse[actual_return_type],
-            final_response_model=FinalResponse[actual_return_type],
+            response_model=AgentResponse[answer_type],
+            final_response_model=FinalResponse[answer_type],
             max_turns=max_turns,
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(
