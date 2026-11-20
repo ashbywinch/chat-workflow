@@ -28,7 +28,17 @@ class Continue(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     intent: Literal[AgentIntent.CONTINUE]
-    message: str = Field(min_length=1, description="The question for the user.")
+    message: str = Field(
+        min_length=1,
+        # A message that ends with a colon promises content it does not give:
+        # the list it introduces is not in the turn. The schema rejects it, so
+        # the model must put the content in the message or finish.
+        pattern=r"^[\s\S]*[^:\s]$",
+        description=(
+            "The question for the user, or a complete statement. Give any "
+            "content you promise: a message that ends with a colon is rejected."
+        ),
+    )
 
 
 class Success(BaseModel, Generic[TResult]):

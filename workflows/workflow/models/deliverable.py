@@ -112,7 +112,10 @@ class Deliverable(LLMValidated):
             summary,
             f"It looks like: {without_full_stop(self.format)}.",
             f"For: {without_full_stop(self.consumer)}.",
-            f"Ready when: {without_full_stop(self.success_criteria)}.",
+            # A check says when the thing is complete. A "Ready when:" label
+            # reads as a gate the user has to pass, which a personal artifact
+            # does not have.
+            f"Complete when {without_full_stop(self.success_criteria)}.",
         ]
         if self.integration_points:
             lines.append(f"Who gets it: {without_full_stop(self.integration_points)}.")
@@ -217,7 +220,7 @@ A private working copy the user never shares is not the thing they make; it is s
 
 Stay at the level of the thing they make, not its contents. Do not ask them to paste their notes, read out what the thing contains, or share the actual material: you are describing the kind of thing they make, not making one. Never praise their domain or develop its content; acknowledge an aside in one clause and return to the thing they make.
 
-If they ask what it should look like, what headings it has, or what you think, do not answer with another question and do not invent a shape here: return what you have now. The next step proposes a concrete shape for them to correct. In your success message, say in one sentence that you will show them the shape you propose — do not say you have made it or present it yourself.
+If they ask what it should look like, what headings it has, or what you think, do not answer with another question and do not invent a shape here: return success now. The next turn shows the proposed shape for them to correct; a continue that says "here's the structure" and does not give it is not a turn. In your success message, say in one sentence that you will show them the shape you propose — do not say you have made it or present it yourself.
 
 Put what they told you in `notes`, in their words — not your reply to them. Return only once the notes name the thing they make; if they have not said it, ask "What do you make?" and keep listening. If you still need an answer, ask it as a continue."""
     ...  # type: ignore[reportReturnType]
@@ -267,7 +270,7 @@ If they ask a question about a part of it — the format, the check, who gets it
 
 If they correct or add a part, update it and return the corrected proposal; the framework shows the change and asks them to confirm it. If they confirm, return the proposal unchanged. If they say the thing is not what they make, replace it with what they say they make.
 
-If they object to a line of the proposal — "I don't want the check / who it's for / where it's kept" — those lines are not sections of the thing: they are how you will know it is complete and where it lives. Say that in one sentence, change only what the thing itself needs (its format or what it contains), and if nothing about the thing changes, return the proposal unchanged and finish. Do not ask the same question again.
+If they object to a line of the proposal — "I don't want the check / who it's for / where it's kept" — those lines are not sections of the thing: they are how you will know it is complete and where it lives. Say that in one sentence, change only what the thing itself needs (its format or what it contains), and if nothing about the thing changes, return the proposal unchanged and finish. Do not ask the same question again. If they say there is nothing to check, do not keep a condition with steps in it: set the check to the simplest true statement about the thing (for a list, that both sections are filled in), say it only says when the thing is done, and finish.
 
 If they ask you to write the thing itself, say in one sentence that you are helping them decide what it looks like, then return to the proposal. If they describe their domain content, do not comment on it; say "Noted." and return. Never return failure because the user's notes lack detail: the proposal is what they correct."""
     ...  # type: ignore[reportReturnType]

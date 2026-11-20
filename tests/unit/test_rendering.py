@@ -123,7 +123,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         # block reads as if "where it is kept" were another section.
         self.assertIn("It looks like: A shared document.", text)
         self.assertIn("For: Meeting attendees.", text)
-        self.assertIn("Ready when: Every decision has an owner.", text)
+        self.assertIn("Complete when Every decision has an owner.", text)
         self.assertIn("Who gets it: Attendees receive it by email.", text)
         self.assertIn("Where it is kept: Shared drive.", text)
 
