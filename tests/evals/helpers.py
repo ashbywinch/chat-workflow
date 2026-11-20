@@ -102,9 +102,7 @@ def _looks_garbled(text: str) -> bool:
     if not words:
         return True
     stars = text.count("*")
-    if stars > 8:
-        return True
-    if text.count('"') % 2:
+    if stars > 10:
         return True
     if any(character in "（）［］｛｝" for character in text):
         return True
