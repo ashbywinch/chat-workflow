@@ -113,7 +113,7 @@ class ComponentStructure(BaseModel):
         session.presented_hints = {
             field.name: field.field_type_hint for field in domain_spec.fields
         }
-        session.present(_format_structure(draft, domain_spec))
+        session.present(result=draft, text=_format_structure(draft, domain_spec))
         return _confirm_structure(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )

@@ -91,6 +91,9 @@ class Session:
     # The domain's own words for each field, cached by a structural-design
     # presentation so a later recap does not fall back to Python types.
     presented_hints: dict[str, str] = dataclasses.field(default_factory=dict)
+    # The value the composite presented. A confirmation that returns it
+    # unchanged must not be presented a second time.
+    presented_result: Any = None
     id: str = dataclasses.field(default_factory=lambda: uuid.uuid4().hex[:8])
     title: str | None = None
     _raw_io: UserIO = dataclasses.field(init=False, repr=False)
@@ -139,9 +142,10 @@ class Session:
         """Find a descendant session by id."""
         return next((item for item in self.walk() if item.id == session_id), None)
 
-    def present(self, text: str) -> None:
+    def present(self, text: str, *, result: Any = None) -> None:
         """Speak a derived result and record that it has been shown."""
         self.presented = True
+        self.presented_result = result
         self.say(text)
         self.presented_at = len(self.state.messages)
 

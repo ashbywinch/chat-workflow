@@ -209,7 +209,7 @@ class ComponentSpec(LLMValidated):
             # The gap resolution asks again with the set it already confirmed.
             # Showing and confirming the same parts a second time is repetition.
             return draft
-        session.present(_format_components(draft))
+        session.present(result=draft, text=_format_components(draft))
         return _confirm_components(
             draft=draft, session=session, max_turns=min(max_turns, 6)
         )

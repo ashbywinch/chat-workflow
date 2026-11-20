@@ -98,7 +98,7 @@ class Resource(LLMValidated):
             analysis=analysis,
             session=session,
         )
-        session.present(_format_resources(draft, deliverables))
+        session.present(result=draft, text=_format_resources(draft, deliverables))
         return _confirm_resources(
             draft=draft, session=session, max_turns=min(max_turns, 4)
         )
