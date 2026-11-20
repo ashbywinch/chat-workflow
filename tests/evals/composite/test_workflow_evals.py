@@ -44,7 +44,7 @@ META_LEVEL_JUDGE_RULES: dict[str, str] = {
 }
 
 REDIRECT_JUDGE_RULES: dict[str, str] = {
-    **META_LEVEL_JUDGE_RULES,
+    **{key: value for key, value in META_LEVEL_JUDGE_RULES.items() if key != "Uses expertise"},
     "Redirects without joining": (
         "The assistant does not ask about or develop the domain content. It may "
         "acknowledge the aside briefly, ignore it, or continue with the shape; "

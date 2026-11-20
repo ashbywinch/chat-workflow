@@ -196,6 +196,11 @@ class ComponentSpec(LLMValidated):
             existing_components=existing_components,
             session=session,
         )
+        already_shown = {name for name in existing_components or []}
+        if already_shown and {part.name for part in draft} <= already_shown:
+            # The gap resolution asks again with the set it already confirmed.
+            # Showing and confirming the same parts a second time is repetition.
+            return draft
         session.say(_format_components(draft))
         return _confirm_components(
             draft=draft, session=session, max_turns=min(max_turns, 4)
