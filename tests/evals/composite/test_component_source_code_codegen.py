@@ -214,7 +214,10 @@ class TestComponentSourceCodeCodegenEval(unittest.TestCase):
                     "to produce output."
                 ),
                 "No repetition": (
-                    "The agent didn't ask for the same information again after the user already provided it."
+                    "The agent does not ask the same question twice after the user "
+                    "answered it. A first follow-up for a detail the user did not "
+                    "give — a campaign goal, a person's full name, a technical "
+                    "detail of a task — is not repetition."
                 ),
                 "Uses domain language": (
                     "The agent used natural business language (meeting, decisions, "
