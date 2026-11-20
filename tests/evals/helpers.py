@@ -104,6 +104,10 @@ def _looks_garbled(text: str) -> bool:
     stars = text.count("*")
     if stars > 20:
         return True
+    if any(character in "（）［］｛｝" for character in text):
+        return True
+    if text.count("(") != text.count(")") or text.count("[") != text.count("]"):
+        return True
     weird = sum(
         1
         for word in words
