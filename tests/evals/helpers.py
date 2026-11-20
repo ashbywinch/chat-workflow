@@ -259,7 +259,10 @@ JUDGE_SYSTEM_PROMPT = (
     "The transcript contains only the user and assistant turns. "
     "[structured-result] marks that the workflow produced its validated "
     "result; it is not a conversation turn. Quote the exact text that "
-    "supports a FAIL in 'evidence', and give the concrete correction in 'fix'."
+    "supports a FAIL in 'evidence', and give the concrete correction in 'fix'. "
+    "Your verdict must agree with your explanation: if the explanation does "
+    "not name a violation, set passed=true. Do not fail a rule for something "
+    "the explanation itself excuses or judges acceptable."
 )
 JUDGE_MODEL_ENV = "CHAT_WORKFLOW_JUDGE_MODEL"
 
