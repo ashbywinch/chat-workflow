@@ -131,8 +131,10 @@ def _draft_resources(
 ) -> list[Resource]:
     """Derive the things people usually start with for this kind of work.
 
-The deliverables and any analysis are established. Propose the typical starting materials yourself; do not ask the
-user anything. For each, in the user's words:
+The deliverables and any analysis are established. A single deliverable is enough: use its name and description to
+propose the materials people usually start with. A starting material is what the person begins from — ingredients,
+notes, a list — not the deliverable itself, its consumer, or its format. Do not ask the user anything and do not return
+failure because there is no process description. For each, in the user's words:
 - where it comes from: the person, place, system, or document, not the act of getting it;
 - what form it takes when it exists: a list, a document, a recording, not the act of gathering it;
 - what it needs first, if anything;

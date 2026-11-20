@@ -18,13 +18,15 @@ PROCESS_DEFINITION_RULES = {
     NO_REPETITION[0]: NO_REPETITION[1],
     "Uses expertise": (
         "The assistant builds the stages, steps, participants, and role in "
-        "charge from the user's description instead of asking the user to "
-        "name each stage or step from scratch."
+        "charge from the user's description instead of asking the user to name "
+        "each stage or step from scratch. The ProcessDefinition stores phases "
+        "and activities as two flat lists; a per-stage mapping is not required."
     ),
     "Honest about provenance": (
         "Every stage, step, participant, and role in the breakdown comes from "
-        "what the user described or is a clearly presented inference; the "
-        "assistant does not invent details the user never mentioned."
+        "what the user described or is a clearly presented inference. A role "
+        "the user's own description implies (for example 'Writer' for a "
+        "content writer) is acceptable."
     ),
 }
 

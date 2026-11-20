@@ -150,18 +150,6 @@ Put the user's description in `notes`, in their words — not your reply to them
     ...  # type: ignore[reportReturnType]
 
 
-@atomic_workflow_step
-def _ask_anything_else(
-    notes: Annotated[GatheredNotes, "What the person told you so far"],
-    max_turns: Annotated[int, "Maximum turns"] = 2,
-) -> GatheredNotes:
-    """Ask one open invitation, then return the complete notes.
-
-Ask exactly "Is there anything else?" once. After their answer, add it to the notes in their words and return the
-complete GatheredNotes. Do not name stages or structure what they say."""
-    ...  # type: ignore[reportReturnType]
-
-
 @atomic_workflow_step(chat=False, single_turn=True)
 def _draft_process_definition(
     notes: Annotated[str, "What the person told you, in their words"],
@@ -254,7 +242,11 @@ def generate_from_chat(
         )
     else:
         gathered = _gather_notes(session=session, max_turns=gather_turns)
-    gathered = _ask_anything_else(notes=gathered, session=session, max_turns=2)
+    answer = session.io.prompt("Is there anything else?")
+    if answer.strip():
+        gathered = gathered.model_copy(
+            update={"notes": f"{gathered.notes}\n{answer}"}
+        )
     draft = _draft_process_definition(notes=gathered.notes, session=session)
     # The proposal is the model's own draft, shown in the user's words before
     # the confirmation turn. A confirmation turn that skips the presentation

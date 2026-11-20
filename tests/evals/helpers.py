@@ -183,6 +183,11 @@ class AgentIO:
         does not see it; the eval would then feed it to the workflow as the
         user's turn. Resample from the same history instead.
         """
+        helper_said = label.removeprefix("\nYou").strip()
+        if helper_said and helper_said != "You":
+            self._conversation.messages.append(
+                ModelRequest.user_text_prompt(f"The helper said:\n{helper_said}")
+            )
         before = list(self._conversation.messages)
         for _ in range(3):
             turn = self._conversation.send(None)

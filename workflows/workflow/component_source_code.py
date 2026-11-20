@@ -1135,12 +1135,13 @@ class ComponentSourceCode(LLMValidated):
         if len(base_model_subclasses) == 0:
             raise ValidationError("Generated code must define at least one BaseModel subclass")
 
-        # Find public workflow steps (@atomic_workflow_step / @composite_workflow_step)
-        workflow_methods = [
+        # Find workflow steps (@atomic_workflow_step / @composite_workflow_step).
+        # A private step is still a step: its return type is a type the
+        # component uses, not a second artifact.
+        all_workflow_methods = [
             node
             for node in ast.walk(tree)
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and not node.name.startswith("_")
             and any(
                 (
                     isinstance(d, ast.Name)
@@ -1153,6 +1154,9 @@ class ComponentSourceCode(LLMValidated):
                 )
                 for d in node.decorator_list
             )
+        ]
+        workflow_methods = [
+            node for node in all_workflow_methods if not node.name.startswith("_")
         ]
 
         if len(workflow_methods) == 0:
@@ -1205,9 +1209,9 @@ class ComponentSourceCode(LLMValidated):
         class_nodes = {
             node.name: node for node in ast.walk(tree) if isinstance(node, ast.ClassDef)
         }
-        returned = _returned_model_names(workflow_methods, base_names)
+        returned = _returned_model_names(all_workflow_methods, base_names)
         primary_name = _resolve_primary_model(
-            workflow_methods, returned, class_nodes, base_names
+            all_workflow_methods, returned, class_nodes, base_names
         )
         if primary_name is None:
             if len(base_names) > 1:
@@ -1220,7 +1224,7 @@ class ComponentSourceCode(LLMValidated):
             primary_name = next(iter(base_names))
 
         used = set(returned) | {primary_name}
-        for node in workflow_methods:
+        for node in all_workflow_methods:
             for argument in node.args.args:
                 used |= _annotation_names(argument.annotation) & base_names
         for name in list(used):
