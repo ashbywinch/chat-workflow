@@ -178,9 +178,9 @@ class TestPresentation(unittest.TestCase):
             }
         )
 
-        self.assertIn("stages: Capture; Write", text)
-        self.assertIn("steps: Scribble notes; Type them up", text)
-        self.assertIn("in charge: Note Taker", text)
+        self.assertIn("The work moves through Capture; Write", text)
+        self.assertIn("The steps are Scribble notes; Type them up", text)
+        self.assertIn("Note Taker keeps it moving", text)
 
     def test_a_string_result_is_its_own_description(self):
         self.assertEqual(SessionComponent().present("the result"), "the result")

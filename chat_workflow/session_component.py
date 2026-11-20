@@ -60,6 +60,17 @@ def _describe_item(item: Any) -> str:
         data = item
     else:
         return ""
+    if data.get("phases") and data.get("activities"):
+        phases = "; ".join(str(value) for value in data["phases"])
+        steps = "; ".join(str(value) for value in data["activities"])
+        people = "; ".join(str(value) for value in data.get("participants") or [])
+        owner = data.get("orchestrating_component") or ""
+        sentence = f"The work moves through {phases}. The steps are {steps}."
+        if people:
+            sentence += f" {people} are involved."
+        if owner:
+            sentence += f" {owner} keeps it moving."
+        return sentence
     heading = data.get("name") or data.get("text") or ""
     # A component was already shown in full by the composite's own
     # presentation; the closing recap names it and its owner, not its scope
