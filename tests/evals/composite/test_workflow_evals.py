@@ -22,10 +22,10 @@ META_LEVEL_JUDGE_RULES: dict[str, str] = {
         "not repetition."
     ),
     "Uses expertise": (
-        "The assistant presents a concrete shape for the process, output, or "
-        "starting materials from what the user said. The shape does not need "
-        "extra invented detail; it must not ask the user to define every part "
-        "from scratch."
+        "The assistant presents the concrete shape of the user's work: a "
+        "process breakdown, an output's name/audience/format/check/destination, "
+        "or a starting material's source/form/check. A faithful proposal is the "
+        "shape; it does not need a separate process flow."
     ),
     "Stays at meta-level": (
         "The assistant works on the SHAPE of the user's work: the process stages "
