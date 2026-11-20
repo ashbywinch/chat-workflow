@@ -136,7 +136,11 @@ def _plain_type(type_expr: str) -> str:
     elif text.startswith("dict[") or text == "dict":
         plain = "a set of values"
     else:
-        plain = text.replace("_", " ").casefold()
+        spaced = "".join(
+            f" {character}" if character.isupper() else character
+            for character in text
+        )
+        plain = spaced.replace("_", " ").strip().casefold()
     return plain
 
 
