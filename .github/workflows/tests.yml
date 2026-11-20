@@ -68,11 +68,15 @@ jobs:
           path: code-coverage-results.md
 
   conversation-evals:
-    # The full conversation suite calls real models and an LLM judge. It is
-    # the release gate, not a per-merge gate: the judge is non-deterministic,
-    # so it cannot decide every PR. It runs on a release tag, on demand, and
-    # weekly. The PRD makes a green run a release requirement.
+    # The full conversation suite calls real models and an LLM judge. It runs
+    # on every PR to give a signal, but it is not a *required* merge check:
+    # the judge is non-deterministic, so it cannot decide every merge. A
+    # release tag requires a green run; the PRD makes that a release
+    # requirement.
     if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.fork != true &&
+       github.actor != 'dependabot[bot]') ||
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'schedule' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))

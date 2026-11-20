@@ -205,6 +205,14 @@ def _build_system_prompt(
         "they are in `result`. If the user's last message asked something, "
         "answer it in `message` before you finish."
     )
+    if not chat and getattr(_inner_model(return_type), "__name__", "") != "TextReply":
+        sections.append(
+            "## One-shot derivation\n"
+            "This step has no user to ask. Return your best draft from the "
+            "inputs. Uncertainty is not a failure: a draft is a proposal the "
+            "user confirms or corrects in the next step. Return failure only "
+            "when the inputs contain nothing relevant to the result at all."
+        )
 
     return "\n\n".join(sections)
 

@@ -120,13 +120,42 @@ class ProcessDefinition(LLMValidated):
 
 
     def render(self, context: RenderContext) -> str:
-        """Say the breakdown in the user's words."""
-        return (
-            f"Stages: {' → '.join(self.phases)}\n"
-            f"Steps: {'; '.join(self.activities)}\n"
-            f"Who's involved: {', '.join(self.participants)}\n"
-            f"In charge: {self.orchestrating_component}"
+        """Say the breakdown as a picture, not a field dump."""
+        self_words = {"you", "yourself", "me", "i", "myself", "the user", "user"}
+        others = [
+            person
+            for person in self.participants
+            if person.strip().casefold() not in self_words
+        ]
+        if not others:
+            people = "It is all you."
+        elif len(others) == 1:
+            people = f"You and {others[0]} are involved."
+        else:
+            people = f"You, {_series(others)} are involved."
+
+        owner = self.orchestrating_component.strip()
+        keeps = (
+            "You keep it moving."
+            if owner.casefold() in self_words
+            else f"{owner} keeps it moving."
         )
+
+        return (
+            f"The work runs through {_series(self.phases)}. "
+            f"The steps are {_series(self.activities)}. "
+            f"{people} {keeps}"
+        )
+
+
+def _series(items: list[str]) -> str:
+    """A, B, and C — a sentence, not a list of labels."""
+    values = [item.strip() for item in items if item.strip()]
+    if len(values) <= 1:
+        return values[0] if values else "nothing yet"
+    if len(values) == 2:
+        return f"{values[0]} and {values[1]}"
+    return ", ".join(values[:-1]) + f", and {values[-1]}"
 
 
 class GatheredNotes(BaseModel):

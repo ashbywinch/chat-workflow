@@ -66,6 +66,18 @@ class UserLabel:
         self.aliases = aliases
         self.guard = guard
 
+    def __get_pydantic_json_schema__(self, schema, handler):
+        """Give the field the user's phrase as its schema title.
+
+        The model reads the tool schema, so the title is where a field's name
+        would otherwise become the model's word for it. With this, the schema
+        itself says "how you know it is good", not "success criteria".
+        """
+        json_schema = handler(schema)
+        resolved = handler.resolve_ref_schema(json_schema)
+        resolved["title"] = self.phrase
+        return json_schema
+
 
 def user_labels(model: object) -> dict[str, UserLabel]:
     """Return ``{field_name: UserLabel}`` for a Pydantic model."""

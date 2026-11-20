@@ -96,6 +96,13 @@ _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _CONFIG_PATH = _PROJECT_ROOT / "config.json"
 
 
+def _echoes_persona(text: str, persona: str) -> bool:
+    """True when the user bot repeated its own role prompt instead of replying."""
+    reply = " ".join(text.split()[:6]).casefold()
+    role = " ".join(persona.split()[:6]).casefold()
+    return bool(reply) and reply == role
+
+
 def _looks_garbled(text: str) -> bool:
     """True for a completion that is not a sentence a person would write."""
     words = text.split()
@@ -190,7 +197,11 @@ class AgentIO:
         for _ in range(3):
             turn = self._conversation.send(None)
             text = turn.output.strip()
-            if text and not _looks_garbled(text):
+            if (
+                text
+                and not _looks_garbled(text)
+                and not _echoes_persona(text, self._persona)
+            ):
                 return text
             self._conversation.messages = list(before)
         # Three corrupted completions in a row is a bad route, not a reason to

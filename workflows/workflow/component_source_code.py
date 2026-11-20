@@ -1499,29 +1499,7 @@ class ComponentSourceCode(LLMValidated):
                     )
 
         returns_class_type = any(
-            (
-                isinstance(n.returns, ast.Name) and n.returns.id == main_cls_name
-            )
-            or (
-                isinstance(n.returns, ast.Constant)
-                and isinstance(n.returns.value, str)
-                and n.returns.value == main_cls_name
-            )
-            or (
-                isinstance(n.returns, ast.Subscript)
-                and isinstance(n.returns.value, ast.Name)
-                and n.returns.value.id == "list"
-                and isinstance(n.returns.slice, ast.Name)
-                and n.returns.slice.id == main_cls_name
-            )
-            or (
-                isinstance(n.returns, ast.Subscript)
-                and isinstance(n.returns.value, ast.Name)
-                and n.returns.value.id == "Sequence"
-                and isinstance(n.returns.slice, ast.Name)
-                and n.returns.slice.id == main_cls_name
-            )
-            for n in workflow_methods
+            main_cls_name in _annotation_names(n.returns) for n in workflow_methods
         )
         if not returns_class_type:
             raise ValidationError(

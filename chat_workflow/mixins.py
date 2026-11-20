@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import ClassVar, Protocol
+from typing import ClassVar, Protocol, Self
 
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -256,6 +256,36 @@ class LLMValidated(BaseModel):
         the LLM judge so a plainly invalid object never costs a judge call.
         Raise :class:`ValidationError` on violation.
         """
+
+    @model_validator(mode="after")
+    def _reject_placeholders(self) -> Self:
+        """A field cannot be filled with a placeholder.
+
+        A model that cannot supply a value sometimes writes "...", "TBD", or
+        "N/A". That passes the field's type and length checks, then reaches
+        the user as an empty answer. Reject it here so the model retries with
+        a real value, or leaves an optional field empty.
+        """
+        placeholders = {
+            "...",
+            "…",
+            "tbd",
+            "tba",
+            "n/a",
+            "na",
+            "???",
+            "none provided",
+            "not provided",
+        }
+        for name in type(self).model_fields:
+            value = getattr(self, name, None)
+            if isinstance(value, str) and value.strip().casefold() in placeholders:
+                raise ValueError(
+                    f"The field '{name}' contains the placeholder {value!r}. "
+                    "Supply the real value; if the field is optional and the "
+                    "value is unknown, leave it empty."
+                )
+        return self
 
     @model_validator(mode="after")
     def validate_llm_rules(self) -> BaseModel:

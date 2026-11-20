@@ -92,12 +92,12 @@ Examples: modifying tests → check [the testing guide](docs/contributors/testin
 | Unsure | `make evals-incremental` | Safe default, auto-detects |
 
 CI runs the deterministic gate (unit, lint, types, docs, coverage) on every
-PR and on main. The full conversation suite (`make evals`) calls real models,
-is non-deterministic, and is the **release gate**: it runs on a tag, on
-`workflow_dispatch`, and weekly. A release is not cut with a failing
-conversation run; that requirement is in the PRD. While developing, use
-targeted evals (`make evals-test TEST=...`), and run `make evals` locally
-before a release.
+PR and on main. The full conversation suite (`make evals`) calls real models
+and runs on every PR and weekly, but it is **not a required merge check** —
+a non-deterministic judge cannot decide every merge. It is the **release
+gate**: a release is not cut with a failing conversation run, and that
+requirement is in the PRD. A red conversation run on a PR is investigated.
+While developing, use targeted evals (`make evals-test TEST=...`).
 
 ### Tool Selection
 

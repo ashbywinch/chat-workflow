@@ -93,7 +93,9 @@ class TestRecursiveSession(unittest.TestCase):
             )
         )
 
-        self.assertTrue(any("Stages: Capture" in str(m) for m in session.state.messages))
+        self.assertTrue(
+            any("runs through Capture" in str(m) for m in session.state.messages)
+        )
 
     def test_propose_says_nothing_for_an_empty_list(self):
         session = _session()

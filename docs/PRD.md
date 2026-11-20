@@ -306,9 +306,11 @@ come from the environment. House traffic goes through Cloudflare AI Gateway.
   conversation suite is the evidence for that requirement.
 - **The gates are split by kind.** The per-merge gate is deterministic: unit
   tests, lint, types, docs links, and coverage. The full conversation suite
-  calls real models and is the **release gate** — it runs before a release is
-  cut and its failure blocks the release. It is not a per-PR gate, because a
-  non-deterministic judge cannot decide every merge.
+  calls real models. It runs on every PR for signal, but it is not a
+  *required* merge check, because a non-deterministic judge cannot decide every
+  merge. It is the **release gate**: a green run is required before a release
+  is cut, and its failure blocks the release. A red conversation run on a PR
+  is investigated, not ignored.
 
 ### L9 — Blobs and large artifacts are first-class
 
@@ -352,9 +354,9 @@ opinion and it is not optional for conversation quality.
 
 - **Cost:** development and CI evals call a real model. Every run is bounded
   (turn limits, timeouts, token reporting); incremental evals are the local
-  default. The full conversation suite is a scheduled/manual run and the
-  release gate, not a per-PR gate. A release without a green conversation run
-  is not a release.
+  default. The full conversation suite runs on every PR and weekly, and
+  it is the release gate. It is not a required merge check; a release without
+  a green conversation run is not a release.
 - **Longevity:** the library is version 0.1 and explicitly unstable. Public API
   changes are allowed; there is no backward-compatibility promise.
 - **Backups:** the library holds no user data. Generated artifacts and eval

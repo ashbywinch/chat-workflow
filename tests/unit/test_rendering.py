@@ -90,9 +90,11 @@ class TestRecordsRenderThemselves(unittest.TestCase):
             RenderContext(),
         )
 
-        self.assertIn("Stages: Capture → Write", text)
-        self.assertIn("Steps: Scribble notes; Type them up", text)
-        self.assertIn("In charge: You", text)
+        flat = " ".join(text.split())
+        self.assertIn("The work runs through Capture and Write", flat)
+        self.assertIn("The steps are Scribble notes and Type them up", flat)
+        self.assertIn("You keep it moving", flat)
+        self.assertNotIn("Stages:", text)
 
     def test_a_resource(self, _rules):
         text = render_result(
