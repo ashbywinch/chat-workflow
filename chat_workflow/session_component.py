@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from inspect import cleandoc
-from typing import Annotated, Any, TypeVar
+from typing import Any, TypeVar
 
 from .conversation_rules import WARM_OPEN
 from .decorators import atomic_workflow, composite_workflow
@@ -25,6 +25,68 @@ T = TypeVar("T")
 
 _FALLBACK_GREETING = "Hi there — what are you working on?"
 _FALLBACK_CLOSING = "I have what I need."
+
+
+_DISPLAY_LABELS: dict[str, str] = {
+    "name": "name",
+    "purpose": "what it does",
+    "description": "what it is",
+    "consumer": "who it is for",
+    "format": "format",
+    "success_criteria": "the check it must pass",
+    "integration_points": "what happens next",
+    "storage_requirements": "where it goes",
+    "source": "where it comes from",
+    "dependencies": "what it needs first",
+    "scope_description": "scope",
+    "owner_role": "owner",
+    "expert_role": "expertise",
+    "must_prioritize": "always cover",
+    "auto_suggest": "suggest",
+    "user_pain_points": "watch for",
+    "phases": "stages",
+    "activities": "steps",
+    "orchestrating_component": "in charge",
+    "participants": "involved",
+}
+
+
+def _describe_item(item: Any) -> str:
+    if isinstance(item, str):
+        return f"- {item}"
+    if hasattr(item, "model_dump"):
+        data = item.model_dump()
+    elif isinstance(item, dict):
+        data = item
+    else:
+        return ""
+    heading = data.get("name") or data.get("text") or ""
+    parts: list[str] = []
+    for key, label in _DISPLAY_LABELS.items():
+        value = data.get(key)
+        if value in (None, "", []):
+            continue
+        if key == heading:
+            continue
+        if isinstance(value, (list, tuple)):
+            value = "; ".join(str(entry) for entry in value)
+        parts.append(f"{label}: {value}")
+    if heading and parts:
+        return f"- {heading} — " + "; ".join(parts)
+    if heading:
+        return f"- {heading}"
+    return "- " + "; ".join(parts) if parts else ""
+
+
+def _describe_result(result: Any) -> str:
+    if result is None:
+        return ""
+    if isinstance(result, str):
+        return result
+    if isinstance(result, (list, tuple)):
+        lines = [_describe_item(item) for item in result]
+        return "\n".join(line for line in lines if line)
+    return _describe_item(result)
 
 
 class SessionComponent:
@@ -47,28 +109,6 @@ class SessionComponent:
         ...  # type: ignore[reportReturnType]
 
     @atomic_workflow(chat=False, single_turn=True)
-    def present(
-        self,
-        *,
-        session: Session,
-        result: Annotated[Any, "The result to describe; internal reference only"],
-        max_turns: int = 1,
-    ) -> TextReply:
-        """Describe what the workflow produced, in the user's words.
-
-        Say what it is and name its main parts by name, using the words the
-        user gave; a count is not a name. If the result is a list, name every
-        item in it, one per line, with its key fields. For each part, say who
-        it is for, its format, the check it must pass, and where it goes, in
-        the user's words.
-        If the conversation already covered it, one short sentence that it is
-        captured is enough; do not repeat the details. Do not ask a question,
-        do not list field names or JSON, and do not mention the internal
-        schema. Keep it to a short paragraph or a short list.
-        """
-        ...  # type: ignore[reportReturnType]
-
-    @atomic_workflow(chat=False, single_turn=True)
     def sign_off(self, *, session: Session, max_turns: int = 1) -> TextReply:
         """Close the conversation.
 
@@ -79,6 +119,15 @@ class SessionComponent:
         conversation.
         """
         ...  # type: ignore[reportReturnType]
+
+    def present(self, result: Any) -> str:
+        """Describe the result in the user's words, without a model call.
+
+        The result's own fields are already in the user's words. A deterministic
+        summary is complete and cannot be cut off mid-sentence the way a model
+        completion can.
+        """
+        return _describe_result(result)
 
     @composite_workflow
     def converse(self, step: Callable[..., T], *, session: Session) -> T:
@@ -142,16 +191,7 @@ class SessionComponent:
             if result is not None and _needs_presentation(
                 session.state.messages, before
             ):
-                try:
-                    presented = self.present(
-                        result=result,
-                        session=session,
-                        _first_user_input=(
-                            "Describe the result to the user in their words."
-                        ),
-                    ).text.strip()
-                except Exception:
-                    presented = ""
+                presented = self.present(result)
                 if presented:
                     session.say(presented)
             try:

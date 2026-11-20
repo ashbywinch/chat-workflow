@@ -258,6 +258,8 @@ def _confirm_components(
 
 Do not re-present the whole set. If the user confirms, return the draft. If they correct a part, or add a requirement
 that belongs to an existing part, say in one sentence that you added it to that part, update the part, and return the
-corrected set. If the requirement is a new artifact, propose a new part. Ask only about a gap the draft cannot fill; do
-not ask the user to name a part, say who owns it, or describe a stage the analysis already lists."""
+corrected set. If the requirement is a new artifact, propose a new part. If the user says the parts are not separate
+jobs, explain that those jobs are steps inside the one part, not separate parts, and return the set. Ask only about a
+gap the draft cannot fill; do not ask the user to name a part, say who owns it, or describe a stage the analysis
+already lists."""
     ...  # type: ignore[reportReturnType]

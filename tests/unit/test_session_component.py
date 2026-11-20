@@ -87,8 +87,8 @@ class TestSessionComponent(unittest.TestCase):
         SessionComponent.greet = lambda self, *, session, **kwargs: TextReply(  # type: ignore[method-assign]
             text="Hi there! I help describe your work."
         )
-        SessionComponent.present = lambda self, *, session, result, **kwargs: (  # type: ignore[method-assign]
-            TextReply(text="Here is the result.")
+        SessionComponent.present = lambda self, result, **kwargs: (  # type: ignore[method-assign]
+            "Here is the result."
         )
         SessionComponent.sign_off = lambda self, *, session, result=None, **kwargs: (  # type: ignore[method-assign]
             TextReply(text="I have what I need.")
@@ -118,8 +118,8 @@ class TestSessionComponent(unittest.TestCase):
         original_present = SessionComponent.present
         original_sign_off = SessionComponent.sign_off
         SessionComponent.greet = lambda self, *, session, **kwargs: calls.append("greet")  # type: ignore[method-assign]
-        SessionComponent.present = lambda self, *, session, result, **kwargs: (  # type: ignore[method-assign]
-            TextReply(text="Here is the result.")
+        SessionComponent.present = lambda self, result, **kwargs: (  # type: ignore[method-assign]
+            "Here is the result."
         )
         SessionComponent.sign_off = lambda self, *, session, result=None, **kwargs: (  # type: ignore[method-assign]
             TextReply(text="I have what I need.")
