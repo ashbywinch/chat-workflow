@@ -228,7 +228,7 @@ def _format_components(draft: list[ComponentSpec]) -> str:
         if part.scope_description:
             line += f" {part.scope_description}"
         if part.owner_role:
-            line += f" Owned by {part.owner_role}."
+            line += f" This part is responsible for {part.purpose} and belongs to {part.owner_role}."
         lines.append(line)
     return "\n".join(lines)
 

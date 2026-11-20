@@ -205,7 +205,8 @@ def _confirm_process_definition(
 The draft breakdown has already been shown to the user. Ask one confirm-or-correct question about it. If the draft
 leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask about that gap
 and offer one concrete possibility in the question: "Is the approver your manager, or someone else?" not "Who is the
-approver?" Name one concrete improvement grounded in the breakdown — a capture
+approver?" If the user says they do not handle a step, propose a concrete role for that step and ask them to confirm it,
+then return the corrected result. Name one concrete improvement grounded in the breakdown — a capture
 format, a template, or a checklist they could adopt — and ask whether it fits. Do not invent a tool or product they did
 not mention; keep the improvement to a practice. If the user asks what the output looks like, say in one sentence that
 the output's shape comes next and return to the stages and steps. If they describe their domain content (a specific

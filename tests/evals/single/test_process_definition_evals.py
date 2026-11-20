@@ -19,8 +19,9 @@ PROCESS_DEFINITION_RULES = {
     "Uses expertise": (
         "The assistant builds the stages, steps, participants, and role in "
         "charge from the user's description instead of asking the user to name "
-        "each stage or step from scratch. The ProcessDefinition stores phases "
-        "and activities as two flat lists; a per-stage mapping is not required."
+        "each stage or step from scratch. It may present the breakdown in plain "
+        "words; the ProcessDefinition stores the structured result. A "
+        "plain-language presentation is the proposal."
     ),
     "Honest about provenance": (
         "Every stage, step, participant, and role in the breakdown comes from "
