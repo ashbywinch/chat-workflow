@@ -253,6 +253,24 @@ class TestRejectedOutput(unittest.TestCase):
         with self.assertRaises(MaxRetriesExceededError):
             conversation.send("hello")
 
+    def test_a_failed_run_keeps_the_attempts_it_made(self):
+        """The rejected output and its feedback are the failure's evidence."""
+        conversation = make_conversation(
+            [{"intent": "success", "result": None}], output_retries=0
+        )
+
+        with self.assertRaises(MaxRetriesExceededError):
+            conversation.send("hello")
+
+        self.assertTrue(
+            conversation.messages,
+            "a failed run must keep the attempt it made and the feedback it got",
+        )
+        self.assertTrue(
+            any("answer" in str(message) for message in conversation.messages),
+            "the rejected answer is part of the record",
+        )
+
         self.assertEqual(len(conversation.script.calls), 1)
         self.assertEqual(_retry_parts(conversation), [])
 
