@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Generic, TypeVar
@@ -452,15 +453,33 @@ class Conversation(Generic[T]):
         ``run_sync`` starts a loop per call but never closes the client it
         opened on it; the async context manager does, so a conversation does
         not leave sockets to the garbage collector.
+
+        A run that exhausts its output retries is the only place the rejected
+        attempts and the feedback they were given exist. They are kept on the
+        conversation before the error propagates, so the session transcript can
+        show why the step failed instead of ending before it.
         """
         async with agent:
-            return await agent.run(
-                prompt,
-                message_history=list(self.messages),
-                model_settings=self.model_settings(),
-                deps=self._deps,
-                usage_limits=UsageLimits(request_limit=self._max_requests),
-            )
+            agent_run: Any = None
+            try:
+                async with agent.iter(
+                    prompt,
+                    message_history=list(self.messages),
+                    model_settings=self.model_settings(),
+                    deps=self._deps,
+                    usage_limits=UsageLimits(request_limit=self._max_requests),
+                ) as agent_run:
+                    async for _node in agent_run:
+                        pass
+                    if agent_run.result is None:
+                        raise RuntimeError("the run ended without a result")
+                    return agent_run.result
+            except Exception:
+                if agent_run is not None:
+                    # Recording is diagnostic; never mask the real failure.
+                    with suppress(Exception):
+                        self.messages.extend(agent_run.new_messages())
+                raise
 
     def model_settings(self) -> ModelSettings:
         """The settings every request carries (budgets, limits, headers)."""
