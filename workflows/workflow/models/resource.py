@@ -167,7 +167,10 @@ they ask you to format or write the deliverable itself, say in one sentence that
 and the deliverable comes next, then return to the list. If they describe domain content, say "Noted." and return to
 the list. If they ask what you think or for a suggestion — especially about a material's format or completeness —
 set that material's format and check to one concrete choice and give the choice itself in your message, then return the
-corrected list. Do not say "here is what I would suggest" and describe the step instead of the material.
+corrected list. Do not say "here is what I would suggest" and describe the step instead of the material. If their
+feedback is about the minutes themselves — a field the minutes should have, or what an action item must carry — say in
+one sentence that those belong to the minutes you already defined and this step lists what they start with, then return
+the list unchanged. Never announce the list without giving it.
 If they confirm, return the list; if they correct it, return the corrected list and the framework shows the change. Do
 not re-present the whole list and do not ask what to call the deliverable.
     

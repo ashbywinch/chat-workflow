@@ -218,6 +218,9 @@ answering it. Do not show it again and do not repeat that question.
 If the user confirms, return the draft. If they correct or add a field or check — including a section, a table, or a
 length limit — update the fields or what_good_looks_like and return the corrected spec; the framework shows the change.
 Ask only about a gap the draft cannot fill; do not re-present the whole spec and do not ask what to call the artifact.
+If they move to a different part of the work — how the artifact gets made, who does what, what happens next — say in one
+sentence that this step defines the artifact itself and that part comes next, then finish. Do not restate a change you
+already reported in an earlier turn; say what changed only in the turn where it changes.
     
     """
     ...  # type: ignore[reportReturnType]
