@@ -48,5 +48,53 @@ class TestMinTurns(unittest.TestCase):
         self.assertEqual(len(conversation.script.calls), 1)
 
 
+class TestTurnShape(unittest.TestCase):
+    """A turn says what it did, or asks; it does not do both, or repeat itself."""
+
+    def test_a_success_that_asks_is_a_correction(self):
+        conversation = make_conversation(
+            [
+                {
+                    "intent": "success",
+                    "message": "What sections does it have?",
+                    "result": make_valid_criteria().model_dump(),
+                },
+                {
+                    "intent": "success",
+                    "message": "It has the sections you named.",
+                    "result": make_valid_criteria().model_dump(),
+                },
+            ]
+        )
+        workflow = AtomicWorkflow(
+            config=make_atomic_workflow_config(conversation=conversation)
+        )
+
+        result = workflow.process_turn("go")
+
+        self.assertTrue(result.is_complete)
+        self.assertEqual(result.message, "It has the sections you named.")
+        self.assertEqual(len(conversation.script.calls), 2)
+
+    def test_an_identical_continue_is_a_correction(self):
+        conversation = make_conversation(
+            [
+                {"intent": "continue", "message": "What do you make?"},
+                {"intent": "continue", "message": "What do you make?"},
+                {"intent": "continue", "message": "Who is it for?"},
+            ]
+        )
+        workflow = AtomicWorkflow(
+            config=make_atomic_workflow_config(conversation=conversation)
+        )
+
+        first = workflow.process_turn("go")
+        second = workflow.process_turn("a list")
+
+        self.assertEqual(first.message, "What do you make?")
+        self.assertEqual(second.message, "Who is it for?")
+        self.assertEqual(len(conversation.script.calls), 3)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

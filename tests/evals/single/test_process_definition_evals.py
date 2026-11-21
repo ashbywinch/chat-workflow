@@ -93,9 +93,13 @@ class TestGatherNotesEval(unittest.TestCase):
             judge_rules={
                 **PROCESS_DEFINITION_RULES,
                 "Open exploration": (
-                    "The assistant explores the user's work before naming stages "
-                    "or steps; it does not ask the user to confirm a structure "
-                    "mid-exploration."
+                    "The assistant explores the user's work before naming "
+                    "stages or steps. Before the breakdown is proposed, it asks "
+                    "how the work actually happens; proposing the derived "
+                    "breakdown at the end, for confirmation, is the next phase "
+                    "and is not premature structuring. A proposal in the first "
+                    "response, or before the user has described what they do, "
+                    "is."
                 ),
             },
         )

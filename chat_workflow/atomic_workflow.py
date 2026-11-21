@@ -41,6 +41,8 @@ class AtomicWorkflow(Generic[TResult]):
         self.turn_count = 0
         self.min_turns = max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
+        # The previous continue message, so an identical repeat is not a turn.
+        self._last_continue: str | None = None
         self.model = config.model
         self.response_model = config.response_model
         self.on_continue: Callable[[Continue], TurnResult[TResult]] = config.on_continue
@@ -91,6 +93,21 @@ class AtomicWorkflow(Generic[TResult]):
         response = self._call_llm(user_input, final_turn=final_turn)
 
         if response.intent == AgentIntent.CONTINUE:
+            message = (response.message or "").strip()
+            if (
+                message
+                and message == self._last_continue
+                and self.turn_count < self.max_turns
+            ):
+                # The same question again is not a new turn: the model did not
+                # read the answer it was given. A correction needs a turn, so at
+                # the limit the repeat is returned and the next call stops.
+                return self.process_turn(
+                    "You repeated your previous message instead of using the "
+                    "user's answer. Read what they just said, then either ask a "
+                    "different question or return the result."
+                )
+            self._last_continue = message
             return self.on_continue(response)
         if response.intent == AgentIntent.SUCCESS:
             if self.turn_count < self.min_turns:
@@ -99,6 +116,14 @@ class AtomicWorkflow(Generic[TResult]):
                 return self.process_turn(
                     "You are finishing too early. Do the task's next step "
                     "before returning the result."
+                )
+            if (response.message or "").strip().endswith("?") and self.turn_count < self.max_turns:
+                # A success is a completion. Asking the user something while
+                # claiming the step is done leaves the answer unread.
+                return self.process_turn(
+                    "A success message cannot ask the user a question. If you "
+                    "still need an answer, return intent='continue'. Otherwise "
+                    "return the result with a statement of what you did."
                 )
             return self.on_success(response)
         if response.intent == AgentIntent.FAILURE:

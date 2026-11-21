@@ -65,7 +65,7 @@ is an atomic or composite workflow step. Further vocabulary:
 
 ## Turn contracts
 
-Six rules shape a conversation, independent of any one step's prompt:
+Eight rules shape a conversation, independent of any one step's prompt:
 
 - **A success says what it did.** `Success` carries `message`, and the session
   speaks it for a chat-on step. A silent completion is not expressible.
@@ -87,6 +87,14 @@ Six rules shape a conversation, independent of any one step's prompt:
   the confirm question, so the confirmation step handles the user's answer —
   it corrects a value or confirms, and never re-presents the draft or repeats
   the question the user is answering.
+- **A turn is not a question it does not ask.** A success message ends with a
+  statement, not a question: asking while claiming the step is done leaves the
+  answer unread. A success that ends with `?` is fed back as a correction, and
+  a continue that ends with `:` — a promised list it does not give — is
+  rejected by the response schema.
+- **A turn is not a repeat.** An identical continue message is not a new turn:
+  it is fed back with a correction, so a model that did not read the answer it
+  was given cannot loop.
 
 A question the schema already fixes (the three interaction preferences) is
 asked by the framework, not left to the model: the answer is a parameter to
