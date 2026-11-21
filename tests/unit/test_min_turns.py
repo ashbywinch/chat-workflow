@@ -7,6 +7,7 @@ accepting a silent summary.
 
 import unittest
 
+from chat_workflow import AtomicWorkflowFailedError
 from chat_workflow.atomic_workflow import AtomicWorkflow
 from tests.conftest import (
     make_atomic_workflow_config,
@@ -109,6 +110,42 @@ class TestTurnShape(unittest.TestCase):
         result = workflow.process_turn("go")
 
         self.assertEqual(result.message, "What sections does it have?")
+        self.assertEqual(len(conversation.script.calls), 2)
+
+    def test_a_failure_is_given_one_turn_to_continue(self):
+        conversation = make_conversation(
+            [
+                {"intent": "failure", "message": "I cannot do this."},
+                {
+                    "intent": "success",
+                    "message": "Done.",
+                    "result": make_valid_criteria().model_dump(),
+                },
+            ]
+        )
+        workflow = AtomicWorkflow(
+            config=make_atomic_workflow_config(conversation=conversation)
+        )
+
+        result = workflow.process_turn("go")
+
+        self.assertTrue(result.is_complete)
+        self.assertEqual(len(conversation.script.calls), 2)
+
+    def test_a_second_failure_stops(self):
+        conversation = make_conversation(
+            [
+                {"intent": "failure", "message": "I cannot do this."},
+                {"intent": "failure", "message": "I still cannot."},
+            ]
+        )
+        workflow = AtomicWorkflow(
+            config=make_atomic_workflow_config(conversation=conversation)
+        )
+
+        with self.assertRaises(AtomicWorkflowFailedError):
+            workflow.process_turn("go")
+
         self.assertEqual(len(conversation.script.calls), 2)
 
 

@@ -85,7 +85,7 @@ class Resource(LLMValidated):
     )
 
     def render(self, context: RenderContext) -> str:
-        """Say one starting material in the user's words."""
+        """Say one thing the person starts with, in their words."""
         lines = [f"{self.source} — {self.format}"]
         if self.dependencies:
             lines.append(f"Needs {'; '.join(self.dependencies)} first.")
@@ -104,7 +104,7 @@ class Resource(LLMValidated):
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
     ) -> Annotated[list[Resource], Field(min_length=1)]:
-        """Derive the typical starting materials, then confirm the list."""
+        """Derive what people usually start with, then confirm the list."""
         draft = _draft_resources(
             deliverables=deliverables,
             analysis=analysis,
@@ -131,7 +131,7 @@ def _draft_resources(
     """Derive the things people usually start with for this kind of work.
 
 The deliverables and any analysis are established. A single deliverable is enough: use its name and description to
-propose the materials people usually start with. A starting material is a concrete thing the person begins from — the notes
+propose what people usually start with. A thing they start with is concrete — the notes
 they took, the agenda, the attendee list, the ingredients they bought, a recording. Use what the deliverable and the
 analysis say: what it is made from, and what the person would already have for that kind of work. It is not an activity
 ("the meetings I attend", "the meeting happening") and never the deliverable itself, the people it is for, or its
@@ -154,12 +154,12 @@ Use the deliverable's name; do not ask what to call it. Return the complete list
 def _confirm_resources(
     draft: Annotated[
         list[Resource],
-        "The complete list of typical starting materials already shown to the user",
+        "The complete list of things they start with, already shown to the user",
     ],
     max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[Resource], Field(min_length=1)]:
     """
-The starting materials were shown with one confirm-or-correct question, and the user is answering it. Do not show the list again and do not repeat that question.
+The list of things they start with was shown with one confirm-or-correct question, and the user is answering it. Do not show the list again and do not repeat that question.
 
 If they add one, include it; if they say one does not apply, remove it. If they say the list is wrong or they do not
 have an item, replace it with what they say they do have; never return failure because the list needs correction. If

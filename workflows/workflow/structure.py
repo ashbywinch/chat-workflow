@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 from chat_workflow.confirmation import confirm_draft
@@ -60,6 +60,13 @@ class StructField(BaseModel):
     )
 
 
+_TYPE_IN_RULE = re.compile(
+    r"\b(str|int|float|bool|dict|datetime)\b"
+    r"|\b(list|set|tuple|dict|Optional)\["
+    r"|\|\s*None\b"
+)
+
+
 class StructValidator(BaseModel):
     """A validation rule for the generated Pydantic model.
 
@@ -78,19 +85,17 @@ class StructValidator(BaseModel):
         min_length=1,
     )
 
-
-def _plain_words(text: str) -> str:
-    """Say any type expression in a rule as the user's words."""
-    for pattern, words in (
-        (re.compile(r"list\[str\]"), "a list of text"),
-        (re.compile(r"\bOptional\[str\]\b"), "text (optional)"),
-        (re.compile(r"\bstr\s*\|\s*None\b"), "text (optional)"),
-        (re.compile(r"\bstr\b"), "text"),
-        (re.compile(r"\bint\b|\bfloat\b"), "a number"),
-        (re.compile(r"\bbool\b"), "yes or no"),
-    ):
-        text = pattern.sub(words, text)
-    return text
+    @field_validator("rule")
+    @classmethod
+    def _the_rule_is_prose(cls, value: str) -> str:
+        """A rule is the user's words; a type expression is not a rule."""
+        if _TYPE_IN_RULE.search(value):
+            raise ValueError(
+                "A rule is prose in the user's words, not a type expression: "
+                "say 'a description', 'a list of names', 'an optional date', "
+                "never 'str', 'list[...]', or '| None'."
+            )
+        return value
 
 
 class ComponentStructure(BaseModel):
@@ -141,13 +146,7 @@ class ComponentStructure(BaseModel):
                 line += f" ({hint})"
             lines.append(line)
         if self.model_validators:
-            # A rule is prose, and a model sometimes writes a type expression
-            # into it. The rendering contract is that the user never reads
-            # Python; translate the expression, keep the rule.
-            lines.extend(
-                f"Rule: {_plain_words(validator.rule)}"
-                for validator in self.model_validators
-            )
+            lines.extend(f"Rule: {validator.rule}" for validator in self.model_validators)
         return "\n".join(lines)
 
     @composite_workflow_step

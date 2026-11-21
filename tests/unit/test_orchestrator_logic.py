@@ -73,6 +73,7 @@ class TestAtomicWorkflow(unittest.TestCase):
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_failure_raises_exception(self, mock_call_llm):
+        """A failure is provisional: the step gets one turn to continue."""
         orchestrator = AtomicWorkflow(config=make_atomic_workflow_config())
 
         action = Failure(intent=AgentIntent.FAILURE, message="I don't have enough information to help")
@@ -85,7 +86,7 @@ class TestAtomicWorkflow(unittest.TestCase):
             "I don't have enough information to help",
             str(context.exception),
         )
-        self.assertEqual(orchestrator.turn_count, 1)
+        self.assertEqual(orchestrator.turn_count, 2)
 
     @patch.object(AtomicWorkflow, "_call_llm")
     def test_process_turn_failure_transcript_not_duplicated(self, mock_call_llm):

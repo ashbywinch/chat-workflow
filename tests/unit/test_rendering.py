@@ -174,10 +174,6 @@ class TestRecordsRenderThemselves(unittest.TestCase):
                         rule="Every action item has an owner.",
                         domain_origin="A missed owner is a missed task.",
                     ),
-                    StructValidator(
-                        rule="Every action item has a description (str) and an owner (str).",
-                        domain_origin="A rule may name a type; the user must not read it.",
-                    ),
                 ],
             ),
             RenderContext(),
@@ -186,8 +182,6 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("meeting date: When it happened (date)", text)
         self.assertIn("attendees: list of person names", text)
         self.assertIn("Rule: Every action item has an owner", text)
-        self.assertIn("description (text) and an owner (text)", text)
-        self.assertNotIn("(str)", text)
 
     def test_a_list_and_an_empty_list(self, _rules):
         text = render_result(
@@ -292,3 +286,21 @@ class TestTheEmptyListDecision(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+class TestRulesAreProse(unittest.TestCase):
+    def test_a_rule_with_a_type_expression_is_rejected(self):
+        """A type expression is not a rule; the model must say the words."""
+        with self.assertRaises(ValueError):
+            StructValidator(
+                rule="each action item has a description (str) and an owner (str).",
+                domain_origin="Every action item has an owner.",
+            )
+
+    def test_a_rule_in_the_user_words_is_accepted(self):
+        validator = StructValidator(
+            rule="every action item has an owner and a due date.",
+            domain_origin="Every action item has an owner.",
+        )
+
+        self.assertIn("due date", validator.rule)
+

@@ -49,6 +49,8 @@ class AtomicWorkflow(Generic[TResult]):
         self.max_turns = config.max_turns
         # The previous continue message, so an identical repeat is not a turn.
         self._last_continue: str | None = None
+        # A failure is provisional until the step has had one turn to continue.
+        self._failure_given_a_turn = False
         self.model = config.model
         self.response_model = config.response_model
         self.on_continue: Callable[[Continue], TurnResult[TResult]] = config.on_continue
@@ -144,6 +146,18 @@ class AtomicWorkflow(Generic[TResult]):
                 )
             return self.on_success(response)
         if response.intent == AgentIntent.FAILURE:
+            if not self._failure_given_a_turn and self.turn_count < self.max_turns:
+                # A step sometimes calls failure when the conversation is hard —
+                # a skeptical user, a thin description, a correction it did not
+                # want. Give it one turn to continue before accepting that the
+                # result cannot be produced.
+                self._failure_given_a_turn = True
+                return self.process_turn(
+                    "You returned failure. Continue with what you were given: "
+                    "propose the result, or ask the one question you still "
+                    "need. Failure is only for a user who refuses to engage or "
+                    "input that cannot be interpreted."
+                )
             error = self.on_failure(response)
             error.messages = list(self.messages)
             error.message = (
