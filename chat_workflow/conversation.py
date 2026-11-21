@@ -305,6 +305,20 @@ class _ProviderLog:
         return f" (served by {', '.join(parts)})"
 
 
+def _rejection(exc: BaseException) -> str:
+    """The rejection that consumed the last retry, not only the retry count.
+
+    ``UnexpectedModelBehavior`` is raised ``from`` the validation error that
+    spent the final retry, so its cause names the fields or rules the answer
+    broke. That sentence is what a caller needs to tell the model *why* the
+    sample was refused; the count alone says a retry happened and nothing
+    about what to do next.
+    """
+    cause = exc.__cause__
+    text = str(cause).strip() if cause is not None else ""
+    return text or str(exc)
+
+
 class Conversation(Generic[T]):
     """A model, its instructions, and the transcript of one conversation.
 
@@ -424,7 +438,8 @@ class Conversation(Generic[T]):
             result = self._run_with_transport_retries(agent, prompt, final_turn=final_turn)
         except UnexpectedModelBehavior as exc:
             raise MaxRetriesExceededError(
-                self._output_retries, reason=f"{exc}{self._provider_log.suffix()}"
+                self._output_retries,
+                reason=f"{_rejection(exc)}{self._provider_log.suffix()}",
             ) from exc
 
         output: Any = result.output

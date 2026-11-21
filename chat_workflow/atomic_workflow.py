@@ -14,11 +14,36 @@ from pydantic_ai.usage import RunUsage
 
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .conversation import Conversation
-from .exceptions import AtomicWorkflowFailedError
+from .exceptions import AtomicWorkflowFailedError, MaxRetriesExceededError
 from .models import AgentIntent, Continue, Failure, Success, TurnResult
 from .transcript import render
 
 TResult = TypeVar("TResult")
+
+# A rejection's own words are the rule that was broken, with its evidence and
+# a suggested repair; the turn keeps the rule and drops the bulk.
+_REJECTION_CORRECTION_LIMIT = 2000
+
+
+def _rejection_correction(exc: MaxRetriesExceededError) -> str:
+    """The turn a rejected result earns: ask for the facts it could not hold.
+
+    Resampling cannot fix a rule that failed for data the conversation does
+    not contain — every retry answers from the same history. The rejection is
+    therefore fed back as a turn, where the model can ask the user and the
+    user can answer, bounded by the step's turn budget like any correction.
+    """
+    reasons = " ".join(exc.reason.split())
+    if len(reasons) > _REJECTION_CORRECTION_LIMIT:
+        reasons = reasons[: _REJECTION_CORRECTION_LIMIT - 1].rstrip() + "…"
+    return (
+        "Your result was rejected by its own rules:\n"
+        f"{reasons}\n\n"
+        "A rejection's 'Fix' text describes what a complete result looks "
+        "like. The missing values are the user's, not yours: do not send the "
+        "same result again and do not invent them. Ask for what is still "
+        "missing, then return the completed result."
+    )
 
 
 class AtomicWorkflow(Generic[TResult]):
@@ -98,7 +123,18 @@ class AtomicWorkflow(Generic[TResult]):
         # The last turn is told so: a model that would ask again is given one
         # turn to answer with what it has, and the step still fails if it will not.
         final_turn = self.turn_count >= self.max_turns
-        response = self._call_llm(user_input, final_turn=final_turn)
+        try:
+            response = self._call_llm(user_input, final_turn=final_turn)
+        except MaxRetriesExceededError as exc:
+            # A rejection is about the result, not the sample: every retry
+            # answered with what the user had already given. Resampling cannot
+            # produce data the conversation does not hold, so the rejection
+            # becomes a turn — the model asks for what the result is missing
+            # and the user gets to answer it. Without this, a draft that omits
+            # a required fact ends the run and loses the conversation.
+            if final_turn:
+                raise
+            return self.process_turn(_rejection_correction(exc))
 
         if response.intent == AgentIntent.CONTINUE:
             message = (response.message or "").strip()
