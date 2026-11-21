@@ -97,9 +97,9 @@
    "severity": "error"
   },
   {
-   "line": 148,
+   "line": 144,
    "column": 20,
-   "stop_line": 148,
+   "stop_line": 144,
    "stop_column": 34,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
@@ -109,9 +109,9 @@
    "severity": "warn"
   },
   {
-   "line": 150,
+   "line": 146,
    "column": 19,
-   "stop_line": 150,
+   "stop_line": 146,
    "stop_column": 33,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
@@ -121,9 +121,9 @@
    "severity": "warn"
   },
   {
-   "line": 153,
+   "line": 149,
    "column": 13,
-   "stop_line": 153,
+   "stop_line": 149,
    "stop_column": 36,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
@@ -133,9 +133,9 @@
    "severity": "error"
   },
   {
-   "line": 183,
+   "line": 179,
    "column": 49,
-   "stop_line": 183,
+   "stop_line": 179,
    "stop_column": 58,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
@@ -145,9 +145,9 @@
    "severity": "error"
   },
   {
-   "line": 243,
+   "line": 239,
    "column": 43,
-   "stop_line": 243,
+   "stop_line": 239,
    "stop_column": 52,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,

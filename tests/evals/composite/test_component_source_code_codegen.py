@@ -129,10 +129,6 @@ class TestComponentSourceCodeCodegenEval(unittest.TestCase):
         self.assertGreater(len(generated.code), 0)
         self.assertIn("class ", generated.code)
 
-        # Verify syntax
-        with suppress(SyntaxError):
-            compile(generated.code, "<test>", "exec")
-
         # --- Step 2: Verify syntax and write code to temp file ---
         # Verify syntax with compile() — ruff E501 (line too long) is not
         # auto-fixable and LLM-generated docstrings may exceed 120 chars.

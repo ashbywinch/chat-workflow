@@ -203,7 +203,7 @@ make evals-test TEST=...  # One targeted eval (module/class/test path)
 make evals-smoke        # Quick framework-level check (test_real_api + debug_streaming, ~5 min)
 make evals-incremental  # Change-aware subset (auto-detects affected evals via code-review-graph, 1800s timeout)
 make evals-verbose      # Same with verbose output
-make evals-debug        # Evals with LLM request/response tracing
+CHAT_WORKFLOW_DEBUG=1 make evals   # Evals with LLM request/response tracing
 make test-all           # Unit tests + evals
 make lint               # ruff check
 ```
