@@ -45,6 +45,10 @@ class AtomicWorkflowConfig(Generic[TResult]):
     # The injection seam: tests pass a Conversation built on a scripted model.
     # Production leaves this None and the step builds one from the fields above.
     conversation: Conversation | None = None
+    # A task that must ask or propose before it answers declares the minimum
+    # number of model turns; a success before then is a correction, not a
+    # completion.
+    min_turns: int = 1
     output_retries: int = 2
     transport_retries: int = 2
     unusable_resends: int = 1

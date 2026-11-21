@@ -120,7 +120,9 @@ class TestConfig(unittest.TestCase):
         temp_path = self._write_temp_config({"llm": {"provider": "openai", "model": "gpt-4"}})
         try:
             cfg = Config(Path(temp_path))
-            self.assertIsNone(cfg.api_base)
+            # The openai provider is pinned to the house gateway when no base
+            # is stated; the key env is the provider default.
+            self.assertEqual(cfg.api_base, os.environ.get("OPENAI_BASE_URL") or None)
             self.assertIsNone(cfg.api_key_env)
         finally:
             os.unlink(temp_path)

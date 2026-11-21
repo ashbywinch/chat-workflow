@@ -1,0 +1,24 @@
+# Dependabot — weekly for package ecosystem + github-actions.
+#
+# For uv projects the package ecosystem is dependabot's `pip` ecosystem (it
+# reads uv.lock). Don't "fix" it to `uv` — that is not a valid value.
+#
+# Patch/minor bumps are grouped per ecosystem and auto-merge on green CI;
+# majors stay human-reviewed. github-actions bumps are NEVER grouped: an
+# action ref bump is a SHA-pin update and needs the pin treatment by a human.
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      minor-patch:
+        update-types: ["minor", "patch"]
+      major:
+        update-types: ["major"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

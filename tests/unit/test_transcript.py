@@ -105,6 +105,108 @@ class TestRender(unittest.TestCase):
         self.assertIn("[output]", text)
         self.assertIn('{"intent": "success", "result": {"ok": true}}', text)
 
+    def test_a_rejected_envelope_is_not_a_turn(self):
+        messages = [
+            ModelRequest(parts=[UserPromptPart("Hi")]),
+            ModelResponse(
+                parts=[TextPart('{"intent": "success", "message": "rejected"}')]
+            ),
+            ModelResponse(
+                parts=[
+                    TextPart(
+                        '{"response":"{\\"intent\\": \\"success\\", \\"message\\": \\"double\\"}"}'
+                    )
+                ]
+            ),
+            ModelResponse(parts=[TextPart("What do you make?")]),
+        ]
+
+        text = render(messages, audience="user")
+
+        self.assertNotIn("rejected", text)
+        self.assertNotIn("double", text)
+        self.assertIn("What do you make?", text)
+
+    def test_a_corrected_turn_is_not_a_delivered_turn(self):
+        """A turn the framework refused was never shown to the user."""
+        messages = [
+            ModelRequest(parts=[UserPromptPart("What do you make?")]),
+            ModelResponse(parts=[TextPart("A list of meals.")]),
+            ModelRequest(
+                parts=[
+                    UserPromptPart(
+                        "You are finishing too early. Do the task's next step "
+                        "before returning the result."
+                    )
+                ]
+            ),
+            ModelResponse(parts=[TextPart("How do you keep the list?")]),
+        ]
+
+        audit = render(messages)
+        user = render(messages, audience="user")
+
+        self.assertIn("A list of meals.", audit)
+        self.assertNotIn("A list of meals.", user)
+        self.assertNotIn("finishing too early", user)
+        self.assertIn("How do you keep the list?", user)
+
+    def test_a_session_projects_each_step_separately(self):
+        """The user view follows steps, not the concatenated log.
+
+        Only the run's last answer used to be recognised as internal, so every
+        earlier step's envelope and every chat-off derivation showed up as
+        assistant turns the user never saw.
+        """
+        from chat_workflow.session_log import TranscriptSegment
+
+        messages = [
+            # Step 1: a chat step, ending in its own success envelope.
+            ModelRequest(parts=[UserPromptPart("Hi")]),
+            ModelResponse(parts=[TextPart("What do you make?")]),
+            ModelResponse(
+                parts=[TextPart('{"intent": "success", "message": "step one"}')]
+            ),
+            # Step 2: a chat-off derivation. Nobody saw any of it.
+            ModelRequest(parts=[UserPromptPart("No user is available.")]),
+            ModelResponse(
+                parts=[TextPart('{"intent": "success", "message": "internal"}')]
+            ),
+            # Step 3: the confirmation's first spoken turn.
+            ModelResponse(parts=[TextPart("Here's what I've got so far.")]),
+        ]
+        segments = [
+            TranscriptSegment(0, 3, chat=True),
+            TranscriptSegment(3, 5, chat=False),
+            TranscriptSegment(5, 6, chat=True),
+        ]
+
+        text = render(messages, audience="user", segments=segments)
+
+        self.assertIn("What do you make?", text)
+        self.assertIn("Here's what I've got so far.", text)
+        self.assertNotIn("step one", text)
+        self.assertNotIn("internal", text)
+        self.assertNotIn("No user is available", text)
+
+    def test_turns_between_steps_are_kept(self):
+        """The composite's own messages sit between segments; the user saw them."""
+        from chat_workflow.session_log import TranscriptSegment
+
+        messages = [
+            ModelResponse(parts=[TextPart("Let me understand how it fits.")]),
+            ModelRequest(parts=[UserPromptPart("I write minutes.")]),
+            ModelResponse(parts=[TextPart("Tell me more.")]),
+            ModelResponse(parts=[TextPart("Now, what does it produce?")]),
+        ]
+        segments = [TranscriptSegment(1, 3, chat=True)]
+
+        text = render(messages, audience="user", segments=segments)
+
+        self.assertIn("Let me understand how it fits.", text)
+        self.assertIn("Tell me more.", text)
+        self.assertIn("Now, what does it produce?", text)
+
 
 class TestStoredForm(unittest.TestCase):
     def test_the_message_list_round_trips_byte_for_byte(self):
@@ -123,6 +225,27 @@ class TestStoredForm(unittest.TestCase):
         self.assertIn("tool-call", kinds)
         self.assertIn("tool-return", kinds)
         self.assertIn("validation", kinds)
+
+
+class TestRetryArtifacts(unittest.TestCase):
+    """A rejected output attempt is not shown twice."""
+
+    def test_identical_consecutive_assistant_turns_are_one(self):
+        messages = [
+            ModelRequest.user_text_prompt("hello"),
+            ModelResponse(parts=[TextPart("same words")]),
+            ModelResponse(parts=[TextPart("same words")]),
+            ModelResponse(parts=[TextPart("after")]),
+        ]
+
+        self.assertEqual(
+            entries(messages),
+            [
+                ("user", "hello"),
+                ("assistant", "same words"),
+                ("assistant", "after"),
+            ],
+        )
 
 
 if __name__ == "__main__":

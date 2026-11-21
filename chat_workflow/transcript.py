@@ -35,6 +35,7 @@ from pydantic_ai.messages import (
 )
 
 from .models import ANSWER_TOOL
+from .session_log import TranscriptSegment
 
 Audience = Literal["all", "user"]
 
@@ -43,21 +44,114 @@ Audience = Literal["all", "user"]
 # value the workflow produced.
 _USER_KINDS = frozenset({"user", "assistant"})
 
+# The framework speaks first and last for a step that has no user of its own.
+# These prompts reach the model as user turns, but a person never said them, so
+# the user view does not show them and a judge is not asked to read them.
+_FRAMEWORK_PROMPTS = frozenset(
+    {
+        "Start the conversation.",
+        "No user is available. Produce the result now from the instructions "
+        "and the inputs.",
+        "The conversation is over. Close it in one sentence.",
+        "The user has finished. Say in one sentence that you have what they "
+        "need.",
+        "The user has finished. Say in one sentence that you have what they "
+        "need. ",
+        "Describe the result to the user in their words.",
+        "You are finishing too early. Do the task's next step before returning "
+        "the result.",
+        "No user is available to answer. Return success with the completed "
+        "result, or failure if it cannot be produced.",
+        "You repeated your previous message instead of using the user's "
+        "answer. Read what they just said, then either ask a different "
+        "question or return the result.",
+        "A success message cannot ask the user a question. If you still need "
+        "an answer, return intent='continue'. Otherwise return the result "
+        "with a statement of what you did.",
+    }
+)
 
-def entries(messages: Sequence[ModelMessage]) -> list[tuple[str, str]]:
+
+# The prompts the framework injects after a turn it refuses: an early success,
+# a success that asks, a repeat, or a chat-off continue. The refused turn was
+# never delivered to the user, so the user view drops it.
+_CORRECTION_PROMPTS = frozenset(
+    {
+        "You are finishing too early. Do the task's next step before returning "
+        "the result.",
+        "You repeated your previous message instead of using the user's "
+        "answer. Read what they just said, then either ask a different "
+        "question or return the result.",
+        "A success message cannot ask the user a question. If you still need "
+        "an answer, return intent='continue'. Otherwise return the result "
+        "with a statement of what you did.",
+        "No user is available to answer. Return success with the completed "
+        "result, or failure if it cannot be produced.",
+        "Your message ends with a colon but the turn does not contain the "
+        "content it introduces. Give the content in the message, or finish "
+        "and let the next step show it.",
+    }
+)
+
+
+_INTERNAL_PROMPTS = _FRAMEWORK_PROMPTS | _CORRECTION_PROMPTS
+
+
+def _has_correction_prompt(message: ModelRequest) -> bool:
+    return any(
+        isinstance(part, UserPromptPart)
+        and _text(part.content).strip() in _CORRECTION_PROMPTS
+        for part in message.parts
+    )
+
+
+def entries(
+    messages: Sequence[ModelMessage],
+    *,
+    suppress_corrected: bool = False,
+) -> list[tuple[str, str]]:
     """The transcript as ``(kind, text)``, in the order the model saw it.
 
     The last response's text is ``output``: it is the structured answer, not a
-    conversational turn, and a caller decides how to show it.
+    conversational turn, and a caller decides how to show it. With
+    ``suppress_corrected``, a response the framework refused (it was followed
+    by a correction prompt) is dropped: the user never saw that turn.
     """
+    suppressed: set[int] = set()
+    if suppress_corrected:
+        last_response: int | None = None
+        for index, message in enumerate(messages):
+            if isinstance(message, ModelResponse):
+                last_response = index
+            elif (
+                isinstance(message, ModelRequest)
+                and last_response is not None
+                and _has_correction_prompt(message)
+            ):
+                suppressed.add(last_response)
     last_answer = _last_answer_index(messages)
     result: list[tuple[str, str]] = []
     for index, message in enumerate(messages):
+        if index in suppressed:
+            continue
         if isinstance(message, ModelRequest):
             result.extend(_request_entries(message))
         elif isinstance(message, ModelResponse):
             result.extend(_response_entries(message, is_answer=index == last_answer))
-    return result
+    # An output retry can leave the same assistant text twice in a row: the
+    # rejected attempt and the accepted one. A person saw it once, so the
+    # transcript shows it once.
+    deduped: list[tuple[str, str]] = []
+    for kind, text in result:
+        if (
+            deduped
+            and kind == "assistant"
+            and deduped[-1][0] == "assistant"
+            and deduped[-1][1].strip() == text.strip()
+        ):
+            continue
+        deduped.append((kind, text))
+    return deduped
 
 
 def render(
@@ -65,6 +159,7 @@ def render(
     *,
     audience: Audience = "all",
     result: Any = None,
+    segments: Sequence[TranscriptSegment] | None = None,
 ) -> str:
     """The transcript as text, or the subset a person saw.
 
@@ -72,18 +167,50 @@ def render(
     structured answer is not repeated as a turn; the result takes its place.
     Without it (a failed run), the raw answer stays — it is the evidence of
     what went wrong.
+
+    ``segments`` marks each step's slice of the concatenated transcript. The
+    user view needs it: a session log holds several steps, each with its own
+    final answer, and only the step's own answer may be dropped as internal.
+    A chat-off step's turns are dropped entirely — no user saw them.
     """
     parts: list[tuple[str, str]] = []
-    for kind, text in entries(messages):
-        if kind == "output":
-            # In the audit view a failed run keeps its last answer as evidence.
-            # A judge never sees it: the raw envelope is internal.
-            if audience == "all" and result is None:
+    if audience == "user" and segments:
+        # Steps cover slices of the log; the composite's own turns (echoes and
+        # spoken messages) sit in the gaps between them and must stay: they are
+        # exactly what the user saw happen between steps.
+        ranges: list[tuple[int, int, bool]] = []
+        cursor = 0
+        for segment in segments:
+            if segment.start > cursor:
+                ranges.append((cursor, segment.start, True))
+            ranges.append((segment.start, segment.end, segment.chat))
+            cursor = segment.end
+        if cursor < len(messages):
+            ranges.append((cursor, len(messages), True))
+        for start, end, chat in ranges:
+            if not chat:
+                continue
+            for kind, text in entries(messages[start:end], suppress_corrected=True):
+                if kind == "output":
+                    continue
+                if kind == "user" and text.strip() in _INTERNAL_PROMPTS:
+                    continue
                 parts.append((kind, text))
-            continue
-        if audience == "user" and kind not in _USER_KINDS:
-            continue
-        parts.append((kind, text))
+    else:
+        for kind, text in entries(
+            messages, suppress_corrected=audience == "user"
+        ):
+            if kind == "output":
+                # In the audit view a failed run keeps its last answer as
+                # evidence. A judge never sees it: the raw envelope is internal.
+                if audience == "all" and result is None:
+                    parts.append((kind, text))
+                continue
+            if audience == "user" and kind not in _USER_KINDS:
+                continue
+            if audience == "user" and kind == "user" and text.strip() in _INTERNAL_PROMPTS:
+                continue
+            parts.append((kind, text))
     if result is not None:
         rendered = (
             result.model_dump_json(indent=2)
@@ -107,15 +234,59 @@ def load(data: bytes | str) -> list[ModelMessage]:
     return ModelMessagesTypeAdapter.validate_json(data)
 
 
+def _answer_envelope(part: ToolCallPart) -> dict[str, Any] | None:
+    args = part.args
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            return None
+    if not isinstance(args, dict):
+        return None
+    body = args.get("response", args)
+    return body if isinstance(body, dict) else None
+
+
+def _is_final_answer(envelope: dict[str, Any] | None) -> bool:
+    return bool(envelope) and envelope.get("intent") in ("success", "failure")
+
+
+def _text_is_an_envelope(text: str) -> bool:
+    """True for the raw JSON of a success/failure answer, however it arrived.
+
+    A provider sometimes returns the envelope as an escaped string inside
+    ``response``, so both the plain and the escaped key forms count.
+    """
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return False
+    has_intent = '"intent"' in stripped or '\\"intent\\"' in stripped
+    has_outcome = any(
+        marker in stripped
+        for marker in (
+            '"success"',
+            '"failure"',
+            '\\"success\\"',
+            '\\"failure\\"',
+        )
+    )
+    return has_intent and has_outcome
+
+
 def _last_answer_index(messages: Sequence[ModelMessage]) -> int | None:
     for index in range(len(messages) - 1, -1, -1):
         message = messages[index]
-        if isinstance(message, ModelResponse) and any(
-            (isinstance(part, TextPart) and part.content.strip())
-            or (isinstance(part, ToolCallPart) and part.tool_name == ANSWER_TOOL)
-            for part in message.parts
-        ):
-            return index
+        if not isinstance(message, ModelResponse):
+            continue
+        for part in message.parts:
+            if (
+                isinstance(part, ToolCallPart)
+                and part.tool_name == ANSWER_TOOL
+                and _is_final_answer(_answer_envelope(part))
+            ):
+                return index
+            if isinstance(part, TextPart) and _text_is_an_envelope(part.content):
+                return index
     return None
 
 
@@ -142,22 +313,24 @@ def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tu
     for part in message.parts:
         if isinstance(part, TextPart):
             if part.content.strip():
-                yield ("output" if is_answer else "assistant"), part.content
+                # A rejected attempt's envelope is as internal as the accepted
+                # one: no user ever saw either.
+                kind = (
+                    "output"
+                    if _text_is_an_envelope(part.content) or is_answer
+                    else "assistant"
+                )
+                yield kind, part.content
         elif isinstance(part, ThinkingPart):
             yield "thinking", part.content
         elif isinstance(part, ToolCallPart):
             if part.tool_name == ANSWER_TOOL:
-                args = part.args
-                if isinstance(args, str):
-                    try:
-                        args = json.loads(args)
-                    except ValueError:
-                        args = None
-                body = args.get("response", args) if isinstance(args, dict) else None
-                spoken = body.get("message") if isinstance(body, dict) else None
-                yield ("output" if is_answer else "assistant"), (
-                    spoken or part.args_as_json_str()
-                )
+                envelope = _answer_envelope(part)
+                spoken = envelope.get("message") if envelope else None
+                # A continue answer is the assistant's question and is shown;
+                # a success/failure answer is the structured result and is not.
+                kind = "output" if _is_final_answer(envelope) else "assistant"
+                yield kind, spoken or part.args_as_json_str()
             else:
                 yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
 

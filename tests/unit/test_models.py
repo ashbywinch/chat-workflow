@@ -174,7 +174,11 @@ class TestAgentResponseShapes(unittest.TestCase):
             ],
         )
 
-        action = Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=criteria)
+        action = Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=criteria,
+            )
 
         self.assertEqual(action.intent, AgentIntent.SUCCESS)
         self.assertEqual(action.result, criteria)
@@ -186,7 +190,7 @@ class TestAgentResponseShapes(unittest.TestCase):
         self.assertEqual(action.message, "Can't help with that")
 
     def test_the_schema_forbids_mixing_the_shapes(self):
-        """`continue` has no result property, `success` no message property.
+        """`continue` has no result; `success` carries words and the object.
 
         A model validator could only reject such an answer after it was
         written, and Pydantic never serialises validator logic into the
@@ -195,7 +199,7 @@ class TestAgentResponseShapes(unittest.TestCase):
         """
         branches = {
             "continue": (Continue, ("message",)),
-            "success": (Success[EvaluationCriteria], ("result",)),
+            "success": (Success[EvaluationCriteria], ("message", "result")),
             "failure": (Failure, ("message",)),
         }
         for intent, (variant, expected) in branches.items():
@@ -208,14 +212,36 @@ class TestAgentResponseShapes(unittest.TestCase):
                 {"intent": "continue", "message": "Which?", "result": {"context": "x", "criteria": []}}
             )
 
+        # A success is a turn: it cannot finish without words.
+        with self.assertRaises(ValueError):
+            TypeAdapter(AgentResponse[EvaluationCriteria]).validate_python(
+                {
+                    "intent": "success",
+                    "result": EvaluationCriteria(
+                        context="test",
+                        criteria=[
+                            Criterion(
+                                name="budget", description="Budget", weight=8.0
+                            ),
+                            Criterion(
+                                name="quality", description="Quality", weight=7.0
+                            ),
+                        ],
+                    ).model_dump(),
+                }
+            )
+
     def test_each_shape_requires_its_own_fields(self):
         with self.assertRaises(ValueError):
             Continue(intent=AgentIntent.CONTINUE, message="")
         with self.assertRaises(ValueError):
-            Success[EvaluationCriteria](intent=AgentIntent.SUCCESS, result=None)
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=None,
+            )
         with self.assertRaises(ValueError):
             Failure(intent=AgentIntent.FAILURE, message="")
-
 
 class TestTurnResultModel(unittest.TestCase):
     def setUp(self):

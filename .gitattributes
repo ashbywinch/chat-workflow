@@ -1,0 +1,5 @@
+# .gitattributes — LF everywhere, always.
+* text=auto eol=lf
+
+# Generated lockfile — keep it out of language stats and diffs.
+uv.lock linguist-generated=true

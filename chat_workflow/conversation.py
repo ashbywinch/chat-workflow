@@ -27,7 +27,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, override
 
 import pydantic_ai
 from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, ToolFailed, UsageLimits
@@ -37,6 +37,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    SystemPromptPart,
     TextPart,
     ToolCallPart,
     UserPromptPart,
@@ -49,7 +50,7 @@ from pydantic_ai.usage import RunUsage
 
 from .exceptions import MaxRetriesExceededError
 from .model_provider import ProviderType, build_model
-from .models import ANSWER_TOOL
+from .models import ANSWER_TOOL, AgentAnswer, FinalAnswer, as_final, as_turn
 
 T = TypeVar("T")
 
@@ -144,6 +145,7 @@ class _ResendUnusable(AbstractCapability[Any]):
         self._max_resends = max_resends
         self.resends: list[Resend] = []
 
+    @override
     async def after_model_request(
         self,
         ctx: RunContext[Any],
@@ -387,22 +389,31 @@ class Conversation(Generic[T]):
                 api_base=self._api_base,
                 api_key_env=self._api_key_env,
             )
-            self._provider_log = _ProviderLog.attach(self._model)
+        self._provider_log = _ProviderLog.attach(self._model)
+        output_type = (
+            (self._final_output_type or self._output_type)
+            if final_turn
+            else self._output_type
+        )
+        # A workflow step's answer is a tool call; a plain-text model call (an
+        # eval's user simulation) is not a structured answer and must not be
+        # forced through the tool schema.
+        output_spec: Any = (
+            str
+            if output_type is str
+            else ToolOutput(output_type, name=ANSWER_TOOL, strict=True)
+        )
         agent: Agent[Any, T] = Agent(
             self._model,
             tools=self._tools,
-            output_type=ToolOutput(
-                (self._final_output_type or self._output_type) if final_turn else self._output_type,
-                name=ANSWER_TOOL,
-                strict=True,
-            ),
+            output_type=output_spec,
             system_prompt=self._instructions
             + (
                 "\n\n## Final turn\n"
                 "No further turn will be offered. Answer now with what the user "
                 "has given: intent='success' with the complete result, or "
-                "intent='failure' if it cannot be produced. Do not ask another "
-                "question."
+                "intent='failure' if it cannot be produced. "
+                "Do not ask another question."
                 if final_turn
                 else ""
             ),
@@ -416,8 +427,13 @@ class Conversation(Generic[T]):
                 self._output_retries, reason=f"{exc}{self._provider_log.suffix()}"
             ) from exc
 
+        output: Any = result.output
+        if isinstance(output, AgentAnswer):
+            output = as_turn(output)
+        elif isinstance(output, FinalAnswer):
+            output = as_final(output)
         turn = ModelTurn(
-            output=result.output,
+            output=output,
             messages=result.new_messages(),
             usage=result.usage,
             resends=tuple(resender.resends),
@@ -454,9 +470,21 @@ class Conversation(Generic[T]):
         not leave sockets to the garbage collector.
         """
         async with agent:
+            history = list(self.messages)
+            if prompt is None and not any(
+                isinstance(message, ModelRequest)
+                and any(isinstance(part, SystemPromptPart) for part in message.parts)
+                for message in history
+            ):
+                # When the model is given a history and no new prompt,
+                # PydanticAI does not add the agent's system prompt. The
+                # instructions are part of the request, not an optional extra.
+                history.insert(
+                    0, ModelRequest(parts=[SystemPromptPart(self._instructions)])
+                )
             return await agent.run(
                 prompt,
-                message_history=list(self.messages),
+                message_history=history,
                 model_settings=self.model_settings(),
                 deps=self._deps,
                 usage_limits=UsageLimits(request_limit=self._max_requests),

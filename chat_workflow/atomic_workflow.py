@@ -33,13 +33,22 @@ class AtomicWorkflow(Generic[TResult]):
     rules (intent, turn limit) and nothing about the model.
     """
 
+    # Whether this step had a user of its own. A chat-off step's turns are
+    # internal; the transcript projection must not show them as conversation.
+    chat: bool = True
+
     def __init__(
         self,
         *,
         config: AtomicWorkflowConfig[TResult],
+        chat: bool = True,
     ):
         self.turn_count = 0
+        self.chat = chat
+        self.min_turns = max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
+        # The previous continue message, so an identical repeat is not a turn.
+        self._last_continue: str | None = None
         self.model = config.model
         self.response_model = config.response_model
         self.on_continue: Callable[[Continue], TurnResult[TResult]] = config.on_continue
@@ -67,6 +76,10 @@ class AtomicWorkflow(Generic[TResult]):
             tools=config.tools,
             deps=config.deps,
         )
+        # The session history this step was given. Only the turns the step
+        # adds are folded back into the session, so a step's prompt and its
+        # initial history are not recorded twice.
+        self.initial_message_count = len(self._conversation.messages)
 
     @property
     def messages(self) -> list[ModelMessage]:
@@ -86,8 +99,49 @@ class AtomicWorkflow(Generic[TResult]):
         response = self._call_llm(user_input, final_turn=final_turn)
 
         if response.intent == AgentIntent.CONTINUE:
+            message = (response.message or "").strip()
+            if (
+                message.endswith(":")
+                and self.turn_count < self.max_turns
+            ):
+                # A colon introduces content the turn does not hold; the model
+                # must give the list or finish, not promise it.
+                return self.process_turn(
+                    "Your message ends with a colon but the turn does not "
+                    "contain the content it introduces. Give the content in "
+                    "the message, or finish and let the next step show it."
+                )
+            if (
+                message
+                and message == self._last_continue
+                and self.turn_count < self.max_turns
+            ):
+                # The same question again is not a new turn: the model did not
+                # read the answer it was given. A correction needs a turn, so at
+                # the limit the repeat is returned and the next call stops.
+                return self.process_turn(
+                    "You repeated your previous message instead of using the "
+                    "user's answer. Read what they just said, then either ask a "
+                    "different question or return the result."
+                )
+            self._last_continue = message
             return self.on_continue(response)
         if response.intent == AgentIntent.SUCCESS:
+            if self.turn_count < self.min_turns:
+                # The task declared that it must ask or propose first. Feed the
+                # early finish back as a correction; it is not a completion.
+                return self.process_turn(
+                    "You are finishing too early. Do the task's next step "
+                    "before returning the result."
+                )
+            if (response.message or "").strip().endswith("?") and self.turn_count < self.max_turns:
+                # A success is a completion. Asking the user something while
+                # claiming the step is done leaves the answer unread.
+                return self.process_turn(
+                    "A success message cannot ask the user a question. If you "
+                    "still need an answer, return intent='continue'. Otherwise "
+                    "return the result with a statement of what you did."
+                )
             return self.on_success(response)
         if response.intent == AgentIntent.FAILURE:
             error = self.on_failure(response)
