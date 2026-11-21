@@ -13,7 +13,7 @@ from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 from chat_workflow import (
-    AgentResponse,
+    AgentAnswer,
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
     Conversation,
@@ -105,7 +105,7 @@ def make_atomic_workflow_config(
     """Create a standard AtomicWorkflowConfig for testing."""
     kwargs = dict(
         system_prompt="Test prompt",
-        response_model=response_model_override or AgentResponse[EvaluationCriteria],
+        response_model=response_model_override or AgentAnswer[EvaluationCriteria],
         max_turns=max_turns,
         on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
         on_success=_success,
@@ -122,9 +122,7 @@ def text_response(payload: Any) -> ModelResponse:
     a tool's schema and ignore ``response_format``. The schema wraps the
     intents' union in an object under ``response``, so the arguments do too.
     """
-    if isinstance(payload, dict) and "response" not in payload:
-        payload = {"response": payload}
-    response = payload.get("response") if isinstance(payload, dict) else None
+    response = payload
     if isinstance(response, dict) and response.get("intent") == "success":
         # A success is a turn: it says what it did. Scripted tests focus on
         # the result, so the helper supplies the words; the protocol test
@@ -170,7 +168,7 @@ def make_conversation(
     conversation = Conversation(
         model="scripted-model",
         instructions="Test instructions",
-        output_type=output_type or AgentResponse[EvaluationCriteria],
+        output_type=output_type or AgentAnswer[EvaluationCriteria],
         model_client=FunctionModel(script),
         **overrides,
     )

@@ -49,8 +49,10 @@ class TestWorkflowPipelineEval(unittest.TestCase):
                 "identification, gap resolution, and diagram generation."
             ),
             "Captures incidental notes": (
-                "The agent asked the user about incidental notes for each identified "
-                "component and captured their response."
+                "If the user mentions incidental details about a part — a "
+                "constraint, a person, a recurring problem — the result keeps "
+                "them. The agent is not required to ask for them: the field "
+                "holds what the user mentioned."
             ),
             "No repetition": (
                 "The agent didn't ask for the same information again after the user already provided it."

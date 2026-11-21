@@ -23,10 +23,12 @@ from .interactive_entity import InteractiveEntity
 from .mixins import BlobSyncMixin, LLMValidated
 from .model_provider import build_model, list_available_providers
 from .models import (
+    AgentAnswer,
     AgentIntent,
     AgentResponse,
     Continue,
     Failure,
+    FinalAnswer,
     FinalResponse,
     Success,
     TextReply,
@@ -43,6 +45,7 @@ composite_workflow_step = composite_workflow
 
 __all__ = [
     "APIKeyError",
+    "AgentAnswer",
     "AgentIntent",
     "AgentResponse",
     "AtomicWorkflow",
@@ -57,6 +60,7 @@ __all__ = [
     "Continue",
     "Conversation",
     "Failure",
+    "FinalAnswer",
     "FinalResponse",
     "InteractiveEntity",
     "InvalidResponseError",

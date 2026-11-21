@@ -33,12 +33,18 @@ class AtomicWorkflow(Generic[TResult]):
     rules (intent, turn limit) and nothing about the model.
     """
 
+    # Whether this step had a user of its own. A chat-off step's turns are
+    # internal; the transcript projection must not show them as conversation.
+    chat: bool = True
+
     def __init__(
         self,
         *,
         config: AtomicWorkflowConfig[TResult],
+        chat: bool = True,
     ):
         self.turn_count = 0
+        self.chat = chat
         self.min_turns = max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
         # The previous continue message, so an identical repeat is not a turn.
@@ -94,6 +100,17 @@ class AtomicWorkflow(Generic[TResult]):
 
         if response.intent == AgentIntent.CONTINUE:
             message = (response.message or "").strip()
+            if (
+                message.endswith(":")
+                and self.turn_count < self.max_turns
+            ):
+                # A colon introduces content the turn does not hold; the model
+                # must give the list or finish, not promise it.
+                return self.process_turn(
+                    "Your message ends with a colon but the turn does not "
+                    "contain the content it introduces. Give the content in "
+                    "the message, or finish and let the next step show it."
+                )
             if (
                 message
                 and message == self._last_continue

@@ -50,7 +50,7 @@ from pydantic_ai.usage import RunUsage
 
 from .exceptions import MaxRetriesExceededError
 from .model_provider import ProviderType, build_model
-from .models import ANSWER_TOOL
+from .models import ANSWER_TOOL, AgentAnswer, FinalAnswer, as_final, as_turn
 
 T = TypeVar("T")
 
@@ -412,8 +412,8 @@ class Conversation(Generic[T]):
                 "\n\n## Final turn\n"
                 "No further turn will be offered. Answer now with what the user "
                 "has given: intent='success' with the complete result, or "
-                "intent='failure' if it cannot be produced. Do not ask another "
-                "question."
+                "intent='failure' if it cannot be produced. "
+                "Do not ask another question."
                 if final_turn
                 else ""
             ),
@@ -427,8 +427,13 @@ class Conversation(Generic[T]):
                 self._output_retries, reason=f"{exc}{self._provider_log.suffix()}"
             ) from exc
 
+        output: Any = result.output
+        if isinstance(output, AgentAnswer):
+            output = as_turn(output)
+        elif isinstance(output, FinalAnswer):
+            output = as_final(output)
         turn = ModelTurn(
-            output=result.output,
+            output=output,
             messages=result.new_messages(),
             usage=result.usage,
             resends=tuple(resender.resends),

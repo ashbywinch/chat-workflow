@@ -3,8 +3,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 from chat_workflow import (
+    AgentAnswer,
     AgentIntent,
-    AgentResponse,
     AtomicWorkflow,
     AtomicWorkflowFailedError,
     Continue,
@@ -387,7 +387,7 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         """The @chat decorator on refine() must resolve the TypeVar to the
         concrete type passed via initial_object. This exercises the full
         resolution logic through the decorator - before the fix, response_model
-        stayed as AgentResponse[ModelType] (unresolved).
+        stayed as AgentAnswer[ModelType] (unresolved).
         """
         from unittest.mock import Mock, patch
 
@@ -446,8 +446,8 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         self.assertIsNotNone(response_model, "response_model should be set")
 
         # The decorator resolved the TypeVar: the concrete union, not the
-        # unresolved AgentResponse[ModelType].
-        self.assertEqual(response_model, AgentResponse[EvaluationCriteria])
+        # unresolved AgentAnswer[ModelType].
+        self.assertEqual(response_model, AgentAnswer[EvaluationCriteria])
 
 
 class TestAutoParamInjection(unittest.TestCase):

@@ -243,22 +243,6 @@ class TestAgentResponseShapes(unittest.TestCase):
         with self.assertRaises(ValueError):
             Failure(intent=AgentIntent.FAILURE, message="")
 
-    def test_a_continue_cannot_promise_content_it_does_not_give(self):
-        """A turn ending with a colon introduces a list the turn does not hold."""
-        with self.assertRaises(ValueError):
-            Continue(
-                intent=AgentIntent.CONTINUE,
-                message="Here's the structure I'd suggest for your minutes:",
-            )
-
-        turn = Continue(
-            intent=AgentIntent.CONTINUE,
-            message="What sections does your minutes template have?",
-        )
-
-        self.assertTrue(turn.message.endswith("?"))
-
-
 class TestTurnResultModel(unittest.TestCase):
     def setUp(self):
         self.valid_criteria = EvaluationCriteria(

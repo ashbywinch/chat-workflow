@@ -95,6 +95,22 @@ class TestTurnShape(unittest.TestCase):
         self.assertEqual(second.message, "Who is it for?")
         self.assertEqual(len(conversation.script.calls), 3)
 
+    def test_a_colon_that_promises_content_is_a_correction(self):
+        conversation = make_conversation(
+            [
+                {"intent": "continue", "message": "Here's the structure:"},
+                {"intent": "continue", "message": "What sections does it have?"},
+            ]
+        )
+        workflow = AtomicWorkflow(
+            config=make_atomic_workflow_config(conversation=conversation)
+        )
+
+        result = workflow.process_turn("go")
+
+        self.assertEqual(result.message, "What sections does it have?")
+        self.assertEqual(len(conversation.script.calls), 2)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

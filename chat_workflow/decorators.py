@@ -13,7 +13,7 @@ from .atomic_workflow_config import AtomicWorkflowConfig
 from .conversation import Conversation
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
 from .debug import StreamingDebug
-from .models import AgentResponse, FinalResponse, Success, TurnResult
+from .models import AgentAnswer, FinalAnswer, Success, TurnResult
 from .prompt_builder import (
     _build_params_section,
     _format_docstring,
@@ -71,10 +71,10 @@ def _output_defs(return_type: Any) -> frozenset[str]:
     if return_type is None:
         return frozenset()
     try:
-        schema = TypeAdapter(AgentResponse[return_type]).json_schema()
+        schema = TypeAdapter(AgentAnswer[return_type]).json_schema()
     except Exception:
         try:
-            schema = TypeAdapter(FinalResponse[return_type]).json_schema()
+            schema = TypeAdapter(FinalAnswer[return_type]).json_schema()
         except Exception:
             return frozenset()
     return frozenset(schema.get("$defs", {}))
@@ -275,8 +275,8 @@ def _setup_atomic_workflow(
         model=session.config.model,
         provider=session.config.provider,
         instructions=system_prompt,
-        output_type=AgentResponse[actual_return_type],
-        final_output_type=FinalResponse[actual_return_type],
+        output_type=AgentAnswer[actual_return_type],
+        final_output_type=FinalAnswer[actual_return_type],
         messages=list(session.state.messages) if chat else [],
         api_base=session.config.api_base,
         api_key_env=session.config.api_key_env,
@@ -295,8 +295,8 @@ def _setup_atomic_workflow(
     return AtomicWorkflow(
         config=AtomicWorkflowConfig(
             system_prompt=system_prompt,
-            response_model=AgentResponse[actual_return_type],
-            final_response_model=FinalResponse[actual_return_type],
+            response_model=AgentAnswer[actual_return_type],
+            final_response_model=FinalAnswer[actual_return_type],
             max_turns=max_turns,
             min_turns=min(min_turns, max_turns),
             initial_messages=None,
@@ -315,7 +315,8 @@ def _setup_atomic_workflow(
             extra_headers=getattr(session.config, "extra_headers", None),
             temperature=getattr(session.config, "temperature", None),
             conversation=conversation,
-        )
+        ),
+        chat=chat,
     )
 
 

@@ -22,7 +22,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
-from chat_workflow import Conversation, FinalResponse, MaxRetriesExceededError, Success
+from chat_workflow import Conversation, FinalAnswer, MaxRetriesExceededError, Success
 from chat_workflow.models import AgentIntent
 from tests.conftest import make_conversation, make_valid_criteria
 from workflows.evaluation_criteria import EvaluationCriteria
@@ -395,7 +395,7 @@ class TestTheLastTurn(unittest.TestCase):
         with: the same answer that was accepted mid-conversation is rejected."""
         conversation = make_conversation(
             [{"intent": "continue", "message": "One more question?"}, VALID],
-            final_output_type=FinalResponse[EvaluationCriteria],
+            final_output_type=FinalAnswer[EvaluationCriteria],
         )
 
         turn = conversation.send("hello", final_turn=True)

@@ -372,6 +372,7 @@ def format_transcript(
             item.state.messages,
             audience="user" if audience == "user" else "all",
             result=result if item is session else item.state.final_result,
+            segments=item.state.segments,
         )
         if text:
             parts.append(text)

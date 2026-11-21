@@ -38,13 +38,17 @@ class Component(LLMValidated):
         "The expert_role is the agent's domain expertise — the role the agent "
         "acts as when helping with this artifact. It may equal or differ from "
         "the owner_role; it is not a generic role ('MinutesDraft Expert' is "
-        "vague; 'Meeting Minutes Administrator' is better).",
+        "vague; 'Meeting Minutes Administrator' is better). A role the user or "
+        "the work itself names is accepted as written ('Note-taker', 'Scrum "
+        "Master', 'Team Lead'); do not demand a fancier title.",
         "The owner_role is the capacity the artifact belongs to — the role "
         "whose job includes it, which may be the user. When the user does the "
         "work end to end, their own answer ('me', 'I', 'myself') is the "
         "capacity and is accepted; do not demand a job title. 'Owner' only "
         "when the artifact is the owner's own work; not the person who "
-        "supplies the input unless they are accountable.",
+        "supplies the input unless they are accountable. A role named for what "
+        "the person does in this work is a capacity ('Note-taker', 'Reviewer', "
+        "'Coordinator'), not a task description.",
         # Tier 1 — Core Structural Integrity
         "Single Artifact Type Rule: The component owns exactly one artifact — "
         "the set of data members of the model it defines. The purpose must "

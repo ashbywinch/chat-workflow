@@ -433,9 +433,9 @@
    "severity": "error"
   },
   {
-   "line": 263,
+   "line": 247,
    "column": 9,
-   "stop_line": 263,
+   "stop_line": 247,
    "stop_column": 14,
    "path": "tests/unit/test_models.py",
    "code": -2,
