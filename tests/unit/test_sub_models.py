@@ -34,6 +34,19 @@ class TestProcessDefinition(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ProcessDefinition()
 
+    def test_a_stage_that_repeats_its_step_says_how_to_repair(self):
+        """The rejection is a repair instruction, not just a complaint."""
+        with self.assertRaises(ValueError) as context:
+            ProcessDefinition(
+                stages=[ProcessStage(name="Collect receipts", steps=["collect receipts"])],
+                orchestrating_component="You",
+                participants=["You"],
+            )
+
+        message = str(context.exception)
+        self.assertIn("rename the stage", message)
+        self.assertIn("drop the duplicate step", message)
+
 
 class TestResource(unittest.TestCase):
     def test_valid_instance(self):

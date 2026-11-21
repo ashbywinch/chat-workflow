@@ -38,6 +38,13 @@ class TestSourceLines(unittest.TestCase):
 
         self.assertEqual(joined, "a = 1\nb = 2\nc = 3")
 
+    def test_a_repair_that_breaks_syntax_is_detectable(self):
+        """A repair must never ship a module that does not parse."""
+        from workflows.workflow.component_source_code import _parse_or_none
+
+        self.assertIsNone(_parse_or_none('x = "a", min_length=1\n'))
+        self.assertIsNotNone(_parse_or_none("x = 1\n"))
+
     def test_a_stub_validator_is_removed_not_retried(self):
         """A validator whose body is only `pass` is repaired, not rejected."""
         import ast

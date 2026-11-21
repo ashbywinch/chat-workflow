@@ -144,8 +144,15 @@ class ProcessDefinition(LLMValidated):
         overlap = sorted(set(names) & steps)
         if overlap:
             raise ValueError(
-                "A stage cannot also be a concrete step. Put the steps inside "
-                "the stage; these appear as both: " + ", ".join(overlap)
+                "The stage(s) "
+                + ", ".join(repr(name) for name in overlap)
+                + " also appear as one of their own steps. A stage is a broad "
+                "phase, not the action itself. Repair it in one of two ways: "
+                "rename the stage to the phase the action belongs to (for "
+                "example 'Prepare' or 'Submit') and keep the user's action as "
+                "a step; or drop the duplicate step when the stage name "
+                "already says it. Keep every other step the user described; do "
+                "not invent a step to fill the stage."
             )
         return self
 

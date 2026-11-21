@@ -959,6 +959,11 @@ _FRAMEWORK_IMPORT_ALIASES: dict[str, str] = {
 }
 
 
+def _repair_imports(code: str, _tree: ast.AST) -> str:
+    """The import repair has the repair-chain signature."""
+    return _canonical_framework_imports(code)
+
+
 def _canonical_framework_imports(code: str) -> str:
     """Rewrite a framework import path that has an exact replacement."""
     for legacy, canonical in _FRAMEWORK_IMPORT_ALIASES.items():
@@ -970,6 +975,14 @@ def _canonical_framework_imports(code: str) -> str:
             code,
         )
     return code
+
+
+def _parse_or_none(code: str) -> ast.Module | None:
+    """Parse repaired code, or None when the repair broke the syntax."""
+    try:
+        return ast.parse(code)
+    except SyntaxError:
+        return None
 
 
 def _join_tuple_descriptions(code: str, tree: ast.AST) -> str:
@@ -1068,6 +1081,11 @@ class ComponentSourceCode(LLMValidated):
         "the conversation. REJECT a rule that demands an identifier the user "
         "would not have — a last name, an email address, an employee number — "
         "when a name they already gave identifies the person in their context.",
+        "REJECT a rule that turns one example from the conversation into a "
+        "universal constraint — a place named 'Zoom', one date, one person's "
+        "name. A rule holds for every valid artifact; the conversation's "
+        "example is data, not a constraint. A rule that rejects a valid, "
+        "different value (an empty action-items list, another room) is wrong.",
         "A generated step returns the result from what the user gave. A "
         "_validation_rules entry judges quality; it is never a reason to return "
         "failure when the user has nothing more to add. Return failure only "
@@ -1125,64 +1143,29 @@ class ComponentSourceCode(LLMValidated):
                 "characters, or non-ASCII punctuation."
             ) from e
 
-        # Required string fields must carry a length constraint. The schema can
-        # express this, so fill it in rather than spending judge retries on it.
-        normalised = _ensure_min_length(code, tree)
-        if normalised != code:
-            self.code = SourceLines(normalised)
-            code = normalised
-            tree = ast.parse(code)
-
-        wrapped = _wrap_long_field_calls(code, tree)
-        if wrapped != code:
-            self.code = SourceLines(wrapped)
-            code = wrapped
-            tree = ast.parse(code)
-
-        wrapped = _wrap_long_field_strings(code, tree)
-        if wrapped != code:
-            self.code = SourceLines(wrapped)
-            code = wrapped
-            tree = ast.parse(code)
-
-        wrapped = _wrap_long_list_strings(code, tree)
-        if wrapped != code:
-            self.code = SourceLines(wrapped)
-            code = wrapped
-            tree = ast.parse(code)
-
-        fixed_self = _fix_field_validator_self(code, tree)
-        if fixed_self != code:
-            self.code = SourceLines(fixed_self)
-            code = fixed_self
-            tree = ast.parse(code)
-
-        without_stubs = _drop_noop_validators(code, tree)
-        if without_stubs != code:
-            self.code = SourceLines(without_stubs)
-            code = without_stubs
-            tree = ast.parse(code)
-
-        explicit = _add_raise_from_none(code, tree)
-        if explicit != code:
-            self.code = SourceLines(explicit)
-            code = explicit
-            tree = ast.parse(code)
-
-        # `chat_workflow.workflow` is a legacy path with an exact, known
-        # replacement. Rewriting it is mechanical; rejecting it only spends a
-        # model retry on a spelling the framework can fix itself.
-        canonical = _canonical_framework_imports(code)
-        if canonical != code:
-            self.code = SourceLines(canonical)
-            code = canonical
-            tree = ast.parse(code)
-
-        joined = _join_tuple_descriptions(code, tree)
-        if joined != code:
-            self.code = SourceLines(joined)
-            code = joined
-            tree = ast.parse(code)
+        # Mechanical repairs run in order. A repair must never introduce a
+        # syntax error: when it does, the original stands and the model is
+        # asked to fix the code, rather than shipping a broken module.
+        for repair in (
+            _ensure_min_length,
+            _wrap_long_field_calls,
+            _wrap_long_field_strings,
+            _wrap_long_list_strings,
+            _fix_field_validator_self,
+            _drop_noop_validators,
+            _add_raise_from_none,
+            _repair_imports,
+            _join_tuple_descriptions,
+        ):
+            repaired = repair(code, tree)
+            if repaired == code:
+                continue
+            new_tree = _parse_or_none(repaired)
+            if new_tree is None:
+                continue
+            self.code = SourceLines(repaired)
+            code = repaired
+            tree = new_tree
 
         # A long line is the model's most common ruff failure, and formatting
         # fixes it deterministically. Only format when it is needed, so code
@@ -1190,9 +1173,11 @@ class ComponentSourceCode(LLMValidated):
         if any("E501" in line for line in _ruff_violations(code)):
             formatted = _ruff_format(code)
             if formatted != code:
-                self.code = SourceLines(formatted)
-                code = formatted
-                tree = ast.parse(code)
+                new_tree = _parse_or_none(formatted)
+                if new_tree is not None:
+                    self.code = SourceLines(formatted)
+                    code = formatted
+                    tree = new_tree
 
         fixed = _ruff_fix(code)
         if fixed != code:
