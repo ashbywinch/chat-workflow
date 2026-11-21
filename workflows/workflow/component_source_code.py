@@ -399,6 +399,42 @@ def _wrap_long_list_strings(code: str, tree: ast.AST) -> str:
     return code
 
 
+def _drop_noop_validators(code: str, tree: ast.AST) -> str:
+    """Remove a ``@model_validator`` whose body is only a docstring and ``pass``.
+
+    A validator that enforces nothing is a hard validation error, and a model
+    that cannot express the rule mechanically tends to write this stub. Asking
+    it again produces the same stub, so the validator is removed here instead;
+    its rule stays in ``_validation_rules``, where the judge evaluates it.
+    """
+    lines = code.splitlines(keepends=True)
+    removals: list[tuple[int, int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not _is_model_validator(node):
+            continue
+        body = [
+            statement
+            for statement in node.body
+            if not (
+                isinstance(statement, ast.Expr)
+                and isinstance(statement.value, ast.Constant)
+                and isinstance(statement.value.value, str)
+            )
+        ]
+        if not body or not all(isinstance(statement, ast.Pass) for statement in body):
+            continue
+        start = min(
+            (item.lineno for item in node.decorator_list),
+            default=node.lineno,
+        )
+        removals.append((start, node.end_lineno or node.lineno))
+    for start, end in sorted(removals, reverse=True):
+        del lines[start - 1 : end]
+    return "".join(lines)
+
+
 def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
     """Rename a field validator's first argument from ``self`` to ``cls``.
 
@@ -1119,6 +1155,12 @@ class ComponentSourceCode(LLMValidated):
         if fixed_self != code:
             self.code = SourceLines(fixed_self)
             code = fixed_self
+            tree = ast.parse(code)
+
+        without_stubs = _drop_noop_validators(code, tree)
+        if without_stubs != code:
+            self.code = SourceLines(without_stubs)
+            code = without_stubs
             tree = ast.parse(code)
 
         explicit = _add_raise_from_none(code, tree)

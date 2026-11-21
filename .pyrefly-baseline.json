@@ -37,9 +37,9 @@
    "severity": "warn"
   },
   {
-   "line": 225,
+   "line": 229,
    "column": 9,
-   "stop_line": 225,
+   "stop_line": 229,
    "stop_column": 35,
    "path": "chat_workflow/mixins.py",
    "code": -2,
@@ -49,9 +49,9 @@
    "severity": "error"
   },
   {
-   "line": 291,
+   "line": 295,
    "column": 5,
-   "stop_line": 291,
+   "stop_line": 295,
    "stop_column": 35,
    "path": "chat_workflow/mixins.py",
    "code": -2,
@@ -157,9 +157,9 @@
    "severity": "error"
   },
   {
-   "line": 99,
+   "line": 104,
    "column": 24,
-   "stop_line": 99,
+   "stop_line": 104,
    "stop_column": 38,
    "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
    "code": -2,
@@ -169,9 +169,9 @@
    "severity": "warn"
   },
   {
-   "line": 105,
+   "line": 110,
    "column": 23,
-   "stop_line": 105,
+   "stop_line": 110,
    "stop_column": 37,
    "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
    "code": -2,
@@ -181,39 +181,15 @@
    "severity": "warn"
   },
   {
-   "line": 105,
-   "column": 55,
-   "stop_line": 105,
-   "stop_column": 59,
-   "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
-   "code": -2,
-   "name": "bad-argument-type",
-   "description": "Argument `ModuleSpec | None` is not assignable to parameter `spec` with type `ModuleSpec` in function `_frozen_importlib.module_from_spec`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
-   "concise_description": "Argument `ModuleSpec | None` is not assignable to parameter `spec` with type `ModuleSpec` in function `_frozen_importlib.module_from_spec`",
-   "severity": "error"
-  },
-  {
-   "line": 107,
+   "line": 112,
    "column": 17,
-   "stop_line": 107,
-   "stop_column": 28,
+   "stop_line": 112,
+   "stop_column": 40,
    "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
    "code": -2,
    "name": "missing-attribute",
-   "description": "Object of class `NoneType` has no attribute `loader`",
-   "concise_description": "Object of class `NoneType` has no attribute `loader`",
-   "severity": "error"
-  },
-  {
-   "line": 179,
-   "column": 34,
-   "stop_line": 179,
-   "stop_column": 49,
-   "path": "tests/evals/composite/test_end_to_end_component_source_code.py",
-   "code": -2,
-   "name": "bad-argument-type",
-   "description": "Argument `Any | None` is not assignable to parameter `model_method` with type `(...) -> Any` in function `tests.evals.helpers.run_multi_turn_eval`\n  The declared type does not allow `None`. Consider narrowing the value with an `is not None` check.",
-   "concise_description": "Argument `Any | None` is not assignable to parameter `model_method` with type `(...) -> Any` in function `tests.evals.helpers.run_multi_turn_eval`",
+   "description": "Object of class `NoneType` has no attribute `exec_module`",
+   "concise_description": "Object of class `NoneType` has no attribute `exec_module`",
    "severity": "error"
   },
   {
@@ -865,21 +841,9 @@
    "severity": "error"
   },
   {
-   "line": 16,
-   "column": 16,
-   "stop_line": 16,
-   "stop_column": 24,
-   "path": "workflows/letter/models.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `Letter` has no attribute `The`",
-   "concise_description": "Object of class `Letter` has no attribute `The`",
-   "severity": "error"
-  },
-  {
-   "line": 1004,
+   "line": 1040,
    "column": 30,
-   "stop_line": 1004,
+   "stop_line": 1040,
    "stop_column": 49,
    "path": "workflows/workflow/component_source_code.py",
    "code": -2,

@@ -16,6 +16,7 @@ import unittest
 from contextlib import suppress
 from pathlib import Path
 
+from tests.conftest import timeout
 from tests.evals.helpers import (
     AgentIO,
     capture_on_failure,
@@ -34,7 +35,11 @@ def make_minutes_draft_responsibilities() -> ComponentSpec:
     return fixtures.minutes_draft_spec()
 
 
-def test_end_to_end_generated_component(self):
+class TestEndToEndGeneratedComponent(unittest.TestCase):
+    """Full pipeline: spec -> create -> generated code -> import -> run -> judge."""
+
+    @timeout(1200)
+    def test_end_to_end_generated_component(self):
         """Full pipeline: ComponentSpec → Component.create() → import → run → judge."""
         config = make_config()
         responsibilities = make_minutes_draft_responsibilities()

@@ -38,6 +38,27 @@ class TestSourceLines(unittest.TestCase):
 
         self.assertEqual(joined, "a = 1\nb = 2\nc = 3")
 
+    def test_a_stub_validator_is_removed_not_retried(self):
+        """A validator whose body is only `pass` is repaired, not rejected."""
+        import ast
+
+        from workflows.workflow.component_source_code import _drop_noop_validators
+
+        code = (
+            "class Draft(BaseModel):\n"
+            "    due: str\n"
+            "\n"
+            "    @model_validator(mode='after')\n"
+            "    def _flag_past_deadlines(self):\n"
+            "        \"\"\"No due date may be in the past.\"\"\"\n"
+            "        pass\n"
+        )
+
+        repaired = _drop_noop_validators(code, ast.parse(code))
+
+        self.assertNotIn("_flag_past_deadlines", repaired)
+        self.assertIn("due: str", repaired)
+
 
 class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
     """Tests for the programmatic @model_validator on ComponentSourceCode."""

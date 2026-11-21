@@ -144,17 +144,21 @@ def _verdict_claims_the_rule_passes(verdict: _VerdictLike) -> bool:
         "no fix needed",
         "is acceptable",
     )
-    negative = (
-        "does not",
-        "doesn't",
+    # A negated pass ("does not pass", "fails") is not a pass; a negated
+    # violation ("does not violate") is. Match the negated *pass* forms only,
+    # so a conclusion of "does not violate the rule" is read as the pass it is.
+    negated_pass = (
+        "does not pass",
+        "doesn't pass",
+        "does not satisfy",
+        "doesn't satisfy",
+        "is not satisfied",
         "fails",
         "failure",
-        "violates",
         "is not valid",
-        "not satisfied",
     )
     if any(phrase in conclusion for phrase in positive) and not any(
-        phrase in conclusion for phrase in negative
+        phrase in conclusion for phrase in negated_pass
     ):
         return True
     # A fix that says there is nothing to fix is a pass in disguise, whatever

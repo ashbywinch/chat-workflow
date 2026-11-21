@@ -47,6 +47,17 @@ class TestVerdictCoherence(unittest.TestCase):
 
         self.assertFalse(_verdict_claims_the_rule_passes(verdict))
 
+    def test_a_negated_violation_is_a_pass(self):
+        """'does not violate' is a pass conclusion, not a failure phrase."""
+        verdict = RuleVerdict(
+            rule="The consumer is a party, not the artifact",
+            passed=False,
+            explanation="The consumer names a role, so the data does not violate the rule.",
+            evidence="consumer: the billing team",
+        )
+
+        self.assertTrue(_verdict_claims_the_rule_passes(verdict))
+
     def test_a_shouted_pass_conclusion_is_discarded(self):
         """A judge that argues its way to PASS and still says false is malformed."""
         verdict = RuleVerdict(

@@ -72,7 +72,7 @@ class TestComponentValidation(unittest.TestCase):
             owner_role="Owner",
         )
 
-    def test_purpose_with_and_raises_validation_error(self):
+    def test_purpose_with_and_has_a_single_responsibility_rule(self):
         """Purpose containing 'and' should be rejected (single responsibility)."""
         with TemporaryDirectory() as tmpdir:
             self._make_component(
@@ -83,7 +83,7 @@ class TestComponentValidation(unittest.TestCase):
             purpose_rule = [r for r in rules if "single responsibility" in r.lower() or "one sentence" in r.lower()]
             self.assertTrue(len(purpose_rule) > 0, "Should have a single responsibility rule")
 
-    def test_purpose_with_also_raises_validation_error(self):
+    def test_purpose_with_also_has_a_single_responsibility_rule(self):
         """Purpose containing 'also' should be rejected (single responsibility)."""
         with TemporaryDirectory() as tmpdir:
             self._make_component(
