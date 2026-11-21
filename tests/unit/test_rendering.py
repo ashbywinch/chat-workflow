@@ -119,13 +119,14 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         text = render_result(_deliverable(), RenderContext())
 
         self.assertIn("Meeting Minutes — The written record", text)
-        # The document's shape is separate from the facts about its use: a flat
-        # block reads as if "where it is kept" were another section.
+        # The handling is said in sentences: labels read as more sections.
         self.assertIn("It looks like: A shared document.", text)
-        self.assertIn("For: Meeting attendees.", text)
-        self.assertIn("Complete when Every decision has an owner.", text)
-        self.assertIn("Who gets it: Attendees receive it by email.", text)
-        self.assertIn("Where it is kept: Shared drive.", text)
+        self.assertIn("It's for Meeting attendees.", text)
+        self.assertIn("You'll know it's done when Every decision has an owner.", text)
+        self.assertIn("Attendees receive it by email.", text)
+        self.assertIn("Shared drive.", text)
+        self.assertNotIn("Who gets it", text)
+        self.assertNotIn("Where it is kept", text)
 
     def test_a_full_stop_is_not_doubled(self, _rules):
         deliverable = _deliverable().model_copy(
@@ -172,7 +173,11 @@ class TestRecordsRenderThemselves(unittest.TestCase):
                     StructValidator(
                         rule="Every action item has an owner.",
                         domain_origin="A missed owner is a missed task.",
-                    )
+                    ),
+                    StructValidator(
+                        rule="Every action item has a description (str) and an owner (str).",
+                        domain_origin="A rule may name a type; the user must not read it.",
+                    ),
                 ],
             ),
             RenderContext(),
@@ -181,6 +186,8 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("meeting date: When it happened (date)", text)
         self.assertIn("attendees: list of person names", text)
         self.assertIn("Rule: Every action item has an owner", text)
+        self.assertIn("description (text) and an owner (text)", text)
+        self.assertNotIn("(str)", text)
 
     def test_a_list_and_an_empty_list(self, _rules):
         text = render_result(

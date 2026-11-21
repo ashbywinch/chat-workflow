@@ -105,26 +105,21 @@ class Deliverable(LLMValidated):
         """Say one thing the user makes, in the user's words.
 
         The document's own shape comes first, then its audience and the facts
-        about how it is used, under the words the user uses for them. A flat
-        block mixes "what the document contains" with "where it is kept", and
-        a reader then reads the handling as more sections.
+        about how it is used, as sentences. Labels ("Complete when", "Where it
+        is kept") read as sections of the document and as process jargon; a
+        confused user does not parse them.
         """
         summary = f"{self.name} — {self.description}" if self.description else self.name
         lines = [
             summary,
             f"It looks like: {without_full_stop(self.format)}.",
-            f"For: {without_full_stop(self.consumer)}.",
-            # A check says when the thing is complete. A "Ready when:" label
-            # reads as a gate the user has to pass, which a personal artifact
-            # does not have.
-            f"Complete when {without_full_stop(self.success_criteria)}.",
+            f"It's for {without_full_stop(self.consumer)}.",
+            f"You'll know it's done when {without_full_stop(self.success_criteria)}.",
         ]
         if self.integration_points:
-            lines.append(f"Who gets it: {without_full_stop(self.integration_points)}.")
+            lines.append(f"{without_full_stop(self.integration_points)}.")
         if self.storage_requirements:
-            lines.append(
-                f"Where it is kept: {without_full_stop(self.storage_requirements)}."
-            )
+            lines.append(f"{without_full_stop(self.storage_requirements)}.")
         return "\n".join(lines)
 
     @model_validator(mode="after")

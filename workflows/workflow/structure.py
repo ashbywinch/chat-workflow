@@ -7,6 +7,7 @@ to produce the final Python code — without any LLM or conversation concepts.
 
 from __future__ import annotations
 
+import re
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -78,6 +79,20 @@ class StructValidator(BaseModel):
     )
 
 
+def _plain_words(text: str) -> str:
+    """Say any type expression in a rule as the user's words."""
+    for pattern, words in (
+        (re.compile(r"list\[str\]"), "a list of text"),
+        (re.compile(r"\bOptional\[str\]\b"), "text (optional)"),
+        (re.compile(r"\bstr\s*\|\s*None\b"), "text (optional)"),
+        (re.compile(r"\bstr\b"), "text"),
+        (re.compile(r"\bint\b|\bfloat\b"), "a number"),
+        (re.compile(r"\bbool\b"), "yes or no"),
+    ):
+        text = pattern.sub(words, text)
+    return text
+
+
 class ComponentStructure(BaseModel):
     """Pydantic-level structural design for a generated component.
 
@@ -126,7 +141,13 @@ class ComponentStructure(BaseModel):
                 line += f" ({hint})"
             lines.append(line)
         if self.model_validators:
-            lines.extend(f"Rule: {validator.rule}" for validator in self.model_validators)
+            # A rule is prose, and a model sometimes writes a type expression
+            # into it. The rendering contract is that the user never reads
+            # Python; translate the expression, keep the rule.
+            lines.extend(
+                f"Rule: {_plain_words(validator.rule)}"
+                for validator in self.model_validators
+            )
         return "\n".join(lines)
 
     @composite_workflow_step
