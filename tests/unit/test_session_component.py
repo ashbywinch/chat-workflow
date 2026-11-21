@@ -121,7 +121,7 @@ class TestRecursiveSession(unittest.TestCase):
 
         text = str(session.state.messages[-1])
         self.assertEqual(len(session.state.messages), 1)
-        self.assertIn("Here's what I propose", text)
+        self.assertIn("Here's what I've got so far", text)
         self.assertIn("first", text)
         self.assertIn("The rest stays as we agreed.", text)
         self.assertEqual(text.count("?"), 1)
@@ -132,8 +132,8 @@ class TestRecursiveSession(unittest.TestCase):
         session.propose([_Draft("first")], changed=True)
 
         text = str(session.state.messages[-1])
-        self.assertIn("updated proposal", text)
-        self.assertIn("Does this capture the change?", text)
+        self.assertIn("Here's what I've changed", text)
+        self.assertIn("Is that the change you meant?", text)
 
 
 class TestTheSuccessMessage(unittest.TestCase):

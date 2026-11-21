@@ -153,11 +153,11 @@ class Session:
         if not text:
             return
         if changed:
-            head = "Here's the updated proposal"
-            question = "Does this capture the change?"
+            head = "Here's what I've changed"
+            question = "Is that the change you meant?"
         else:
-            head = "Here's what I propose — tell me what you'd change"
-            question = "Does that capture it, or would you adjust anything?"
+            head = "Here's what I've got so far — tell me what you'd change"
+            question = "Does that look right, or should I change something?"
         parts = [f"{head}:\n\n{text}"]
         if note:
             parts.append(note)
