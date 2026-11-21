@@ -21,7 +21,9 @@ PROCESS_DEFINITION_RULES = {
         "charge from the user's description instead of asking the user to name "
         "each stage or step from scratch. It may present the breakdown in plain "
         "words; the ProcessDefinition stores the structured result. A "
-        "plain-language presentation is the proposal."
+        "plain-language presentation is the proposal. Asking for one "
+        "walk-through to fill a gap is not asking the user to name stages: a "
+        "breakdown derived after it still comes from their description."
     ),
     "Honest about provenance": (
         "Every stage, step, participant, and role in the breakdown comes from "

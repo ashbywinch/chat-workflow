@@ -22,7 +22,7 @@ _NO_EXECUTOR_MODE: tuple[str, str] = (
 
 
 class Deliverable(LLMValidated):
-    """A single workflow deliverable."""
+    """One thing the person makes."""
 
     model_config = ConfigDict(title="what you make")
 
@@ -79,7 +79,7 @@ class Deliverable(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "A check someone can apply when the deliverable is produced — not "
+            "A check someone can apply when the thing is produced — not "
             "an after-the-fact outcome and not just its format"
         ),
         min_length=1,
@@ -127,7 +127,7 @@ class Deliverable(LLMValidated):
         """The consumer is a person, role, or team — not the artifact itself."""
         if self.consumer.strip().casefold() == self.name.strip().casefold():
             raise ValueError(
-                "consumer must be a person, role, or team, not the deliverable itself"
+                "consumer must be a person, role, or team, not the thing itself"
             )
         return self
 
