@@ -1,0 +1,35 @@
+name: Merge when approved
+
+# GitHub's own auto-merge needs Pro on a private repo, so the merge is done by
+# hand — in omp-config, called by tag. The approval and the thread resolution
+# are still the gate; this only removes the last click.
+#
+# It carries the same triggers the reusable workflow needs: review submitted,
+# PR activity, and check completion (an approval that lands while checks are
+# still running is re-examined when they finish).
+#
+# Check completion is `workflow_run`, not `check_suite`: Actions raises no
+# check_suite event for its own workflows, and none at all for a job that comes
+# from a reusable workflow, which is exactly what the reviewer is. That gap left
+# the last PR green, approved and unmerged.
+
+on:
+  pull_request_review:
+    types: [submitted]
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  workflow_run:
+    workflows: ["CI", "AI Code Review"]
+    types: [completed]
+  status: {}
+  workflow_dispatch:
+
+permissions:
+  contents: write       # update-branch
+  pull-requests: write  # merge
+  checks: read
+  statuses: read        # the called workflow reads the legacy commit statuses
+
+jobs:
+  merge:
+    uses: ashbywinch/omp-config/.github/workflows/merge-when-approved.yml@v0.2.13
