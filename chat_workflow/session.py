@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from collections.abc import Iterator
-from typing import Any, override
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING, Any, override
 
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart
 
 from .atomic_workflow import AtomicWorkflow
 from .models import TurnResult
 from .session_log import SessionLog, _record_atomic_workflow
+
+if TYPE_CHECKING:
+    from .rendering import Renderable
 
 
 class UserIO:
@@ -133,7 +136,7 @@ class Session:
 
     def propose(
         self,
-        result: Any,
+        result: Renderable | Sequence[Renderable],
         *,
         changed: bool = False,
         note: str | None = None,
@@ -146,6 +149,11 @@ class Session:
         proposal asks about the change, not the same question again. ``note``
         says what the proposal leaves out — "everything else stays as we
         agreed" — without becoming a second message.
+
+        The parameter type is the contract: a proposal is a record that
+        renders itself, so a non-renderable cannot be passed. Rendering the
+        wrong shape is a type error here rather than a ``RenderError`` in the
+        middle of a conversation.
         """
         from .rendering import RenderContext, render_result
 
@@ -201,23 +209,18 @@ class Session:
                 # The assistant spoke last (a greeting or a composite echo);
                 # the next turn belongs to the user.
                 first = self._raw_io.prompt("\nYou")
-            result = workflow.process_turn(first)
-            if not result.is_complete:
-                self._raw_io.echo(f"\nAssistant: {result.message}")
-
-            while not result.is_complete:
-                if chat:
-                    user_input = self._raw_io.prompt("\nYou")
-                    result = workflow.process_turn(user_input)
-                else:
-                    # No user to ask. The framework turn is a correction, not
-                    # an authored prompt: it may say what the step must return.
-                    result = workflow.process_turn(
-                        "No user is available to answer. Return success with the "
-                        "completed result, or failure if it cannot be produced."
-                    )
-                if not result.is_complete:
+            if not chat:
+                # No user to prompt, so the step owns its own retries: its turn
+                # budget, not this loop, is what ends a step that will not
+                # finish. The echo keeps the internal turns in the log.
+                result = workflow.complete_without_user(
+                    first, echo=self._raw_io.echo
+                )
+            else:
+                result = workflow.process_turn(first)
+                while not result.is_complete:
                     self._raw_io.echo(f"\nAssistant: {result.message}")
+                    result = workflow.process_turn(self._raw_io.prompt("\nYou"))
         finally:
             _record_atomic_workflow(self.state, workflow)
 

@@ -11,6 +11,7 @@ from typing import override
 
 from chat_workflow import Session, SessionComponent, SessionLog, TextReply
 from chat_workflow.atomic_workflow import AtomicWorkflow
+from chat_workflow.exceptions import TurnLimitExceededError
 from chat_workflow.session import UserIO
 from chat_workflow.transcript import entries
 from tests.conftest import (
@@ -180,6 +181,27 @@ class TestTheSuccessMessage(unittest.TestCase):
             ("assistant", "Internal summary only."),
             entries(session.state.messages),
         )
+
+    def test_a_chat_off_step_that_never_finishes_stops_at_the_budget(self):
+        """No user can answer, so the step's own turn budget ends the run."""
+        session = _session()
+        conversation = make_conversation(
+            [
+                {"intent": "continue", "message": "Which format?"},
+                {"intent": "continue", "message": "Which tone?"},
+            ]
+        )
+        workflow = AtomicWorkflow(
+            config=make_atomic_workflow_config(
+                conversation=conversation, max_turns=2
+            ),
+            chat=False,
+        )
+
+        with self.assertRaises(TurnLimitExceededError):
+            session.run(workflow, "", chat=False)
+
+        self.assertEqual(len(conversation.script.calls), 2)
 
 
 class TestSessionComponent(unittest.TestCase):

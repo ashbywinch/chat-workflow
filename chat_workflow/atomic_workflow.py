@@ -24,6 +24,13 @@ TResult = TypeVar("TResult")
 # a suggested repair; the turn keeps the rule and drops the bulk.
 _REJECTION_CORRECTION_LIMIT = 2000
 
+# The turn a chat-off step gets when it asks for an answer nobody can give.
+# It is a correction, not an authored prompt, so it states the job again.
+_NO_USER_ANSWER = (
+    "No user is available to answer. Return success with the completed "
+    "result, or failure if it cannot be produced."
+)
+
 
 def _rejection_correction(exc: MaxRetriesExceededError) -> str:
     """The turn a rejected result earns: ask for the facts it could not hold.
@@ -114,97 +121,137 @@ class AtomicWorkflow(Generic[TResult]):
         return self._conversation.messages
 
     def process_turn(self, user_input: str) -> TurnResult[TResult]:
+        """Take the next turn, with the corrections that turn needs.
+
+        A correction — a rejected result, an answer that promises content it
+        does not give, a repeated question, an early finish — is a turn of its
+        own: it is fed back as the next input and spends one of ``max_turns``.
+        The budget at the top of this loop is what ends a model that will not
+        stop asking; no branch can add a turn past it or pass it to a callee.
+        """
         from .exceptions import InvalidResponseError, TurnLimitExceededError
 
-        if self.turn_count >= self.max_turns:
-            raise TurnLimitExceededError(self.max_turns)
+        while True:
+            if self.turn_count >= self.max_turns:
+                raise TurnLimitExceededError(self.max_turns)
 
-        self.turn_count += 1
-        # The last turn is told so: a model that would ask again is given one
-        # turn to answer with what it has, and the step still fails if it will not.
-        final_turn = self.turn_count >= self.max_turns
-        try:
-            response = self._call_llm(user_input, final_turn=final_turn)
-        except MaxRetriesExceededError as exc:
-            # A rejection is about the result, not the sample: every retry
-            # answered with what the user had already given. Resampling cannot
-            # produce data the conversation does not hold, so the rejection
-            # becomes a turn — the model asks for what the result is missing
-            # and the user gets to answer it. Without this, a draft that omits
-            # a required fact ends the run and loses the conversation.
-            if final_turn:
-                raise
-            return self.process_turn(_rejection_correction(exc))
+            self.turn_count += 1
+            # The last turn is told so: a model that would ask again is given
+            # one turn to answer with what it has, and the step still fails if
+            # it will not.
+            final_turn = self.turn_count >= self.max_turns
+            try:
+                response = self._call_llm(user_input, final_turn=final_turn)
+            except MaxRetriesExceededError as exc:
+                # A rejection is about the result, not the sample: every retry
+                # answered with what the user had already given. Resampling
+                # cannot produce data the conversation does not hold, so the
+                # rejection becomes a turn — the model asks for what the result
+                # is missing and the user gets to answer it. Without this, a
+                # draft that omits a required fact ends the run and loses the
+                # conversation.
+                if final_turn:
+                    raise
+                user_input = _rejection_correction(exc)
+                continue
 
-        if response.intent == AgentIntent.CONTINUE:
-            message = (response.message or "").strip()
-            if (
-                message.endswith(":")
-                and self.turn_count < self.max_turns
-            ):
-                # A colon introduces content the turn does not hold; the model
-                # must give the list or finish, not promise it.
-                return self.process_turn(
-                    "Your message ends with a colon but the turn does not "
-                    "contain the content it introduces. Give the content in "
-                    "the message, or finish and let the next step show it."
+            if response.intent == AgentIntent.CONTINUE:
+                message = (response.message or "").strip()
+                if message.endswith(":") and self.turn_count < self.max_turns:
+                    # A colon introduces content the turn does not hold; the
+                    # model must give the list or finish, not promise it.
+                    user_input = (
+                        "Your message ends with a colon but the turn does not "
+                        "contain the content it introduces. Give the content in "
+                        "the message, or finish and let the next step show it."
+                    )
+                    continue
+                if (
+                    message
+                    and message == self._last_continue
+                    and self.turn_count < self.max_turns
+                ):
+                    # The same question again is not a new turn: the model did
+                    # not read the answer it was given. A correction needs a
+                    # turn, so at the limit the repeat is returned and the next
+                    # call stops.
+                    user_input = (
+                        "You repeated your previous message instead of using "
+                        "the user's answer. Read what they just said, then "
+                        "either ask a different question or return the result."
+                    )
+                    continue
+                self._last_continue = message
+                return self.on_continue(response)
+            if response.intent == AgentIntent.SUCCESS:
+                if self.turn_count < self.min_turns:
+                    # The task declared that it must ask or propose first. Feed
+                    # the early finish back as a correction; it is not a
+                    # completion.
+                    user_input = (
+                        "You are finishing too early. Do the task's next step "
+                        "before returning the result."
+                    )
+                    continue
+                if (response.message or "").strip().endswith("?") and self.turn_count < self.max_turns:
+                    # A success is a completion. Asking the user something
+                    # while claiming the step is done leaves the answer unread.
+                    user_input = (
+                        "A success message cannot ask the user a question. If "
+                        "you still need an answer, return intent='continue'. "
+                        "Otherwise return the result with a statement of what "
+                        "you did."
+                    )
+                    continue
+                return self.on_success(response)
+            if response.intent == AgentIntent.FAILURE:
+                if not self._failure_given_a_turn and self.turn_count < self.max_turns:
+                    # A step sometimes calls failure when the conversation is
+                    # hard — a skeptical user, a thin description, a correction
+                    # it did not want. Give it one turn to continue before
+                    # accepting that the result cannot be produced.
+                    self._failure_given_a_turn = True
+                    user_input = (
+                        "You returned failure. Continue with what you were "
+                        "given: propose the result, or ask the one question you "
+                        "still need. Failure is only for a user who refuses to "
+                        "engage or input that cannot be interpreted."
+                    )
+                    continue
+                error = self.on_failure(response)
+                error.messages = list(self.messages)
+                error.message = (
+                    f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━\n"
+                    f"{render(self.messages)}"
                 )
-            if (
-                message
-                and message == self._last_continue
-                and self.turn_count < self.max_turns
-            ):
-                # The same question again is not a new turn: the model did not
-                # read the answer it was given. A correction needs a turn, so at
-                # the limit the repeat is returned and the next call stops.
-                return self.process_turn(
-                    "You repeated your previous message instead of using the "
-                    "user's answer. Read what they just said, then either ask a "
-                    "different question or return the result."
-                )
-            self._last_continue = message
-            return self.on_continue(response)
-        if response.intent == AgentIntent.SUCCESS:
-            if self.turn_count < self.min_turns:
-                # The task declared that it must ask or propose first. Feed the
-                # early finish back as a correction; it is not a completion.
-                return self.process_turn(
-                    "You are finishing too early. Do the task's next step "
-                    "before returning the result."
-                )
-            if (response.message or "").strip().endswith("?") and self.turn_count < self.max_turns:
-                # A success is a completion. Asking the user something while
-                # claiming the step is done leaves the answer unread.
-                return self.process_turn(
-                    "A success message cannot ask the user a question. If you "
-                    "still need an answer, return intent='continue'. Otherwise "
-                    "return the result with a statement of what you did."
-                )
-            return self.on_success(response)
-        if response.intent == AgentIntent.FAILURE:
-            if not self._failure_given_a_turn and self.turn_count < self.max_turns:
-                # A step sometimes calls failure when the conversation is hard —
-                # a skeptical user, a thin description, a correction it did not
-                # want. Give it one turn to continue before accepting that the
-                # result cannot be produced.
-                self._failure_given_a_turn = True
-                return self.process_turn(
-                    "You returned failure. Continue with what you were given: "
-                    "propose the result, or ask the one question you still "
-                    "need. Failure is only for a user who refuses to engage or "
-                    "input that cannot be interpreted."
-                )
-            error = self.on_failure(response)
-            error.messages = list(self.messages)
-            error.message = (
-                f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━\n"
-                f"{render(self.messages)}"
+                if self.debug:
+                    self.debug.on_error(error)
+                raise error
+
+            raise InvalidResponseError(
+                f"Invalid intent received: {response.intent}"
             )
-            if self.debug:
-                self.debug.on_error(error)
-            raise error
 
-        raise InvalidResponseError(f"Invalid intent received: {response.intent}")
+    def complete_without_user(
+        self,
+        opening_input: str,
+        *,
+        echo: Callable[[str], None] | None = None,
+    ) -> TurnResult[TResult]:
+        """Run to completion with nobody to answer.
+
+        A chat-off step has no user, so a ``continue`` is answered by restating
+        the job. Each retry is a turn, and :meth:`process_turn` spends one from
+        ``max_turns``: this call returns a result or raises
+        ``TurnLimitExceededError`` within the budget, so it cannot outlast it.
+        ``echo`` receives each internal turn as it happens, for the log.
+        """
+        result = self.process_turn(opening_input)
+        while not result.is_complete:
+            if echo:
+                echo(f"\nAssistant: {result.message}")
+            result = self.process_turn(_NO_USER_ANSWER)
+        return result
 
     def _call_llm(self, user_input: str | None = None, *, final_turn: bool = False) -> Any:
         """One turn with the model, timed for the debug stream."""

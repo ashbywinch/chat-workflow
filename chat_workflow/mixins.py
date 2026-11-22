@@ -119,47 +119,81 @@ class _VerdictLike(Protocol):
     fix: str | None
 
 
+# A judge sometimes narrates its own change of mind after the sentence that
+# reads the data ("I need to correct my verdict"). That sentence is about the
+# verdict, not the rule, so the conclusion is the last sentence that is not.
+_VERDICT_META = (
+    "i need to correct",
+    "i should correct",
+    "correct my verdict",
+    "let me revise",
+    "revising my verdict",
+    "re-evaluat",
+    "i was wrong",
+)
+
+_PASS_PHRASES = (
+    "passes",
+    " pass",
+    "satisfied",
+    "is valid",
+    "meets the rule",
+    "not violated",
+    "does not violate",
+    "no violation",
+    "not a violation",
+    "is unambiguous",
+    "no fix needed",
+    "is acceptable",
+)
+
+# A negated pass ("does not pass", "fails") is not a pass; a negated
+# violation ("does not violate") is. Match the negated *pass* forms only,
+# so a conclusion of "does not violate the rule" is read as the pass it is.
+_NEGATED_PASS_PHRASES = (
+    "does not pass",
+    "doesn't pass",
+    "does not satisfy",
+    "doesn't satisfy",
+    "is not satisfied",
+    "fails",
+    "failure",
+    "is not valid",
+)
+
+
+def _concludes_a_pass(text: str | None) -> bool:
+    """True when the last sentence about the rule concludes that it passes.
+
+    Read the last sentence, so a hedge ("could be considered a failure,
+    but...") does not hide the conclusion; skip the sentences that narrate the
+    judge's own verdict, which say nothing about the data.
+    """
+    text = (text or "").strip().lower()
+    sentences = [part for part in re.split(r"(?<=[.!?])\s+", text) if part]
+    about_the_rule = [
+        sentence
+        for sentence in sentences
+        if not any(marker in sentence for marker in _VERDICT_META)
+    ]
+    conclusion = (about_the_rule or sentences or [""])[-1]
+    return any(phrase in conclusion for phrase in _PASS_PHRASES) and not any(
+        phrase in conclusion for phrase in _NEGATED_PASS_PHRASES
+    )
+
+
 def _verdict_claims_the_rule_passes(verdict: _VerdictLike) -> bool:
-    """True when a failed verdict's own conclusion says the rule passed.
+    """True when a failed verdict's own words say the rule passed.
 
     A self-contradictory verdict is a malformed judge response, not a
-    violation: the explanation concludes that the data satisfies the rule while
-    the ``passed`` flag says it does not. Read the last sentence, so a hedge
-    ("could be considered a failure, but...") does not hide the conclusion.
+    violation: its conclusion says the data satisfies the rule while the
+    ``passed`` flag says it does not.
     """
-    text = (verdict.explanation or "").strip().lower()
-    sentences = re.split(r"(?<=[.!?])\s+", text)
-    conclusion = sentences[-1] if sentences else text
-    positive = (
-        "passes",
-        " pass",
-        "satisfied",
-        "is valid",
-        "meets the rule",
-        "not violated",
-        "does not violate",
-        "no violation",
-        "not a violation",
-        "is unambiguous",
-        "no fix needed",
-        "is acceptable",
-    )
-    # A negated pass ("does not pass", "fails") is not a pass; a negated
-    # violation ("does not violate") is. Match the negated *pass* forms only,
-    # so a conclusion of "does not violate the rule" is read as the pass it is.
-    negated_pass = (
-        "does not pass",
-        "doesn't pass",
-        "does not satisfy",
-        "doesn't satisfy",
-        "is not satisfied",
-        "fails",
-        "failure",
-        "is not valid",
-    )
-    if any(phrase in conclusion for phrase in positive) and not any(
-        phrase in conclusion for phrase in negated_pass
-    ):
+    if _concludes_a_pass(verdict.explanation):
+        return True
+    # The judge may write the withdrawn verdict into the fix it was asked for;
+    # a fix that concludes the data already passes asks for no change either.
+    if _concludes_a_pass(verdict.fix):
         return True
     # A fix that says there is nothing to fix is a pass in disguise, whatever
     # the explanation's last sentence says.
