@@ -41,6 +41,14 @@ later one.
   This phase is why the current branch is `meta-workflow`; it is not a
   prerequisite for phases 0–2.
 
+## Standards and persistence (next)
+
+- **Plan**: [standards and persistence](PLAN/standards-and-persistence.md) —
+  rule identity, `RequirementFailed`, the store contract and simple
+  implementation, requirements as documents, the router and rework step, and the
+  eval of the eval.
+- **Not a numbered phase**: it builds on Phase 3 and does not depend on Phase 4.
+
 ## Phase 4 — Scale and packaging (future)
 
 - **Inputs**: caller demand.
