@@ -99,8 +99,10 @@ Not yet implemented. The shape:
 
 - Requirements are modelled, persisted with the component, and versioned; checks,
   prompts and code reference them by `requirement_id@version`.
-- Judgment produces a **report** of verdicts (requirement, version, evidence),
-  not an exception. Structural validation may still raise and retry.
+- Judgment raises a typed **`RequirementFailed`** carrying the verdicts
+  (requirement, version, evidence) and the attempted artifact. The caller
+  persists both and routes; the exception is the signal, not a second return
+  path. Structural validation keeps its own retry path.
 - The author has a rework surface: the failing requirement, the evidence, and
   the four-layer choice, with the same artifact re-evaluated against the new
   version.

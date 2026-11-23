@@ -20,51 +20,55 @@ not a store at all.
 
 ## Where it lives
 
-**Persistence is not in the library.** The library produces values and knows
-nothing about documents, storage or files. A separate persistence package owns
-the store, and the application (the component maker, the CLI) wires it in.
+**Persistence is not in the library.** The library produces values and raises
+typed failures; it knows nothing about documents, storage or files. Persistence
+is its own set of libraries, and the application (the component maker, the CLI)
+chooses one and wires it in.
 
-One class per module, packages to organise them:
+At least two implementations exist: a simple local one and a proper enterprise
+one. They are separate libraries, not modes of one, and neither is "the"
+persistence of the project. The contract they share is a third, tiny package;
+one class per module, packages to organise them:
 
 ```
-packages/chat-workflow-persistence/src/chat_workflow_persistence/
+packages/document-store/src/document_store/
   document.py               # Document
   document_type.py          # DocumentType (StrEnum)
   document_store.py         # DocumentStore (Protocol)
-  local_document_store.py   # LocalDocumentStore
   release.py                # Release
   errors.py                 # DocumentStoreError
+
+packages/document-store-files/src/document_store_files/
+  local_document_store.py   # LocalDocumentStore
+
+packages/document-store-enterprise/   # later: object storage + metadata service
 ```
 
-The library does not import this package; the package does not import the
-component maker.
+The library imports none of them; the adapters do not import the component
+maker.
 
 ## The library-side interface
 
-The integration is at **step boundaries**. The library returns typed results;
-the application persists them. Three things make that interface neat, and only
-the first is a library change:
+The integration is at **step boundaries**. The library returns typed results and
+raises typed failures; the application persists them. Only two things are
+needed on the library side, and neither is a store concept:
 
-- **A verdict is a value, not an exception.** `LLMValidated` currently raises
-  inside a model validator, so a semantic verdict exists only as an error. The
-  refactor splits it: structural validation still raises (a malformed object is
-  returned to the model); semantic evaluation returns a `ValidationReport` of
-  verdicts, each naming the rule id and version and carrying its evidence. The
-  report rides on `TurnResult`/`SessionLog`, where the application can read it
-  and persist it. The existing raising behaviour remains as a wrapper for callers
-  that want it.
 - **A rule has identity.** `_validation_rules` entries become
-  `Rule(id, version, text)` values instead of bare strings, so a verdict can be
-  tied to the requirement it operationalises. This is a value type in the
-  library, not a store concept.
+  `Rule(id, version, text)` values instead of bare strings, so a verdict can
+  name the requirement version it operationalises.
+- **The failure carries its evidence.** A semantic rule failure raises
+  `RequirementFailed` with the verdicts (rule id, version, passed, evidence) and
+  the attempted artifact. The caller catches it, persists the artifact and the
+  verdicts, and routes. There is no parallel "report" return path: one signal,
+  carrying data.
 - **No I/O.** The library never opens a file, never names a path, and never
-  imports the persistence package.
+  imports a store package.
 
 The application persists at each step it owns: the requirements when they are
 authored, the generated code, every artefact with the requirement versions it
-was judged under, and every evaluation report. The component maker's composites
-already receive each child result, so this is explicit rather than a hook;
-whether to add a thin `@persisted` wrapper is an application decision.
+was judged under, and every failure. The component maker's composites already
+receive each child result, so this is explicit rather than a hook; whether to
+add a thin `@persisted` wrapper is an application decision.
 
 ## One store, one record
 
@@ -140,11 +144,12 @@ new adapter, not a change to any caller.
 ## Seeding the eval of the eval
 
 The rework loop is tested against a **real session from the failure that
-motivated it**, truncated at the failure, not a synthetic one. Capture the raw
-PydanticAI messages (`session_logging.dump`) when an eval fails, curate one into
-a fixture, and replay it through the rework step: the router must reach the same
-conclusion on a conversation that actually happened. This keeps the meta-eval
-faithful and deterministic without inventing a scenario.
+motivated it**, truncated at the failure. The eval harness already writes that
+session to the failure record (`<label>-<ts>.json`: `events` and the rendered
+`transcript`, plus the verdicts). Curate one of those records, truncate it at
+the failure, and replay its events through the rework step — no new capture
+format. The router must reach the same conclusion on a conversation that
+actually happened, which keeps the meta-eval faithful and deterministic.
 
 ## Enterprise direction
 
