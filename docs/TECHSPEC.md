@@ -54,6 +54,7 @@ layering change updates the test in the same commit.
 | `AgentResponse` / `AgentIntent` | `chat_workflow/models.py` | A discriminated union: continue, success + value, or failure; the answer is a tool call |
 | `LLMValidated` | `chat_workflow/mixins.py` | Runs `Validation(...)` rules through the model |
 | `BlobSyncMixin` | `chat_workflow/mixins.py` | Materialises annotated fields to files after success |
+| `DocumentStore` | `chat_workflow/storage.py` | The one store: `put`, `get`, `find`, `release`; local adapter first, no database |
 | `Component` | `workflows/workflow/component.py` | The generated component: a class with a Pydantic model and workflow steps |
 | `ComponentSourceCode` | `workflows/workflow/component_source_code.py` | The generated Python source for a component |
 | `WorkflowSpec` | `workflows/workflow/workflow_spec.py` | The workflow spec: name, diagram, inputs, outputs, and component specs |
@@ -62,6 +63,17 @@ layering change updates the test in the same commit.
 `WorkflowSpec` is the **workflow spec**, not a runtime workflow. A runtime workflow
 is an atomic or composite workflow step. Further vocabulary:
 [domain concepts](reference/domain-concepts.md).
+
+## Documents
+
+A document's home is a property of the document, not of the component, the
+process or the person who ran it. Requirements, artefacts, evaluations and
+generated code are all documents in one store, distinguished by `type` and
+metadata; composition is by reference, with no single top level. The store lives
+in the core package as a port (`put`, `get`, `find`, `release`) with a local
+file adapter first; the enterprise adapter is a later implementation of the same
+four calls. The record shape, `owning_role`, releases and the local layout are
+in [document store](reference/document-store.md).
 
 ## Turn contracts
 
