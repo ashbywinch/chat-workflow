@@ -133,11 +133,15 @@ There is one path from the library to a model: `Conversation.send()` in
 `chat_workflow/conversation.py`. A workflow step, the rule judge, and an eval's
 user simulation are all conversations. Nothing else imports a provider SDK.
 
-- The answer is a forced `answer` tool call (`ToolOutput(..., strict=True)`).
+- The answer travels as a forced `answer` tool call (`ToolOutput(..., strict=True)`).
   `response_format` is not used: the endpoints behind this model accept it and
-  ignore it; a tool's schema is enforced on the same route. A `success`
-  carries both the words the user reads (`message`) and the typed `result`, so
-  a conversational step cannot finish silently.
+  ignore it; a tool's schema is enforced on the same route. The wire schema is
+  one flat object — `intent`, `message`, optional `result` — because a union
+  output type makes PydanticAI nest the answer under `response` while the prompt
+  speaks of a top-level `intent`; `as_turn` builds the three turn shapes
+  (`continue`, `success`, `failure`) from the flat answer. A `success` carries
+  both the words the user reads (`message`) and the typed `result`, so a
+  conversational step cannot finish silently.
 - The transcript is PydanticAI's message list — thinking, tool calls, tool
   returns, retry prompts and the final answer. `transcript.render` is the one
   projection into the audit view and the user view.
@@ -192,12 +196,15 @@ The prompt and history come from the session:
 - The checklist is declared on the step (`conversation_validation_rules`,
   defaulting to `DEFAULT_RULES`). It is rendered as `## Conversation checklist`
   and is the list the judge applies.
-- `AgentResponse` is a discriminated union (`continue`, `success`, `failure`);
-  the answer travels as a forced `answer` tool call, so the schema — not a
-  prompt sentence — owns the protocol. No authored prompt says "return JSON",
-  "put the text in message", or "never reply with plain text". A rejected
-  answer is retried with the validator's own complaint; a transport failure is
-  resent; a blank or thinking-only response is resampled invisibly.
+- `AgentAnswer` is the flat wire model; `AgentResponse` is the internal
+  discriminated union (`continue`, `success`, `failure`) that `as_turn` builds
+  from it. The answer travels as a forced `answer` tool call, so the schema —
+  not a prompt sentence — owns the protocol. No authored prompt says "return
+  JSON", "put the text in message", or "never reply with plain text". A
+  structurally rejected answer is retried with the validator's own complaint; a
+  transport failure is resent; a blank or thinking-only response is resampled
+  invisibly. A semantic rule failure is not a retry: see
+  [rules and authority](reference/rules-and-authority.md).
 - A response that is not an answer — the model's own reasoning, another API's
   object, an empty object — is not replayed as an assistant turn. The answer
   schema and the answer tool still enforce the envelope; a truncated or
