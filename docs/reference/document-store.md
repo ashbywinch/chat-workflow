@@ -2,12 +2,13 @@
 
 Where a document lives is a property of the document, not of the component that
 produced it, the process that caused it, or the person who ran it. This note
-defines the store that records documents, the four operations the framework
+defines the store that records documents, the four operations the application
 needs, and the local adapter that ships first.
 
 **Status:** proposal. Scope: single user, local execution. The enterprise
-adapter (object storage + DMS + search) is a later implementation of the same
-interface.
+adapter is described in
+[enterprise document management](enterprise-document-management.md) and is a
+later implementation of the same interface.
 
 ## The problem
 
@@ -17,9 +18,53 @@ by marketing even when a product team asked for them. A component's own
 directory is therefore the wrong home for the artefact, and the session log is
 not a store at all.
 
-The current state is thinner than that: a generated module is written to
-`workflows/<name>/`, the diagram goes to a temporary directory, and the
-requirements, artefacts and verdicts exist only in transcripts.
+## Where it lives
+
+**Persistence is not in the library.** The library produces values and knows
+nothing about documents, storage or files. A separate persistence package owns
+the store, and the application (the component maker, the CLI) wires it in.
+
+One class per module, packages to organise them:
+
+```
+packages/chat-workflow-persistence/src/chat_workflow_persistence/
+  document.py               # Document
+  document_type.py          # DocumentType (StrEnum)
+  document_store.py         # DocumentStore (Protocol)
+  local_document_store.py   # LocalDocumentStore
+  release.py                # Release
+  errors.py                 # DocumentStoreError
+```
+
+The library does not import this package; the package does not import the
+component maker.
+
+## The library-side interface
+
+The integration is at **step boundaries**. The library returns typed results;
+the application persists them. Three things make that interface neat, and only
+the first is a library change:
+
+- **A verdict is a value, not an exception.** `LLMValidated` currently raises
+  inside a model validator, so a semantic verdict exists only as an error. The
+  refactor splits it: structural validation still raises (a malformed object is
+  returned to the model); semantic evaluation returns a `ValidationReport` of
+  verdicts, each naming the rule id and version and carrying its evidence. The
+  report rides on `TurnResult`/`SessionLog`, where the application can read it
+  and persist it. The existing raising behaviour remains as a wrapper for callers
+  that want it.
+- **A rule has identity.** `_validation_rules` entries become
+  `Rule(id, version, text)` values instead of bare strings, so a verdict can be
+  tied to the requirement it operationalises. This is a value type in the
+  library, not a store concept.
+- **No I/O.** The library never opens a file, never names a path, and never
+  imports the persistence package.
+
+The application persists at each step it owns: the requirements when they are
+authored, the generated code, every artefact with the requirement versions it
+was judged under, and every evaluation report. The component maker's composites
+already receive each child result, so this is explicit rather than a hook;
+whether to add a thin `@persisted` wrapper is an application decision.
 
 ## One store, one record
 
@@ -66,7 +111,7 @@ no single top level. A "view" is a query, not a root object.
 - `release(name, [uuid@version])` — an immutable snapshot of the named versions
 
 Everything else — folders, role views, search, permissions — is a query or a
-later adapter. The workflow needs only these four.
+later adapter.
 
 ## The local adapter
 
@@ -92,19 +137,27 @@ new adapter, not a change to any caller.
   interpreter imports. The duplication is deliberate for now: the store is the
   record, the file is the executable.
 
-## Independence
+## Seeding the eval of the eval
 
-The store lives in the core package (`packages/chat-workflow`). It knows only
-documents; it does not import the component maker, and it holds no server, no
-database and no vendor SDK. The component maker depends on it, one way.
+The rework loop is tested against a **real session from the failure that
+motivated it**, truncated at the failure, not a synthetic one. Capture the raw
+PydanticAI messages (`session_logging.dump`) when an eval fails, curate one into
+a fixture, and replay it through the rework step: the router must reach the same
+conclusion on a conversation that actually happened. This keeps the meta-eval
+faithful and deterministic without inventing a scenario.
 
-The library still owns no persistence in the PRD's sense: this is an optional
-local adapter behind a port, not a service. That sentence in the PRD needs
-amending to say so.
+## Enterprise direction
+
+The physical/logical split, UUID identity, releases, metadata views, discovery
+and document-level security are specified in
+[enterprise document management](enterprise-document-management.md). The local
+adapter implements the same four calls so that system is a replacement, not a
+rewrite.
 
 ## Open questions
 
+- Explicit saves at step boundaries versus a thin persistence wrapper in the
+  component maker.
 - Retention: nothing is deleted now; is that acceptable indefinitely?
 - Blobs: local files first; which object store is the second adapter?
-- Does the runnable code file live beside the store or inside it, once the
-  component maker is split out?
+- Does the runnable code file live beside the store or inside it?

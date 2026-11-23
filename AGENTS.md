@@ -184,6 +184,7 @@ Do not re-run the eval suite just to see something you already captured. Before 
 | [TECHSPEC](docs/TECHSPEC.md) | Technology choices, architecture, layer boundaries | Architecture decisions |
 | [Rules and Authority](docs/reference/rules-and-authority.md) | Why a rule is pass/fail, who amends it, and the rework loop | Contributors and product decisions |
 | [Document Store](docs/reference/document-store.md) | One store for requirements, artefacts, evaluations and code; ownership and releases | Contributors and product decisions |
+| [Enterprise Document Management](docs/reference/enterprise-document-management.md) | Product-layer reference: object storage, metadata, discovery, security | Product and architecture decisions |
 | [PLAN](docs/PLAN.md) | Phases, operations and quality gates | Delivery planning |
 | [UX](docs/UX.md) | The conversational UX spec | Prompt and flow design |
 | [Couch2food Migration Guide](docs/workflow-authors/couch2food-migration-guide.md) | Migrating from old patterns to chat-workflow-prototype | Developers updating existing workflows |
