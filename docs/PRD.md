@@ -358,9 +358,10 @@ opinion and it is not optional for conversation quality.
   need a green run.
 - **Longevity:** the library is version 0.1 and explicitly unstable. Public API
   changes are allowed; there is no backward-compatibility promise.
-- **Backups:** the library holds no user data. Generated artifacts and eval
-  transcripts are local files; losing them is acceptable. Persistence is a
-  product-layer concern.
+- **Backups:** the library holds no user data and writes no files. Persistence is
+  provided by separate persistence libraries (a store contract plus
+  implementations) and is a product-layer concern; eval transcripts are local
+  files, and losing them is acceptable.
 - **Monitoring:** no service to monitor. The signals are eval transcripts, the
   token/cost report, and named exceptions.
 - **Auth:** none in the library. The product layer may add it; downstream tools

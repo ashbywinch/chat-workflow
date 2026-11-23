@@ -29,7 +29,7 @@ The word "spec" hides four different things with different owners and lifespans:
 
 | Layer | Example | Durability | Owner |
 | --- | --- | --- | --- |
-| **Requirement** | "an absent attendee can catch up in two minutes"; "every decision names who made it" | durable, versioned | the author |
+| **Requirement** | "an absent attendee can catch up in two minutes"; "every decision names who made it" — with one good and one bad exemplar | durable, versioned | the author |
 | **Check** | the pass/fail predicate that operationalises the requirement | disposable | implementation |
 | **Conveyance** | the prompt that tells the model what the requirement is | disposable | implementation |
 | **Implementation** | the generated module | disposable, stochastic | generated |
@@ -51,6 +51,13 @@ monotonic versions. Checks, prompts and generated code are specification: each
 carries the `requirement_id@version` it serves. An artifact records the
 requirement versions it was judged under. "The same object now passes" means
 re-evaluating that object against a later version of a requirement.
+
+**What a requirement record holds.** The **intent** — what the document is for
+and what success looks like, in the author's words; the checkable statements; an
+**exemplar** that is good and one that is not, with why; the **scope** (when it
+applies); the **owner**; and the version. The exemplars are conveyance and test
+cases, not rules: a non-technical author can say "like this, not like that" far
+more precisely than they can write a predicate.
 
 **Who may change what.** Only the author changes a requirement. The four layers
 give the autonomy boundary:
@@ -89,20 +96,21 @@ requirement, the evidence, and the readings — not "what should I do?".
 
 **Which validations are structural.** A failure that a corrected object could
 fix from the same facts is structural: the object is wrong, and it may be
-repaired or regenerated. A failure the facts cannot satisfy is semantic: it is
-reported against its requirement, not retried. The two are distinguished by
+repaired or regenerated. A failure the facts cannot satisfy is semantic: it
+raises `RequirementFailed` against its requirement and is not retried; the
+application persists it and routes. The two are distinguished by
 satisfiability, not by whether a machine or a judge decided it.
 
 ## What this implies for the architecture
 
 Not yet implemented. The shape:
 
-- Requirements are modelled, persisted with the component, and versioned; checks,
-  prompts and code reference them by `requirement_id@version`.
-- Judgment raises a typed **`RequirementFailed`** carrying the verdicts
-  (requirement, version, evidence) and the attempted artifact. The caller
-  persists both and routes; the exception is the signal, not a second return
-  path. Structural validation keeps its own retry path.
+- Requirements are modelled, stored as documents, and versioned; checks, prompts
+  and code reference them by `requirement_id@version`.
+- Judgment raises a typed **`RequirementFailed`**; the integration — rule
+  identity, the exception's payload, and where the application persists — is in
+  [document store](document-store.md). Structural validation keeps its own retry
+  path.
 - The author has a rework surface: the failing requirement, the evidence, and
   the four-layer choice, with the same artifact re-evaluated against the new
   version.
@@ -112,6 +120,7 @@ Not yet implemented. The shape:
 
 ## Open questions
 
-- How the meta-eval seeds a failure deterministically enough to test each route.
+- How a contradiction between a requirement and its check is proven to the
+  evidence bar — who judges it, and what counts as proof.
 - How the rework surface records an amendment against the component, so the next
   run uses it.

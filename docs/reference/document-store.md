@@ -3,7 +3,8 @@
 Where a document lives is a property of the document, not of the component that
 produced it, the process that caused it, or the person who ran it. This note
 defines the store that records documents, the four operations the application
-needs, and the local adapter that ships first.
+needs, and the simple implementation that ships first
+(`document-store-files`).
 
 **Status:** proposal. Scope: single user, local execution. The enterprise
 adapter is described in
@@ -117,7 +118,9 @@ no single top level. A "view" is a query, not a root object.
 Everything else — folders, role views, search, permissions — is a query or a
 later adapter.
 
-## The local adapter
+## The simple implementation
+
+`document-store-files` writes `.workflow-store/`:
 
 ```
 .workflow-store/            # configurable path
@@ -128,11 +131,12 @@ later adapter.
 
 It is a minimal DMS, not a database: append-only, inspectable, and safe to
 commit or back up. Replacing it with object storage plus a metadata service is a
-new adapter, not a change to any caller.
+new implementation of the same contract, not a change to any caller.
 
 ## What is stored
 
-- **Requirements**, with their versions and the checks that operationalise them.
+- **Requirements**, with their intent, checkable statements, one good and one
+  bad exemplar, scope, owner and versions.
 - **Artefacts**, every version, with the requirement versions they were judged
   under. A release marks which versions matter; nothing is deleted.
 - **Evaluations**, as documents that reference the artefact and the requirement
