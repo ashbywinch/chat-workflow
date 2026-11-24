@@ -315,6 +315,11 @@ class LLMValidated(BaseModel):
                 timeout_seconds=config.request_timeout_seconds,
                 temperature=0.0,
                 thinking=True,
+                # The house gateway's route is a dynamic model id, so the
+                # portable switch above does not reach the provider. The
+                # explicit effort is what makes the judge actually reason;
+                # without it the response's reasoning is empty.
+                reasoning_effort="high" if config.provider == "openai" else None,
                 extra_headers=config.extra_headers,
             )
             # This validator runs inside the agent's own event loop, where

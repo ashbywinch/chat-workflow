@@ -27,7 +27,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Generic, TypeVar, override
+from typing import Any, Generic, TypeVar, cast, override
 
 import pydantic_ai
 from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, ToolFailed, UsageLimits
@@ -356,6 +356,7 @@ class Conversation(Generic[T]):
         tools: Sequence[Callable[..., Any]] = (),
         deps: Any = None,
         thinking: bool = False,
+        reasoning_effort: str | None = None,
         model_client: Model | None = None,
     ) -> None:
         self.model = model
@@ -378,6 +379,13 @@ class Conversation(Generic[T]):
         self._deps = deps
         self._provider_log = _ProviderLog()
         self._thinking = thinking
+        # ``thinking=True`` is the portable switch, but PydanticAI only maps it
+        # to an effort for a model id its profile knows. A gateway route such as
+        # ``openai/dynamic/fallback2`` is unknown, so the request carries no
+        # effort and the provider reasons not at all. An explicit effort is the
+        # one setting that survives that route; the response's reasoning is then
+        # parsed from its ``reasoning``/``reasoning_content`` field.
+        self._reasoning_effort = reasoning_effort
         # The injection seam for tests: a FunctionModel scripts a whole turn
         # without a network or a provider SDK. Production builds the real one
         # on the first send — constructing a step must not need a key — and
@@ -507,14 +515,21 @@ class Conversation(Generic[T]):
 
     def model_settings(self) -> ModelSettings:
         """The settings every request carries (budgets, limits, headers)."""
-        settings = ModelSettings(
-            max_tokens=self._max_tokens,
-            timeout=self._timeout_seconds,
-            max_retries=self._transport_retries,
-            thinking=self._thinking,
+        # A plain dict because the reasoning effort is a provider-specific key:
+        # PydanticAI's portable ``ModelSettings`` type does not name it, but the
+        # OpenAI model reads it, and a dynamic gateway route needs it.
+        settings: dict[str, Any] = dict(
+            ModelSettings(
+                max_tokens=self._max_tokens,
+                timeout=self._timeout_seconds,
+                max_retries=self._transport_retries,
+                thinking=self._thinking,
+            )
         )
         if self._temperature is not None:
             settings["temperature"] = self._temperature
+        if self._reasoning_effort is not None:
+            settings["openai_reasoning_effort"] = self._reasoning_effort
         if self._extra_headers:
             settings["extra_headers"] = self._extra_headers
-        return settings
+        return cast(ModelSettings, settings)
