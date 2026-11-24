@@ -51,36 +51,47 @@ The design is in [rules and authority](../reference/rules-and-authority.md) and
   `uuid@version`; refs compose to arbitrary depth; the architecture test shows no
   library→store import.
 
-### 3. Requirements as documents
+### 3. Requirements as documents, and the rule-quality gate
 
 - **Inputs:** the component's domain spec and checks.
 - **Outputs:** the requirement record — intent, statements, one good and one bad
   exemplar, scope, owner, version — written to the store; checks carry
   `requirement_id`; generated code carries the same ids.
+- **The gate:** each rule is classified as deterministic (emitted as a validator
+  and removed from the judged rules), unambiguous (kept as a judged check), or
+  ambiguous (the author is asked the one question that resolves it). Code
+  generation does not start until every rule is classified and every ambiguous
+  one answered. The six meta-rules are the gate's rubric; overfit is not
+  detectable here and is handled at runtime.
 - **Operations:** the domain-spec step asks for intent and the two exemplars.
-- **Quality gate:** every check resolves to a requirement version; a component
-  whose rule has no requirement is rejected at authoring time.
+- **Quality gate:** an ambiguous rule blocks generation; a deterministic rule
+  becomes code; every check resolves to a requirement version.
 
 ### 4. Router and rework step
 
 - **Inputs:** a `RequirementFailed` and the facts the user gave.
-- **Outputs:** `route()` returning fix-check / fix-prompt / regenerate / ask, with
-  the two-attempt budget; the rework conversation step that applies a spec fix
-  with a citation or asks the author one question; an amendment is a new version.
-- **Operations:** the rework step runs in the authoring conversation.
-- **Quality gate:** a check is only repaired when the contradiction is quoted; a
-  requirement change always asks; the same artifact is re-evaluated under the new
+- **Outputs:** the three causes as a fixed procedure — the user declared a
+  deviation, the rule is ambiguous, or the artifact is invalid — and the action
+  each implies: the author decides the first two; the system repairs the third.
+  The rework conversation step shows the requirement, the check, the artifact and
+  the proposed change in the same format every time; an amendment is a new
   version.
+- **Operations:** the rework step runs in the authoring conversation.
+- **Quality gate:** a rule change always asks the author; an invalid artifact is
+  repaired without touching the standard; the same artifact is re-evaluated under
+  a new version.
 
 ### 5. The eval of the eval
 
 - **Inputs:** an existing failure record (`events`, transcript, verdicts),
-  truncated at the failure.
-- **Outputs:** a deterministic replay test that asserts the route, plus one live
-  end-to-end eval of the loop.
-- **Operations:** the live eval runs in the conversation suite.
+  truncated at the failure; plus authoring scenarios for the gate.
+- **Outputs:** a deterministic replay test that asserts the cause and the action,
+  plus live cases for the gate — an ambiguous rule is blocked or questioned, a
+  deterministic rule becomes code, an overfit rule is caught when the author
+  declares the artifact correct.
+- **Operations:** the live cases run in the conversation suite.
 - **Quality gate:** the replay reaches the same conclusion as the original
-  failure; the live eval passes.
+  failure; the gate cases behave as specified; the live eval passes.
 
 ## Out of scope
 
@@ -90,7 +101,7 @@ rewrites.
 
 ## Open questions
 
-- How a check's contradiction of its requirement is proven to the evidence bar.
+- How the gate's classification is made and what evidence it records.
 - How an amendment is recorded against the component so the next run uses it.
 - Explicit saves versus a thin persistence wrapper in the component maker.
 - Retention; the blob adapter; where the runnable code file lives.

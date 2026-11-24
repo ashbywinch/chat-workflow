@@ -1,8 +1,8 @@
 # Rules and Authority
 
-A rule is a pass/fail statement about an artifact. This note explains why the
-framework must treat a failed rule as a finding about the **standard**, not as
-a model error, and who may change the standard.
+A rule is a statement of what "good" means for an artifact. This note explains
+the three kinds of rule, how each is evaluated, what a failure means, and who
+may change the standard.
 
 **Status:** proposal. Scope: one user, present, actively authoring a component.
 The absent-author case is out of scope here.
@@ -12,115 +12,131 @@ The absent-author case is out of scope here.
 The conversation suite surfaced failures that were not framework defects:
 
 - a meeting with no decisions failed "every decision has an owner";
-- a required date with no date failed because the only honest value was `TBD`;
-- a generated rule said "Location must be Zoom", because one example was Zoom;
-- "Note-taker" was rejected as not a role, though it was the user's own word.
+- a description failed "specific enough";
+- a generated rule said "Location must be Zoom", because one meeting was on Zoom.
 
-Each is a disagreement about the **standard**, not about the conversation, the
+Each is a disagreement about what "good" means, not about the conversation, the
 protocol, or the model. The current architecture answers every one of them the
 same way: retry the model. A retry asks for a *different artifact*. It cannot
-fix a rule the facts cannot satisfy, so it either spends the output budget or
-produces a fabricated value. Either way the standard has been changed silently,
-by a model, with no author.
+resolve a rule whose meaning is unsettled, so it either spends the budget or
+fabricates a value. Either way the standard has been changed silently, by a
+model, with no author.
 
-## Four layers
+## Three kinds of rule
 
-The word "spec" hides four different things with different owners and lifespans:
+Ambiguous and non-deterministic are different things. A rule can be impossible
+to check mechanically and still be perfectly clear; that is the kind of rule this
+system exists to evaluate.
 
-| Layer | Example | Durability | Owner |
-| --- | --- | --- | --- |
-| **Requirement** | "an absent attendee can catch up in two minutes"; "every decision names who made it" — with one good and one bad exemplar | durable, versioned | the author |
-| **Check** | the pass/fail predicate that operationalises the requirement | disposable | implementation |
-| **Conveyance** | the prompt that tells the model what the requirement is | disposable | implementation |
-| **Implementation** | the generated module | disposable, stochastic | generated |
+| Kind | Example | Evaluated by |
+| --- | --- | --- |
+| **Deterministic** | "any action has a date" | code — a field constraint or validator |
+| **Unambiguous, non-deterministic** | "the minutes capture the actions agreed, as per the notes" | the judge |
+| **Ambiguous** | "the description must be specific enough" | nobody — it is a defect |
 
-Code generation is **not deterministic from the spec**. A generated module is a
-*sample*, not a build product, so the spec cannot guarantee behaviour. The
-durable record is the **requirements**, and they are the oracle an artifact is
-judged against.
+A deterministic rule written as a judged rule is a defect too: it spends a model
+call on something a validator can decide exactly, and it makes the outcome
+stochastic.
 
-This is the inversion that matters: in ordinary software the code is durable and
-the specification rots. Here the generated code is disposable and the
-requirements must survive generation.
+A fourth defect is **overfit**: a rule that encodes one example ("Location must
+be Zoom"). It is unambiguous, so it cannot be detected from its text with
+certainty. It surfaces when the user declares that an artifact is correct
+despite the rule.
+
+## Rules about rules
+
+Rules are authored by the author and checked against a small set of
+meta-rules at authoring time:
+
+1. **One requirement per rule.** A compound rule hides one failure behind the
+   other.
+2. **Quantify the scope.** Say whether at least one must exist, or whether only
+   the items that exist are constrained. "Every decision has an owner" does not
+   say whether a meeting with no decisions is acceptable.
+3. **No undefined predicates.** "Specific", "clear", "appropriate", "good" name
+   nothing checkable; replace them with the parts that make a thing so.
+4. **No example values as constraints.** An example belongs in the exemplar,
+   not in the rule.
+5. **If it can be checked mechanically, it must be checked in code**, not judged.
+6. **Cite the user's words**, so the author recognises their own intent.
+
+The meta-rules are enforced by a **rule-quality gate** in the authoring flow,
+after the requirements are captured and before code is generated. It classifies
+each rule and does one of three things:
+
+- **deterministic** → emit a validator and remove it from the judged rules;
+- **unambiguous** → keep it as a judged check, tied to its requirement;
+- **ambiguous** → stop and ask the author the one question that resolves it.
+
+The gate is a hard gate: no code generation until every rule is classified and
+every ambiguous one answered. Overfit is the exception — it cannot be detected
+here with confidence, and is handled at runtime when the author declares it.
+
+## What a failure means
+
+With the gate in place, a runtime failure has one of three causes:
+
+1. **The definition is ambiguous.** It should have been caught by the gate; if
+   it reaches runtime, the author clarifies the rule, and the same artifact is
+   re-judged under the clarification.
+2. **The user wants something that is not good.** The rule is clear and right;
+   the artifact knowingly does not meet it because the user's context differs —
+   no next meeting, no action items, headings without the standard sections. The
+   author decides: change or scope the rule, or the artifact is not compliant.
+3. **The artifact is invalid.** The definition is clear, right and accepted; the
+   artifact is malformed, missing a supplied value, or vague where the rule is
+   specific. The system repairs or regenerates it; the standard is untouched.
+
+Overfit is a special case of cause 2: the user declares an artifact correct
+despite the rule, and the author decides that the rule, not the artifact, was
+wrong.
 
 ## Decisions
 
-**What is versioned.** The component's **requirements** — the author's outcomes
-and constraints in their own words — are the durable record, with ids and
-monotonic versions. Checks, prompts and generated code are specification: each
-carries the `requirement_id@version` it serves. An artifact records the
-requirement versions it was judged under. "The same object now passes" means
-re-evaluating that object against a later version of a requirement.
+**What is versioned.** The component's requirements — the author's outcomes and
+constraints in their own words — are the durable record, with ids and monotonic
+versions. Checks, prompts and generated code are specification: each carries the
+`requirement_id@version` it serves. An artifact records the requirement versions
+it was judged under. "The same object now passes" means re-evaluating that object
+against a later version of a requirement.
 
-**What a requirement record holds.** The **intent** — what the document is for
-and what success looks like, in the author's words; the checkable statements; an
-**exemplar** that is good and one that is not, with why; the **scope** (when it
-applies); the **owner**; and the version. The exemplars are conveyance and test
-cases, not rules: a non-technical author can say "like this, not like that" far
-more precisely than they can write a predicate.
+**What a requirement record holds.** The intent — what the document is for and
+what success looks like, in the author's words; the checkable statements; an
+exemplar that is good and one that is not, with why; the scope (when it
+applies); the owner; and the version. The exemplars are conveyance and test
+cases, not rules.
 
-**Who may change what.** Only the author changes a requirement. The four layers
-give the autonomy boundary:
+**Who may change what.** Only the author changes a requirement or a rule. The
+system owns the implementation: generated code, and the prompt that conveys the
+rules. A defect in either is the system's to fix, provided it can name the
+requirement it serves.
 
-| Layer | System may change it alone? | Condition |
-| --- | --- | --- |
-| Implementation | yes | the check is faithful; regenerate or repair, then judge again |
-| Conveyance | yes, citing the requirement | the requirement is explicit and the prompt omits or misstates it |
-| Check | only to repair a **provable contradiction** | the requirement and the check can be shown side by side to disagree; otherwise ask |
-| Requirement | never | the author amends it, as a new version |
+**Routing a failure.** Name the cause, then act:
 
-"Fix the check so this sample passes" is forbidden. "The check contradicts the
-requirement" is a bug in the specification and may be fixed autonomously. If the
-contradiction cannot be shown from the requirement's own words, the system is
-inferring intent, and that is a question for the author.
+1. The user declared a deviation → cause 2: the author decides.
+2. The rule is ambiguous → cause 1: the author clarifies, then re-judge.
+3. Otherwise → cause 3: the system repairs the artifact.
 
-**Routing a failure.** One diagnosis, then one action:
-
-1. Name the layer from the verdict: which requirement, which check, what
-   evidence, what facts the user gave.
-2. Check contradicts the requirement, provably → fix the check, re-run, report
-   the change against the requirement.
-3. Prompt omits or misstates an explicit requirement → fix the prompt, re-run,
-   report.
-4. A correct artifact is possible from the same facts → repair or regenerate,
-   re-run.
-5. Otherwise — the requirement is ambiguous, missing, or the fix would change it
-   → **ask the author**, with the evidence and the readings, one question.
-6. At most **two autonomous attempts per failing requirement** in a run. If it
-   still fails, or fails differently, stop and ask. Never loosen a check to pass
-   a sample; never change a requirement.
-
-**What the author sees.** An autonomous change is a diff against the check or
-prompt, tied to a requirement id, with the re-run result. A question is the
-requirement, the evidence, and the readings — not "what should I do?".
-
-**Which validations are structural.** A failure that a corrected object could
-fix from the same facts is structural: the object is wrong, and it may be
-repaired or regenerated. A failure the facts cannot satisfy is semantic: it
-raises `RequirementFailed` against its requirement and is not retried; the
-application persists it and routes. The two are distinguished by
-satisfiability, not by whether a machine or a judge decided it.
+No one has to prove anything, and a repeat is not a different cause. The
+classification is by the evidence in the conversation and the rule's text.
 
 ## What this implies for the architecture
 
 Not yet implemented. The shape:
 
+- A **rule-quality gate** runs at authoring: classify, emit code for
+  deterministic rules, keep judged rules with ids, ask about ambiguous ones, and
+  block generation until it passes.
 - Requirements are modelled, stored as documents, and versioned; checks, prompts
-  and code reference them by `requirement_id@version`.
-- Judgment raises a typed **`RequirementFailed`**; the integration — rule
-  identity, the exception's payload, and where the application persists — is in
-  [document store](document-store.md). Structural validation keeps its own retry
-  path.
-- The author has a rework surface: the failing requirement, the evidence, and
-  the four-layer choice, with the same artifact re-evaluated against the new
-  version.
-- The eval of the component-making component includes the loop: a scenario that
-  fails a requirement, a routing decision, and the same object passing under the
-  amended version. That tests the author's tool, not the generated component.
+  and code reference them by `requirement_id@version`. The integration is in
+  [document store](document-store.md).
+- Judgment raises a typed **`RequirementFailed`**; the application persists it
+  and routes.
+- The eval of the component-making component includes the gate: an ambiguous
+  rule is blocked or questioned, a deterministic one becomes code, and an
+  overfit one is caught when the user declares the artifact correct.
 
 ## Open questions
 
-- How a contradiction between a requirement and its check is proven to the
-  evidence bar — who judges it, and what counts as proof.
-- How the rework surface records an amendment against the component, so the next
-  run uses it.
+- How the gate's classification is made and what evidence it records.
+- How an amendment is recorded against the component, so the next run uses it.
