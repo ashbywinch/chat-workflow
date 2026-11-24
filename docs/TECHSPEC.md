@@ -154,6 +154,11 @@ There is one path from the library to a model: `Conversation.send()` in
 `chat_workflow/conversation.py`. A workflow step, the rule judge, and an eval's
 user simulation are all conversations. Nothing else imports a provider SDK.
 
+- **Every step and the rule judge reason.** Their requests carry an explicit
+  reasoning effort (`high` on the OpenAI gateway). The portable `thinking`
+  switch alone is not enough for a dynamic gateway model id: PydanticAI has no
+  profile for it, so no effort is sent and the provider returns no reasoning.
+
 - The answer travels as a forced `answer` tool call (`ToolOutput(..., strict=True)`).
   `response_format` is not used: the endpoints behind this model accept it and
   ignore it; a tool's schema is enforced on the same route. The wire schema is

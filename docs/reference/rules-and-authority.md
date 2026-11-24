@@ -50,12 +50,12 @@ hiding it inside a prose explanation. The judge does not repair the artifact or
 propose its correction; a response that does not match the schema is sent back
 to the judge with the validation error.
 
-The judge's request carries an explicit reasoning effort. The portable
-"thinking" switch alone is not enough for a gateway route: a dynamic model id
-has no profile, so no effort is sent and the provider reasons not at all. With
-the effort stated, the provider's thinking is part of the judge's transcript,
-and the verdict's `reasoning` field holds the argument that is fed back with a
-failure.
+Every step's request, and the judge's, carries an explicit reasoning effort. The
+portable "thinking" switch alone is not enough for a gateway route: a dynamic
+model id has no profile, so no effort is sent and the provider reasons not at
+all. With the effort stated, the provider's thinking is part of the transcript,
+and the judge's verdict carries a `reasoning` field holding the argument that is
+fed back with a failure.
 
 ## Writing a rule
 
@@ -158,6 +158,9 @@ classification is by the evidence in the conversation and the rule's text.
 - **The feedback loop already exists**: a rejected result is an error message fed
   back to the model, which continues the conversation. The work is the content of
   those messages, not new plumbing.
+- **No runtime repetition guard.** A repeated question is a turn the judge
+  reads, not a condition the loop detects and corrects. Correcting it at runtime
+  hides the model's reasoning failure behind framework prose.
 - A component is **released when the author accepts it at the end of the step**.
   There is no separate release action.
 

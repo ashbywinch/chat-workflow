@@ -78,8 +78,6 @@ class AtomicWorkflow(Generic[TResult]):
         self.chat = chat
         self.min_turns = max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
-        # The previous continue message, so an identical repeat is not a turn.
-        self._last_continue: str | None = None
         # A failure is provisional until the step has had one turn to continue.
         self._failure_given_a_turn = False
         self.model = config.model
@@ -105,6 +103,8 @@ class AtomicWorkflow(Generic[TResult]):
             timeout_seconds=config.request_timeout_seconds,
             extra_headers=config.extra_headers,
             temperature=config.temperature,
+            thinking=True,
+            reasoning_effort="high" if config.provider == "openai" else None,
             final_output_type=config.final_response_model,
             tools=config.tools,
             deps=config.deps,
@@ -123,8 +123,8 @@ class AtomicWorkflow(Generic[TResult]):
         """Take the next turn, with the corrections that turn needs.
 
         A correction — a rejected result, an answer that promises content it
-        does not give, a repeated question, an early finish — is a turn of its
-        own: it is fed back as the next input and spends one of ``max_turns``.
+        does not give, an early finish — is a turn of its own: it is fed back
+        as the next input and spends one of ``max_turns``.
         The budget at the top of this loop is what ends a model that will not
         stop asking; no branch can add a turn past it or pass it to a callee.
         """
@@ -165,22 +165,6 @@ class AtomicWorkflow(Generic[TResult]):
                         "the message, or finish and let the next step show it."
                     )
                     continue
-                if (
-                    message
-                    and message == self._last_continue
-                    and self.turn_count < self.max_turns
-                ):
-                    # The same question again is not a new turn: the model did
-                    # not read the answer it was given. A correction needs a
-                    # turn, so at the limit the repeat is returned and the next
-                    # call stops.
-                    user_input = (
-                        "You repeated your previous message instead of using "
-                        "the user's answer. Read what they just said, then "
-                        "either ask a different question or return the result."
-                    )
-                    continue
-                self._last_continue = message
                 return self.on_continue(response)
             if response.intent == AgentIntent.SUCCESS:
                 if self.turn_count < self.min_turns:

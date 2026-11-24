@@ -285,6 +285,11 @@ def _setup_atomic_workflow(
         timeout_seconds=session.config.request_timeout_seconds,
         extra_headers=getattr(session.config, "extra_headers", None),
         temperature=getattr(session.config, "temperature", None),
+        # Every step reasons. The gateway's dynamic route has no profile, so the
+        # portable switch alone sends no effort; the explicit effort is what
+        # makes the provider return thinking.
+        thinking=True,
+        reasoning_effort="high" if session.config.provider == "openai" else None,
         tools=tools,
         deps=deps,
     )

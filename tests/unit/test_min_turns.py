@@ -77,12 +77,12 @@ class TestTurnShape(unittest.TestCase):
         self.assertEqual(result.message, "It has the sections you named.")
         self.assertEqual(len(conversation.script.calls), 2)
 
-    def test_an_identical_continue_is_a_correction(self):
+    def test_an_identical_continue_is_returned_as_is(self):
+        """There is no runtime repetition guard: the judge reads the transcript."""
         conversation = make_conversation(
             [
                 {"intent": "continue", "message": "What do you make?"},
                 {"intent": "continue", "message": "What do you make?"},
-                {"intent": "continue", "message": "Who is it for?"},
             ]
         )
         workflow = AtomicWorkflow(
@@ -93,8 +93,8 @@ class TestTurnShape(unittest.TestCase):
         second = workflow.process_turn("a list")
 
         self.assertEqual(first.message, "What do you make?")
-        self.assertEqual(second.message, "Who is it for?")
-        self.assertEqual(len(conversation.script.calls), 3)
+        self.assertEqual(second.message, "What do you make?")
+        self.assertEqual(len(conversation.script.calls), 2)
 
     def test_a_colon_that_promises_content_is_a_correction(self):
         conversation = make_conversation(

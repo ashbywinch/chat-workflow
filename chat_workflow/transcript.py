@@ -62,9 +62,6 @@ _FRAMEWORK_PROMPTS = frozenset(
         "the result.",
         "No user is available to answer. Return success with the completed "
         "result, or failure if it cannot be produced.",
-        "You repeated your previous message instead of using the user's "
-        "answer. Read what they just said, then either ask a different "
-        "question or return the result.",
         "A success message cannot ask the user a question. If you still need "
         "an answer, return intent='continue'. Otherwise return the result "
         "with a statement of what you did.",
@@ -73,15 +70,12 @@ _FRAMEWORK_PROMPTS = frozenset(
 
 
 # The prompts the framework injects after a turn it refuses: an early success,
-# a success that asks, a repeat, or a chat-off continue. The refused turn was
+# a success that asks, or a chat-off continue. The refused turn was
 # never delivered to the user, so the user view drops it.
 _CORRECTION_PROMPTS = frozenset(
     {
         "You are finishing too early. Do the task's next step before returning "
         "the result.",
-        "You repeated your previous message instead of using the user's "
-        "answer. Read what they just said, then either ask a different "
-        "question or return the result.",
         "A success message cannot ask the user a question. If you still need "
         "an answer, return intent='continue'. Otherwise return the result "
         "with a statement of what you did.",
