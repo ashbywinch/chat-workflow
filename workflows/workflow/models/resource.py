@@ -146,7 +146,7 @@ failure because there is no process description. For each, in the user's words:
 - what it needs first, if anything;
 - the check they apply: something true of the finished thing, not an action, an outcome, or a state of mind. Start
   the check with the thing, not with "you".
-Use the deliverable's name; do not ask what to call it. Return the complete list."""
+Use the deliverable's name; do not ask what to call it. In your message, call these "the things you start with" or name them; never call them "materials". Return the complete list."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -164,10 +164,14 @@ The list of things they start with was shown with one confirm-or-correct questio
 If they add one, include it; if they say one does not apply, remove it. If they say the list is wrong or they do not
 have an item, replace it with what they say they do have; never return failure because the list needs correction. If
 they ask you to format or write the deliverable itself, say in one sentence that this step lists what they start with
-and the deliverable comes next, then return to the list. If they describe domain content, say "Noted." and return to
-the list. If they ask what you think or for a suggestion — especially about a material's format or completeness —
-set that material's format and check to one concrete choice and give the choice itself in your message, then return the
-corrected list. Do not say "here is what I would suggest" and describe the step instead of the material. If their
+and the deliverable comes next, then return to the list. If they ask about a different process, or say they are not
+talking about this deliverable, say in one sentence that this step lists what they start with for that deliverable and
+return the list. Do not return failure because the question is off-topic or because they are confused about the
+process name. If they describe domain content, say "Noted." and return to the list. If they ask what you think or for
+a suggestion — especially about a material's format or completeness — set that material's format and check to one
+concrete choice and give the choice itself in your message, then return the corrected list. If they say "you tell me"
+or ask for suggestions, give one concrete choice for the material and update it; never thank them and finish without
+a choice. Do not say "here is what I would suggest" and describe the step instead of the material. If their
 feedback is about the minutes themselves — a field the minutes should have, or what an action item must carry — say in
 one sentence that those belong to the minutes you already defined and this step lists what they start with, then return
 the list unchanged. Never announce the list without giving it.

@@ -238,6 +238,8 @@ def _draft_deliverables(
 
 The notes are what the user told you; do not ask them anything. Derive the shape yourself and return one Deliverable per thing they make. Return the artifact they produce — the minutes, the plan, the invoice — not their working notes, their tools, or the meeting itself.
 
+The `analysis` is optional context. When it is None, the notes alone are enough: derive the usual shape for the thing they named. Never return failure because the process analysis is absent.
+
 Use their words for every part they covered. For every part they did not cover, propose what people in that domain usually use, and make it concrete: this is a proposal they will correct, so an empty or generic value is useless. If they named meeting minutes, propose what minutes contain (the date, who attended, the decisions, action items with an owner and a due date, and the next meeting if there is one), how they are laid out (a short structured document), who gets them, where they are kept, and a check someone can apply when the minutes exist (every decision has an owner; every action item names who does it and when).
 
 In the user's words, for each thing:

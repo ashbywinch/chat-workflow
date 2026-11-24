@@ -1081,6 +1081,12 @@ class ComponentSourceCode(LLMValidated):
         "the conversation. REJECT a rule that demands an identifier the user "
         "would not have — a last name, an email address, an employee number — "
         "when a name they already gave identifies the person in their context.",
+        "A _validation_rules entry must be decidable from the generated "
+        "model's own fields. REJECT a rule that depends on a fact the artifact "
+        "does not carry — evidence that a named owner attended, chronological "
+        "order when there is no order or timestamp field, a decision matched to "
+        "a topic when nothing links them. The fix is the field that carries the "
+        "fact, or no rule; an unsatisfiable rule burns the conversation.",
         "REJECT a rule that turns one example from the conversation into a "
         "universal constraint — a place named 'Zoom', one date, one person's "
         "name. A rule holds for every valid artifact; the conversation's "
@@ -1637,7 +1643,11 @@ class ComponentSourceCode(LLMValidated):
         "`what_good_looks_like` criterion with a rule or a validator. A rule "
         "is checked against the field values you define: do not write a rule "
         "that requires a field the model does not have — add the field, or "
-        "leave the rule out. "
+        "leave the rule out. A rule must be decidable from the artifact "
+        "itself: if it needs a fact the artifact does not carry (whether an "
+        "owner attended, whether a list is chronological without an order "
+        "field, whether a covered topic has a matching decision when nothing "
+        "links them), add the field or drop the rule. "
         "A _validation_rules entry is a rule the judge checks against the "
         "artifact's content, not a structural condition: a rule code can "
         "check ('notes are required when conditions were discussed') belongs "
@@ -1765,6 +1775,14 @@ class ComponentSourceCode(LLMValidated):
         a `_validation_rules` entry or a `@model_validator`; do not drop a
         quality criterion. If it is not mechanically checkable, express it as a
         domain-quality rule.
+
+        Every `_validation_rules` entry must be decidable from the generated
+        model's own fields. If a rule needs a fact the artifact does not carry
+        — whether a named owner attended, whether a list is in chronological
+        order without an order field, whether a covered topic has a matching
+        decision when nothing links them — add the field that carries the fact
+        or drop the rule. A rule the user cannot satisfy from the artifact is
+        a defect even when the quality is real.
 
         A rule that code can check — "notes are required when conditions were
         discussed" — belongs in a @model_validator, not in _validation_rules.

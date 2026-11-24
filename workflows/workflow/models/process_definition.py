@@ -68,7 +68,9 @@ class ProcessDefinition(LLMValidated):
         "No stage name is repeated as one of the steps.",
         "The participants may name the user as 'You'. In this conversation "
         "that is the user's own role, not a placeholder, and it is valid "
-        "alongside other named participants.",
+        "alongside other named participants. It is optional: a list of the "
+        "other participants is complete without it, and the user's role may "
+        "be named by a job title instead.",
         "The person in charge is the person or role that keeps the work moving. The user's own role is valid when they do the work end "
         "to end (for example 'Freelance Writer' or 'Meal Planner'); a job "
         "title the user states, such as 'Project Manager', is their own role "
