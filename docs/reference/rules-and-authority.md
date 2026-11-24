@@ -43,41 +43,42 @@ be Zoom"). It is unambiguous, so it cannot be detected from its text with
 certainty. It surfaces when the user declares that an artifact is correct
 despite the rule.
 
-## Rules about rules
+The judge returns a typed verdict per rule: `pass` or `fail`, a `reasoning`
+field for its argument, and an `evidence` field quoting the data. Keeping the
+argument and the quote apart is what makes a contradiction visible instead of
+hiding it inside a prose explanation. The judge does not repair the artifact or
+propose its correction; a response that does not match the schema is sent back
+to the judge with the validation error.
 
-Rules are authored by the author and checked against a small set of
-meta-rules at authoring time:
+## Writing a rule
+
+Rules are authored by the author, and the authoring prompt carries a small set
+of qualities to write them to:
 
 1. **One requirement per rule.** A compound rule hides one failure behind the
    other. Two attributes of the same thing ("an owner and a due date") are one
    requirement; two different outcomes are two entries.
-2. **Quantify the scope.** Say whether at least one must exist, or whether only
-   the items that exist are constrained. "Every decision has an owner" does not
-   say whether a meeting with no decisions is acceptable.
-3. **A quality word carries its standard.** A word whose standard is intrinsic
+2. **A quality word carries its standard.** A word whose standard is intrinsic
    and shared — "concise", "readable", "polite" — is fine, because a reader can
    judge it. A relation whose other end is unstated is ambiguous — "complete"
    (with respect to what?), "sufficient" (for what?), "appropriate" (to what?),
    "specific" (about what?) — and must name its reference or be replaced by the
    parts that must be present. Non-deterministic is not ambiguous: never demand a
    mechanical test for "concise".
-4. **No example values as constraints.** An example belongs in the exemplar,
+3. **No example values as constraints.** An example belongs in the exemplar,
    not in the rule.
-5. **If it can be checked mechanically, it must be checked in code**, not judged.
-6. **Cite the user's words**, so the author recognises their own intent.
+4. **If it can be checked mechanically, it must be checked in code**, not judged.
+5. **Cite the user's words**, so the author recognises their own intent.
 
-The meta-rules are **the validation rules of the requirement set itself**. The
-authoring step proposes the set as a typed artifact; the framework shows it to
-the author for confirmation; a rule that fails a meta-rule is fed back to the
-model as a correction, and the model continues the conversation and asks the
-author to disambiguate. There is no separate classifier and no linter: the model
-that writes the rules classifies them — a deterministic rule becomes a code
-check, an unambiguous one a judged check — and the author confirms the result.
-The gate is that loop: code generation does not start until the set is confirmed
-and the meta-rules pass.
+These are **guidance for the model that writes the rules, not rules the judge
+evaluates**. The authoring step proposes the set as a typed artifact; the
+framework shows it to the author for confirmation; where a rule is ambiguous the
+model asks the author which reading they mean and updates it. There is no
+separate classifier, linter, or meta-judge: the model that writes the rules
+classifies them — a deterministic rule becomes a code check, an unambiguous one a
+judged check — and the author's confirmation is the gate. Code generation does
+not start until the set is confirmed.
 
-The authoring prompt carries one explicit hint: if a rule is ambiguous, ask the
-author which reading they mean before finishing; never choose one for them.
 Overfit is the exception the gate cannot catch with confidence — it is handled at
 runtime when the author declares an artifact correct despite the rule.
 
@@ -133,8 +134,9 @@ classification is by the evidence in the conversation and the rule's text.
 
 - The **requirement step is the gate**: the model proposes the rule set (a
   deterministic rule as a code check, an unambiguous one as a judged check), the
-  framework shows it for confirmation, and a meta-rule failure is fed back so the
-  model asks the author to disambiguate. No separate classifier.
+  framework shows it for confirmation, and the author's acceptance is the gate.
+  The rule-writing guidance lives in the authoring prompt; the rules themselves
+  are not judged.
 - **The feedback loop already exists**: a rejected result is an error message fed
   back to the model, which continues the conversation. The work is the content of
   those messages, not new plumbing.

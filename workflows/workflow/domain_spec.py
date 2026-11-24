@@ -64,24 +64,6 @@ class ComponentDomainSpec(LLMValidated):
         "or name a specialist helping the owner. It is not a generic label "
         "('Reviewer', 'Expert', 'Analyst', 'Assistant', 'Helper') and not the "
         "person who supplies the input unless they are that specialist.",
-        # Rules about rules: what_good_looks_like is the standard the component
-        # will be judged against, so each entry must be something a reader can
-        # evaluate without guessing the author's intent.
-        "Each entry in what_good_looks_like is one requirement. Two attributes "
-        "of the same thing ('an owner and a due date') are one requirement; two "
-        "different outcomes are two entries.",
-        "An entry that constrains 'every' or 'all' says whether at least one "
-        "must exist, or whether only the items that exist are constrained. "
-        "'Every decision has an owner' does not say whether a meeting with no "
-        "decisions is acceptable; name which is meant.",
-        "A quality word carries its standard. 'Concise', 'readable', 'polite' "
-        "are fine: their standard is intrinsic and shared. 'Complete' (with "
-        "respect to what?), 'sufficient' (for what?), 'appropriate' (to what?), "
-        "'specific' (about what?) must name their reference or be replaced by "
-        "the parts that must be present. Non-deterministic is not ambiguous: do "
-        "not demand a mechanical test for 'concise'.",
-        "An entry does not encode a value from one example (a place name, a "
-        "date, a person's name) as a requirement.",
     ]
 
     name: Annotated[
@@ -217,7 +199,14 @@ def _draft_domain_spec(
 
 The responsibilities and any deliverables are established. Derive the fields, the quality checks, and the expertise
 yourself; do not ask the user anything. Keep `responsibilities.name` exactly as given: do not reformat, split, or
-expand it. Return the complete spec."""
+expand it. Return the complete spec.
+
+Write each quality check as one requirement the user can confirm without guessing. One outcome per entry; two
+attributes of the same thing ('an owner and a due date') are one requirement. A quality word must carry its standard:
+'concise', 'readable' and 'polite' are intrinsic and shared, while 'complete' (with respect to what?), 'sufficient'
+(for what?) and 'appropriate' (to what?) name their reference or are replaced by the parts that must be present.
+Never turn a value from one example (a place, a date, a person's name) into a requirement. A check a program could
+decide exactly belongs in code, not in this list."""
     ...  # type: ignore[reportReturnType]
 
 
@@ -236,6 +225,8 @@ answering it. Do not show it again and do not repeat that question.
 If the user confirms, return the draft. If they correct or add a field or check — including a section, a table, or a
 length limit — update the fields or what_good_looks_like and return the corrected spec; the framework shows the change.
 Ask only about a gap the draft cannot fill; do not re-present the whole spec and do not ask what to call the artifact.
+If a quality check is ambiguous — a word whose reference is unstated — ask which reading the user means and update it;
+do not choose one for them.
 If they move to a different part of the work — how the artifact gets made, who does what, what happens next — say in one
 sentence that this step defines the artifact itself and that part comes next, then finish. Do not restate a change you
 already reported in an earlier turn; say what changed only in the turn where it changes.

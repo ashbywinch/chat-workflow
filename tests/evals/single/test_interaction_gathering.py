@@ -55,8 +55,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
             ],
             what_good_looks_like=[
                 "Someone who missed the meeting can catch up in two minutes",
-                "Every decision has enough context to be understood without the discussion",
-                "Every action item has a clear owner and a due date",
+                "A decision is written with enough context to be understood without the discussion.",
             ],
             expert_role="Meeting Minutes Administrator",
         )
@@ -98,7 +97,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
                 ),
                 StructValidator(
                     rule="Every action item must have both an owner and a due date",
-                    domain_origin=("Every action item has a clear owner and a due date"),
+                    domain_origin=("An action item names an owner and a due date."),
                 ),
             ],
         )

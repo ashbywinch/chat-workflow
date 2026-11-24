@@ -84,6 +84,14 @@ class RulePassed(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rule: str = Field(..., min_length=1, description="The rule text, copied exactly")
+    reasoning: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Why the evidence supports the verdict. This is the judge's own "
+            "argument, kept apart from the quote."
+        ),
+    )
     verdict: Literal["pass"] = Field(description="The data satisfies the rule")
     evidence: str = Field(
         ...,
@@ -98,6 +106,14 @@ class RuleFailed(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rule: str = Field(..., min_length=1, description="The rule text, copied exactly")
+    reasoning: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "Why the evidence supports the verdict. This is the judge's own "
+            "argument, kept apart from the quote."
+        ),
+    )
     verdict: Literal["fail"] = Field(description="The data does not satisfy the rule")
     evidence: str = Field(
         ...,
@@ -271,13 +287,16 @@ class LLMValidated(BaseModel):
         prompt += (
             "\nReturn one verdict per rule, in order. Each verdict has:\n"
             '- "rule": the rule text, copied exactly\n'
+            '- "reasoning": why the evidence supports your verdict, in one or '
+            "two sentences; decide the verdict from this reasoning\n"
             '- "verdict": "pass" if the data satisfies the rule, "fail" if it '
             "does not\n"
             '- "evidence": the exact quote from the data that supports the '
             "verdict; a fail MUST quote the field or phrase that violates the "
             "rule\n"
-            "A pass carries no other fields. Do not propose a correction: the "
-            "caller decides what to do with a fail."
+            "Reasoning explains the judgment; evidence quotes the data. Do not "
+            "put an argument in evidence or a quote in reasoning. Do not "
+            "propose a correction: the caller decides what to do with a fail."
         )
 
         try:
@@ -295,6 +314,7 @@ class LLMValidated(BaseModel):
                 transport_retries=config.max_retries,
                 timeout_seconds=config.request_timeout_seconds,
                 temperature=0.0,
+                thinking=True,
                 extra_headers=config.extra_headers,
             )
             # This validator runs inside the agent's own event loop, where
@@ -317,7 +337,8 @@ class LLMValidated(BaseModel):
         if failures:
             raise ValidationError(
                 "; ".join(
-                    f"[{verdict.rule}] Evidence: {verdict.evidence}"
+                    f"[{verdict.rule}] {verdict.reasoning} "
+                    f"Evidence: {verdict.evidence}"
                     for verdict in failures
                 )
             )

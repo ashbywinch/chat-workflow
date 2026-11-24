@@ -16,6 +16,8 @@ import unittest
 from contextlib import suppress
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from tests.conftest import timeout
 from tests.evals.helpers import (
     AgentIO,
@@ -68,8 +70,7 @@ def make_minutes_draft_design_spec() -> ComponentDesignSpec:
             what_good_looks_like=[
                 "Attendees can immediately understand decisions made",
                 "Someone who missed the meeting can catch up in two minutes",
-                "Every action item has a clear owner and due date",
-                "The minutes are concise but complete",
+                "The minutes are concise — no rambling or unnecessary detail.",
             ],
             expert_role="Meeting Minutes Administrator",
         ),
@@ -156,7 +157,6 @@ class TestComponentSourceCodeCodegenEval(unittest.TestCase):
                 attr = getattr(mod, attr_name)
                 if not isinstance(attr, type):
                     continue
-                from pydantic import BaseModel
 
                 if not (isinstance(attr, type) and issubclass(attr, BaseModel)):
                     continue

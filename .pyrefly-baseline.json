@@ -73,9 +73,9 @@
    "severity": "error"
   },
   {
-   "line": 144,
+   "line": 145,
    "column": 20,
-   "stop_line": 144,
+   "stop_line": 145,
    "stop_column": 34,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
@@ -85,9 +85,9 @@
    "severity": "warn"
   },
   {
-   "line": 146,
+   "line": 147,
    "column": 19,
-   "stop_line": 146,
+   "stop_line": 147,
    "stop_column": 33,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
@@ -97,39 +97,15 @@
    "severity": "warn"
   },
   {
-   "line": 149,
+   "line": 150,
    "column": 13,
-   "stop_line": 149,
+   "stop_line": 150,
    "stop_column": 36,
    "path": "tests/evals/composite/test_component_source_code_codegen.py",
    "code": -2,
    "name": "missing-attribute",
    "description": "Object of class `NoneType` has no attribute `exec_module`",
    "concise_description": "Object of class `NoneType` has no attribute `exec_module`",
-   "severity": "error"
-  },
-  {
-   "line": 179,
-   "column": 49,
-   "stop_line": 179,
-   "stop_column": 58,
-   "path": "tests/evals/composite/test_component_source_code_codegen.py",
-   "code": -2,
-   "name": "unbound-name",
-   "description": "`BaseModel` may be uninitialized",
-   "concise_description": "`BaseModel` may be uninitialized",
-   "severity": "error"
-  },
-  {
-   "line": 239,
-   "column": 43,
-   "stop_line": 239,
-   "stop_column": 52,
-   "path": "tests/evals/composite/test_component_source_code_codegen.py",
-   "code": -2,
-   "name": "unbound-name",
-   "description": "`BaseModel` may be uninitialized",
-   "concise_description": "`BaseModel` may be uninitialized",
    "severity": "error"
   },
   {

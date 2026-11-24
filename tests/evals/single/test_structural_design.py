@@ -57,8 +57,7 @@ class TestStructuralDesignEval(unittest.TestCase):
             ],
             what_good_looks_like=[
                 "Someone who missed the meeting can catch up in two minutes",
-                "Every decision has enough context to be understood without the discussion",
-                "Every action item has a clear owner and a due date",
+                "A decision is written with enough context to be understood without the discussion.",
                 "The minutes are concise — no rambling or unnecessary detail",
             ],
             expert_role="Meeting Minutes Administrator",
