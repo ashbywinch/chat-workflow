@@ -171,35 +171,35 @@ class TestFieldGenerator(unittest.TestCase):
         from chat_workflow.code_generator import generate_field
 
         result = generate_field("name", "str", "A name")
-        self.assertIn("str", result)
+        self.assertIn("name: str = Field(", result)
 
     def test_generate_field_int_type(self):
         """generate_field should handle int type."""
         from chat_workflow.code_generator import generate_field
 
         result = generate_field("age", "int", "Age in years")
-        self.assertIn("int", result)
+        self.assertIn("age: int = Field(", result)
 
     def test_generate_field_float_type(self):
         """generate_field should handle float type."""
         from chat_workflow.code_generator import generate_field
 
         result = generate_field("price", "float", "Price in dollars")
-        self.assertIn("float", result)
+        self.assertIn("price: float = Field(", result)
 
     def test_generate_field_list_type(self):
         """generate_field should handle list type."""
         from chat_workflow.code_generator import generate_field
 
         result = generate_field("tags", "list", "List of tags")
-        self.assertIn("list", result)
+        self.assertIn("tags: list = Field(", result)
 
     def test_generate_field_optional_type(self):
         """generate_field should handle optional fields (type | None)."""
         from chat_workflow.code_generator import generate_field
 
         result = generate_field("nickname", "str | None", "Optional nickname")
-        self.assertIn("None", result)
+        self.assertIn("nickname: str | None = Field(", result)
 
     def test_generate_field_no_description(self):
         """generate_field should handle missing description gracefully."""

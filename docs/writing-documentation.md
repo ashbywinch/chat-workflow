@@ -139,6 +139,11 @@ a reader needs to know why, state the constraint: "this message format is
 required by the upstream API" — not "Bob chose this format in 2022 because
 the old parser couldn't handle".
 
+A port's deviation comment is the same rule, not an exception to it: it
+states the constraint the new language imposes, at the point of
+divergence, and names no alternative and no person. See "A port mirrors
+the reference" in `coding-standards.md`.
+
 ## API keys never go in docs
 
 API keys, passwords, and secrets never appear in documentation or `.env`

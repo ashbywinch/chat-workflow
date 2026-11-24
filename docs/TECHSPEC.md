@@ -81,7 +81,7 @@ library-side interface are in
 
 ## Turn contracts
 
-Eight rules shape a conversation, independent of any one step's prompt:
+Nine rules shape a conversation, independent of any one step's prompt:
 
 - **A success says what it did.** `Success` carries `message`, and the session
   speaks it for a chat-on step. A silent completion is not expressible.
@@ -111,6 +111,12 @@ Eight rules shape a conversation, independent of any one step's prompt:
 - **A turn is not a repeat.** An identical continue message is not a new turn:
   it is fed back with a correction, so a model that did not read the answer it
   was given cannot loop.
+- **A result its own rules reject is a turn.** A rejection is about the result,
+  not the sample: every retry answers from the same history, so a rule that
+  failed for a fact the user has not given cannot be repaired by resampling.
+  The rejection is fed back as a correction turn — ask for what is missing —
+  and the conversation continues, bounded by `max_turns`. On the last turn the
+  run fails rather than asking a question it cannot get answered.
 
 A question the schema already fixes (the three interaction preferences) is
 asked by the framework, not left to the model: the answer is a parameter to

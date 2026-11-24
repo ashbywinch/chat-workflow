@@ -125,6 +125,48 @@ class TestVerdictCoherence(unittest.TestCase):
         self.assertTrue(_verdict_claims_the_rule_passes(verdict))
         self.assertFalse(_is_actionable_failure(verdict))
 
+    def test_a_narrated_correction_does_not_hide_the_pass(self):
+        """The judge concluded a pass, then narrated withdrawing its verdict."""
+        verdict = RuleVerdict(
+            rule=(
+                "The scope states what this part of the work itself does; it "
+                "also states at least one thing it does not do."
+            ),
+            passed=False,
+            explanation=(
+                "However, it does not state at least one thing it does not do. "
+                "Evidence: 'Does not include capturing the raw notes during "
+                "the meeting.' Fix: The scope_description already includes that "
+                "statement. Re-evaluating: the data does state it. So this "
+                "actually passes. I need to correct my verdict."
+            ),
+            evidence="scope_description: 'Does not include capturing the raw notes.'",
+            fix=(
+                "The scope_description already includes the out-of-scope "
+                "statement, so this actually passes. I need to correct my "
+                "verdict."
+            ),
+        )
+
+        self.assertTrue(_verdict_claims_the_rule_passes(verdict))
+        self.assertFalse(_is_actionable_failure(verdict))
+
+    def test_a_narration_alone_keeps_a_real_failure(self):
+        """Skipping verdict narration must not read the previous sentence as a pass."""
+        verdict = RuleVerdict(
+            rule="The name is a noun naming a concrete artifact",
+            passed=False,
+            explanation=(
+                "The name 'GenerateInvoice' is an action, so it fails the rule. "
+                "I need to correct my verdict."
+            ),
+            evidence="name: GenerateInvoice",
+            fix="replace name 'GenerateInvoice' with 'Invoice'",
+        )
+
+        self.assertFalse(_verdict_claims_the_rule_passes(verdict))
+        self.assertTrue(_is_actionable_failure(verdict))
+
     def test_substantive_failure_is_actionable(self):
         verdict = RuleVerdict(
             rule="The name is a noun naming a concrete artifact",
