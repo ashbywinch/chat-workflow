@@ -3,105 +3,66 @@
 The design is in [rules and authority](../reference/rules-and-authority.md) and
 [document store](../reference/document-store.md). This page is the build order.
 
-**Status:** next, not started. Scope: one user, present, authoring a component.
+**Status:** the minimal path is next; the persistence and release machinery is
+deferred until the evals show it is needed.
 
 ## Process decisions
 
-- **Branch.** Work happens on a branch cut from `meta-workflow`, not from `main`.
-  [PR#23](https://github.com/ashbywinch/chat-workflow/pull/23) (the core split) is
-  stacked on the same branch and will move the new packages under `packages/`;
-  that move is file relocation, not redesign.
-- **Package layout.** New packages live at the repository root until #23 lands:
-  `document-store` (contract) and `document-store-files` (simple
-  implementation). `document-store-enterprise` is not built in this phase.
-  One class per module; packages organise them.
-- **One PR.** The five items below are interdependent — a store with nothing to
-  store, a router with no verdicts — so they land as one PR with one commit per
-  item. If review prefers smaller changes, the split point is after item 2.
-- **No persistence in the library.** The library gains only rule identity and the
-  typed failure. It imports no store package and writes no file.
-- **No new capture.** The eval of the eval replays a failure record the harness
-  already writes.
-- **Build for the split, not around it.** Nothing in the library imports the
-  component maker; the component maker imports the store contract and the simple
-  implementation.
+- **Branch.** Work happens on a branch cut from `meta-workflow`. Nothing is built
+  off `main` while [PR#17](https://github.com/ashbywinch/chat-workflow/pull/17)
+  is open.
+- **One PR at a time.** The minimal path below is one PR: the meta-rules, the
+  message improvements, and the eval that proves the loop.
+- **The existing feedback loop is the mechanism.** A failed validation is an
+  error message fed back to the model, which continues the conversation and asks
+  the author when it needs to. No new failure type, router, release or version
+  store is built now.
+- **A component is released when it is accepted at the end of its step.** There
+  is no separate release action.
 
-## Work items
+## Now
 
-### 1. Rule identity and the typed failure (library)
+### 1. Rules about rules in the requirement step
 
-- **Inputs:** `_validation_rules` strings; the judge's verdicts.
-- **Outputs:** `Rule(id, version, text)`; an explicit semantic evaluation that
-  runs after the object is constructed; `RequirementFailed` carrying the verdicts
-  and the attempted artifact. Structural validation and its retry path are
-  unchanged.
-- **Operations:** none for the user.
-- **Quality gate:** a semantic failure raises with rule ids and versions; a
-  structural failure still reaches the model as a retry; the existing suite
-  unchanged.
+- **Inputs:** the author's intent, exemplars and quality statements.
+- **Outputs:** the rule-quality meta-rules as the requirement set's validation
+  rules, and one prompt hint: if a rule is ambiguous, ask the author which
+  reading they mean before finishing; never choose one.
+- **Quality gate:** an ambiguous rule produces a question and the step does not
+  finish; a deterministic rule is written as a code check; a compound or
+  example-bearing rule is rejected with the repair.
 
-### 2. Storage contract and the simple implementation
+### 2. Messages that repair, in the existing loop
 
-- **Inputs:** the record shape and four operations in the store note.
-- **Outputs:** `document-store` (`Document`, `DocumentType`, `DocumentStore`,
-  `Release`, errors); `document-store-files` (`LocalDocumentStore` over
-  `.workflow-store/`).
-- **Operations:** `put`, `get`, `find`, `release`; configurable path.
-- **Quality gate:** round-trip and versioning; a release is an immutable set of
-  `uuid@version`; refs compose to arbitrary depth; the architecture test shows no
-  library→store import.
+- **Inputs:** the failures the suite already produces.
+- **Outputs:** every rejection names the offending value and a concrete repair —
+  the stage that repeats its step, a placeholder, a type expression in prose, a
+  success that asks a question. These are the messages the model is given when it
+  is asked to continue.
+- **Quality gate:** the failing eval passes after the message change, without a
+  new mechanism.
 
-### 3. Requirements as documents, and the rule-quality gate
+### 3. Prove it with the evals
 
-- **Inputs:** the component's domain spec and checks.
-- **Outputs:** the requirement record — intent, statements, one good and one bad
-  exemplar, scope, owner, version — written to the store; checks carry
-  `requirement_id`; generated code carries the same ids.
-- **The gate:** the rule set is a proposed artifact. The model writes each rule
-  as a code check (deterministic) or a judged check (unambiguous), with the six
-  meta-rules as the set's validation rules; the framework shows it for
-  confirmation. A meta-rule failure is fed back, and the model asks the author to
-  disambiguate rather than choosing a reading. Code generation does not start
-  until the set is confirmed. Overfit is not detectable here and is handled at
-  runtime.
-- **Operations:** the domain-spec step asks for intent and the two exemplars.
-- **Quality gate:** an ambiguous rule produces a question before generation; a
-  deterministic rule becomes code; every check resolves to a requirement version.
+- **Inputs:** the failures the suite produces, including a real truncated
+  session from the original failure.
+- **Outputs:** the previously failing evals green; a replay case that shows an
+  ambiguous rule being questioned rather than guessed.
+- **Quality gate:** the conversation suite passes; no rule change is made
+  silently.
 
-### 4. Router and rework step
+## Deferred
 
-- **Inputs:** a `RequirementFailed` and the facts the user gave.
-- **Outputs:** the three causes as a fixed procedure — the user declared a
-  deviation, the rule is ambiguous, or the artifact is invalid — and the action
-  each implies: the author decides the first two; the system repairs the third.
-  The rework conversation step shows the requirement, the check, the artifact and
-  the proposed change in the same format every time; an amendment is a new
-  version.
-- **Operations:** the rework step runs in the authoring conversation.
-- **Quality gate:** a rule change always asks the author; an invalid artifact is
-  repaired without touching the standard; the same artifact is re-evaluated under
-  a new version.
+Recorded in the design notes, not built now. Revisit only if the feedback loop
+proves insufficient:
 
-### 5. The eval of the eval
-
-- **Inputs:** an existing failure record (`events`, transcript, verdicts),
-  truncated at the failure; plus authoring scenarios for the gate.
-- **Outputs:** a deterministic replay test that asserts the cause and the action,
-  plus live cases for the gate — an ambiguous rule is blocked or questioned, a
-  deterministic rule becomes code, an overfit rule is caught when the author
-  declares the artifact correct.
-- **Operations:** the live cases run in the conversation suite.
-- **Quality gate:** the replay reaches the same conclusion as the original
-  failure; the gate cases behave as specified; the live eval passes.
+- requirement ids and versions, and the document store (`document-store`,
+  `document-store-files`);
+- persisting requirements, artefacts, verdicts and code;
+- the rework surface beyond the existing conversation;
+- releases and amendments as separate machinery.
 
 ## Out of scope
 
 The enterprise adapter, multi-user operation, permissions, search/RAG and
-retention policy. The store contract is shaped so they are additions, not
-rewrites.
-
-## Open questions
-
-- How an amendment is recorded against the component so the next run uses it.
-- Explicit saves versus a thin persistence wrapper in the component maker.
-- Retention; the blob adapter; where the runnable code file lives.
+retention policy.

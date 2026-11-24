@@ -123,25 +123,28 @@ requirement it serves.
 No one has to prove anything, and a repeat is not a different cause. The
 classification is by the evidence in the conversation and the rule's text.
 
-## What this implies for the architecture
+## What we build now
 
-Not yet implemented. The shape:
+- The **requirement step is the gate**: the model proposes the rule set (a
+  deterministic rule as a code check, an unambiguous one as a judged check), the
+  framework shows it for confirmation, and a meta-rule failure is fed back so the
+  model asks the author to disambiguate. No separate classifier.
+- **The feedback loop already exists**: a rejected result is an error message fed
+  back to the model, which continues the conversation. The work is the content of
+  those messages, not new plumbing.
+- A component is **released when the author accepts it at the end of the step**.
+  There is no separate release action.
 
-- A **rule-quality gate** is the requirement step itself: the model proposes the
-  rule set (a deterministic rule as a code check, an unambiguous one as a judged
-  check), the framework shows it for confirmation, and a meta-rule failure is fed
-  back so the model asks the author to disambiguate. No separate classifier.
-- Requirements are modelled, stored as documents, and versioned; checks, prompts
-  and code reference them by `requirement_id@version`. The integration is in
-  [document store](document-store.md).
-- Judgment raises a typed **`RequirementFailed`**; the application persists it
-  and routes.
-- The eval of the component-making component includes the gate: an ambiguous
-  rule is blocked or questioned, a deterministic one becomes code, and an
-  overfit one is caught when the user declares the artifact correct.
+The rest — requirement ids and versions, the document store, persisted verdicts,
+rework beyond the conversation, and amendments as separate machinery — is
+[deferred](../PLAN/standards-and-persistence.md) until the feedback loop proves
+insufficient.
+
+The eval of the component-making component still has to show the gate working:
+an ambiguous rule is questioned, a deterministic one becomes code, and an overfit
+one is caught when the user declares the artifact correct.
 
 ## Open questions
 
-- How an amendment is recorded against the component, so the next run uses it.
-- How the author's confirmation of the rule set is recorded with the requirement
-  versions.
+None for the minimal path. The deferred design's open questions are in
+[document store](document-store.md).
