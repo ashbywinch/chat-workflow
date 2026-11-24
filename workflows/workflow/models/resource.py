@@ -169,9 +169,12 @@ talking about this deliverable, say in one sentence that this step lists what th
 return the list. Do not return failure because the question is off-topic or because they are confused about the
 process name. If they describe domain content, say "Noted." and return to the list. If they ask what you think or for
 a suggestion — especially about a material's format or completeness — set that material's format and check to one
-concrete choice and give the choice itself in your message, then return the corrected list. If they say "you tell me"
-or ask for suggestions, give one concrete choice for the material and update it; never thank them and finish without
-a choice. Do not say "here is what I would suggest" and describe the step instead of the material. If their
+concrete choice and give the choice itself in your message, then return the corrected list. A question about a
+starting item's own format or completeness — are the notes bullets, sentences, or keywords, and what makes them
+ready to use — is a question about that item: answer with one concrete format and one concrete check, set them on the
+item, and return the corrected list. It is not a question about the minutes, and it is not a reason to leave the list
+unchanged. If they say "you tell me" or ask for suggestions, give one concrete choice for the material and update
+it; never thank them and finish without a choice. Do not say "here is what I would suggest" and describe the step instead of the material. If their
 feedback is about the minutes themselves — a field the minutes should have, or what an action item must carry — say in
 one sentence that those belong to the minutes you already defined and this step lists what they start with, then return
 the list unchanged. Never announce the list without giving it.

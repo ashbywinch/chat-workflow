@@ -32,10 +32,9 @@ class Deliverable(LLMValidated):
         "'everyone is happy'. A completeness check (the required fields are "
         "present) is valid when that is the user's standard, even for a "
         "personal record that may be saved with only a name.",
-        "The consumer is a person, role, or team — not the artifact itself. "
         "What happens to it next says who receives it and what they do with it, "
         "or that it stays with the user and is not handed on. Where it is kept "
-        "says where. None of these restates what it contains.",
+        "says where. Neither restates what it contains.",
         "If the thing's name alone is ambiguous, the explanation says what it "
         "contains.",
     ]
@@ -124,7 +123,7 @@ class Deliverable(LLMValidated):
 
     @model_validator(mode="after")
     def _consumer_is_a_party(self) -> Deliverable:
-        """The consumer is a person, role, or team — not the artifact itself."""
+        """Reject the artifact as its own consumer; the field says who it is for."""
         if self.consumer.strip().casefold() == self.name.strip().casefold():
             raise ValueError(
                 "consumer must be a person, role, or team, not the thing itself"

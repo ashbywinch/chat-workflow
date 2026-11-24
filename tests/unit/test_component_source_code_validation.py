@@ -605,8 +605,8 @@ class MinutesDraft(BaseModel):
     def test_field_validator_self_is_renamed_to_cls(self, mock_collect):
         """A field validator receives the class; `self` raises at import."""
         code = VALID_COMPONENT_CODE.replace(
-            "from pydantic import Field",
-            "from pydantic import Field, field_validator",
+            "from pydantic import BaseModel, Field",
+            "from pydantic import BaseModel, Field, field_validator",
         ).replace(
             "    @atomic_workflow_step\n",
             '    @field_validator("meeting_date")\n'
@@ -628,8 +628,8 @@ class MinutesDraft(BaseModel):
         from chat_workflow.exceptions import ValidationError
 
         code = VALID_COMPONENT_CODE.replace(
-            "from pydantic import Field",
-            "from pydantic import Field, model_validator",
+            "from pydantic import BaseModel, Field",
+            "from pydantic import BaseModel, Field, model_validator",
         ).replace(
             "    @atomic_workflow_step\n",
             '    @model_validator("meeting_date")\n'
@@ -675,7 +675,7 @@ class MinutesDraft(BaseModel):
             "later the same day without confusion."
         )
         code = VALID_COMPONENT_CODE.replace(
-            '"Every action item in the minutes names an owner and a due date.",',
+            '"Each decision records the reason behind it, not only what was decided.",',
             f'"{long_rule}",',
         )
 

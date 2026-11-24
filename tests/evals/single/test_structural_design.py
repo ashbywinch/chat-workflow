@@ -56,7 +56,7 @@ class TestStructuralDesignEval(unittest.TestCase):
                 ),
             ],
             what_good_looks_like=[
-                "Someone who missed the meeting can catch up in two minutes",
+                "Someone who missed the meeting can understand what happened without asking",
                 "A decision is written with enough context to be understood without the discussion.",
                 "The minutes are concise — no rambling or unnecessary detail",
             ],
@@ -68,7 +68,7 @@ class TestStructuralDesignEval(unittest.TestCase):
             "You know exactly what makes good meeting minutes: every decision needs "
             "enough context to stand on its own, every action item must have an owner "
             "and a due date, and someone who missed the meeting should be able to "
-            "catch up in under two minutes. You also know that minutes should be "
+            "understand what happened without asking. You also know that minutes should be "
             "concise — no rambling or unnecessary detail.\n\n"
             "But you know absolutely NOTHING about Python, Pydantic, data types, "
             "programming, or code. If the person you're talking to uses technical "

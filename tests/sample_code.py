@@ -9,23 +9,35 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from chat_workflow import atomic_workflow_step
 from chat_workflow.mixins import LLMValidated
+
+
+class ActionItem(BaseModel):
+    """One action agreed in the meeting."""
+
+    description: str = Field(..., description="What to do", min_length=1)
+    owner: str = Field(..., description="Who owns it", min_length=1)
+    due_date: str = Field(..., description="When it is due", min_length=1)
 
 
 class MinutesDraft(LLMValidated):
     """Structured meeting minutes."""
 
     _validation_rules: ClassVar[list[str]] = [
-        "Every action item in the minutes names an owner and a due date.",
+        "Each decision records the reason behind it, not only what was decided.",
     ]
 
     meeting_date: str = Field(
         ..., description="When the meeting took place", min_length=1
     )
     attendees: list[str] = Field(..., description="People who attended", min_length=1)
+    decisions: list[str] = Field(..., description="Decisions made, with the reason")
+    action_items: list[ActionItem] = Field(
+        ..., description="Action items with owners and due dates"
+    )
 
     @atomic_workflow_step
     @classmethod

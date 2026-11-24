@@ -32,7 +32,7 @@ class TestDomainExplorationEval(unittest.TestCase):
             "You know exactly what good minutes look like: every decision "
             "must be recorded with who made it, every action item needs an "
             "owner and a due date, and the whole thing should be skimmable "
-            "so someone who missed the meeting can catch up in two minutes. "
+            "so someone who missed the meeting can understand what happened without asking. "
             "You've been doing this for years and have strong opinions about "
             "what works.\n\n"
             "But you know NOTHING about programming, data structures, or "

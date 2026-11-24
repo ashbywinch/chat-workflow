@@ -79,7 +79,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
             ],
             what_good_looks_like=[
                 "Attendees can immediately understand decisions made",
-                "Someone who missed the meeting can catch up in two minutes",
+                "Someone who missed the meeting can understand what happened without asking",
             ],
             expert_role="Meeting Minutes Administrator",
         )

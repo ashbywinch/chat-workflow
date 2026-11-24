@@ -54,7 +54,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
                 ),
             ],
             what_good_looks_like=[
-                "Someone who missed the meeting can catch up in two minutes",
+                "Someone who missed the meeting can understand what happened without asking",
                 "A decision is written with enough context to be understood without the discussion.",
             ],
             expert_role="Meeting Minutes Administrator",
@@ -93,7 +93,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
             model_validators=[
                 StructValidator(
                     rule="Every decision must include enough context to stand on its own",
-                    domain_origin=("Someone who missed the meeting can catch up in two minutes"),
+                    domain_origin=("Someone who missed the meeting can understand what happened without asking"),
                 ),
                 StructValidator(
                     rule="Every action item must have both an owner and a due date",
