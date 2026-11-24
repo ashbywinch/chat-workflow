@@ -49,12 +49,18 @@ Rules are authored by the author and checked against a small set of
 meta-rules at authoring time:
 
 1. **One requirement per rule.** A compound rule hides one failure behind the
-   other.
+   other. Two attributes of the same thing ("an owner and a due date") are one
+   requirement; two different outcomes are two entries.
 2. **Quantify the scope.** Say whether at least one must exist, or whether only
    the items that exist are constrained. "Every decision has an owner" does not
    say whether a meeting with no decisions is acceptable.
-3. **No undefined predicates.** "Specific", "clear", "appropriate", "good" name
-   nothing checkable; replace them with the parts that make a thing so.
+3. **A quality word carries its standard.** A word whose standard is intrinsic
+   and shared — "concise", "readable", "polite" — is fine, because a reader can
+   judge it. A relation whose other end is unstated is ambiguous — "complete"
+   (with respect to what?), "sufficient" (for what?), "appropriate" (to what?),
+   "specific" (about what?) — and must name its reference or be replaced by the
+   parts that must be present. Non-deterministic is not ambiguous: never demand a
+   mechanical test for "concise".
 4. **No example values as constraints.** An example belongs in the exemplar,
    not in the rule.
 5. **If it can be checked mechanically, it must be checked in code**, not judged.

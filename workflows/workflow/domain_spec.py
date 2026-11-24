@@ -64,6 +64,24 @@ class ComponentDomainSpec(LLMValidated):
         "or name a specialist helping the owner. It is not a generic label "
         "('Reviewer', 'Expert', 'Analyst', 'Assistant', 'Helper') and not the "
         "person who supplies the input unless they are that specialist.",
+        # Rules about rules: what_good_looks_like is the standard the component
+        # will be judged against, so each entry must be something a reader can
+        # evaluate without guessing the author's intent.
+        "Each entry in what_good_looks_like is one requirement. Two attributes "
+        "of the same thing ('an owner and a due date') are one requirement; two "
+        "different outcomes are two entries.",
+        "An entry that constrains 'every' or 'all' says whether at least one "
+        "must exist, or whether only the items that exist are constrained. "
+        "'Every decision has an owner' does not say whether a meeting with no "
+        "decisions is acceptable; name which is meant.",
+        "A quality word carries its standard. 'Concise', 'readable', 'polite' "
+        "are fine: their standard is intrinsic and shared. 'Complete' (with "
+        "respect to what?), 'sufficient' (for what?), 'appropriate' (to what?), "
+        "'specific' (about what?) must name their reference or be replaced by "
+        "the parts that must be present. Non-deterministic is not ambiguous: do "
+        "not demand a mechanical test for 'concise'.",
+        "An entry does not encode a value from one example (a place name, a "
+        "date, a person's name) as a requirement.",
     ]
 
     name: Annotated[

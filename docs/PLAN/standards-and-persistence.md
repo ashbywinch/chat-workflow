@@ -11,43 +11,31 @@ deferred until the evals show it is needed.
 - **Branch.** Work happens on a branch cut from `meta-workflow`. Nothing is built
   off `main` while [PR#17](https://github.com/ashbywinch/chat-workflow/pull/17)
   is open.
-- **One PR at a time.** The minimal path below is one PR: the meta-rules, the
-  message improvements, and the eval that proves the loop.
 - **The existing feedback loop is the mechanism.** A failed validation is an
-  error message fed back to the model, which continues the conversation and asks
-  the author when it needs to. No new failure type, router, release or version
-  store is built now.
+  error message fed back to the model, which continues the conversation. No new
+  failure type, router, release, version store or prompt-hint mechanism is built.
+  A meta-rule's text *is* its repair message.
 - **A component is released when it is accepted at the end of its step.** There
   is no separate release action.
 
 ## Now
 
-### 1. Rules about rules in the requirement step
+### 1. Rules about rules
 
 - **Inputs:** the author's intent, exemplars and quality statements.
-- **Outputs:** the rule-quality meta-rules as the requirement set's validation
-  rules, and one prompt hint: if a rule is ambiguous, ask the author which
-  reading they mean before finishing; never choose one.
-- **Quality gate:** an ambiguous rule produces a question and the step does not
-  finish; a deterministic rule is written as a code check; a compound or
-  example-bearing rule is rejected with the repair.
+- **Outputs:** the meta-rules attached to the requirement-bearing model, so the
+  existing validation feedback rejects an ambiguous requirement and the model
+  continues the conversation.
+- **Quality gate:** an ambiguous rule is rejected with a repair; a deterministic
+  rule is written as a code check; a compound or example-bearing rule is
+  rejected with the repair.
 
-### 2. Messages that repair, in the existing loop
+### 2. Prove it with the evals
 
-- **Inputs:** the failures the suite already produces.
-- **Outputs:** every rejection names the offending value and a concrete repair —
-  the stage that repeats its step, a placeholder, a type expression in prose, a
-  success that asks a question. These are the messages the model is given when it
-  is asked to continue.
-- **Quality gate:** the failing eval passes after the message change, without a
-  new mechanism.
-
-### 3. Prove it with the evals
-
-- **Inputs:** the failures the suite produces, including a real truncated
-  session from the original failure.
+- **Inputs:** the failures the suite produces, including a real truncated session
+  from the original failure.
 - **Outputs:** the previously failing evals green; a replay case that shows an
-  ambiguous rule being questioned rather than guessed.
+  ambiguous rule being rejected rather than guessed.
 - **Quality gate:** the conversation suite passes; no rule change is made
   silently.
 
