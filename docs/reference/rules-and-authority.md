@@ -50,10 +50,18 @@ hiding it inside a prose explanation. The judge does not repair the artifact or
 propose its correction; a response that does not match the schema is sent back
 to the judge with the validation error.
 
+The judge's request carries an explicit reasoning effort. The portable
+"thinking" switch alone is not enough for a gateway route: a dynamic model id
+has no profile, so no effort is sent and the provider reasons not at all. With
+the effort stated, the provider's thinking is part of the judge's transcript,
+and the verdict's `reasoning` field holds the argument that is fed back with a
+failure.
+
 ## Writing a rule
 
-Rules are authored by the author, and the authoring prompt carries a small set
-of qualities to write them to:
+Rules are authored by the author, and
+`ComponentDomainSpec._validation_rules` carries a small set of rules about the
+rules themselves:
 
 1. **One requirement per rule.** A compound rule hides one failure behind the
    other. Two attributes of the same thing ("an owner and a due date") are one
@@ -67,17 +75,18 @@ of qualities to write them to:
    mechanical test for "concise".
 3. **No example values as constraints.** An example belongs in the exemplar,
    not in the rule.
-4. **If it can be checked mechanically, it must be checked in code**, not judged.
-5. **Cite the user's words**, so the author recognises their own intent.
+4. **If it can be checked mechanically, it belongs in the fields and
+   validators**, not in the quality list.
 
-These are **guidance for the model that writes the rules, not rules the judge
-evaluates**. The authoring step proposes the set as a typed artifact; the
-framework shows it to the author for confirmation; where a rule is ambiguous the
-model asks the author which reading they mean and updates it. There is no
-separate classifier, linter, or meta-judge: the model that writes the rules
-classifies them — a deterministic rule becomes a code check, an unambiguous one a
-judged check — and the author's confirmation is the gate. Code generation does
-not start until the set is confirmed.
+These are **the model's rules, and the judge is their executor**: they live on
+`ComponentDomainSpec`, and the judge's own prompt and code carry none of them.
+The authoring step proposes the set as a typed artifact; the judge applies the
+four to that list; a failure is fed back to the model, which asks the author
+which reading they mean and updates it; the framework shows the change; the
+author confirms. There is no separate classifier or linter: the model that
+writes the rules classifies them — a deterministic rule becomes a code check, an
+unambiguous one a judged check — and the author's confirmation is the gate. Code
+generation does not start until the set is confirmed.
 
 Overfit is the exception the gate cannot catch with confidence — it is handled at
 runtime when the author declares an artifact correct despite the rule.

@@ -64,6 +64,23 @@ class ComponentDomainSpec(LLMValidated):
         "or name a specialist helping the owner. It is not a generic label "
         "('Reviewer', 'Expert', 'Analyst', 'Assistant', 'Helper') and not the "
         "person who supplies the input unless they are that specialist.",
+        # Rules about rules: what_good_looks_like is the standard the component
+        # will be judged against, so each entry must be something a reader can
+        # evaluate without guessing the author's intent.
+        "Each entry in what_good_looks_like is one requirement. Two attributes "
+        "of the same thing ('an owner and a due date') are one requirement; two "
+        "different outcomes are two entries.",
+        "A quality word carries its standard. 'Concise', 'readable', 'polite' "
+        "are fine: their standard is intrinsic and shared. 'Complete' (with "
+        "respect to what?), 'sufficient' (for what?), 'appropriate' (to what?), "
+        "'specific' (about what?) must name their reference or be replaced by "
+        "the parts that must be present. Non-deterministic is not ambiguous: do "
+        "not demand a mechanical test for 'concise'.",
+        "An entry does not encode a value from one example (a place name, a "
+        "date, a person's name) as a requirement.",
+        "A requirement a program could decide exactly — a field is present, a "
+        "date has a format, an owner is not empty — belongs in the fields and "
+        "validators, not in what_good_looks_like.",
     ]
 
     name: Annotated[
@@ -199,14 +216,7 @@ def _draft_domain_spec(
 
 The responsibilities and any deliverables are established. Derive the fields, the quality checks, and the expertise
 yourself; do not ask the user anything. Keep `responsibilities.name` exactly as given: do not reformat, split, or
-expand it. Return the complete spec.
-
-Write each quality check as one requirement the user can confirm without guessing. One outcome per entry; two
-attributes of the same thing ('an owner and a due date') are one requirement. A quality word must carry its standard:
-'concise', 'readable' and 'polite' are intrinsic and shared, while 'complete' (with respect to what?), 'sufficient'
-(for what?) and 'appropriate' (to what?) name their reference or are replaced by the parts that must be present.
-Never turn a value from one example (a place, a date, a person's name) into a requirement. A check a program could
-decide exactly belongs in code, not in this list."""
+expand it. Return the complete spec."""
     ...  # type: ignore[reportReturnType]
 
 

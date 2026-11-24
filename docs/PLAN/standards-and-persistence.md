@@ -14,7 +14,7 @@ deferred until the evals show it is needed.
 - **The existing feedback loop is the mechanism.** A failed validation is an
   error message fed back to the model, which continues the conversation. No new
   failure type, router, release, version store or prompt-hint mechanism is built.
-  The rule-writing guidance is part of the authoring prompt, so a weak rule is
+  The rule-writing rules are part of `ComponentDomainSpec`, so a weak rule is
   corrected by rewriting it before the author confirms the set.
 - **A component is released when it is accepted at the end of its step.** There
   is no separate release action.
@@ -24,9 +24,9 @@ deferred until the evals show it is needed.
 ### 1. Rules about rules
 
 - **Inputs:** the author's intent, exemplars and quality statements.
-- **Outputs:** the rule-writing guidance in the authoring prompt, so the model
-  writes rules the author can confirm and asks about any it cannot make
-  unambiguous.
+- **Outputs:** the rules about rules in `ComponentDomainSpec._validation_rules`,
+  so the model writes rules the author can confirm and asks about any it cannot
+  make unambiguous.
 - **Quality gate:** the author confirms the set; a deterministic rule is written
   as a code check; a compound or example-bearing rule is rewritten before the
   author sees the set. The rules are not themselves judged.

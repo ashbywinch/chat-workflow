@@ -6,8 +6,8 @@ defines the store that records documents, the four operations the application
 needs, and the simple implementation that ships first
 (`document-store-files`).
 
-**Status:** deferred design. The minimal path — rule-writing guidance in the
-authoring prompt and message quality in the existing feedback loop — is in
+**Status:** deferred design. The minimal path — rule-writing guidance on
+`ComponentDomainSpec` and message quality in the existing feedback loop — is in
 [the plan](../PLAN/standards-and-persistence.md). This page records the
 persistence model for when that loop proves insufficient. Scope when built: one
 user, local execution. The enterprise adapter is described in
