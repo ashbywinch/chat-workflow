@@ -1069,9 +1069,10 @@ class ComponentSourceCode(LLMValidated):
         "not the artifact or its fields. A chat-off atomic workflow step or a "
         "composite orchestrator has no user conversation; its docstring may "
         "be empty or documentation.",
-        "REJECT if the workflow docstring restates the class docstring or "
-        "enumerates the model's fields. A conversation-only docstring may "
-        "name the artifact once.",
+        "For a chat-on step: REJECT if the workflow docstring restates the "
+        "class docstring or enumerates the model's fields. A conversation-only "
+        "docstring may name the artifact once. A chat-off step's docstring is "
+        "prompt instructions and may name fields or list what to produce.",
         "In the generated model, mechanical constraints (non-empty, numeric "
         "range, pattern) use Pydantic field constraints or @model_validator. "
         "Reserve the generated model's _validation_rules for domain-quality "
@@ -1087,6 +1088,16 @@ class ComponentSourceCode(LLMValidated):
         "order when there is no order or timestamp field, a decision matched to "
         "a topic when nothing links them. The fix is the field that carries the "
         "fact, or no rule; an unsatisfiable rule burns the conversation.",
+        "REJECT a per-field rule that demands facts the artifact does not carry "
+        "— which product, the target audience, the budget, a format — as proof "
+        "of quality. A whole-artifact criterion ('someone who missed the meeting "
+        "can understand it') is a rule about the artifact, not a demand on "
+        "every item's description.",
+        "A generated _validation_rules entry does not rest on an unstated "
+        "reference. REJECT 'specific enough', 'clear', 'complete', "
+        "'appropriate', or 'sufficient' unless the rule says for whom or with "
+        "respect to what. 'Specific enough that someone who did not attend "
+        "could act on it' names its standard; the bare word does not.",
         "REJECT a rule that turns one example from the conversation into a "
         "universal constraint — a place named 'Zoom', one date, one person's "
         "name. A rule holds for every valid artifact; the conversation's "
@@ -1647,7 +1658,9 @@ class ComponentSourceCode(LLMValidated):
         "itself: if it needs a fact the artifact does not carry (whether an "
         "owner attended, whether a list is chronological without an order "
         "field, whether a covered topic has a matching decision when nothing "
-        "links them), add the field or drop the rule. "
+        "links them), add the field or drop the rule. A rule does not rest on "
+        "an unstated reference: 'specific enough' says for whom, or it is not a "
+        "rule. "
         "A _validation_rules entry is a rule the judge checks against the "
         "artifact's content, not a structural condition: a rule code can "
         "check ('notes are required when conditions were discussed') belongs "
@@ -1774,7 +1787,11 @@ class ComponentSourceCode(LLMValidated):
         Every entry in `domain_spec.what_good_looks_like` must be represented by
         a `_validation_rules` entry or a `@model_validator`; do not drop a
         quality criterion. If it is not mechanically checkable, express it as a
-        domain-quality rule.
+        domain-quality rule. A criterion about the artifact as a whole —
+        "someone who missed the meeting can understand it" — becomes a rule
+        about the artifact, not a per-item demand. A rule for a field is
+        satisfiable from that field's content; do not require it to carry facts
+        the artifact has no field for.
 
         Every `_validation_rules` entry must be decidable from the generated
         model's own fields. If a rule needs a fact the artifact does not carry
@@ -1782,7 +1799,10 @@ class ComponentSourceCode(LLMValidated):
         order without an order field, whether a covered topic has a matching
         decision when nothing links them — add the field that carries the fact
         or drop the rule. A rule the user cannot satisfy from the artifact is
-        a defect even when the quality is real.
+        a defect even when the quality is real. A rule also does not rest on an
+        unstated reference: "specific enough" must say for whom or with respect
+        to what, or list the parts that must be present. That is the same
+        distinction as the domain spec's quality rules.
 
         A rule that code can check — "notes are required when conditions were
         discussed" — belongs in a @model_validator, not in _validation_rules.
