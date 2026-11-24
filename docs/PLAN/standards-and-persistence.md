@@ -57,15 +57,16 @@ The design is in [rules and authority](../reference/rules-and-authority.md) and
 - **Outputs:** the requirement record — intent, statements, one good and one bad
   exemplar, scope, owner, version — written to the store; checks carry
   `requirement_id`; generated code carries the same ids.
-- **The gate:** each rule is classified as deterministic (emitted as a validator
-  and removed from the judged rules), unambiguous (kept as a judged check), or
-  ambiguous (the author is asked the one question that resolves it). Code
-  generation does not start until every rule is classified and every ambiguous
-  one answered. The six meta-rules are the gate's rubric; overfit is not
-  detectable here and is handled at runtime.
+- **The gate:** the rule set is a proposed artifact. The model writes each rule
+  as a code check (deterministic) or a judged check (unambiguous), with the six
+  meta-rules as the set's validation rules; the framework shows it for
+  confirmation. A meta-rule failure is fed back, and the model asks the author to
+  disambiguate rather than choosing a reading. Code generation does not start
+  until the set is confirmed. Overfit is not detectable here and is handled at
+  runtime.
 - **Operations:** the domain-spec step asks for intent and the two exemplars.
-- **Quality gate:** an ambiguous rule blocks generation; a deterministic rule
-  becomes code; every check resolves to a requirement version.
+- **Quality gate:** an ambiguous rule produces a question before generation; a
+  deterministic rule becomes code; every check resolves to a requirement version.
 
 ### 4. Router and rework step
 
@@ -101,7 +102,6 @@ rewrites.
 
 ## Open questions
 
-- How the gate's classification is made and what evidence it records.
 - How an amendment is recorded against the component so the next run uses it.
 - Explicit saves versus a thin persistence wrapper in the component maker.
 - Retention; the blob adapter; where the runnable code file lives.

@@ -60,17 +60,20 @@ meta-rules at authoring time:
 5. **If it can be checked mechanically, it must be checked in code**, not judged.
 6. **Cite the user's words**, so the author recognises their own intent.
 
-The meta-rules are enforced by a **rule-quality gate** in the authoring flow,
-after the requirements are captured and before code is generated. It classifies
-each rule and does one of three things:
+The meta-rules are **the validation rules of the requirement set itself**. The
+authoring step proposes the set as a typed artifact; the framework shows it to
+the author for confirmation; a rule that fails a meta-rule is fed back to the
+model as a correction, and the model continues the conversation and asks the
+author to disambiguate. There is no separate classifier and no linter: the model
+that writes the rules classifies them — a deterministic rule becomes a code
+check, an unambiguous one a judged check — and the author confirms the result.
+The gate is that loop: code generation does not start until the set is confirmed
+and the meta-rules pass.
 
-- **deterministic** → emit a validator and remove it from the judged rules;
-- **unambiguous** → keep it as a judged check, tied to its requirement;
-- **ambiguous** → stop and ask the author the one question that resolves it.
-
-The gate is a hard gate: no code generation until every rule is classified and
-every ambiguous one answered. Overfit is the exception — it cannot be detected
-here with confidence, and is handled at runtime when the author declares it.
+The authoring prompt carries one explicit hint: if a rule is ambiguous, ask the
+author which reading they mean before finishing; never choose one for them.
+Overfit is the exception the gate cannot catch with confidence — it is handled at
+runtime when the author declares an artifact correct despite the rule.
 
 ## What a failure means
 
@@ -124,9 +127,10 @@ classification is by the evidence in the conversation and the rule's text.
 
 Not yet implemented. The shape:
 
-- A **rule-quality gate** runs at authoring: classify, emit code for
-  deterministic rules, keep judged rules with ids, ask about ambiguous ones, and
-  block generation until it passes.
+- A **rule-quality gate** is the requirement step itself: the model proposes the
+  rule set (a deterministic rule as a code check, an unambiguous one as a judged
+  check), the framework shows it for confirmation, and a meta-rule failure is fed
+  back so the model asks the author to disambiguate. No separate classifier.
 - Requirements are modelled, stored as documents, and versioned; checks, prompts
   and code reference them by `requirement_id@version`. The integration is in
   [document store](document-store.md).
@@ -138,5 +142,6 @@ Not yet implemented. The shape:
 
 ## Open questions
 
-- How the gate's classification is made and what evidence it records.
 - How an amendment is recorded against the component, so the next run uses it.
+- How the author's confirmation of the rule set is recorded with the requirement
+  versions.
