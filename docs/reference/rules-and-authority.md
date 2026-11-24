@@ -88,6 +88,15 @@ writes the rules classifies them — a deterministic rule becomes a code check, 
 unambiguous one a judged check — and the author's confirmation is the gate. Code
 generation does not start until the set is confirmed.
 
+**Quantifying scope is the author's, not a rule about rules.** An entry that says
+"every decision has an owner" may mean that a meeting with no decisions is
+acceptable, or that a meeting with no decisions is itself a failure. That is a
+question about the author's intent, not a property the text can settle. We do not
+enforce a blanket "say what happens when there are none" rule: the author answers
+it when it matters, and the gate records the answer. A mechanical version of that
+rule was tried and removed — it made the judge argue about wording instead of
+evaluating the artifact.
+
 Overfit is the exception the gate cannot catch with confidence — it is handled at
 runtime when the author declares an artifact correct despite the rule.
 
@@ -97,7 +106,8 @@ With the gate in place, a runtime failure has one of three causes:
 
 1. **The definition is ambiguous.** It should have been caught by the gate; if
    it reaches runtime, the author clarifies the rule, and the same artifact is
-   re-judged under the clarification.
+   re-judged under the clarification. "Every decision has an owner" is the
+   example: the author says whether a meeting with no decisions is acceptable.
 2. **The user wants something that is not good.** The rule is clear and right;
    the artifact knowingly does not meet it because the user's context differs —
    no next meeting, no action items, headings without the standard sections. The
@@ -144,8 +154,7 @@ classification is by the evidence in the conversation and the rule's text.
 - The **requirement step is the gate**: the model proposes the rule set (a
   deterministic rule as a code check, an unambiguous one as a judged check), the
   framework shows it for confirmation, and the author's acceptance is the gate.
-  The rule-writing guidance lives in the authoring prompt; the rules themselves
-  are not judged.
+  The rules about rules live on `ComponentDomainSpec`; the judge executes them.
 - **The feedback loop already exists**: a rejected result is an error message fed
   back to the model, which continues the conversation. The work is the content of
   those messages, not new plumbing.
