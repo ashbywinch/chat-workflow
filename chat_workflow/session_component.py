@@ -46,6 +46,10 @@ class SessionComponent:
         personal routine, not only a job. Keep it warm and plain:
         no list of questions, no form, no jargon. Do not ask the user to
         introduce themselves.
+
+        This is a single turn: return success with the greeting, and put the
+        same sentence in the result's `text` field. Do not return a continue
+        and do not use a placeholder.
         """
         ...  # type: ignore[reportReturnType]
 
@@ -58,6 +62,9 @@ class SessionComponent:
         have what you need — for example "I have what I need." Do not ask a
         question, offer another step, describe what the conversation produced,
         or say there was no conversation.
+
+        This is a single turn: return success with the closing, and put the
+        same sentence in the result's `text` field.
         """
         ...  # type: ignore[reportReturnType]
 
