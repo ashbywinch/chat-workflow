@@ -57,14 +57,15 @@ The integration is at **step boundaries**. The library returns typed results and
 raises typed failures; the application persists them. Only two things are
 needed on the library side, and neither is a store concept:
 
-- **A rule has identity.** `_validation_rules` entries become
-  `Rule(id, version, text)` values instead of bare strings, so a verdict can
-  name the requirement version it operationalises.
-- **The failure carries its evidence.** A semantic rule failure raises
-  `RequirementFailed` with the verdicts (rule id, version, passed, evidence) and
-  the attempted artifact. The caller catches it, persists the artifact and the
-  verdicts, and routes. There is no parallel "report" return path: one signal,
-  carrying data.
+- **A rule will need identity.** In the deferred design, `_validation_rules`
+  entries become `Rule(id, version, text)` values instead of bare strings, so a
+  verdict can name the requirement version it operationalises.
+- **The failure carries its evidence.** Today the judge returns typed verdicts
+  and the library raises a `ValidationError` naming the rule and quoting the
+  evidence; the model continues from that message. The deferred change is a
+  verdict that also carries the rule id/version and the attempted artifact, so
+  the application can persist and route it — one signal, no parallel report
+  path.
 - **No I/O.** The library never opens a file, never names a path, and never
   imports a store package.
 

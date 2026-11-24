@@ -46,10 +46,9 @@ def _rejection_correction(exc: MaxRetriesExceededError) -> str:
     return (
         "Your result was rejected by its own rules:\n"
         f"{reasons}\n\n"
-        "A rejection's 'Fix' text describes what a complete result looks "
-        "like. The missing values are the user's, not yours: do not send the "
-        "same result again and do not invent them. Ask for what is still "
-        "missing, then return the completed result."
+        "The missing values are the user's, not yours: do not send the same "
+        "result again and do not invent them. Ask for what is still missing, "
+        "then return the completed result."
     )
 
 

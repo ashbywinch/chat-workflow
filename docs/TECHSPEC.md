@@ -73,11 +73,10 @@ metadata; composition is by reference, with no single top level.
 The store is **not in this library**. Persistence is separate libraries
 (proposed; not yet implemented): a contract package (`document-store`) and
 implementations (`document-store-files` now, `document-store-enterprise` later),
-one class per module. The library returns typed results and raises a typed
-`RequirementFailed` carrying the verdicts; the application persists them at step
-boundaries. The record shape, `owning_role`, releases, the local layout and the
-library-side interface are in
-[document store](reference/document-store.md).
+one class per module. The library keeps returning typed results; a failed
+semantic rule is a typed `ValidationError` whose message the model continues
+from. The record shape, `owning_role`, releases, the local layout and the
+deferred interface are in [document store](reference/document-store.md).
 
 ## Turn contracts
 

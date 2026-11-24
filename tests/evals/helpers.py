@@ -388,11 +388,71 @@ def _has_conversation(session: Session) -> bool:
     )
 
 
+# Test-harness only. The eval judge writes prose and sometimes contradicts its
+# own flag ("So PASS." with passed=false, or a withdrawn verdict); this keeps a
+# self-contradictory report from failing a conversation. The product judge is
+# typed and does not parse prose.
+_VERDICT_META = (
+    "i need to correct",
+    "i should correct",
+    "correct my verdict",
+    "let me revise",
+    "revising my verdict",
+    "re-evaluat",
+    "i was wrong",
+)
+_PASS_PHRASES = (
+    "passes",
+    " pass",
+    "satisfied",
+    "is valid",
+    "meets the rule",
+    "not violated",
+    "does not violate",
+    "no violation",
+    "not a violation",
+    "is unambiguous",
+    "no fix needed",
+    "is acceptable",
+)
+_NEGATED_PASS_PHRASES = (
+    "does not pass",
+    "doesn't pass",
+    "does not satisfy",
+    "doesn't satisfy",
+    "is not satisfied",
+    "fails",
+    "failure",
+    "is not valid",
+)
+
+
+def _concludes_a_pass(text: str | None) -> bool:
+    import re
+
+    text = (text or "").strip().lower()
+    sentences = [part for part in re.split(r"(?<=[.!?])\s+", text) if part]
+    about_the_rule = [
+        sentence
+        for sentence in sentences
+        if not any(marker in sentence for marker in _VERDICT_META)
+    ]
+    conclusion = (about_the_rule or sentences or [""])[-1]
+    return any(phrase in conclusion for phrase in _PASS_PHRASES) and not any(
+        phrase in conclusion for phrase in _NEGATED_PASS_PHRASES
+    )
+
+
 def _judge_says_it_passes(verdict: JudgeVerdict) -> bool:
     """True when a failed verdict's own conclusion says there was no violation."""
-    from chat_workflow.mixins import _verdict_claims_the_rule_passes
-
-    return _verdict_claims_the_rule_passes(verdict)
+    if _concludes_a_pass(verdict.explanation):
+        return True
+    if _concludes_a_pass(verdict.fix):
+        return True
+    fix = (verdict.fix or "").strip().lower()
+    return fix.startswith(
+        ("no fix", "no change", "nothing to fix", "none needed", "not needed", "n/a")
+    )
 
 
 @dataclass

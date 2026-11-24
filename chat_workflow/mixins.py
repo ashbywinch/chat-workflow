@@ -7,11 +7,10 @@ LLM calls.
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
-from typing import ClassVar, Protocol, Self
+from typing import Annotated, ClassVar, Literal, Self, override
 
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from .annotations import Blob, Validation, user_labels
 from .exceptions import ValidationError
@@ -79,29 +78,35 @@ class BlobSyncMixin(BaseModel):
         return self._blob_paths.get(field)
 
 
-class RuleVerdict(BaseModel):
-    """One judge verdict for one validation rule."""
+class RulePassed(BaseModel):
+    """The judge's verdict that the data satisfies one rule."""
 
-    rule: str = Field(..., description="The rule text, copied exactly from the list")
-    passed: bool = Field(..., description="Whether the data satisfies this rule")
-    explanation: str | None = Field(None, description="Why the rule passed or failed")
-    evidence: str | None = Field(
-        None,
-        description=(
-            "Exact quote from the data that supports the verdict. A failed "
-            "verdict MUST quote the code line, field, or phrase that violates "
-            "the rule; a failed verdict without evidence is discarded."
-        ),
+    model_config = ConfigDict(extra="forbid")
+
+    rule: str = Field(..., min_length=1, description="The rule text, copied exactly")
+    verdict: Literal["pass"] = Field(description="The data satisfies the rule")
+    evidence: str = Field(
+        ...,
+        min_length=1,
+        description="The exact quote from the data that shows the rule holds",
     )
-    fix: str | None = Field(
-        None,
-        description=(
-            "For a failed verdict, the concrete correction: the exact value or "
-            "change to make. Name the field and give the corrected form (for "
-            "example: replace name 'Approval' with 'Approval Record'). Empty "
-            "for a passing verdict."
-        ),
+
+
+class RuleFailed(BaseModel):
+    """The judge's verdict that the data does not satisfy one rule."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    rule: str = Field(..., min_length=1, description="The rule text, copied exactly")
+    verdict: Literal["fail"] = Field(description="The data does not satisfy the rule")
+    evidence: str = Field(
+        ...,
+        min_length=1,
+        description="The exact quote from the data that shows it violates the rule",
     )
+
+
+type RuleVerdict = Annotated[RulePassed | RuleFailed, Field(discriminator="verdict")]
 
 
 class RuleVerdicts(BaseModel):
@@ -112,110 +117,9 @@ class RuleVerdicts(BaseModel):
     )
 
 
-class _VerdictLike(Protocol):
-    """The two fields the coherence check reads, from either verdict type."""
-
-    explanation: str | None
-    fix: str | None
-
-
-# A judge sometimes narrates its own change of mind after the sentence that
-# reads the data ("I need to correct my verdict"). That sentence is about the
-# verdict, not the rule, so the conclusion is the last sentence that is not.
-_VERDICT_META = (
-    "i need to correct",
-    "i should correct",
-    "correct my verdict",
-    "let me revise",
-    "revising my verdict",
-    "re-evaluat",
-    "i was wrong",
-)
-
-_PASS_PHRASES = (
-    "passes",
-    " pass",
-    "satisfied",
-    "is valid",
-    "meets the rule",
-    "not violated",
-    "does not violate",
-    "no violation",
-    "not a violation",
-    "is unambiguous",
-    "no fix needed",
-    "is acceptable",
-)
-
-# A negated pass ("does not pass", "fails") is not a pass; a negated
-# violation ("does not violate") is. Match the negated *pass* forms only,
-# so a conclusion of "does not violate the rule" is read as the pass it is.
-_NEGATED_PASS_PHRASES = (
-    "does not pass",
-    "doesn't pass",
-    "does not satisfy",
-    "doesn't satisfy",
-    "is not satisfied",
-    "fails",
-    "failure",
-    "is not valid",
-)
-
-
-def _concludes_a_pass(text: str | None) -> bool:
-    """True when the last sentence about the rule concludes that it passes.
-
-    Read the last sentence, so a hedge ("could be considered a failure,
-    but...") does not hide the conclusion; skip the sentences that narrate the
-    judge's own verdict, which say nothing about the data.
-    """
-    text = (text or "").strip().lower()
-    sentences = [part for part in re.split(r"(?<=[.!?])\s+", text) if part]
-    about_the_rule = [
-        sentence
-        for sentence in sentences
-        if not any(marker in sentence for marker in _VERDICT_META)
-    ]
-    conclusion = (about_the_rule or sentences or [""])[-1]
-    return any(phrase in conclusion for phrase in _PASS_PHRASES) and not any(
-        phrase in conclusion for phrase in _NEGATED_PASS_PHRASES
-    )
-
-
-def _verdict_claims_the_rule_passes(verdict: _VerdictLike) -> bool:
-    """True when a failed verdict's own words say the rule passed.
-
-    A self-contradictory verdict is a malformed judge response, not a
-    violation: its conclusion says the data satisfies the rule while the
-    ``passed`` flag says it does not.
-    """
-    if _concludes_a_pass(verdict.explanation):
-        return True
-    # The judge may write the withdrawn verdict into the fix it was asked for;
-    # a fix that concludes the data already passes asks for no change either.
-    if _concludes_a_pass(verdict.fix):
-        return True
-    # A fix that says there is nothing to fix is a pass in disguise, whatever
-    # the explanation's last sentence says.
-    fix = (verdict.fix or "").strip().lower()
-    return fix.startswith(
-        ("no fix", "no change", "nothing to fix", "none needed", "not needed", "n/a")
-    )
-
-
-def _is_actionable_failure(verdict: RuleVerdict) -> bool:
-    """A failure must be substantive and fixable, not a malformed verdict.
-
-    The judge is told to attach the violating evidence and a concrete fix to
-    every failed verdict. A failure without both is discarded, as is one whose
-    conclusion says the rule passes.
-    """
-    return (
-        not verdict.passed
-        and bool((verdict.evidence or "").strip())
-        and bool((verdict.fix or "").strip())
-        and not _verdict_claims_the_rule_passes(verdict)
-    )
+def _is_actionable_failure(verdict: RulePassed | RuleFailed) -> bool:
+    """A failure is a typed verdict; nothing is inferred from its prose."""
+    return isinstance(verdict, RuleFailed)
 
 
 class LLMValidated(BaseModel):
@@ -259,6 +163,7 @@ class LLMValidated(BaseModel):
         rules.extend(cls._validation_rules)
         return rules
 
+    @override
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs):
         """Put the user-facing phrase next to the field in the JSON schema.
@@ -327,7 +232,7 @@ class LLMValidated(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_llm_rules(self) -> BaseModel:
+    def validate_llm_rules(self) -> Self:
         """Call the model to check all rules against the current instance.
 
         The rule judge is a :class:`~chat_workflow.conversation.Conversation`:
@@ -366,18 +271,13 @@ class LLMValidated(BaseModel):
         prompt += (
             "\nReturn one verdict per rule, in order. Each verdict has:\n"
             '- "rule": the rule text, copied exactly\n'
-            '- "passed": true only if the data satisfies the rule\n'
-            '- "explanation": a brief reason\n'
-            '- "evidence": the exact quote from the data that supports the verdict. '
-            "A failed verdict MUST quote the code line, field, or phrase that "
-            "violates the rule. A failed verdict without evidence and a concrete "
-            "fix is discarded.\n"
-            '- "fix": for a failed verdict, the concrete correction — name the '
-            "field and give the exact corrected value or form (for example: "
-            "replace name 'Approval' with 'Approval Record'). Empty on a pass.\n"
-            "If your explanation concludes that the data passes or satisfies a "
-            "rule, set passed to true. A failed verdict must state what is wrong "
-            "and quote the violating text, not the valid value."
+            '- "verdict": "pass" if the data satisfies the rule, "fail" if it '
+            "does not\n"
+            '- "evidence": the exact quote from the data that supports the '
+            "verdict; a fail MUST quote the field or phrase that violates the "
+            "rule\n"
+            "A pass carries no other fields. Do not propose a correction: the "
+            "caller decides what to do with a fail."
         )
 
         try:
@@ -417,9 +317,7 @@ class LLMValidated(BaseModel):
         if failures:
             raise ValidationError(
                 "; ".join(
-                    f"[{verdict.rule}] {verdict.explanation or 'rule failed'}"
-                    + (f" Evidence: {verdict.evidence}" if verdict.evidence else "")
-                    + (f" Fix: {verdict.fix}" if verdict.fix else "")
+                    f"[{verdict.rule}] Evidence: {verdict.evidence}"
                     for verdict in failures
                 )
             )
