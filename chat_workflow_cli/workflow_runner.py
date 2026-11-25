@@ -61,7 +61,7 @@ class WorkflowRunner:
 
             # The closure hides the step's chat flag; carry it so a chat-off
             # top-level step is not greeted or closed.
-            run_step._chat = getattr(func, "_chat", True)  # type: ignore[attr-defined]
+            run_step._chat = getattr(func, "_chat", True)  # type: ignore[attr-defined]  # the step decorator attaches this metadata
             result = SessionComponent().converse(run_step, session=session)
             if result is not None:
                 _log_and_exit(result_dict=result.model_dump(), default_success=True)

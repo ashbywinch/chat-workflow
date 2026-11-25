@@ -51,7 +51,7 @@ class SessionComponent:
         same sentence in the result's `text` field. Do not return a continue
         and do not use a placeholder.
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @atomic_workflow(chat=False, single_turn=True)
     def sign_off(self, *, session: Session, max_turns: int = 1) -> TextReply:
@@ -66,7 +66,7 @@ class SessionComponent:
         This is a single turn: return success with the closing, and put the
         same sentence in the result's `text` field.
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @composite_workflow
     def converse(self, step: Callable[..., T], *, session: Session) -> T:

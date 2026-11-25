@@ -650,7 +650,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         - Name the workflow after the main process or artifact and end with
           "Workflow".
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @classmethod
     def _create_diagram(

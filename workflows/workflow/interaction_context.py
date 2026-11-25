@@ -92,7 +92,7 @@ class ComponentInteractionContext(BaseModel):
             ("The structural design — what fields and rules the artifact follows"),
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> ComponentInteractionContext:
         """Ask the three fixed questions, show the derived picture, confirm it."""
         answer = session.io.prompt(
@@ -134,7 +134,7 @@ The three questions are what the assistant should always cover, what it should s
 goes wrong; the user's answer is in `answer`. Derive all four parts from it, using the domain spec and structure for
 the artifact. If the answer leaves one part empty, propose the usual answer for this kind of work. Do not ask the user
 anything. Leave the tone empty unless the user gave one. Return the complete context."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step
@@ -154,4 +154,4 @@ framework shows the change. Ask only about a point they left unanswered. Do not 
 what to call the artifact.
     
     """
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

@@ -206,7 +206,7 @@ class ComponentSpec(LLMValidated):
             "Parts already identified; include them and add any that are missing",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
         """Derive the parts of the user's work, then confirm the set.
 
@@ -320,7 +320,7 @@ reviews or sends another part's thing belongs to that part. Name each part after
 "Approval"). For each, say what it does end to end and at least one thing it does not do. Describe what kind of thing
 it is in plain words — the thing it produces, or the plan or service it is. Never say the internal labels
 "value_stream", "artifact_producing", or "planning_service"."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step
@@ -347,4 +347,4 @@ name a part, say who owns it, or describe a stage the analysis already lists. Ne
 and "what it does".
     
     """
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

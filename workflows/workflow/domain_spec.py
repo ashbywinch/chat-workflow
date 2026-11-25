@@ -183,7 +183,7 @@ class ComponentDomainSpec(LLMValidated):
             "What the user makes, with the check they gave for it",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> ComponentDomainSpec:
         """Derive the artifact's domain spec, then confirm it."""
         draft = _draft_domain_spec(
@@ -217,7 +217,7 @@ def _draft_domain_spec(
 The responsibilities and any deliverables are established. Derive the fields, the quality checks, and the expertise
 yourself; do not ask the user anything. Keep `responsibilities.name` exactly as given: do not reformat, split, or
 expand it. Return the complete spec."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step
@@ -242,7 +242,7 @@ sentence that this step defines the artifact itself and that part comes next, th
 already reported in an earlier turn; say what changed only in the turn where it changes.
     
     """
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 from .models.deliverable import Deliverable  # noqa: E402

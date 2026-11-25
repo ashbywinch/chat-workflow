@@ -161,7 +161,7 @@ class ComponentStructure(BaseModel):
             ),
         ],
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> ComponentStructure:
         """Derive the structure from the domain spec, then confirm it."""
         draft = _draft_structure(domain_spec=domain_spec, session=session)
@@ -192,7 +192,7 @@ the business
 language into the technical structure silently. For dates, use a str with an ISO format or a pre-validator; never a
 date/datetime field. Include a validator for every rule a field can enforce structurally; return an empty list only
 when nothing is structurally enforceable. Do not define a second independent artifact."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step
@@ -213,4 +213,4 @@ structure or ask the user to choose code types. Say the types in business words 
 optional date" — never "str", "list[str]", or "| None".
     
     """
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

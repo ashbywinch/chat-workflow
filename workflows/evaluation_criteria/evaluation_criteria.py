@@ -89,7 +89,7 @@ class EvaluationCriteria(BaseModel):
         - If the user is uncooperative or refuses to provide useful information within max_turns,
             use intent="failure".
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @model_validator(mode="after")
     def validate_business_rules(self):

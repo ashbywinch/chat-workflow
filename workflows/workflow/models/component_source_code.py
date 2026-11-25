@@ -90,4 +90,4 @@ class ComponentSourceCode(LLMValidated):
 
         Output format: Return ONLY the Python code as a string in the 'code' field.
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

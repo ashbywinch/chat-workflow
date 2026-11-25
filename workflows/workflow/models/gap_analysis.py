@@ -127,4 +127,4 @@ class GapAnalysis(LLMValidated):
         that produces the thing. Parsing and file handling are technical work:
         give them their own part only if they produce their own record.
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

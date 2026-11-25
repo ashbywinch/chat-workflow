@@ -1868,4 +1868,4 @@ class ComponentSourceCode(LLMValidated):
         docstrings. If the design cannot produce a valid module, return
         failure with the reason.
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

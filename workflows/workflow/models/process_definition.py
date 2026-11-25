@@ -248,7 +248,7 @@ describing their work, say the template comes after you understand the work, and
 Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown.
 
 Put the user's description in `notes`, in their words — not your reply to them. If you still need an answer, ask the question as a continue; never put a question in `notes`."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step(chat=False, single_turn=True)
@@ -272,7 +272,7 @@ the breakdown. A name the notes say the user is unsure about — "I don't know i
 project" — is not a participant; leave it out. An example is not a fact.
 
 Return the complete ProcessDefinition."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step(
@@ -301,7 +301,7 @@ corrected result; the framework shows the change and asks for confirmation. Do n
 ask them to name the stages or steps.
     
     """
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @composite_workflow_step

@@ -122,17 +122,12 @@ class Deliverable(LLMValidated):
         return "\n".join(lines)
 
     @model_validator(mode="after")
-    def _consumer_is_a_party(self) -> Deliverable:
-        """Reject the artifact as its own consumer; the field says who it is for."""
+    def _parties_are_distinct(self) -> Deliverable:
+        """The artifact is not its consumer, and the next step is not a repeat."""
         if self.consumer.strip().casefold() == self.name.strip().casefold():
             raise ValueError(
                 "consumer must be a person, role, or team, not the thing itself"
             )
-        return self
-
-    @model_validator(mode="after")
-    def _integration_is_not_the_consumer(self) -> Deliverable:
-        """What happens next is not a repeat of who receives it."""
         if (
             self.integration_points.strip().casefold()
             == self.consumer.strip().casefold()
@@ -152,7 +147,7 @@ class Deliverable(LLMValidated):
             "What the person has already told you about how their work happens",
         ] = None,
         max_turns: Annotated[int, "Maximum conversation turns"] = 10,
-        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]
+        session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> Annotated[list[Deliverable], Field(min_length=1)]:
         """Gather what the user makes, propose its shape, then confirm it.
 
@@ -221,7 +216,7 @@ Stay at the level of the thing they make, not its contents. Do not ask them to p
 If they ask what it should look like, what headings it has, a format, or what you think, do not name any heading, section, or layout and do not ask another question: return success now. The next turn shows the complete proposed shape — who it is for, its format, the check it must pass, and where it goes — for them to correct. A structure named here is fragmented across turns and the complete proposal is lost. In your success message, say in one sentence that you will show them the shape you propose — do not say you have made it or present it yourself.
 
 Put what they told you in `notes`, in their words — not your reply to them. Return only once the notes name the thing they make; if they have not said it, ask "What do you make?" and keep listening. If you still need an answer, ask it as a continue."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step(chat=False, single_turn=True)
@@ -251,7 +246,7 @@ In the user's words, for each thing:
 - storage requirements: where it is kept.
 
 If every part is already in the notes, return what they said. Never return failure because the notes are thin: propose the usual shape for that kind of thing."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
 @atomic_workflow_step(conversation_validation_rules=[_NO_EXECUTOR_MODE])
@@ -275,4 +270,4 @@ If they push back that this is not what they need — they ask for a method, a c
 If they object to a line of the proposal — "I don't want the check / who it's for / where it's kept" — those lines are not sections of the thing: they are how you will know it is complete and where it lives. Say that in one sentence, change only what the thing itself needs (its format or what it contains), and if nothing about the thing changes, return the proposal unchanged and finish. Do not ask the same question again. If they say there is nothing to check, do not keep a condition with steps in it: set the check to the simplest true statement about the thing (for a list, that both sections are filled in), say it only says when the thing is done, and finish.
 
 If they ask you to write the thing itself, say in one sentence that you are helping them decide what it looks like, then return to the proposal. If they describe their domain content, do not comment on it; say "Noted." and return. Never return failure because the user's notes lack detail: the proposal is what they correct."""
-    ...  # type: ignore[reportReturnType]
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
