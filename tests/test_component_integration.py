@@ -1,12 +1,12 @@
 """Integration tests for Component.create with ComponentSpec."""
 
+# lucidlint: ignore-file fakefs the pipeline writes a generated module and runs ruff over it; real FS is the subject
+import tempfile
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, override
 from unittest.mock import MagicMock
-
-from pyfakefs.fake_filesystem_unittest import TestCase
 
 from chat_workflow import Session, SessionLog
 from tests.sample_code import VALID_COMPONENT_CODE
@@ -49,15 +49,6 @@ class _StepRecorder:
         return self.result
 
 
-class _VerifierRecorder:
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-
-    def __call__(self, code: str) -> str:
-        self.calls.append(code)
-        return code
-
-
 class _DomainFake:
     def __init__(self, result: Any) -> None:
         self.explore = _StepRecorder(result)
@@ -84,17 +75,17 @@ class _Pipeline:
     structure: _StructureFake
     interaction: _InteractionFake
     source: _SourceFake
-    verifier: _VerifierRecorder
 
 
-class _NoRuleJudge(TestCase):
+class _NoRuleJudge(unittest.TestCase):
     """Construct real records without the LLM judge, using the documented skip flag."""
 
     _MODELS = (ComponentSpec, ComponentDomainSpec, Component, ComponentSourceCode)
 
     @override
     def setUp(self) -> None:
-        self.setUpPyfakefs()
+        self.out_dir = Path(tempfile.mkdtemp(prefix="component-integration-"))
+        self.addCleanup(self._remove_out_dir)
         self._saved_skip = {model: model._skip_llm_validation for model in self._MODELS}
         for model in self._MODELS:
             model._skip_llm_validation = True
@@ -103,6 +94,11 @@ class _NoRuleJudge(TestCase):
     def tearDown(self) -> None:
         for model, value in self._saved_skip.items():
             model._skip_llm_validation = value
+
+    def _remove_out_dir(self) -> None:
+        import shutil
+
+        shutil.rmtree(self.out_dir, ignore_errors=True)
 
 
 class TestComponentCreateWithResponsibilities(_NoRuleJudge):
@@ -196,10 +192,10 @@ class TestComponentCreateWithResponsibilities(_NoRuleJudge):
             structure=_StructureFake(self._make_structure()),
             interaction=_InteractionFake(self._make_interaction_context()),
             source=_SourceFake(self._make_generated_component()),
-            verifier=_VerifierRecorder(),
         )
 
-    def _run(self, pipeline: _Pipeline, *, output_dir: Path | None = Path("/out"), cwd=None):
+    def _run(self, pipeline: _Pipeline, *, output_dir: Path | None = None, cwd=None):
+        output_dir = output_dir if output_dir is not None else self.out_dir / "out"
         requirements = self._make_responsibilities()
         session, io = self._make_session()
         result = Component.create(
@@ -211,7 +207,6 @@ class TestComponentCreateWithResponsibilities(_NoRuleJudge):
             structure=pipeline.structure,
             interaction=pipeline.interaction,
             source=pipeline.source,
-            verifier=pipeline.verifier,
         )
         return result, requirements, session, io, pipeline
 
@@ -301,11 +296,10 @@ class TestComponentCreateWithResponsibilities(_NoRuleJudge):
 
         io.echo.assert_any_call("Generating component code: MeetingMinutes...")
 
-    def test_code_verified_and_written(self):
-        """Code should be verified and written to disk."""
+    def test_code_written_to_disk(self):
+        """The model-validated code is written to disk unchanged."""
         result, _, _, _, pipeline = self._run(self._pipeline())
 
-        self.assertEqual(pipeline.verifier.calls, [pipeline.source.generate.result.code])
         self.assertTrue(result.code_path.exists())
         self.assertEqual(result.code_path.read_text(), pipeline.source.generate.result.code)
 

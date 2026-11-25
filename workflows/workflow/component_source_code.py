@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import ast
 import importlib.util
-import json
 import re
 import shutil
 import subprocess
 import sys
-from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, override
 
@@ -21,11 +19,9 @@ from chat_workflow.mixins import LLMValidated
 from .design_spec import ComponentDesignSpec
 
 # lucidlint: ignore-file record-shape the repair layer exchanges AST nodes, schema fragments and tuples with libcst/ast
-# lucidlint: ignore-file data-clump the repair helpers take (code, tree) because that pair is the module's working state
 # lucidlint: ignore-file assembly-class each repair threads code through its helpers in one ordered pass
 # lucidlint: ignore-file complexity each repair is a branch per AST case in one pass
 # lucidlint: ignore-file large-function the deterministic validator is the ordered repair chain; splitting scatters it
-# lucidlint: ignore-file duplicate the two long-string wrappers share a traversal, not a behaviour
 # lucidlint: ignore-file duplicate-block the repair branches repeat apply-reparse-keep, which is the loop
 # lucidlint: ignore-file swallow exec of generated code can fail arbitrarily; the AST fallback is the surface
 # lucidlint: ignore-file closure-cluster the validator's repair closures are its ordered steps over code/tree
@@ -48,18 +44,6 @@ class SourceRules:
         "set intent to",
     )
 
-    # The package was reorganised; the old import paths still appear in the wild.
-    FRAMEWORK_IMPORT_ALIASES: ClassVar[dict[str, str]] = {
-        "chat_workflow.workflow": "chat_workflow",
-        "chat_workflow.workflow.decorators": "chat_workflow",
-    }
-
-    # Re-wrapping a long generated line: the limit, the narrowest a split may
-    # get before it stops helping, an argument's indent, and room for a quote.
-    MAX_LINE: ClassVar[int] = 120
-    MIN_SPLIT_WIDTH: ClassVar[int] = 20
-    FIELD_INDENT: ClassVar[int] = 4
-    ESCAPE_ROOM: ClassVar[int] = 3
 
 
 def _basemodel_class_names(tree: ast.AST) -> set[str]:
@@ -74,6 +58,19 @@ def _basemodel_class_names(tree: ast.AST) -> set[str]:
                 if alias.name in _BASE_MODEL_SOURCES:
                     names.add(alias.asname or alias.name.rsplit(".", 1)[-1])
     return names
+
+
+def _strip_markdown_fences(code: str) -> str:
+    """Drop a Markdown fence wrapping the module, if the model added one."""
+    text = code.strip()
+    if not text.startswith("```"):
+        return code
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines) + "\n"
 
 
 def _join_source_lines(value: Any) -> Any:
@@ -110,457 +107,6 @@ class SourceLines(str):
         return {"type": "array", "items": {"type": "string"}}
 
 
-def _column_to_index(line: str, column: int) -> int:
-    """Convert an AST column offset into a character index in ``line``.
-
-    ``ast`` reports column offsets in UTF-8 bytes. Slicing a ``str`` with them
-    lands in the wrong place as soon as the line holds a non-ASCII character —
-    an em dash in a description is enough to splice code into the next line.
-    """
-    if column <= 0:
-        return 0
-    return len(line.encode("utf-8")[:column].decode("utf-8", errors="ignore"))
-
-
-def _absolute_index(code: str, lineno: int, column: int) -> int:
-    """The character index of an AST position in the whole module."""
-    lines = code.splitlines(keepends=True)
-    return sum(len(line) for line in lines[: lineno - 1]) + _column_to_index(
-        lines[lineno - 1], column
-    )
-
-
-_SPLIT_DESCRIPTION = re.compile(
-    r'(description\s*=\s*"[^"]*")\s*,\s*\n(\s*)(")'
-)
-
-
-_TRAILING_GARBAGE = frozenset({"}", ")", "]", "to", "the", "and"})
-
-
-def _trim_trailing_garbage(code: str) -> str:
-    """Drop stray lines a model leaves after a complete module."""
-    lines = code.splitlines()
-    changed = False
-    while lines and lines[-1].strip() in _TRAILING_GARBAGE:
-        lines.pop()
-        changed = True
-    if not changed:
-        return code
-    return "\n".join(lines) + ("\n" if code.endswith("\n") else "")
-
-
-def _join_split_descriptions(code: str) -> str:
-    """Join a description string the model split into two positional strings.
-
-    ``description="one part",`` followed by ``" another part"`` is a syntax
-    error: the continuation is parsed as a positional argument after a keyword.
-    Adjacent string literals are valid, so removing the comma is enough.
-    """
-    return _SPLIT_DESCRIPTION.sub(r"\1\n\2\3", code)
-
-
-def _ensure_min_length(code: str, tree: ast.AST) -> str:
-    """Add ``min_length=1`` to required ``str`` fields that lack it.
-
-    A required string with no length constraint accepts the empty string, which
-    makes the artifact categorically invalid. Pydantic supports this constraint
-    directly, so it is filled in mechanically instead of relying on the model
-    to restate it. Fields with an existing ``min_length`` (including
-    ``min_length=0``) and optional fields are left alone.
-    """
-    base_names = _basemodel_class_names(tree)
-    if not base_names:
-        return code
-
-    insertions: list[int] = []
-    for cls_node in ast.walk(tree):
-        if not isinstance(cls_node, ast.ClassDef):
-            continue
-        if not any(isinstance(base, ast.Name) and base.id in base_names for base in cls_node.bases):
-            continue
-        for node in cls_node.body:
-            if not isinstance(node, ast.AnnAssign):
-                continue
-            annotation = node.annotation
-            annotation_name = (
-                annotation.id
-                if isinstance(annotation, ast.Name)
-                else annotation.value
-                if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str)
-                else None
-            )
-            if annotation_name != "str":
-                continue
-            call = node.value
-            if not (
-                isinstance(call, ast.Call)
-                and isinstance(call.func, ast.Name)
-                and call.func.id == "Field"
-            ):
-                continue
-            # Required either by an explicit ``...`` first argument or by
-            # having no default at all (``Field(description=...)``).
-            has_ellipsis = bool(
-                call.args
-                and isinstance(call.args[0], ast.Constant)
-                and call.args[0].value is Ellipsis
-            )
-            has_default = any(
-                kw.arg in ("default", "default_factory") for kw in call.keywords
-            )
-            if not has_ellipsis and (call.args or has_default):
-                continue
-            if any(kw.arg == "min_length" for kw in call.keywords):
-                continue
-            if call.keywords:
-                last_arg: ast.expr = call.keywords[-1].value
-            elif call.args:
-                last_arg = call.args[-1]
-            else:
-                continue
-            if last_arg.end_lineno is None or last_arg.end_col_offset is None:
-                continue
-            insertions.append(
-                _absolute_index(code, last_arg.end_lineno, last_arg.end_col_offset)
-            )
-
-    for pos in sorted(insertions, reverse=True):
-        code = code[:pos] + ", min_length=1" + code[pos:]
-    return code
-
-
-def _escaped_length(text: str) -> int:
-    """The width a string occupies once ``json.dumps`` has escaped it.
-
-    A non-ASCII character costs one character in the source but six in the
-    rendered literal (``\\u2014``), so measuring the raw text overruns the
-    line limit.
-    """
-    return len(json.dumps(text))
-
-
-def _split_description(
-    text: str, width: int, measure: Callable[[str], int] = len
-) -> list[str]:
-    """Split a description into lines that fit, preserving spaces at joins."""
-    words = text.split()
-    if not words:
-        return [text]
-    lines: list[str] = []
-    current = ""
-    for word in words:
-        candidate = f"{current} {word}".strip()
-        if measure(candidate) > width and current:
-            lines.append(current + " ")
-            current = word
-        else:
-            current = candidate
-    if current:
-        lines.append(current)
-    return lines
-
-
-def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
-    """Split single-line ``Field(...)`` calls that exceed the line limit.
-
-    Models reliably keep long descriptions on one line even after repeated
-    E501 feedback. Wrapping at the argument boundaries is mechanical, so it is
-    done here instead of spending retries on formatting.
-    """
-    lines = code.splitlines(keepends=True)
-    replacements: list[tuple[int, int, int, str]] = []
-    for node in ast.walk(tree):
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "Field"
-        ):
-            continue
-        if node.lineno != node.end_lineno:
-            continue
-        if node.end_col_offset is None:
-            continue
-        line = lines[node.lineno - 1].rstrip("\n")
-        if len(line) <= 120:
-            continue
-        arguments: list[str] = []
-        indent = " " * node.col_offset
-        argument_indent = " " * (node.col_offset + SourceRules.FIELD_INDENT)
-        for argument in [*node.args, *node.keywords]:
-            if isinstance(argument, ast.keyword):
-                if argument.arg is None:
-                    arguments = []
-                    break
-                segment = ast.get_source_segment(code, argument.value)
-                if segment is None:
-                    arguments = []
-                    break
-                single = f"{argument.arg}={segment}"
-                if len(argument_indent + single) <= 120 or not (
-                    isinstance(argument.value, ast.Constant)
-                    and isinstance(argument.value.value, str)
-                ):
-                    arguments.append(single)
-                    continue
-                width = max(
-                    SourceRules.MIN_SPLIT_WIDTH,
-                    SourceRules.MAX_LINE
-                    - len(argument_indent)
-                    - SourceRules.FIELD_INDENT
-                    - SourceRules.ESCAPE_ROOM,
-                )
-                chunks = _split_description(
-                    argument.value.value, width, _escaped_length
-                )
-                inner = "\n".join(f"    {json.dumps(chunk)}" for chunk in chunks)
-                arguments.append(f"{argument.arg}=(\n{inner}\n)")
-            else:
-                segment = ast.get_source_segment(code, argument)
-                if segment is None:
-                    arguments = []
-                    break
-                arguments.append(segment)
-        if not arguments:
-            continue
-        newline = "\n"
-        rendered = [
-            f"{argument_indent}{argument.replace(newline, newline + argument_indent)}"
-            for argument in arguments
-        ]
-        wrapped = "Field(\n" + ",\n".join(rendered) + ",\n" + indent + ")"
-        replacements.append((node.lineno - 1, node.col_offset, node.end_col_offset, wrapped))
-    for line_number, start, end, wrapped in sorted(replacements, reverse=True):
-        line = lines[line_number]
-        newline = "\n" if line.endswith("\n") else ""
-        content = line.rstrip("\n")
-        start_index = _column_to_index(content, start)
-        end_index = _column_to_index(content, end)
-        lines[line_number] = (
-            content[:start_index] + wrapped + content[end_index:] + newline
-        )
-    return "".join(lines)
-
-
-def _wrapped_string(
-    value: str,
-    column: int,
-    lines: list[str],
-    start_line: int,
-    end_line: int,
-) -> str | None:
-    """Wrap one long string at word boundaries, or None when it already fits."""
-    if not any(
-        len(lines[index].rstrip("\n")) > SourceRules.MAX_LINE
-        for index in range(start_line, end_line + 1)
-    ):
-        return None
-    width = max(
-        SourceRules.MIN_SPLIT_WIDTH,
-        SourceRules.MAX_LINE - column - SourceRules.ESCAPE_ROOM,
-    )
-    chunks = _split_description(value, width, _escaped_length)
-    indent = " " * column
-    newline = "\n"
-    rendered = json.dumps(chunks[0])
-    for chunk in chunks[1:]:
-        rendered += newline + indent + json.dumps(chunk)
-    return rendered
-
-
-def _wrap_long_field_strings(code: str, tree: ast.AST) -> str:
-    """Wrap long string constants inside already multi-line ``Field(...)`` calls.
-
-    Models often wrap the call but leave one implicit-concatenation segment
-    longer than the line limit. The AST value is the concatenated string, so
-    rebuilding it at word boundaries is safe and preserves the text.
-    """
-    lines = code.splitlines(keepends=True)
-    replacements: list[tuple[int, int, str]] = []
-    for node in ast.walk(tree):
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "Field"
-        ):
-            continue
-        for keyword in node.keywords:
-            value = keyword.value
-            if not (
-                isinstance(value, ast.Constant)
-                and isinstance(value.value, str)
-                and value.end_lineno is not None
-                and value.end_col_offset is not None
-            ):
-                continue
-            start_line = value.lineno - 1
-            end_line = value.end_lineno - 1
-            # `_split_description` keeps a trailing space on every line but the
-            # last so concatenation preserves the text; leave room for it.
-            # AST columns are UTF-8 byte offsets; indentation is characters.
-            char_column = _column_to_index(lines[value.lineno - 1], value.col_offset)
-            rendered = _wrapped_string(
-                value.value, char_column, lines, start_line, end_line
-            )
-            if rendered is None:
-                continue
-            start = _absolute_index(code, start_line + 1, value.col_offset)
-            end = _absolute_index(code, end_line + 1, value.end_col_offset)
-            replacements.append((start, end, rendered))
-    for start, end, rendered in sorted(replacements, reverse=True):
-        code = code[:start] + rendered + code[end:]
-    return code
-
-
-def _wrap_long_list_strings(code: str, tree: ast.AST) -> str:
-    """Wrap long string elements of lists and tuples at word boundaries.
-
-    ``_validation_rules`` entries are list elements, not ``Field`` keyword
-    arguments, so the field wrapper does not reach them. Models keep writing
-    one long rule line; splitting it mechanically avoids a retry.
-    """
-    lines = code.splitlines(keepends=True)
-    replacements: list[tuple[int, int, str]] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.List, ast.Tuple)):
-            continue
-        for element in node.elts:
-            if not (
-                isinstance(element, ast.Constant)
-                and isinstance(element.value, str)
-                and element.end_lineno is not None
-                and element.end_col_offset is not None
-            ):
-                continue
-            start_line = element.lineno - 1
-            end_line = element.end_lineno - 1
-            rendered = _wrapped_string(
-                element.value, element.col_offset, lines, start_line, end_line
-            )
-            if rendered is None:
-                continue
-            start = _absolute_index(code, start_line + 1, element.col_offset)
-            end = _absolute_index(code, end_line + 1, element.end_col_offset)
-            replacements.append((start, end, rendered))
-    for start, end, rendered in sorted(replacements, reverse=True):
-        code = code[:start] + rendered + code[end:]
-    return code
-
-
-def _drop_noop_validators(code: str, tree: ast.AST) -> str:
-    """Remove a ``@model_validator`` whose body is only a docstring and ``pass``.
-
-    A validator that enforces nothing is a hard validation error, and a model
-    that cannot express the rule mechanically tends to write this stub. Asking
-    it again produces the same stub, so the validator is removed here instead;
-    its rule stays in ``_validation_rules``, where the judge evaluates it.
-    """
-    lines = code.splitlines(keepends=True)
-    removals: list[tuple[int, int]] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if not _is_model_validator(node):
-            continue
-        body = [
-            statement
-            for statement in node.body
-            if not (
-                isinstance(statement, ast.Expr)
-                and isinstance(statement.value, ast.Constant)
-                and isinstance(statement.value.value, str)
-            )
-        ]
-        if not body or not all(isinstance(statement, ast.Pass) for statement in body):
-            continue
-        start = min(
-            (item.lineno for item in node.decorator_list),
-            default=node.lineno,
-        )
-        removals.append((start, node.end_lineno or node.lineno))
-    for start, end in sorted(removals, reverse=True):
-        del lines[start - 1 : end]
-    return "".join(lines)
-
-
-def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
-    """Rename a field validator's first argument from ``self`` to ``cls``.
-
-    Pydantic's ``@field_validator`` is a classmethod: it receives the class,
-    and a validator that takes ``self`` raises at import time. The rename is
-    mechanical and safe.
-    """
-    replacements: list[tuple[int, int, int]] = []
-    insertions: list[tuple[int, str]] = []
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        is_field_validator = any(
-            isinstance(decorator, ast.Call)
-            and isinstance(decorator.func, ast.Name)
-            and decorator.func.id == "field_validator"
-            for decorator in node.decorator_list
-        )
-        if not is_field_validator:
-            continue
-        # Ruff only knows why the first argument is not `self` when the
-        # classmethod decorator is visible, so make it explicit.
-        has_classmethod = any(
-            isinstance(decorator, ast.Name) and decorator.id == "classmethod"
-            for decorator in node.decorator_list
-        )
-        if not has_classmethod and node.decorator_list:
-            last = max(
-                decorator.end_lineno or decorator.lineno
-                for decorator in node.decorator_list
-            )
-            insertions.append((last, " " * node.col_offset + "@classmethod\n"))
-        replacements.extend(
-            (argument.lineno, argument.col_offset, argument.end_col_offset)
-            for argument in [*node.args.args, *node.args.kwonlyargs]
-            if argument.arg == "self" and argument.end_col_offset is not None
-        )
-        replacements.extend(
-            (child.lineno, child.col_offset, child.end_col_offset)
-            for child in ast.walk(node)
-            if isinstance(child, ast.Name)
-            and child.id == "self"
-            and child.end_col_offset is not None
-        )
-    lines = code.splitlines(keepends=True)
-    for lineno, start, end in sorted(replacements, reverse=True):
-        line = lines[lineno - 1]
-        lines[lineno - 1] = line[:start] + "cls" + line[end:]
-    for after_line, text in sorted(insertions, reverse=True):
-        lines.insert(after_line, text)
-    return "".join(lines)
-
-
-def _add_raise_from_none(code: str, tree: ast.AST) -> str:
-    """Make a bare ``raise`` inside an ``except`` clause explicit.
-
-    Ruff's B904 requires the cause to be stated. A validator that turns one
-    error into another almost always means ``from None``.
-    """
-    insertions: list[int] = []
-    for handler in ast.walk(tree):
-        if not isinstance(handler, ast.ExceptHandler):
-            continue
-        for node in ast.walk(handler):
-            if not isinstance(node, ast.Raise):
-                continue
-            if node.exc is None or node.cause is not None:
-                continue
-            if node.end_lineno is None or node.end_col_offset is None:
-                continue
-            insertions.append(
-                _absolute_index(code, node.end_lineno, node.end_col_offset)
-            )
-    for position in sorted(insertions, reverse=True):
-        code = code[:position] + " from None" + code[position:]
-    return code
-
-
 def _ruff_executable() -> str | None:
     """Return the ruff binary for this environment, if present."""
     venv_ruff = Path(sys.executable).with_name("ruff")
@@ -573,19 +119,17 @@ def _ruff_violations(code: str) -> list[str]:
     """Run ``ruff check`` on the generated module and return its diagnostics.
 
     Uses the repository's ``pyproject.toml`` so generated code is held to the
-    same standard as the codebase. When ruff is unavailable, falls back to the
-    line-length rule only; syntax is checked separately by the caller.
+    same standard as the codebase. Ruff is required: a missing binary is a
+    configuration error, never a silent pass.
     """
     ruff = _ruff_executable()
     if ruff is None:
-        return [
-            f"generated_component.py:{number}: E501 Line too long "
-            f"({len(line)} > 120)"
-            for number, line in enumerate(code.splitlines(), 1)
-            if len(line) > 120
-        ]
+        raise ValidationError(
+            "ruff is required to validate generated code but was not found. "
+            "Install it in the environment that generates components."
+        )
 
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path.cwd()
     try:
         proc = subprocess.run(
             [
@@ -622,7 +166,7 @@ def _ruff_format(code: str) -> str:
     if ruff is None:
         return code
 
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path.cwd()
     try:
         proc = subprocess.run(
             [
@@ -643,42 +187,6 @@ def _ruff_format(code: str) -> str:
     if proc.returncode != 0 or not proc.stdout.strip():
         return code
     return proc.stdout
-
-
-def _ruff_fix(code: str) -> str:
-    """Apply ruff's safe automatic fixes and return the rewritten module.
-
-    Import order, unused imports and modern type syntax are mechanical; fixing
-    them here keeps model retries for judgment calls such as wrapping long
-    lines. Returns the original code when ruff is unavailable.
-    """
-    ruff = _ruff_executable()
-    if ruff is None:
-        return code
-
-    repo_root = Path(__file__).resolve().parents[2]
-    try:
-        proc = subprocess.run(
-            [
-                ruff,
-                "check",
-                "--fix",
-                "--output-format=concise",
-                "--stdin-filename",
-                "generated_component.py",
-                "-",
-            ],
-            input=code,
-            text=True,
-            capture_output=True,
-            cwd=repo_root,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return code
-
-    # ruff writes the rewritten module to stdout; diagnostics go to stderr.
-    return proc.stdout if proc.stdout.strip() else code
 
 
 def _annotation_names(node: ast.AST | None) -> set[str]:
@@ -926,6 +434,16 @@ def _workflow_kind(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[bool, 
     return is_atomic, is_chat_off
 
 
+
+def _is_field_validator(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """True when the method is decorated with ``@field_validator``."""
+    return any(
+        (isinstance(d, ast.Name) and d.id == "field_validator")
+        or (isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "field_validator")
+        for d in node.decorator_list
+    )
+
+
 def _is_model_validator(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
     """True when the method is decorated with ``@model_validator``."""
     for decorator in node.decorator_list:
@@ -996,74 +514,6 @@ def _shared_phrase(first: str, second: str, size: int = 6) -> str | None:
 def _words(text: str) -> list[str]:
     """Normalise a sentence to lowercase alphanumeric words."""
     return re.findall(r"[a-z0-9]+", text.lower())
-
-
-def _repair_imports(code: str, _tree: ast.AST) -> str:
-    """The import repair has the repair-chain signature."""
-    return _canonical_framework_imports(code)
-
-
-def _canonical_framework_imports(code: str) -> str:
-    """Rewrite a framework import path that has an exact replacement."""
-    for legacy, canonical in SourceRules.FRAMEWORK_IMPORT_ALIASES.items():
-        if legacy not in code:
-            continue
-        code = re.sub(
-            rf"(from\s+){re.escape(legacy)}\b",
-            lambda match, canonical=canonical: match.group(1) + canonical,
-            code,
-        )
-    return code
-
-
-def _parse_or_none(code: str) -> ast.Module | None:
-    """Parse repaired code, or None when the repair broke the syntax."""
-    try:
-        return ast.parse(code)
-    except SyntaxError:
-        return None
-
-
-def _join_tuple_descriptions(code: str, tree: ast.AST) -> str:
-    """Collapse a tuple of strings in ``description=`` into one string.
-
-    A model that wraps a description across lines sometimes writes
-    ``description=("first part", "second part")``. That is a tuple, not
-    implicit concatenation: pydantic accepts it silently and every reader of
-    the field gets a tuple where a sentence was meant.
-    """
-    replacements: list[tuple[int, int, str]] = []
-    for node in ast.walk(tree):
-        if not (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "Field"
-        ):
-            continue
-        for keyword in node.keywords:
-            value = keyword.value
-            if keyword.arg != "description" or not isinstance(value, ast.Tuple):
-                continue
-            parts: list[str] = []
-            for element in value.elts:
-                if not (
-                    isinstance(element, ast.Constant)
-                    and isinstance(element.value, str)
-                ):
-                    parts = []
-                    break
-                parts.append(element.value)
-            if not parts:
-                continue
-            if value.end_lineno is None or value.end_col_offset is None:
-                continue
-            start = _absolute_index(code, value.lineno, value.col_offset)
-            end = _absolute_index(code, value.end_lineno, value.end_col_offset)
-            joined = " ".join(parts)
-            replacements.append((start, end, json.dumps(joined)))
-    for start, end, rendered in sorted(replacements, reverse=True):
-        code = code[:start] + rendered + code[end:]
-    return code
 
 
 def _unresolvable_imports(tree: ast.AST) -> list[str]:
@@ -1179,11 +629,9 @@ class ComponentSourceCode(LLMValidated):
         inheritance like LLMValidated → BaseModel), public workflow step,
         return type check, and business validation presence check.
         """
-        code = self.code
-        repaired = _trim_trailing_garbage(_join_split_descriptions(code))
-        if repaired != code:
-            self.code = SourceLines(repaired)
-            code = repaired
+        code = _strip_markdown_fences(self.code)
+        if code != self.code:
+            self.code = SourceLines(code)
 
         try:
             tree = ast.parse(code)
@@ -1199,46 +647,13 @@ class ComponentSourceCode(LLMValidated):
                 "characters, or non-ASCII punctuation."
             ) from e
 
-        # Mechanical repairs run in order. A repair must never introduce a
-        # syntax error: when it does, the original stands and the model is
-        # asked to fix the code, rather than shipping a broken module.
-        for repair in (
-            _ensure_min_length,
-            _wrap_long_field_calls,
-            _wrap_long_field_strings,
-            _wrap_long_list_strings,
-            _fix_field_validator_self,
-            _drop_noop_validators,
-            _add_raise_from_none,
-            _repair_imports,
-            _join_tuple_descriptions,
-        ):
-            repaired = repair(code, tree)
-            if repaired == code:
-                continue
-            new_tree = _parse_or_none(repaired)
-            if new_tree is None:
-                continue
-            self.code = SourceLines(repaired)
-            code = repaired
-            tree = new_tree
-
-        # A long line is the model's most common ruff failure, and formatting
-        # fixes it deterministically. Only format when it is needed, so code
-        # that already fits is left exactly as written.
-        if any("E501" in line for line in _ruff_violations(code)):
-            formatted = _ruff_format(code)
-            if formatted != code:
-                new_tree = _parse_or_none(formatted)
-                if new_tree is not None:
-                    self.code = SourceLines(formatted)
-                    code = formatted
-                    tree = new_tree
-
-        fixed = _ruff_fix(code)
-        if fixed != code:
-            self.code = SourceLines(fixed)
-            code = fixed
+        # Formatting is deterministic and semantics-preserving; it is not a
+        # lint repair. Format once, then hold the formatted code to ruff and
+        # feed the actual violation back to the model through the output retry.
+        formatted = _ruff_format(code)
+        if formatted != code:
+            self.code = SourceLines(formatted)
+            code = formatted
             tree = ast.parse(code)
 
         unknown = _unresolvable_imports(tree)
@@ -1294,6 +709,19 @@ class ComponentSourceCode(LLMValidated):
                     "A validator must enforce its rule: raise ValueError with a "
                     "specific message, or remove the validator and the "
                     "_validation_rules entry it was meant to enforce."
+                )
+
+        # A field validator is a classmethod: it takes `cls`, not `self`.
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if not _is_field_validator(node):
+                continue
+            args = [*node.args.args, *node.args.kwonlyargs]
+            if args and args[0].arg == "self":
+                raise ValidationError(
+                    f"@field_validator '{node.name}' takes `self`; a field "
+                    "validator is a classmethod, so it takes `cls`."
                 )
 
         # Find BaseModel subclasses — try runtime issubclass first, fall back to AST
@@ -1438,6 +866,65 @@ class ComponentSourceCode(LLMValidated):
         main_cls = next(
             cls for cls in base_model_subclasses if _class_name(cls) == primary_name
         )
+
+        # AST checks for the primary model's required strings and descriptions.
+        # They run even when runtime introspection falls back (forward-ref
+        # annotations can make Pydantic's model rebuild fail), and they raise,
+        # so the model sees the error instead of the framework rewriting it.
+        primary_node = class_nodes.get(primary_name)
+        if primary_node is not None:
+            missing_min_length: list[str] = []
+            tuple_descriptions: list[str] = []
+            for statement in primary_node.body:
+                if not (
+                    isinstance(statement, ast.AnnAssign)
+                    and isinstance(statement.target, ast.Name)
+                ):
+                    continue
+                annotation = statement.annotation
+                is_str = (
+                    isinstance(annotation, ast.Name) and annotation.id == "str"
+                ) or (
+                    isinstance(annotation, ast.Constant) and annotation.value == "str"
+                )
+                if not is_str:
+                    continue
+                call = statement.value
+                if not (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "Field"
+                ):
+                    continue
+                has_ellipsis = bool(
+                    call.args
+                    and isinstance(call.args[0], ast.Constant)
+                    and call.args[0].value is Ellipsis
+                )
+                has_default = any(
+                    kw.arg in ("default", "default_factory") for kw in call.keywords
+                )
+                if not has_ellipsis and (call.args or has_default):
+                    continue
+                if not any(kw.arg == "min_length" for kw in call.keywords):
+                    missing_min_length.append(statement.target.id)
+                if any(
+                    kw.arg == "description" and isinstance(kw.value, ast.Tuple)
+                    for kw in call.keywords
+                ):
+                    tuple_descriptions.append(statement.target.id)
+            if tuple_descriptions:
+                raise ValidationError(
+                    "Field description= must be one string, not a tuple. Wrap the "
+                    "text with implicit concatenation (adjacent string literals, "
+                    "no commas). Fields: " + ", ".join(tuple_descriptions)
+                )
+            if missing_min_length:
+                raise ValidationError(
+                    "Required string field(s) must declare min_length=1 "
+                    "(or min_length=0 if empty is intentionally allowed): "
+                    + ", ".join(missing_min_length)
+                )
 
         if runtime_available and isinstance(main_cls, type):
             missing_min_length = [

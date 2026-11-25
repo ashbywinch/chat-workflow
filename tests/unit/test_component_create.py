@@ -97,14 +97,6 @@ class _FakeSource:
         return _Generated()
 
 
-def _clean(_code: str) -> str:
-    return "clean code"
-
-
-def _fails(_code: str) -> str:
-    raise RuntimeError("bad code")
-
-
 class _NoRuleJudge(TestCase):
     """Construct real records without the LLM judge, using the documented skip flag."""
 
@@ -124,7 +116,7 @@ class _NoRuleJudge(TestCase):
 
 
 class TestComponentCreate(_NoRuleJudge):
-    def _create(self, verifier):
+    def _create(self):
         return Component.create(
             _requirements(),
             session=_session(),
@@ -133,18 +125,13 @@ class TestComponentCreate(_NoRuleJudge):
             structure=_FakeStructure,
             interaction=_FakeInteraction,
             source=_FakeSource,
-            verifier=verifier,
         )
 
     def test_the_new_path_writes_the_component(self):
-        component = self._create(_clean)
+        component = self._create()
 
         self.assertEqual(component.name, "MeetingMinutes")
-        self.assertEqual(component.code_path.read_text(), "clean code")
-
-    def test_a_verification_failure_is_raised(self):
-        with self.assertRaises(RuntimeError):
-            self._create(_fails)
+        self.assertEqual(component.code_path.read_text(), _Generated.code)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,11 @@
 
 ## TL;DR
 
-The chat-workflow library does not use templates or AST-based code generation for new components. Instead, the LLM designs the component and emits raw Python code as a string. We feed that string through `verify_code()` which runs `ruff format` and `ruff check`, auto-fixing issues, and raises `RuntimeError` if the code can't be cleaned up after 3 attempts. The result is clean, lint-free Python written to disk.
+The chat-workflow library does not use templates or AST-based code generation for new components. Instead, the LLM designs the component and emits raw Python code. The component's own deterministic validator formats the code with `ruff format` and holds it to `ruff check`; a violation is raised, and the model sees the exact rule and line through the output-retry loop. There is no silent AST repair and no auto-fix. The result is clean, lint-free Python written to disk.
 
 The `chat_workflow/code_generator.py` module provides helpers for this process:
 
-- `verify_code(code)` -- the core pipeline for turning raw LLM output into clean Python
+- `verify_code(code)` -- format, then hold standalone generated code to `ruff check`
 - `generate_code()` -- optional pass-through with libcst normalization
 - `generate_field()` -- generates Pydantic field definition strings
 - `generate_workflow_method()` -- generates `@atomic_workflow_step` / `@classmethod` boilerplate
@@ -22,21 +22,24 @@ A companion convention ("one class per file") keeps the generated codebase organ
 The `Component.create()` flow is the primary consumer of code generation. It works like this:
 
 1. The LLM receives the full context of the component requirements (name, purpose, inputs, outputs, field types, validation rules, method signatures).
-2. The LLM designs the component and emits Python source code as a string.
-3. We feed that string through `verify_code()` which formats and lints it.
-4. Any remaining quality constraints are checked via `Validation` rules on the output.
-5. The cleaned code is written to disk at the component's `code_path`.
+2. The LLM designs the component and emits Python source code.
+3. `ComponentSourceCode`'s deterministic validator formats it with `ruff format`, then checks it with `ruff check` and the framework's own AST rules. A failure is a `ValidationError`, which PydanticAI feeds back to the model as an output retry.
+4. The model corrects the code; the step succeeds only when the validator passes.
+5. The validated code is written to disk at the component's `code_path`.
 
-This approach works because the LLM has all the context it needs for a one-shot correct output. The code does the mechanical cleanup that LLMs are bad at (consistent indentation, import ordering, trailing whitespace). The LLM does the semantic work that code is bad at (designing sensible field types, writing good docstrings, choosing the right validation patterns).
+The model does the semantic work (field types, docstrings, validation patterns). `ruff format` does the deterministic formatting. `ruff check` is a **gate**, not a fixer: a violation goes back to the model, so the model — not the framework — changes the program. There is no AST repair pass and no `ruff check --fix`.
 
 ```
-LLM designs component         raw Python string
+LLM designs component         Python source
          |
          v
-verify_code(code)             runs ruff format --check + ruff check
-         |                    auto-fixes, loops up to 3 times
+ruff format                   deterministic, semantics-preserving
+         |
          v
-clean, lint-free code         written to disk
+ruff check + AST rules        fail -> ValidationError -> model output retry
+         |
+         v
+validated code                written to disk
 ```
 
 ### Example: LLM Output Before Verification
@@ -62,7 +65,7 @@ class Criterion(BaseModel):
         ...
 ```
 
-There are subtle issues: inconsistent spacing around `:` in annotations, missing whitespace in keyword arguments. `verify_code()` catches and fixes these.
+Formatting differences (spacing, wrapping) are handled by `ruff format`. A real lint violation is fed back with its rule and line; the model fixes it.
 
 ### When to Use LLM-Generated Code
 
@@ -76,7 +79,7 @@ This approach is for generating new workflow component classes at runtime. It is
 
 ## Code Verification with verify_code()
 
-`verify_code()` is the gatekeeper between raw LLM output and clean disk files. It lives in `chat_workflow/code_generator.py`.
+`verify_code()` is a standalone formatter/checker for callers outside the component pipeline. It lives in `chat_workflow/code_generator.py`. The component pipeline itself uses the same format-then-check contract inside `ComponentSourceCode`'s deterministic validator, so a violation reaches the model through the output retry.
 
 ### How It Works
 
@@ -95,57 +98,42 @@ class Task(BaseModel):
 
 cleaned = verify_code(raw_code)
 print(cleaned)
-# Output: properly formatted, lint-free Python
+# Output: formatted, lint-clean Python
 ```
 
 The function does the following:
 
-1. Writes the code to a temporary file.
-2. Runs `ruff format --check` on the file. If formatting fails, runs `ruff format` to auto-fix.
-3. Runs `ruff check` on the file. If linting fails, runs `ruff check --fix` to auto-fix.
-4. If either check fails after auto-fix, it loops back to step 2 for another attempt.
-5. After `max_attempts` (default: 3), if the code still does not pass, raises `RuntimeError` with the combined stdout and stderr from the failed checks.
-6. On success, reads the cleaned file content and returns it.
+1. Runs `ruff format` on the code. Formatting is deterministic and semantics-preserving.
+2. Runs `ruff check` on the formatted code.
+3. If ruff reports any violation, raises `RuntimeError` with the diagnostics; it does **not** run `ruff check --fix`.
+4. On success, returns the formatted code.
+
+There is no attempt loop: a lint violation is not something a formatter can decide. The caller — or the model that produced the code — corrects it.
 
 ### Signature
 
 ```python
-def verify_code(code: str, max_attempts: int = 3) -> str:
-    """Verify generated code passes ruff linting and formatting checks.
-
-    Parameters
-    ----------
-    code:
-        The Python source code to verify.
-    max_attempts:
-        Maximum number of fix attempts (default: 3).
-
-    Returns
-    -------
-    str
-        The cleaned, lint-free Python source code.
+def verify_code(code: str) -> str:
+    """Format generated code, then hold it to ``ruff check``.
 
     Raises
     ------
     RuntimeError
-        If the code cannot be fixed after max_attempts.
+        If ruff reports any violation.
     """
 ```
 
 ### Error Handling
 
-When `verify_code()` raises, the error message includes both the `ruff format --check` output and the `ruff check` output. This tells you exactly what is wrong so you can fix the prompt or the LLM's generation pattern.
+When `verify_code()` raises, the message contains the ruff diagnostics, including the rule and line. That is the same text the model sees when the component validator rejects its output.
 
 ```python
 try:
     cleaned = verify_code(bad_code)
 except RuntimeError as e:
     print(e)
-    # "Code failed ruff checks after 3 attempts."
-    # "--- format --check ---"
-    # "error: Bad indentation at line 12"
-    # "--- check ---"
-    # "error: F401 `os` imported but unused"
+    # "Generated code failed `ruff check`:"
+    # "generated_component.py:3:8: F401 `os` imported but unused"
 ```
 
 ### How Ruff Is Located
@@ -380,7 +368,7 @@ class Task(BaseModel):
         ...
 '''
 
-# Step 2: Verify and clean
+# Step 2: Format and verify (raises on a lint violation)
 cleaned_code = verify_code(llm_output)
 
 # Step 3: Write to disk

@@ -51,35 +51,6 @@ class TestSourceLines(unittest.TestCase):
 
         self.assertEqual(joined, "a = 1\nb = 2\nc = 3")
 
-    def test_a_repair_that_breaks_syntax_is_detectable(self):
-        """A repair must never ship a module that does not parse."""
-        from workflows.workflow.component_source_code import _parse_or_none
-
-        self.assertIsNone(_parse_or_none('x = "a", min_length=1\n'))
-        self.assertIsNotNone(_parse_or_none("x = 1\n"))
-
-    def test_a_stub_validator_is_removed_not_retried(self):
-        """A validator whose body is only `pass` is repaired, not rejected."""
-        import ast
-
-        from workflows.workflow.component_source_code import _drop_noop_validators
-
-        code = (
-            "class Draft(BaseModel):\n"
-            "    due: str\n"
-            "\n"
-            "    @model_validator(mode='after')\n"
-            "    def _flag_past_deadlines(self):\n"
-            "        \"\"\"No due date may be in the past.\"\"\"\n"
-            "        pass\n"
-        )
-
-        repaired = _drop_noop_validators(code, ast.parse(code))
-
-        self.assertNotIn("_flag_past_deadlines", repaired)
-        self.assertIn("due: str", repaired)
-
-
 class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
     """Tests for the programmatic @model_validator on ComponentSourceCode."""
 
@@ -325,27 +296,32 @@ class TestDeterministicConstraints(unittest.TestCase):
     """Schema-supported constraints are filled in or rejected deterministically."""
 
     def test_required_str_gets_min_length(self):
-        """A required str field without min_length is normalised to min_length=1."""
+        """A required str field without min_length is rejected for the model to fix."""
+        from chat_workflow.exceptions import ValidationError
+
         code = VALID_COMPONENT_CODE.replace(
             '..., description="When the meeting took place", min_length=1',
             '..., description="When the meeting took place"',
         )
-        self.assertNotIn('min_length=1\n    )\n    attendees', code)
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertIn('description="When the meeting took place", min_length=1', component.code)
+        self.assertIn("Required string field(s) must declare min_length=1", str(ctx.exception))
 
     def test_field_without_ellipsis_gets_min_length(self):
         """A required Field(description=...) with no default is still required."""
+        from chat_workflow.exceptions import ValidationError
+
         code = VALID_COMPONENT_CODE.replace(
             '..., description="When the meeting took place", min_length=1',
             'description="When the meeting took place"',
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertIn('description="When the meeting took place", min_length=1', component.code)
+        self.assertIn("Required string field(s) must declare min_length=1", str(ctx.exception))
 
     def test_explicit_min_length_zero_is_preserved(self):
         """min_length=0 means empty is allowed and must not be rewritten."""
@@ -434,16 +410,19 @@ class MinutesDraft(BaseModel):
 
         self.assertIn("It may be the user owner", component.code)
 
-    def test_ruff_autofix_removes_unused_imports(self):
-        """Mechanical ruff fixes are applied, not pushed back to the model."""
+    def test_unused_import_is_rejected_by_ruff(self):
+        """Ruff findings are fed back, not auto-fixed."""
+        from chat_workflow.exceptions import ValidationError
+
         code = VALID_COMPONENT_CODE.replace(
-            "from chat_workflow import atomic_workflow_step",
-            "import os\nfrom chat_workflow import atomic_workflow_step",
+            "from typing import ClassVar",
+            "import os\nfrom typing import ClassVar",
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertNotIn("import os", component.code)
+        self.assertIn("F401", str(ctx.exception))
 
     def test_unfixable_ruff_violation_is_rejected(self):
         """Ruff violations it cannot fix (long lines) still fail validation."""
@@ -461,17 +440,19 @@ class MinutesDraft(BaseModel):
         self.assertIn("ruff", str(ctx.exception))
         self.assertIn("E501", str(ctx.exception))
 
-    def test_legacy_framework_import_is_rewritten(self):
-        """The old path has an exact replacement, so it is fixed, not rejected."""
+    def test_legacy_framework_import_is_rejected(self):
+        """The old path is rejected, not silently rewritten."""
+        from chat_workflow.exceptions import ValidationError
+
         code = VALID_COMPONENT_CODE.replace(
             "from chat_workflow import atomic_workflow_step",
             "from chat_workflow.workflow import atomic_workflow_step",
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertIn("from chat_workflow import atomic_workflow_step", component.code)
-        self.assertNotIn("chat_workflow.workflow", component.code)
+        self.assertIn("cannot be resolved", str(ctx.exception))
 
     def test_an_invented_dependency_is_still_rejected(self):
         """Rewriting is for known aliases only; a made-up package still fails."""
@@ -497,19 +478,19 @@ class MinutesDraft(BaseModel):
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
-    def test_a_tuple_description_is_joined(self):
-        """A wrapped description with commas is a tuple, not concatenation."""
+    def test_a_tuple_description_is_rejected(self):
+        """A tuple description is rejected, not joined."""
+        from chat_workflow.exceptions import ValidationError
+
         code = VALID_COMPONENT_CODE.replace(
             'description="When the meeting took place"',
             'description=("When the meeting took place", "in local time")',
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertIn(
-            'description="When the meeting took place in local time"', component.code
-        )
-        self.assertNotIn('("When the meeting took place"', component.code)
+        self.assertIn("Field description= must be one string", str(ctx.exception))
 
     def test_a_long_condition_is_wrapped_by_the_formatter(self):
         """A joined condition is the model's most common ruff failure."""
@@ -540,31 +521,15 @@ class MinutesDraft(BaseModel):
 
         component = ComponentSourceCode.model_validate_json(payload)
 
-        self.assertEqual(
-            component.code.splitlines(), VALID_COMPONENT_CODE.splitlines()
-        )
+        from workflows.workflow.component_source_code import _ruff_format
+
+        self.assertEqual(component.code, _ruff_format(VALID_COMPONENT_CODE))
 
     def test_schema_asks_for_an_array_of_lines(self):
         schema = ComponentSourceCode.model_json_schema()["properties"]["code"]
 
         self.assertEqual(schema["type"], "array")
         self.assertEqual(schema["items"]["type"], "string")
-
-    def test_non_ascii_line_does_not_shift_the_min_length_insertion(self):
-        """AST columns are UTF-8 bytes; an em dash must not splice the code."""
-        from workflows.workflow.component_source_code import _ensure_min_length
-
-        code = (
-            "from pydantic import BaseModel, Field\n\n\n"
-            "class M(BaseModel):\n"
-            '    summary: str = Field(..., description="Summary — of the meeting")\n'
-        )
-        import ast
-
-        fixed = _ensure_min_length(code, ast.parse(code))
-
-        self.assertIn('"Summary — of the meeting", min_length=1)', fixed)
-        compile(fixed, "generated", "exec")
 
     def test_wrapped_line_with_a_non_ascii_character_still_fits(self):
         """A non-ASCII character costs six characters once escaped."""
@@ -581,8 +546,10 @@ class MinutesDraft(BaseModel):
             "every wrapped line must fit the limit",
         )
 
-    def test_field_validator_self_is_renamed_to_cls(self):
-        """A field validator receives the class; `self` raises at import."""
+    def test_field_validator_taking_self_is_rejected(self):
+        """A field validator must take cls; self is rejected, not renamed."""
+        from chat_workflow.exceptions import ValidationError
+
         code = VALID_COMPONENT_CODE.replace(
             "from pydantic import BaseModel, Field",
             "from pydantic import BaseModel, Field, field_validator",
@@ -595,11 +562,10 @@ class MinutesDraft(BaseModel):
             1,
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertIn("def _check_date(cls, value: str)", component.code)
-        self.assertNotIn("def _check_date(self", component.code)
-        self.assertIn("@classmethod", component.code)
+        self.assertIn("takes `self`", str(ctx.exception))
 
     def test_model_validator_with_field_name_is_rejected(self):
         """`@model_validator('field')` parses but fails at import time."""
@@ -643,8 +609,10 @@ class MinutesDraft(BaseModel):
             component.code,
         )
 
-    def test_long_validation_rule_is_wrapped(self):
-        """A long `_validation_rules` entry is split like a long Field string."""
+    def test_long_validation_rule_is_rejected(self):
+        """A long line ruff cannot format is rejected with E501."""
+        from chat_workflow.exceptions import ValidationError
+
         long_rule = (
             "The raw notes should be sufficiently clear that a person can "
             "reconstruct the meeting's key points, decisions, and action items "
@@ -655,17 +623,15 @@ class MinutesDraft(BaseModel):
             f'"{long_rule}",',
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertNotIn(f'"{long_rule}"', component.code)
-        self.assertIn("The raw notes should be sufficiently clear", component.code)
-        self.assertTrue(
-            all(len(line) <= 120 for line in component.code.splitlines()),
-            "every wrapped line must fit the limit",
-        )
+        self.assertIn("E501", str(ctx.exception))
 
-    def test_long_string_inside_multiline_field_is_wrapped(self):
-        """A long description segment inside a wrapped Field is split too."""
+    def test_long_string_inside_multiline_field_is_rejected(self):
+        """A long string ruff cannot wrap is rejected with E501."""
+        from chat_workflow.exceptions import ValidationError
+
         long_description = (
             "The date the meeting took place, written at the top of the first "
             "page of the minutes and kept with the record of the meeting"
@@ -681,14 +647,10 @@ class MinutesDraft(BaseModel):
             '    )',
         )
 
-        component = _DeterministicOnly(code=code)
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
 
-        self.assertNotIn(f'description="{long_description}"', component.code)
-        self.assertIn("The date the meeting took place", component.code)
-        self.assertTrue(
-            all(len(line) <= 120 for line in component.code.splitlines()),
-            "every wrapped line must fit the limit",
-        )
+        self.assertIn("E501", str(ctx.exception))
 
     def test_private_validation_rules_are_rejected(self):
         """An annotated list[str] is a Pydantic private attribute, not a rule."""
@@ -746,3 +708,48 @@ class TestComponentSourceCodeRulesCollection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestRuffFeedback(unittest.TestCase):
+    """A ruff violation is an output error the model sees and corrects."""
+
+    def test_a_ruff_violation_is_fed_back_and_corrected(self):
+        from pydantic_ai.models.function import FunctionModel
+
+        from chat_workflow import AgentAnswer, Conversation, Success
+        from tests.conftest import ScriptedModel
+
+        invalid = VALID_COMPONENT_CODE.replace(
+            "from typing import ClassVar",
+            "import os\nfrom typing import ClassVar",
+        )
+        script = ScriptedModel(
+            [
+                {
+                    "intent": "success",
+                    "message": "Done.",
+                    "result": {"code": invalid.splitlines()},
+                },
+                {
+                    "intent": "success",
+                    "message": "Done.",
+                    "result": {"code": VALID_COMPONENT_CODE.splitlines()},
+                },
+            ]
+        )
+        original = ComponentSourceCode._skip_llm_validation
+        ComponentSourceCode._skip_llm_validation = True
+        self.addCleanup(setattr, ComponentSourceCode, "_skip_llm_validation", original)
+
+        conversation = Conversation(
+            model="scripted",
+            instructions="Generate the module.",
+            output_type=AgentAnswer[ComponentSourceCode],
+            model_client=FunctionModel(script),
+        )
+
+        turn = conversation.send("Generate the module.")
+
+        self.assertIsInstance(turn.output, Success)
+        self.assertNotIn("import os", turn.output.result.code)
+        self.assertEqual(len(script.calls), 2)

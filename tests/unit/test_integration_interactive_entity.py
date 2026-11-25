@@ -53,7 +53,7 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
         fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn("from __future__ import annotations", result)
-        self.assertIn("from pydantic import BaseModel, Field, model_validator", result)
+        self.assertIn("from pydantic import Field, model_validator", result)
         self.assertIn("from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow_step", result)
 
     def test_generated_code_includes_fields(self):

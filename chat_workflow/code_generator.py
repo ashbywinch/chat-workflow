@@ -13,13 +13,11 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import libcst as cst
-
-# lucidlint: ignore-file duplicate-block this module assembles source line by line; repeated append calls are the output
 
 __all__ = [
     "FieldSpec",
@@ -182,90 +180,67 @@ def generate_model_validator(rule: str, field_name: str | None = None) -> str:
     )
 
 
-def verify_code(code: str, max_attempts: int = 3) -> str:
-    """Verify generated code passes ruff linting and formatting checks.
-
-    Runs ``ruff format --check`` and ``ruff check`` on the code. If either
-    fails, attempts to auto-fix using ``ruff format`` and ``ruff check --fix``.
-    Loops until the code passes or ``max_attempts`` is reached.
-
-    Parameters
-    ----------
-    code:
-        The Python source code to verify.
-    max_attempts:
-        Maximum number of fix attempts (default: 3).
-
-    Returns
-    -------
-    str
-        The cleaned, lint-free Python source code.
-
-    Raises
-    ------
-    RuntimeError
-        If the code cannot be fixed after ``max_attempts``.
-    """
-    ruff_path = _find_ruff()
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
-        f.write(code)
-        tmp_path = f.name
-
-    fmt_result = None
-    lint_result = None
-
-    try:
-        for _ in range(max_attempts):
-            # Check formatting
-            fmt_result = subprocess.run(
-                [ruff_path, "format", "--check", tmp_path],
-                capture_output=True,
-                text=True,
-            )
-
-            if fmt_result.returncode != 0:
-                subprocess.run(
-                    [ruff_path, "format", tmp_path],
-                    capture_output=True,
-                    text=True,
-                )
-                continue
-
-            # Check linting — no rules ignored. If the generated code violates
-            # ruff rules, the prompt must be improved to generate cleaner code.
-            lint_result = subprocess.run(
-                [ruff_path, "check", tmp_path],
-                capture_output=True,
-                text=True,
-            )
-
-            if lint_result.returncode != 0:
-                subprocess.run(
-                    [ruff_path, "check", "--fix", tmp_path],
-                    capture_output=True,
-                    text=True,
-                )
-                continue
-
-            # Both passed — read and return cleaned code
-            with open(tmp_path) as f:
-                return f.read()
-
-        # All attempts exhausted
-        parts = [f"Code failed ruff checks after {max_attempts} attempts."]
-        parts.extend(_ruff_details("format --check", fmt_result))
-        parts.extend(_ruff_details("check", lint_result))
-        raise RuntimeError("\n".join(parts))
-
-    finally:
-        os.unlink(tmp_path)
-
-
-def _ruff_details(label: str, result: subprocess.CompletedProcess | None) -> list[str]:
-    if result is None:
+def _ruff_violations(code: str) -> list[str]:
+    """Run ``ruff check`` on a generated module and return its diagnostics."""
+    ruff = _find_ruff()
+    repo_root = Path.cwd()
+    proc = subprocess.run(
+        [
+            ruff,
+            "check",
+            "--output-format=concise",
+            "--stdin-filename",
+            "generated_component.py",
+            "-",
+        ],
+        input=code,
+        text=True,
+        capture_output=True,
+        cwd=repo_root,
+        timeout=10,
+    )
+    if proc.returncode == 0:
         return []
-    return [f"--- {label} ---", result.stdout, result.stderr]
+    return [line for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _ruff_format(code: str) -> str:
+    """Format a generated module the way the repository formats its own code."""
+    ruff = _find_ruff()
+    repo_root = Path.cwd()
+    proc = subprocess.run(
+        [
+            ruff,
+            "format",
+            "--stdin-filename",
+            "generated_component.py",
+            "-",
+        ],
+        input=code,
+        text=True,
+        capture_output=True,
+        cwd=repo_root,
+        timeout=10,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return code
+    return proc.stdout
+
+
+def verify_code(code: str) -> str:
+    """Format generated code, then hold it to ``ruff check``.
+
+    Formatting is deterministic and semantics-preserving. A lint violation is
+    raised, never auto-fixed: the caller (or the model that produced the code)
+    is the one that has to correct it.
+    """
+    formatted = _ruff_format(code)
+    violations = _ruff_violations(formatted)
+    if violations:
+        raise RuntimeError(
+            "Generated code failed `ruff check`:\n" + "\n".join(violations)
+        )
+    return formatted
 
 
 def _find_ruff() -> str:
@@ -344,8 +319,16 @@ def generate_class(
     """
     lines: list[str] = []
     lines.append("from __future__ import annotations")
-    lines.append("from pydantic import BaseModel, Field, model_validator")
-    lines.append("from chat_workflow import InteractiveEntity, ValidationError, atomic_workflow_step")
+    lines.append("")
+    pydantic_names = ["model_validator"]
+    if fields:
+        pydantic_names.insert(0, "Field")
+    chat_names = ["InteractiveEntity", "atomic_workflow_step"]
+    if validation_rules or fields:
+        chat_names.insert(1, "ValidationError")
+    lines.append(f"from pydantic import {', '.join(pydantic_names)}")
+    lines.append("")
+    lines.append(f"from chat_workflow import {', '.join(chat_names)}")
     lines.append("")
     lines.append(f"class {name}(InteractiveEntity):")
 

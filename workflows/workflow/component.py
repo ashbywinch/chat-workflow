@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from pydantic import Field, model_validator
 
 from chat_workflow import composite_workflow_step
-from chat_workflow.code_generator import verify_code
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.session import Session
 
@@ -26,20 +24,6 @@ def _generated_code(
     source: Any = ComponentSourceCode,
 ) -> Any:
     return source.generate(design_spec=design_spec, session=session)
-
-
-def _verified_code(
-    code: str,
-    session: Session,
-    verifier: Callable[[str], str] = verify_code,
-) -> str:
-    """Verify generated code, reporting the failure before it propagates."""
-    session.io.echo("Verifying generated code...")
-    try:
-        return verifier(code)
-    except RuntimeError as e:
-        session.io.echo(f"Code verification failed: {e}")
-        raise
 
 
 class Component(LLMValidated):
@@ -216,7 +200,6 @@ class Component(LLMValidated):
         structure: Any = ComponentStructure,
         interaction: Any = ComponentInteractionContext,
         source: Any = ComponentSourceCode,
-        verifier: Callable[[str], str] = verify_code,
         cwd: Path | None = None,
     ) -> Component:
         """Create ONE business component.
@@ -265,7 +248,7 @@ class Component(LLMValidated):
             session.io.echo(f"Generating component code: {domain_spec.name}...")
             generated = _generated_code(design_spec, session, source)
 
-            clean_code = _verified_code(generated.code, session, verifier)
+            clean_code = generated.code
 
             if output_dir is None:
                 output_dir = (cwd or Path.cwd()) / "workflows" / domain_spec.name.lower()
@@ -309,8 +292,9 @@ class Component(LLMValidated):
         # lucidlint: ignore duplicate-block the two paths fork on the design spec here
         generated = _generated_code(design_spec, session, source)
 
-        # Step 2: Verify code quality
-        clean_code = _verified_code(generated.code, session, verifier)
+        # The model's own deterministic validation already held the code to
+        # ruff and formatted it; there is no second post-step to run.
+        clean_code = generated.code
 
         # Step 3: Determine output path
         if output_dir is None:

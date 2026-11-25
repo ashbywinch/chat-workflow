@@ -410,7 +410,7 @@ For debugging LLM interactions, see the [Contributor Guide](../contributors/cont
 ## Next Steps
 
 - See [../users/example-evaluation-criteria.md](../users/example-evaluation-criteria.md) for a complete worked example using these patterns to build an evaluation criteria workflow.
-- See [code-generation.md](code-generation.md) for LLM-based workflow code generation and the verify_code() pipeline.
+- See [code-generation.md](code-generation.md) for LLM-based workflow code generation and the format-then-check verification.
 
 ## Annotations & Mixins
 
@@ -695,8 +695,9 @@ class Component(BaseModel):
             session=session,
         )
 
-        # Verify and write to disk
-        clean_code = verify_code(generated.code)
+        # The model's deterministic validation already formatted the code and
+        # held it to `ruff check`; write the validated result.
+        clean_code = generated.code
         if output_dir is None:
             output_dir = Path.cwd() / "workflows" / requirements.name.lower()
         output_dir.mkdir(parents=True, exist_ok=True)

@@ -532,12 +532,10 @@ class TestClassGenerator(unittest.TestCase):
 
 
 class TestVerifyCode(unittest.TestCase):
-    """Test the verify_code() function for ruff linting/formatting verification.
+    """verify_code() formats, then holds the code to ruff check.
 
-    verify_code() should:
-    1. Pass clean code through unchanged
-    2. Fix badly formatted code automatically
-    3. Raise RuntimeError when code can't be fixed after max_attempts
+    Formatting is deterministic and safe. A lint violation is raised, never
+    auto-fixed: the caller (or the model) has to correct it.
     """
 
     def test_verify_code_import(self):
@@ -566,45 +564,30 @@ class TestVerifyCode(unittest.TestCase):
         self.assertEqual(result, source)
 
     def test_verify_code_fixes_bad_formatting(self):
-        """Badly formatted code should be auto-fixed by ruff format."""
+        """Badly formatted code is formatted by ruff format."""
         from chat_workflow.code_generator import verify_code
 
-        # Missing spaces around operators — ruff format will add them
         bad = "x=1\ny=2\n"
         result = verify_code(bad)
         self.assertIn("x = 1", result)
         self.assertIn("y = 2", result)
-        # The fixed version should have spaces around =
         self.assertNotIn("x=1", result)
 
-    def test_verify_code_fixes_lint_issues(self):
-        """Code with auto-fixable lint issues should be fixed."""
+    def test_verify_code_rejects_unused_import(self):
+        """An unused import is a ruff violation, not an auto-fix."""
         from chat_workflow.code_generator import verify_code
 
-        # Unused import (F401) — ruff check --fix can remove it.
-        # Code is already well-formatted so format check passes first.
-        source = "import os\n\nx = 1\n"
-        result = verify_code(source)
-        self.assertNotIn("import os", result)
-        self.assertIn("x = 1", result)
-
-    def test_verify_code_max_attempts_raises_error(self):
-        """verify_code should raise RuntimeError when code can't be fixed."""
-        from chat_workflow.code_generator import verify_code
-
-        # Undefined name (F821) — ruff cannot auto-fix this
-        bad_code = "x = undefined_variable\n"
-        with self.assertRaises(RuntimeError):
-            verify_code(bad_code, max_attempts=2)
-
-    def test_verify_code_max_attempts_error_message(self):
-        """RuntimeError message should mention max_attempts."""
-        from chat_workflow.code_generator import verify_code
-
-        bad_code = "x = undefined_variable\n"
         with self.assertRaises(RuntimeError) as ctx:
-            verify_code(bad_code, max_attempts=1)
-        self.assertIn("1 attempts", str(ctx.exception))
+            verify_code("import os\n\nx = 1\n")
+        self.assertIn("F401", str(ctx.exception))
+
+    def test_verify_code_rejects_undefined_name(self):
+        """An undefined name is a ruff violation, not an auto-fix."""
+        from chat_workflow.code_generator import verify_code
+
+        with self.assertRaises(RuntimeError) as ctx:
+            verify_code("x = undefined_variable\n")
+        self.assertIn("F821", str(ctx.exception))
 
     def test_verify_code_class_def_round_trip(self):
         """A valid class definition should pass through cleanly."""
