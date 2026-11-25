@@ -115,8 +115,8 @@ Language-agnostic by design; per-language toolchain conventions (ruff, eslint, f
   `duration_min`) by design; the semantic types govern all in-memory
   computation, and conversion happens only at the (de)serialization boundary.
   **Never float-compare monetary values, even in tests** — wire strings parse
-  via `Decimal` (exact: `35500.00 − 25500.00` is `10000.00`, not
-  `9999.999…`) into the Money type, and tests compare Money, never floats.
+  via `Decimal` (exact: `0.1 + 0.2` is `0.3`, not
+  `0.30000000000000004`) into the Money type, and tests compare Money, never floats.
 - **Quantities carry their units.** A distance, duration, speed, or weight is
   a typed value with its unit attached — never a bare number. Before
   reaching for `float`/`int`, ask "what unit is this in?" — unit-named field

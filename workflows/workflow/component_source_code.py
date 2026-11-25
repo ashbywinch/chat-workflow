@@ -344,9 +344,13 @@ def _wrap_long_field_strings(code: str, tree: ast.AST) -> str:
                 continue
             # `_split_description` keeps a trailing space on every line but the
             # last so concatenation preserves the text; leave room for it.
-            width = max(20, 120 - value.col_offset - 3)
+            # AST columns are UTF-8 byte offsets; indentation is characters.
+            char_column = _column_to_index(
+                lines[value.lineno - 1], value.col_offset
+            )
+            width = max(20, 120 - char_column - 3)
             chunks = _split_description(value.value, width, _escaped_length)
-            indent = " " * value.col_offset
+            indent = " " * char_column
             rendered = json.dumps(chunks[0])
             for chunk in chunks[1:]:
                 rendered += "\n" + indent + json.dumps(chunk)
@@ -1050,7 +1054,7 @@ def _unresolvable_imports(tree: ast.AST) -> list[str]:
         try:
             if importlib.util.find_spec(path) is None:
                 unresolved.append(path)
-        except (ImportError, ModuleNotFoundError, ValueError):
+        except (ImportError, ValueError):
             unresolved.append(path)
     return unresolved
 

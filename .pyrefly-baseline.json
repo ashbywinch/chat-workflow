@@ -791,18 +791,6 @@
    "description": "Missing argument `component_type` in function `workflows.workflow.component.Component.__init__`",
    "concise_description": "Missing argument `component_type` in function `workflows.workflow.component.Component.__init__`",
    "severity": "error"
-  },
-  {
-   "line": 1053,
-   "column": 30,
-   "stop_line": 1053,
-   "stop_column": 49,
-   "path": "workflows/workflow/component_source_code.py",
-   "code": -2,
-   "name": "unreachable-except-clause",
-   "description": "`ModuleNotFoundError` is already caught earlier in this `try` statement, so it never matches here",
-   "concise_description": "`ModuleNotFoundError` is already caught earlier in this `try` statement, so it never matches here",
-   "severity": "warn"
   }
  ]
 }
