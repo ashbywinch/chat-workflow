@@ -1212,6 +1212,27 @@ class ComponentSourceCode(LLMValidated):
                 "packages from their installed names."
             )
 
+        tuple_fields = sorted(
+            {
+                node.target.id
+                for cls in ast.walk(tree)
+                if isinstance(cls, ast.ClassDef)
+                for node in cls.body
+                if isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and any(
+                    isinstance(sub, ast.Name) and sub.id == "tuple"
+                    for sub in ast.walk(node.annotation)
+                )
+            }
+        )
+        if tuple_fields:
+            raise ValidationError(
+                "Generated fields must not use tuple[...]: the strict answer "
+                "schema rejects prefixItems. Use list[...] (a bounded list if "
+                "the length is fixed): " + ", ".join(tuple_fields)
+            )
+
         # A no-op validator is worse than no validator: the rule it was meant
         # to enforce is silently unenforced, and the judge has to catch it.
         for node in ast.walk(tree):
@@ -1646,7 +1667,10 @@ class ComponentSourceCode(LLMValidated):
         "change, an `update` method; every method works on the same artifact. "
         "The `create` conversation asks at most two or three questions and "
         "synthesizes a draft from a block of user detail rather than walking "
-        "through the fields one by one. "
+        "through the fields one by one. Its docstring tells the model that a "
+        "success carries the complete artifact as `result`, and that the "
+        "final turn returns it; never return success with a question or a "
+        "null result. "
         "The primary model inherits LLMValidated and declares _validation_rules "
         "for the domain's non-deterministic quality criteria. Derive them from "
         "the design spec and domain knowledge; add as many as the domain "
@@ -1678,7 +1702,9 @@ class ComponentSourceCode(LLMValidated):
         "Declare date fields as `str` in ISO 8601 — never `date`/`datetime`, "
         "because the model returns JSON strings. Validate an ISO date with "
         "`datetime.date.fromisoformat(value)`, not a regex; backslashes in a "
-        "regex are the most common source of invalid JSON escapes. "
+        "regex are the most common source of invalid JSON escapes. Never use "
+        "`tuple[...]` for a field; use `list[...]` (a bounded list if the "
+        "length is fixed). "
         "Every @atomic_workflow_step method has a return type annotation and a body "
         "of exactly `...` (Ellipsis). Import only "
         "packages available in this environment; do not invent third-party "
@@ -1734,6 +1760,9 @@ class ComponentSourceCode(LLMValidated):
         `what_good_looks_like` to decide what to probe
         for, not as text to repeat. Use details the user already gave, never
         ask for them again, confirm the draft once, then finish.
+        Tell the model in the docstring that a success carries the complete
+        artifact as `result`, and that the final turn returns it; a success
+        with a question or a null result is wrong.
         Ask at most two or three questions in the whole conversation. When the
         user gives a block of detail, extract every field you can from it and
         propose the draft; do not walk through the fields one by one.
@@ -1825,7 +1854,9 @@ class ComponentSourceCode(LLMValidated):
         Then `action_items: list[ActionItem] = Field(...)`. A dataclass or
         TypedDict is also fine for a nested shape. Declare date
         fields as `str` in ISO 8601 — never `date`/`datetime`, because the
-        model returns JSON strings. Import only packages available in this
+        model returns JSON strings. Never use `tuple[...]` for a field; use
+        `list[...]` (a bounded list if the length is fixed). Import only
+        packages available in this
         environment; do not invent third-party imports. The module must pass
         `ruff check`: sorted imports with a blank line between third-party and
         `chat_workflow`, no unused imports, modern type syntax (`str | None`,
