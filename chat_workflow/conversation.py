@@ -387,7 +387,13 @@ class Conversation(Generic[T]):
         # keeps it for the conversation's later turns.
         self._model: Model | None = model_client
 
-    def send(self, prompt: str | None = None, *, final_turn: bool = False) -> ModelTurn[T]:
+    def send(
+        self,
+        prompt: str | None = None,
+        *,
+        final_turn: bool = False,
+        chat_off: bool = False,
+    ) -> ModelTurn[T]:
         """One turn: *prompt* (or the opening prompt), then the typed result.
 
         ``prompt`` may be ``None`` when the transcript already ends with a user
@@ -412,9 +418,10 @@ class Conversation(Generic[T]):
                 api_key_env=self._api_key_env,
             )
         self._provider_log = _ProviderLog.attach(self._model)
+        one_turn = final_turn or chat_off
         output_type = (
             (self._final_output_type or self._output_type)
-            if final_turn
+            if one_turn
             else self._output_type
         )
         # A workflow step's answer is a tool call; a plain-text model call (an

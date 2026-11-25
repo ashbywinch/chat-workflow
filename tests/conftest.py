@@ -17,6 +17,7 @@ from chat_workflow import (
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
     Conversation,
+    FinalAnswer,
     TurnResult,
 )
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
@@ -163,6 +164,7 @@ def make_conversation(
     responses: list[Any],
     *,
     output_type: type | None = None,
+    final_output_type: type | None = None,
     **overrides: Any,
 ) -> Any:
     """A Conversation on a scripted model: no network, no provider."""
@@ -171,6 +173,7 @@ def make_conversation(
         model="scripted-model",
         instructions="Test instructions",
         output_type=output_type or AgentAnswer[EvaluationCriteria],
+        final_output_type=final_output_type or FinalAnswer[EvaluationCriteria],
         model_client=FunctionModel(script),
         **overrides,
     )

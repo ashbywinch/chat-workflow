@@ -195,12 +195,10 @@ class Session:
         result: TurnResult[TResult] | None = None
         try:
             if not chat:
-                # No user to prompt, so the step owns its own retries: its turn
-                # budget, not this loop, is what ends a step that will not
-                # finish. The step's docstring is the instruction; the workflow
-                # supplies the first (no-user) turn. The echo keeps the internal
-                # turns in the log.
-                result = workflow.complete_without_user(echo=self._raw_io.echo)
+                # No user turn to add: the step's docstring is the instruction,
+                # and its output schema has no `continue` to ask with. The
+                # workflow's own turn budget owns the failure correction.
+                result = workflow.process_turn()
             else:
                 first = ""
                 if _last_role(workflow.messages) == "assistant":

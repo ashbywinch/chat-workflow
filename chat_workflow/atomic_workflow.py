@@ -66,20 +66,6 @@ class AtomicWorkflow(Generic[TResult]):
     # and a suggested repair; the turn keeps the rule and drops the bulk.
     _REJECTION_CORRECTION_LIMIT: ClassVar[int] = 2000
 
-    # The first turn a chat-off step gets when nobody can answer. It states
-    # the job; the step's docstring is the instruction for how to do it.
-    _NO_USER_OPENING: ClassVar[str] = (
-        "No user is available. Produce the result now from the instructions "
-        "and the inputs."
-    )
-
-    # The turn a chat-off step gets when it asks for an answer nobody can give.
-    # It is a correction, not an authored prompt, so it states the job again.
-    _NO_USER_ANSWER: ClassVar[str] = (
-        "No user is available to answer. Return success with the completed "
-        "result, or failure if it cannot be produced."
-    )
-
     # Whether this step had a user of its own. A chat-off step's turns are
     # internal; the transcript projection must not show them as conversation.
     chat: bool = True
@@ -92,7 +78,9 @@ class AtomicWorkflow(Generic[TResult]):
     ):
         self.turn_count = 0
         self.chat = chat
-        self.min_turns = max(1, getattr(config, "min_turns", 1))
+        # A chat-off step has no user to ask, so it cannot need a minimum
+        # number of conversational turns.
+        self.min_turns = 1 if not chat else max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
         # A failure is provisional until the step has had one turn to continue.
         self._failure_given_a_turn = False
@@ -134,7 +122,7 @@ class AtomicWorkflow(Generic[TResult]):
         """The transcript: the conversation's message list, not a rendering."""
         return self._conversation.messages
 
-    def process_turn(self, user_input: str) -> TurnResult[TResult]:
+    def process_turn(self, user_input: str | None = None) -> TurnResult[TResult]:
         """Take the next turn, with the corrections that turn needs.
 
         A correction — a rejected result, an answer that promises content it
@@ -162,12 +150,19 @@ class AtomicWorkflow(Generic[TResult]):
                 # is missing and the user gets to answer it. Without this, a
                 # draft that omits a required fact ends the run and loses the
                 # conversation.
-                if final_turn:
+                # A chat-off step has no user to ask for the missing values;
+                # the output retries already gave it the rejection.
+                if final_turn or not self.chat:
                     raise
                 user_input = _rejection_correction(exc)
                 continue
 
             if response.intent == AgentIntent.CONTINUE:
+                if not self.chat:
+                    raise InvalidResponseError(
+                        "A chat-off step returned 'continue'; its output schema "
+                        "does not permit a question."
+                    )
                 message = (response.message or "").strip()
                 if message.endswith(":") and self.turn_count < self.max_turns:
                     # A colon introduces content the turn does not hold; the
@@ -180,7 +175,7 @@ class AtomicWorkflow(Generic[TResult]):
                     continue
                 return self.on_continue(response)
             if response.intent == AgentIntent.SUCCESS:
-                if self.turn_count < self.min_turns:
+                if self.chat and self.turn_count < self.min_turns:
                     # The task declared that it must ask or propose first. Feed
                     # the early finish back as a correction; it is not a
                     # completion.
@@ -228,32 +223,14 @@ class AtomicWorkflow(Generic[TResult]):
                 f"Invalid intent received: {response.intent}"
             )
 
-    def complete_without_user(
-        self,
-        *,
-        echo: Callable[[str], None] | None = None,
-    ) -> TurnResult[TResult]:
-        """Run to completion with nobody to answer.
-
-        A chat-off step has no user, so a ``continue`` is answered by restating
-        the job. Each retry is a turn, and :meth:`process_turn` spends one from
-        ``max_turns``: this call returns a result or raises
-        ``TurnLimitExceededError`` within the budget, so it cannot outlast it.
-        ``echo`` receives each internal turn as it happens, for the log.
-        """
-        result = self.process_turn(self._NO_USER_OPENING)
-        while not result.is_complete:
-            if echo:
-                echo(f"\nAssistant: {result.message}")
-            result = self.process_turn(self._NO_USER_ANSWER)
-        return result
-
     def _call_llm(self, user_input: str | None = None, *, final_turn: bool = False) -> Any:
         """One turn with the model, timed for the debug stream."""
         started = time.monotonic()
         if self.debug:
             self.debug.on_request(self.messages, self.model)
-        turn = self._conversation.send(user_input, final_turn=final_turn)
+        turn = self._conversation.send(
+            user_input, final_turn=final_turn, chat_off=not self.chat
+        )
         self.usage.incr(turn.usage)
         if self.debug:
             duration_ms = (time.monotonic() - started) * 1000

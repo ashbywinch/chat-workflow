@@ -40,7 +40,7 @@ class _ScriptedConversation:
         self.messages = []
         self.prompts = []
 
-    def send(self, prompt=None, *, final_turn=False):
+    def send(self, prompt=None, *, final_turn=False, chat_off=False):
         self.prompts.append(prompt)
         index = min(len(self.prompts) - 1, len(self._outputs) - 1)
         output = self._outputs[index]

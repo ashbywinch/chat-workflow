@@ -12,7 +12,7 @@ from typing import override
 
 from chat_workflow import Session, SessionComponent, SessionLog, TextReply
 from chat_workflow.atomic_workflow import AtomicWorkflow
-from chat_workflow.exceptions import TurnLimitExceededError
+from chat_workflow.exceptions import MaxRetriesExceededError
 from chat_workflow.session import UserIO
 from chat_workflow.transcript import entries
 from tests.conftest import (
@@ -183,26 +183,23 @@ class TestTheSuccessMessage(unittest.TestCase):
             entries(session.state.messages),
         )
 
-    def test_a_chat_off_step_that_never_finishes_stops_at_the_budget(self):
-        """No user can answer, so the step's own turn budget ends the run."""
+    def test_a_chat_off_step_cannot_continue(self):
+        """The chat-off output shape has no continue, so a question is rejected."""
         session = _session()
         conversation = make_conversation(
-            [
-                {"intent": "continue", "message": "Which format?"},
-                {"intent": "continue", "message": "Which tone?"},
-            ]
+            [{"intent": "continue", "message": "Which format?"}]
         )
         workflow = AtomicWorkflow(
-            config=make_atomic_workflow_config(
-                conversation=conversation, max_turns=2
-            ),
+            config=make_atomic_workflow_config(conversation=conversation),
             chat=False,
         )
 
-        with self.assertRaises(TurnLimitExceededError):
+        with self.assertRaises(MaxRetriesExceededError):
             session.run(workflow, chat=False)
 
-        self.assertEqual(len(conversation.script.calls), 2)
+        # The initial request plus the output retries; the schema never accepts
+        # a continue.
+        self.assertEqual(len(conversation.script.calls), 3)
 
 
 def _no_route() -> TextReply:

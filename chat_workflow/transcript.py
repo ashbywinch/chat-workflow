@@ -66,12 +66,8 @@ _USER_KINDS = frozenset({"user", "assistant"})
 _FRAMEWORK_PROMPTS = frozenset(
     {
         "Start the conversation.",
-        "No user is available. Produce the result now from the instructions "
-        "and the inputs.",
         "You are finishing too early. Do the task's next step before returning "
         "the result.",
-        "No user is available to answer. Return success with the completed "
-        "result, or failure if it cannot be produced.",
         "A success message cannot ask the user a question. If you still need "
         "an answer, return intent='continue'. Otherwise return the result "
         "with a statement of what you did.",
@@ -89,8 +85,6 @@ _CORRECTION_PROMPTS = frozenset(
         "A success message cannot ask the user a question. If you still need "
         "an answer, return intent='continue'. Otherwise return the result "
         "with a statement of what you did.",
-        "No user is available to answer. Return success with the completed "
-        "result, or failure if it cannot be produced.",
         "Your message ends with a colon but the turn does not contain the "
         "content it introduces. Give the content in the message, or finish "
         "and let the next step show it.",
