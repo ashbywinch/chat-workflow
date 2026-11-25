@@ -8,6 +8,7 @@ LLM calls.
 from __future__ import annotations
 
 import concurrent.futures
+import os
 from pathlib import Path
 from typing import Annotated, ClassVar, Literal, NamedTuple, Self, override
 
@@ -262,8 +263,9 @@ class LLMValidated(BaseModel):
         Raises :class:`ValidationError` (from ``chat_workflow.exceptions``) on
         any violation.
 
-        Skips silently when infrastructure is unavailable (no config file or
-        API key), so models can be constructed in test environments.
+        Unit tests turn the judge off explicitly with `_skip_llm_validation`
+        or `CHAT_WORKFLOW_SKIP_LLM_VALIDATION=1`. Otherwise an unavailable
+        judge is an error: a model with rules is never silently unvalidated.
         """
         # Deterministic first: cheap, precise, and no judge tokens wasted on
         # an object that is structurally invalid.
@@ -273,14 +275,13 @@ class LLMValidated(BaseModel):
         if not rules:
             return self
 
-        if self._skip_llm_validation:
+        if self._skip_llm_validation or os.getenv("CHAT_WORKFLOW_SKIP_LLM_VALIDATION") == "1":
             return self
 
-        try:
-            config = Config(Path(__file__).parent.parent / "config.json")
-        # lucidlint: ignore broad-except validation must not fail a model construction when infra is absent
-        except Exception:
-            return self
+        # Infrastructure failures propagate: a model with rules cannot be
+        # constructed without a working judge. Unit tests turn the judge off
+        # explicitly (see `make test`); evals run it for real.
+        config = Config(Path(__file__).parent.parent / "config.json")
 
         prompt = (
             f"Data:\n{self.model_dump_json(indent=2)}\n\n"
@@ -303,34 +304,30 @@ class LLMValidated(BaseModel):
             "propose a correction: the caller decides what to do with a fail."
         )
 
-        try:
-            conversation = Conversation(
-                model=config.model,
-                provider=config.provider,
-                api_base=config.api_base,
-                api_key_env=config.api_key_env,
-                instructions=(
-                    "You are a validation assistant. Evaluate the data against "
-                    "each rule."
-                ),
-                output_type=RuleVerdicts,
-                output_retries=config.max_retries,
-                transport_retries=config.max_retries,
-                timeout_seconds=config.request_timeout_seconds,
-                temperature=0.0,
-                thinking=True,
-                extra_headers=config.extra_headers,
-            )
-            # This validator runs inside the agent's own event loop, where
-            # `Conversation.send` cannot start one. A thread gives the judge
-            # its own loop; the validator stays synchronous, as Pydantic
-            # requires.
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                turn = pool.submit(conversation.send, prompt).result()
-            verdicts = turn.output
-        # lucidlint: ignore broad-except a judge that cannot run leaves the object valid; the caller sees no verdict
-        except Exception:
-            return self
+        conversation = Conversation(
+            model=config.model,
+            provider=config.provider,
+            api_base=config.api_base,
+            api_key_env=config.api_key_env,
+            instructions=(
+                "You are a validation assistant. Evaluate the data against "
+                "each rule."
+            ),
+            output_type=RuleVerdicts,
+            output_retries=config.max_retries,
+            transport_retries=config.max_retries,
+            timeout_seconds=config.request_timeout_seconds,
+            temperature=0.0,
+            thinking=True,
+            extra_headers=config.extra_headers,
+        )
+        # This validator runs inside the agent's own event loop, where
+        # `Conversation.send` cannot start one. A thread gives the judge
+        # its own loop; the validator stays synchronous, as Pydantic
+        # requires.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            turn = pool.submit(conversation.send, prompt).result()
+        verdicts = turn.output
 
         failures = [
             verdict

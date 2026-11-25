@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import ClassVar, Literal
+from typing import Any, ClassVar, Literal
 
 from pydantic import Field, model_validator
 
@@ -19,15 +20,23 @@ from .interaction_context import ComponentInteractionContext
 from .structure import ComponentStructure
 
 
-def _generated_code(design_spec: ComponentDesignSpec, session: Session) -> ComponentSourceCode:
-    return ComponentSourceCode.generate(design_spec=design_spec, session=session)
+def _generated_code(
+    design_spec: ComponentDesignSpec,
+    session: Session,
+    source: Any = ComponentSourceCode,
+) -> Any:
+    return source.generate(design_spec=design_spec, session=session)
 
 
-def _verified_code(code: str, session: Session) -> str:
+def _verified_code(
+    code: str,
+    session: Session,
+    verifier: Callable[[str], str] = verify_code,
+) -> str:
     """Verify generated code, reporting the failure before it propagates."""
     session.io.echo("Verifying generated code...")
     try:
-        return verify_code(code)
+        return verifier(code)
     except RuntimeError as e:
         session.io.echo(f"Code verification failed: {e}")
         raise
@@ -192,9 +201,10 @@ class Component(LLMValidated):
             )
         return self
 
-    # lucidlint: ignore large-function create dispatches the two documented paths in order; each step is a named call
+    # lucidlint: ignore large-function create walks both documented paths in order
     @composite_workflow_step
     @classmethod
+    # lucidlint: ignore long-param-list the factories are injection seams
     def create(
         cls,
         requirements: ComponentSpec | ComponentSpec,
@@ -202,6 +212,12 @@ class Component(LLMValidated):
         session: Session,
         output_dir: Path | None = None,
         deliverables: list | None = None,
+        domain_spec: Any = ComponentDomainSpec,
+        structure: Any = ComponentStructure,
+        interaction: Any = ComponentInteractionContext,
+        source: Any = ComponentSourceCode,
+        verifier: Callable[[str], str] = verify_code,
+        cwd: Path | None = None,
     ) -> Component:
         """Create ONE business component.
 
@@ -221,20 +237,20 @@ class Component(LLMValidated):
         # --- New path: ComponentSpec (Phase 1-4) ---
         if isinstance(requirements, ComponentSpec):
             session.io.echo(f"Exploring domain: {requirements.name}...")
-            domain_spec = ComponentDomainSpec.explore(
+            domain_spec = domain_spec.explore(
                 responsibilities=requirements,
                 deliverables=deliverables,
                 session=session,
             )
 
             session.io.echo(f"Designing structure: {domain_spec.name}...")
-            structure = ComponentStructure.design(
+            structure = structure.design(
                 domain_spec=domain_spec,
                 session=session,
             )
 
             session.io.echo(f"Gathering interaction context: {domain_spec.name}...")
-            interaction_context = ComponentInteractionContext.gather(
+            interaction_context = interaction.gather(
                 domain_spec=domain_spec,
                 structure=structure,
                 session=session,
@@ -247,12 +263,12 @@ class Component(LLMValidated):
             )
 
             session.io.echo(f"Generating component code: {domain_spec.name}...")
-            generated = _generated_code(design_spec, session)
+            generated = _generated_code(design_spec, session, source)
 
-            clean_code = _verified_code(generated.code, session)
+            clean_code = _verified_code(generated.code, session, verifier)
 
             if output_dir is None:
-                output_dir = Path.cwd() / "workflows" / domain_spec.name.lower()
+                output_dir = (cwd or Path.cwd()) / "workflows" / domain_spec.name.lower()
             output_dir.mkdir(parents=True, exist_ok=True)
             code_path = output_dir / f"{domain_spec.name.lower()}.py"
 
@@ -274,31 +290,31 @@ class Component(LLMValidated):
         # Step 1: Construct a ComponentDesignSpec from the requirement
         session.io.echo(f"Designing component: {requirements.name}...")
         design_spec = ComponentDesignSpec(
-            domain_spec=ComponentDomainSpec(
+            domain_spec=domain_spec(
                 name=requirements.name,
                 description=requirements.purpose,
                 fields=[],
                 what_good_looks_like=[],
                 expert_role=f"{requirements.name} Expert",
             ),
-            structure=ComponentStructure(
+            structure=structure(
                 description=requirements.purpose,
             ),
-            interaction_context=ComponentInteractionContext(
+            interaction_context=interaction(
                 must_prioritize=[],
                 auto_suggest=[],
                 user_pain_points=[],
             ),
         )
         # lucidlint: ignore duplicate-block the two paths fork on the design spec here
-        generated = _generated_code(design_spec, session)
+        generated = _generated_code(design_spec, session, source)
 
         # Step 2: Verify code quality
-        clean_code = _verified_code(generated.code, session)
+        clean_code = _verified_code(generated.code, session, verifier)
 
         # Step 3: Determine output path
         if output_dir is None:
-            output_dir = Path.cwd() / "workflows" / requirements.name.lower()
+            output_dir = (cwd or Path.cwd()) / "workflows" / requirements.name.lower()
         output_dir.mkdir(parents=True, exist_ok=True)
         code_path = output_dir / f"{requirements.name.lower()}.py"
 

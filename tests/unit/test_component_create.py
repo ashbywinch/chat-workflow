@@ -1,18 +1,12 @@
 """Component.create orchestrates the phases and writes the artifact.
 
-The phase steps are model conversations; this test replaces them and checks
-the wiring: the record, the output file, and the legacy path.
+The phase steps are model conversations; this test injects object fakes and
+checks the wiring: the record, the output file, and the failure path.
 """
 
-# lucidlint: ignore-file monkeypatch Component.create constructs ComponentDomainSpec, ComponentStructure,
-# ComponentInteractionContext, ComponentSourceCode and calls verify_code in its own body — there is no
-# injectable seam for that pipeline, and changing production is out of scope here
-
-import tempfile
 import unittest
 from pathlib import Path
 from typing import override
-from unittest.mock import patch
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
@@ -75,63 +69,82 @@ class _Generated:
     code = "class MeetingMinutes:\n    pass\n"
 
 
-@patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-class TestComponentCreate(TestCase):
+class _FakeDomainSpec:
+    @staticmethod
+    def explore(**_kwargs) -> ComponentDomainSpec:
+        return _domain()
+
+
+class _FakeStructure:
+    @staticmethod
+    def design(**_kwargs) -> ComponentStructure:
+        return ComponentStructure(description="The artifact")
+
+
+class _FakeInteraction:
+    @staticmethod
+    def gather(**_kwargs) -> ComponentInteractionContext:
+        return ComponentInteractionContext(
+            must_prioritize=[],
+            auto_suggest=[],
+            user_pain_points=[],
+        )
+
+
+class _FakeSource:
+    @staticmethod
+    def generate(**_kwargs):
+        return _Generated()
+
+
+def _clean(_code: str) -> str:
+    return "clean code"
+
+
+def _fails(_code: str) -> str:
+    raise RuntimeError("bad code")
+
+
+class _NoRuleJudge(TestCase):
+    """Construct real records without the LLM judge, using the documented skip flag."""
+
+    _MODELS = (ComponentSpec, ComponentDomainSpec, Component)
+
     @override
     def setUp(self) -> None:
         self.setUpPyfakefs()
+        self._saved_skip = {model: model._skip_llm_validation for model in self._MODELS}
+        for model in self._MODELS:
+            model._skip_llm_validation = True
 
-    @patch("workflows.workflow.component.verify_code", return_value="clean code")
-    @patch("workflows.workflow.component.ComponentSourceCode")
-    @patch("workflows.workflow.component.ComponentInteractionContext")
-    @patch("workflows.workflow.component.ComponentStructure")
-    @patch("workflows.workflow.component.ComponentDomainSpec")
-    def test_the_new_path_writes_the_component(
-        self, domain, structure, interaction, source, _verify, _rules
-    ):
-        domain.explore.return_value = _domain()
-        structure.design.return_value = ComponentStructure(description="The artifact")
-        interaction.gather.return_value = ComponentInteractionContext(
-            must_prioritize=[],
-            auto_suggest=[],
-            user_pain_points=[],
+    @override
+    def tearDown(self) -> None:
+        for model, value in self._saved_skip.items():
+            model._skip_llm_validation = value
+
+
+class TestComponentCreate(_NoRuleJudge):
+    def _create(self, verifier):
+        return Component.create(
+            _requirements(),
+            session=_session(),
+            output_dir=Path("/out"),
+            domain_spec=_FakeDomainSpec,
+            structure=_FakeStructure,
+            interaction=_FakeInteraction,
+            source=_FakeSource,
+            verifier=verifier,
         )
-        source.generate.return_value = _Generated()
 
-        with tempfile.TemporaryDirectory() as directory:
-            component = Component.create(
-                _requirements(),
-                session=_session(),
-                output_dir=Path(directory),
-            )
+    def test_the_new_path_writes_the_component(self):
+        component = self._create(_clean)
 
-            self.assertEqual(component.name, "MeetingMinutes")
-            self.assertEqual(component.code_path.read_text(), "clean code")
+        self.assertEqual(component.name, "MeetingMinutes")
+        self.assertEqual(component.code_path.read_text(), "clean code")
 
-    @patch("workflows.workflow.component.verify_code")
-    @patch("workflows.workflow.component.ComponentSourceCode")
-    @patch("workflows.workflow.component.ComponentInteractionContext")
-    @patch("workflows.workflow.component.ComponentStructure")
-    @patch("workflows.workflow.component.ComponentDomainSpec")
-    def test_a_verification_failure_is_raised(
-        self, domain, structure, interaction, source, verify, _rules
-    ):
-        domain.explore.return_value = _domain()
-        structure.design.return_value = ComponentStructure(description="The artifact")
-        interaction.gather.return_value = ComponentInteractionContext(
-            must_prioritize=[],
-            auto_suggest=[],
-            user_pain_points=[],
-        )
-        source.generate.return_value = _Generated()
-        verify.side_effect = RuntimeError("bad code")
-
-        with tempfile.TemporaryDirectory() as directory, self.assertRaises(RuntimeError):
-            Component.create(
-                _requirements(),
-                session=_session(),
-                output_dir=Path(directory),
-            )
+    def test_a_verification_failure_is_raised(self):
+        with self.assertRaises(RuntimeError):
+            self._create(_fails)
 
 
 if __name__ == "__main__":

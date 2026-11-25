@@ -303,6 +303,9 @@ def _setup_atomic_workflow(
         temperature=getattr(session.config, "temperature", None),
         # Every step reasons; the conversation supplies the gateway's effort.
         thinking=True,
+        # A scripted model for tests; production leaves this None and builds
+        # the real one from the provider fields above.
+        model_client=getattr(session.config, "model_client", None),
         tools=tools,
         deps=deps,
     )

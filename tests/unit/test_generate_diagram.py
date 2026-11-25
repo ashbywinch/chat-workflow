@@ -1,7 +1,6 @@
 """Tests for WorkflowSpec._generate_diagram and the diagram contract."""
 
 import unittest
-from unittest.mock import patch
 
 from chat_workflow.exceptions import ValidationError
 from workflows.workflow.component_spec import ComponentSpec
@@ -306,8 +305,13 @@ class TestDiagramRepair(unittest.TestCase):
             repaired, _make_components(), _make_outputs(), _make_inputs()
         )
 
-    @patch.object(WorkflowSpec, "collect_all_rules", return_value=[])
-    def test_the_model_repairs_the_outcome_before_validation(self, mock_collect):
+    def test_the_model_repairs_the_outcome_before_validation(self):
+        # The judge is switched off at its documented seam; the repair, not
+        # the judgement, is the subject.
+        original = WorkflowSpec._skip_llm_validation
+        WorkflowSpec._skip_llm_validation = True
+        self.addCleanup(setattr, WorkflowSpec, "_skip_llm_validation", original)
+
         diagram = (
             "sequenceDiagram\n"
             'participant Order as "Order: Process"\n'

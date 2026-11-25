@@ -75,6 +75,8 @@ class FakeConfig:
     request_timeout_seconds = 30
     debug = False
     extra_headers: dict[str, str] = {}
+    temperature: float | None = None
+    model_client: Any = None
 
 
 def make_valid_criteria() -> EvaluationCriteria:

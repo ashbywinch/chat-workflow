@@ -1,11 +1,15 @@
 """Integration tests for Component.create with ComponentSpec."""
 
 import unittest
+from dataclasses import dataclass
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+from typing import Any, override
+from unittest.mock import MagicMock
+
+from pyfakefs.fake_filesystem_unittest import TestCase
 
 from chat_workflow import Session, SessionLog
+from tests.sample_code import VALID_COMPONENT_CODE
 from workflows.workflow.component import Component
 from workflows.workflow.component_source_code import ComponentSourceCode
 from workflows.workflow.component_spec import (
@@ -33,15 +37,80 @@ class FakeConfig:
     debug = False
 
 
-class TestComponentCreateWithResponsibilities(unittest.TestCase):
+class _StepRecorder:
+    """A step fake that records its keyword arguments and returns a fixture."""
+
+    def __init__(self, result: Any) -> None:
+        self.result = result
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        return self.result
+
+
+class _VerifierRecorder:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def __call__(self, code: str) -> str:
+        self.calls.append(code)
+        return code
+
+
+class _DomainFake:
+    def __init__(self, result: Any) -> None:
+        self.explore = _StepRecorder(result)
+
+
+class _StructureFake:
+    def __init__(self, result: Any) -> None:
+        self.design = _StepRecorder(result)
+
+
+class _InteractionFake:
+    def __init__(self, result: Any) -> None:
+        self.gather = _StepRecorder(result)
+
+
+class _SourceFake:
+    def __init__(self, result: Any) -> None:
+        self.generate = _StepRecorder(result)
+
+
+@dataclass
+class _Pipeline:
+    domain: _DomainFake
+    structure: _StructureFake
+    interaction: _InteractionFake
+    source: _SourceFake
+    verifier: _VerifierRecorder
+
+
+class _NoRuleJudge(TestCase):
+    """Construct real records without the LLM judge, using the documented skip flag."""
+
+    _MODELS = (ComponentSpec, ComponentDomainSpec, Component, ComponentSourceCode)
+
+    @override
+    def setUp(self) -> None:
+        self.setUpPyfakefs()
+        self._saved_skip = {model: model._skip_llm_validation for model in self._MODELS}
+        for model in self._MODELS:
+            model._skip_llm_validation = True
+
+    @override
+    def tearDown(self) -> None:
+        for model, value in self._saved_skip.items():
+            model._skip_llm_validation = value
+
+
+class TestComponentCreateWithResponsibilities(_NoRuleJudge):
     """Component.create() with ComponentSpec (Phase 1 skeleton)."""
 
-    def _make_session(self) -> Session:
-        return Session(
-            io=MagicMock(),
-            state=SessionLog(),
-            config=FakeConfig(),
-        )
+    def _make_session(self) -> tuple[Session, MagicMock]:
+        io = MagicMock()
+        return Session(io=io, state=SessionLog(), config=FakeConfig()), io
 
     def _make_responsibilities(self, **overrides) -> ComponentSpec:
         kwargs = dict(
@@ -119,383 +188,127 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
         )
 
     def _make_generated_component(self) -> ComponentSourceCode:
-        return ComponentSourceCode(
-            code=(
-                "from __future__ import annotations\n"
-                "from pydantic import BaseModel\n"
-                "\n"
-                "class MeetingMinutes(BaseModel):\n"
-                "    meeting_date: str\n"
-                "    attendees: list[str]\n"
-            ),
+        return ComponentSourceCode(code=VALID_COMPONENT_CODE)
+
+    def _pipeline(self) -> _Pipeline:
+        return _Pipeline(
+            domain=_DomainFake(self._make_domain_spec()),
+            structure=_StructureFake(self._make_structure()),
+            interaction=_InteractionFake(self._make_interaction_context()),
+            source=_SourceFake(self._make_generated_component()),
+            verifier=_VerifierRecorder(),
         )
 
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_create_returns_component_with_domain_spec_fields(
-        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
-    ):
+    def _run(self, pipeline: _Pipeline, *, output_dir: Path | None = Path("/out"), cwd=None):
+        requirements = self._make_responsibilities()
+        session, io = self._make_session()
+        result = Component.create(
+            requirements=requirements,
+            session=session,
+            output_dir=output_dir,
+            cwd=cwd,
+            domain_spec=pipeline.domain,
+            structure=pipeline.structure,
+            interaction=pipeline.interaction,
+            source=pipeline.source,
+            verifier=pipeline.verifier,
+        )
+        return result, requirements, session, io, pipeline
+
+    def test_create_returns_component_with_domain_spec_fields(self):
         """Component.create should return a Component with fields from domain spec."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        result, _, _, _, _ = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        self.assertIsInstance(result, Component)
+        self.assertEqual(result.name, "MeetingMinutes")
+        self.assertEqual(
+            result.purpose,
+            "Structured meeting minutes that capture what happened, decisions made, and action items assigned",
+        )
+        self.assertEqual(result.expert_role, "Meeting Minutes Administrator")
+        self.assertEqual(result.component_type, "artifact_producing")
+        self.assertEqual(result.model_class, "MeetingMinutes")
+        self.assertIsInstance(result.code_path, Path)
+        self.assertIn("meetingminutes", str(result.code_path).lower())
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            result = Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            self.assertIsInstance(result, Component)
-            self.assertEqual(result.name, "MeetingMinutes")
-            self.assertEqual(
-                result.purpose,
-                "Structured meeting minutes that capture what happened, decisions made, and action items assigned",
-            )
-            self.assertEqual(result.expert_role, "Meeting Minutes Administrator")
-            self.assertEqual(result.component_type, "artifact_producing")
-            self.assertEqual(result.model_class, "MeetingMinutes")
-            self.assertIsInstance(result.code_path, Path)
-            self.assertIn("meetingminutes", str(result.code_path).lower())
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_explore_called_with_responsibilities(
-        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
-    ):
+    def test_explore_called_with_responsibilities(self):
         """Component.create should pass responsibilities to explore()."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, requirements, session, _, pipeline = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        call = pipeline.domain.explore.calls[0]
+        self.assertEqual(call["responsibilities"], requirements)
+        self.assertIs(call["session"], session)
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            mock_explore.assert_called_once_with(
-                responsibilities=responsibilities,
-                session=session,
-            )
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_default_output_dir(self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code):
+    def test_default_output_dir(self):
         """When no output_dir given, defaults to cwd/workflows/{name}/."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        result, _, _, _, _ = self._run(self._pipeline(), output_dir=None, cwd=Path("/work"))
 
-        responsibilities = self._make_responsibilities()
-        session = self._make_session()
+        self.assertIsInstance(result, Component)
+        self.assertIn("meetingminutes", str(result.code_path).lower())
 
-        with patch.object(Path, "cwd", return_value=Path("/tmp")):
-            result = Component.create(
-                requirements=responsibilities,
-                session=session,
-            )
-
-            self.assertIsInstance(result, Component)
-            self.assertIn("meetingminutes", str(result.code_path).lower())
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_explore_echoes_message(self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code):
+    def test_explore_echoes_message(self):
         """Component.create should echo an exploring message."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, _, io, _ = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        io.echo.assert_any_call("Exploring domain: MeetingMinutes...")
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            session.raw_io.echo.assert_any_call("Exploring domain: MeetingMinutes...")
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_design_called_with_domain_spec(
-        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
-    ):
+    def test_design_called_with_domain_spec(self):
         """Component.create should pass domain_spec from Phase 1 to Phase 2."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, session, _, pipeline = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        call = pipeline.structure.design.calls[0]
+        self.assertEqual(call["domain_spec"], pipeline.domain.explore.result)
+        self.assertIs(call["session"], session)
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            mock_design.assert_called_once_with(
-                domain_spec=domain_spec,
-                session=session,
-            )
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_design_echoes_message(self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code):
+    def test_design_echoes_message(self):
         """Component.create should echo a designing message."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, _, io, _ = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        io.echo.assert_any_call("Designing structure: MeetingMinutes...")
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            session.raw_io.echo.assert_any_call("Designing structure: MeetingMinutes...")
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_gather_called_with_domain_spec_and_structure(
-        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
-    ):
+    def test_gather_called_with_domain_spec_and_structure(self):
         """Phase 3: gather() should receive domain_spec and structure."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, session, _, pipeline = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        call = pipeline.interaction.gather.calls[0]
+        self.assertEqual(call["domain_spec"], pipeline.domain.explore.result)
+        self.assertEqual(call["structure"], pipeline.structure.design.result)
+        self.assertIs(call["session"], session)
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            mock_gather.assert_called_once_with(
-                domain_spec=domain_spec,
-                structure=structure,
-                session=session,
-            )
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_gather_echoes_message(self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code):
+    def test_gather_echoes_message(self):
         """Phase 3: Component.create should echo a gathering message."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, _, io, _ = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        io.echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            session.raw_io.echo.assert_any_call("Gathering interaction context: MeetingMinutes...")
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_generate_called_with_design_spec(
-        self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code
-    ):
+    def test_generate_called_with_design_spec(self):
         """Phase 4: generate() should receive a ComponentDesignSpec."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, session, _, pipeline = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        call = pipeline.source.generate.calls[0]
+        design_spec = call["design_spec"]
+        self.assertEqual(design_spec.domain_spec, pipeline.domain.explore.result)
+        self.assertEqual(design_spec.structure, pipeline.structure.design.result)
+        self.assertEqual(
+            design_spec.interaction_context,
+            pipeline.interaction.gather.result,
+        )
+        self.assertIs(call["session"], session)
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            mock_generate.assert_called_once()
-            call_kwargs = mock_generate.call_args.kwargs
-            self.assertIn("design_spec", call_kwargs)
-            self.assertEqual(call_kwargs["design_spec"].domain_spec, domain_spec)
-            self.assertEqual(call_kwargs["design_spec"].structure, structure)
-            self.assertEqual(
-                call_kwargs["design_spec"].interaction_context,
-                interaction_context,
-            )
-            self.assertEqual(call_kwargs["session"], session)
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_generate_echoes_message(self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code):
+    def test_generate_echoes_message(self):
         """Phase 4: Component.create should echo a generating message."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        _, _, _, io, _ = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
+        io.echo.assert_any_call("Generating component code: MeetingMinutes...")
 
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            session.raw_io.echo.assert_any_call("Generating component code: MeetingMinutes...")
-
-    @patch("workflows.workflow.component.verify_code")
-    @patch.object(ComponentSourceCode, "generate")
-    @patch.object(ComponentInteractionContext, "gather")
-    @patch.object(ComponentStructure, "design")
-    @patch.object(ComponentDomainSpec, "explore")
-    def test_code_verified_and_written(self, mock_explore, mock_design, mock_gather, mock_generate, mock_verify_code):
+    def test_code_verified_and_written(self):
         """Code should be verified and written to disk."""
-        domain_spec = self._make_domain_spec()
-        mock_explore.return_value = domain_spec
-        structure = self._make_structure()
-        mock_design.return_value = structure
-        interaction_context = self._make_interaction_context()
-        mock_gather.return_value = interaction_context
-        generated = self._make_generated_component()
-        mock_generate.return_value = generated
-        mock_verify_code.side_effect = lambda code: code
+        result, _, _, _, pipeline = self._run(self._pipeline())
 
-        responsibilities = self._make_responsibilities()
-
-        with TemporaryDirectory() as tmpdir:
-            session = self._make_session()
-            Component.create(
-                requirements=responsibilities,
-                session=session,
-                output_dir=Path(tmpdir),
-            )
-
-            mock_verify_code.assert_called_once_with(generated.code)
-            expected_path = Path(tmpdir) / "meetingminutes.py"
-            self.assertTrue(expected_path.exists())
-            self.assertEqual(expected_path.read_text(), generated.code)
+        self.assertEqual(pipeline.verifier.calls, [pipeline.source.generate.result.code])
+        self.assertTrue(result.code_path.exists())
+        self.assertEqual(result.code_path.read_text(), pipeline.source.generate.result.code)
 
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-
-# File-level suppressions sit at the end so the pyrefly baseline's line numbers stay stable.
-# lucidlint: ignore-file monkeypatch Component.create calls explore/design/gather/generate/verify_code
-# as class- and module-level globals; there is no collaborator seam to inject, and production is out of scope
-# lucidlint: ignore-file fakefs the write-to-disk step is the subject: the test asserts code_path holds the code

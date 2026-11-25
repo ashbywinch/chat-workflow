@@ -27,6 +27,9 @@ TOOLS := .tools
 ACTIONLINT := $(TOOLS)/actionlint
 GITLEAKS := $(TOOLS)/gitleaks
 UNITTEST := $(PYTHON) -m unittest
+# Unit tests never call a model: the LLM judge is explicitly off. Evals are the
+# real-model suite and fail loudly when credentials are absent.
+UNIT_TEST_ENV := CHAT_WORKFLOW_SKIP_LLM_VALIDATION=1
 COVERAGE := .venv/bin/coverage
 EVAL_TIMEOUT ?= 1800
 
@@ -95,12 +98,12 @@ run: setup
 check: deps lint-check typecheck lucidlint merge-markers-check docs-check
 
 test: deps lint-check typecheck merge-markers-check
-	@$(UNITTEST) discover tests/unit/
+	@$(UNIT_TEST_ENV) $(UNITTEST) discover tests/unit/
 
 test-unit: test
 
 test-verbose: deps lint-check typecheck
-	@$(UNITTEST) discover tests/unit/ -v
+	@$(UNIT_TEST_ENV) $(UNITTEST) discover tests/unit/ -v
 
 test-all: test evals
 
@@ -108,17 +111,17 @@ dist: deps
 	@$(UV) build
 
 coverage: deps
-	@$(COVERAGE) run -m unittest discover tests/unit/
+	@$(UNIT_TEST_ENV) $(COVERAGE) run -m unittest discover tests/unit/
 	@$(COVERAGE) report -m
 	@$(COVERAGE) xml
 	@$(COVERAGE) html
 	@echo "${GREEN}Coverage report generated: htmlcov/index.html${NC}"
 
 fixtures-check: deps
-	@$(PYTHON) scripts/check_eval_fixtures.py
+	@$(UNIT_TEST_ENV) $(PYTHON) scripts/check_eval_fixtures.py
 
 docs-check: deps  # every relative markdown link resolves (house standard)
-	@$(UNITTEST) tests.unit.test_docs_links
+	@$(UNIT_TEST_ENV) $(UNITTEST) tests.unit.test_docs_links
 
 lint: deps lint-check
 

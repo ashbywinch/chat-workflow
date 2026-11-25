@@ -1,135 +1,170 @@
 #!/usr/bin/env python3
-"""Tests for generic exception handling in WorkflowConsole.run()."""
+"""Tests for generic exception handling in WorkflowConsole.run().
 
-# lucidlint: ignore-file monkeypatch run() builds Config/Session/log_session itself, no seam to inject
-# and typer is module-level; the crash path is reachable only by patching those globals.
-# lucidlint: ignore-file fakefs the subject is the companion -exception.txt file written beside the session log
+The console takes its collaborators by injection, so the crash path is
+exercised with object fakes — no module globals are patched.
+"""
 
-import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from typing import override
+
+from pyfakefs.fake_filesystem_unittest import TestCase
 
 from chat_workflow_cli.workflowconsole import WorkflowConsole
+from tests.conftest import FakeConfig
 
 
-class TestWorkflowConsoleErrorHandling(unittest.TestCase):
-    """Verifies the generic Exception handler saves logs + companion file before handle_error."""
+class _FakeIO:
+    def echo(self, message: str) -> None:
+        pass
+
+    def prompt(self, label: str) -> str:
+        return ""
+
+
+class _NoWrapComponent:
+    """Run the step directly: the crash path, not the greeting, is the subject."""
+
+    def converse(self, step, *, session):
+        return step(session=session)
+
+
+class _FakeExitError(Exception):
+    pass
+
+
+class _FakeColors:
+    RED = "red"
+    YELLOW = "yellow"
+
+
+class _FakeConsole:
+    Exit = _FakeExitError
+    colors = _FakeColors
+
+    def __init__(self) -> None:
+        self.echoes: list[str] = []
+        self.sechoes: list[str] = []
+        self.confirms: list[str] = []
+        self.prompts: list[str] = []
+
+    def echo(self, message: str) -> None:
+        self.echoes.append(message)
+
+    def secho(self, message: str, **_kwargs) -> None:
+        self.sechoes.append(message)
+
+    def confirm(self, message: str, *, default: bool = False) -> bool:
+        self.confirms.append(message)
+        return default
+
+    def prompt(self, message: str, *, default: str = "") -> str:
+        self.prompts.append(message)
+        return default
+
+
+class _FakeLogger:
+    """A session logger that records the record and returns a chosen path."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.records = []
+
+    def __call__(self, record):
+        self.records.append(record)
+        return self.path
+
+
+class _FakeErrorHandler:
+    def __init__(self) -> None:
+        self.errors: list[Exception] = []
+
+    def __call__(self, error: Exception) -> None:
+        self.errors.append(error)
+
+
+class TestWorkflowConsoleErrorHandling(TestCase):
+    """Verifies the generic Exception handler saves logs + companion file before handling."""
+
+    @override
+    def setUp(self) -> None:
+        self.setUpPyfakefs()
 
     def _failing_func(self, **kwargs):
         """A workflow function that raises an unhandled exception."""
         raise ValueError("test crash: something went wrong")
 
-    def _get_runner(self, config_path: Path) -> WorkflowConsole:
-        """Create a WorkflowConsole with the given config path."""
-        return WorkflowConsole(config_path=config_path)
+    def _console(
+        self, log_path: Path, **overrides
+    ) -> tuple[WorkflowConsole, _FakeLogger, _FakeErrorHandler, _FakeConsole]:
+        """A console wired with object fakes and a fake log destination."""
+        self.fs.create_dir(str(log_path.parent))
+        log_path.write_text("{}")
+        dependencies = {
+            "config_factory": lambda _path: FakeConfig(),
+            "io_factory": _FakeIO,
+            "component_factory": _NoWrapComponent,
+            "logger": _FakeLogger(log_path),
+            "error_handler": _FakeErrorHandler(),
+            "console": _FakeConsole(),
+        }
+        dependencies.update(overrides)
+        console = WorkflowConsole(
+            config_path=log_path.parent / "config.json",
+            **dependencies,
+        )
+        return (
+            console,
+            dependencies["logger"],
+            dependencies["error_handler"],
+            dependencies["console"],
+        )
 
-    # ----------------------------------------------------------------
-    # Test 1: Companion -exception.txt file is created with traceback
-    # ----------------------------------------------------------------
-    @patch("chat_workflow_cli.workflowconsole.Config")
-    @patch("chat_workflow_cli.workflowconsole.Session")
-    @patch("chat_workflow_cli.workflowconsole.handle_error")
-    @patch("chat_workflow_cli.workflowconsole.typer")
-    def test_companion_exception_file_created(
-        self,
-        mock_typer,
-        mock_handle_error,
-        mock_session_class,
-        mock_config_class,
-    ):
+    def test_companion_exception_file_created(self):
         """Exception handler must write companion -exception.txt with full traceback."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            log_path = Path(tmpdir) / "session_test.json"
-            # Pre-create the log file so the companion path derivation works
-            log_path.write_text("{}")
+        log_path = Path("/logs/session_test.json")
+        console, logger, _handler, _terminal = self._console(log_path)
 
-            with patch(
-                "chat_workflow_cli.workflowconsole.log_session",
-                return_value=log_path,
-            ) as mock_log_session:
-                runner = self._get_runner(config_path=Path(tmpdir) / "config.json")
-                runner.run(func=self._failing_func, user_params={})
+        console.run(func=self._failing_func, user_params={})
 
-            # Companion file must exist
-            expected_tb_path = log_path.with_name(log_path.stem + "-exception.txt")
-            self.assertTrue(
-                expected_tb_path.exists(),
-                f"Companion exception file not found at {expected_tb_path}",
-            )
+        expected_tb_path = log_path.with_name(log_path.stem + "-exception.txt")
+        self.assertTrue(
+            expected_tb_path.exists(),
+            f"Companion exception file not found at {expected_tb_path}",
+        )
 
-            # Content must contain markers and traceback
-            content = expected_tb_path.read_text()
-            self.assertIn("=== EXCEPTION DETAILS ===", content)
-            self.assertIn("=== END EXCEPTION DETAILS ===", content)
-            self.assertIn("ValueError", content)
-            self.assertIn("test crash: something went wrong", content)
+        content = expected_tb_path.read_text()
+        self.assertIn("=== EXCEPTION DETAILS ===", content)
+        self.assertIn("=== END EXCEPTION DETAILS ===", content)
+        self.assertIn("ValueError", content)
+        self.assertIn("test crash: something went wrong", content)
 
-            # log_session must have been called with crash-specific args
-            mock_log_session.assert_called_once()
-            record = mock_log_session.call_args.args[0]
-            self.assertFalse(record.success_judgement)
-            self.assertEqual(record.feedback_text, "Unhandled exception")
-            self.assertIsNone(record.criteria)
+        self.assertEqual(len(logger.records), 1)
+        record = logger.records[0]
+        self.assertFalse(record.success_judgement)
+        self.assertEqual(record.feedback_text, "Unhandled exception")
+        self.assertIsNone(record.criteria)
 
-    # ----------------------------------------------------------------
-    # Test 2: handle_error() IS called after companion file save
-    # ----------------------------------------------------------------
-    @patch("chat_workflow_cli.workflowconsole.Config")
-    @patch("chat_workflow_cli.workflowconsole.Session")
-    @patch("chat_workflow_cli.workflowconsole.log_session")
-    @patch("chat_workflow_cli.workflowconsole.typer")
-    def test_handle_error_called_after_save(
-        self,
-        mock_typer,
-        mock_log_session,
-        mock_session_class,
-        mock_config_class,
-    ):
-        """handle_error() must be invoked after the session and companion file are saved."""
-        # Make log_session return a real-ish path so .with_name().write_text() doesn't crash
-        import tempfile
+    def test_handle_error_called_after_save(self):
+        """The error handler must run after the session and companion file are saved."""
+        log_path = Path("/logs/session_test_handle.json")
+        console, _logger, handler, _terminal = self._console(log_path)
 
-        mock_log_path = Path(tempfile.gettempdir()) / "session_test_handle.json"
+        console.run(func=self._failing_func, user_params={})
 
-        with patch(
-            "chat_workflow_cli.workflowconsole.handle_error",
-        ) as mock_handle_error:
-            mock_log_session.return_value = mock_log_path
+        self.assertEqual(len(handler.errors), 1)
+        self.assertIsInstance(handler.errors[0], ValueError)
+        self.assertEqual(str(handler.errors[0]), "test crash: something went wrong")
 
-            runner = self._get_runner(config_path=Path("/nonexistent/config.json"))
-            runner.run(func=self._failing_func, user_params={})
+    def test_no_feedback_prompt_on_crash(self):
+        """confirm must NOT be called when an unhandled exception occurs."""
+        log_path = Path("/logs/session_test_noprompt.json")
+        console, _logger, _handler, terminal = self._console(log_path)
 
-            mock_handle_error.assert_called_once()
-            args, _ = mock_handle_error.call_args
-            self.assertIsInstance(args[0], ValueError)
-            self.assertEqual(str(args[0]), "test crash: something went wrong")
+        console.run(func=self._failing_func, user_params={})
 
-    # ----------------------------------------------------------------
-    # Test 3: typer.confirm is NOT called on the crash path
-    # ----------------------------------------------------------------
-    @patch("chat_workflow_cli.workflowconsole.Config")
-    @patch("chat_workflow_cli.workflowconsole.Session")
-    @patch("chat_workflow_cli.workflowconsole.log_session")
-    @patch("chat_workflow_cli.workflowconsole.handle_error")
-    def test_no_feedback_prompt_on_crash(
-        self,
-        mock_handle_error,
-        mock_log_session,
-        mock_session_class,
-        mock_config_class,
-    ):
-        """typer.confirm must NOT be called when an unhandled exception occurs."""
-        mock_log_path = Path("/tmp/session_test_noprompt.json")
+        self.assertEqual(terminal.confirms, [])
 
-        with patch(
-            "chat_workflow_cli.workflowconsole.typer.confirm",
-        ) as mock_confirm:
-            mock_log_session.return_value = mock_log_path
-
-            runner = self._get_runner(config_path=Path("/nonexistent/config.json"))
-            runner.run(func=self._failing_func, user_params={})
-
-            # confirm is used in _log_and_exit (success/specific-error path)
-            # but must NEVER be called on the generic Exception path
-            mock_confirm.assert_not_called()
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

@@ -157,54 +157,6 @@
    "severity": "error"
   },
   {
-   "line": 264,
-   "column": 13,
-   "stop_line": 264,
-   "stop_column": 48,
-   "path": "tests/test_component_integration.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "concise_description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "severity": "error"
-  },
-  {
-   "line": 327,
-   "column": 13,
-   "stop_line": 327,
-   "stop_column": 48,
-   "path": "tests/test_component_integration.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "concise_description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "severity": "error"
-  },
-  {
-   "line": 391,
-   "column": 13,
-   "stop_line": 391,
-   "stop_column": 48,
-   "path": "tests/test_component_integration.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "concise_description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "severity": "error"
-  },
-  {
-   "line": 460,
-   "column": 13,
-   "stop_line": 460,
-   "stop_column": 48,
-   "path": "tests/test_component_integration.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "concise_description": "Object of class `FunctionType` has no attribute `assert_any_call`",
-   "severity": "error"
-  },
-  {
    "line": 95,
    "column": 40,
    "stop_line": 99,

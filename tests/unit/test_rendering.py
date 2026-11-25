@@ -5,15 +5,9 @@ plain-text format, and the guardrail that stops schema vocabulary, Python
 types, or markup from reaching a user.
 """
 
-# lucidlint: ignore-file monkeypatch the class constructs the real workflow records (Deliverable, Resource,
-# ProcessDefinition, ComponentSpec, ComponentDomainSpec, ComponentStructure) so their own rendering is
-# exercised; the LLM rule judge is stubbed by patching collect_all_rules because those records expose no
-# injectable seam, and rendering, not rule judgement, is the subject
-
 import json
 import unittest
-from typing import Annotated
-from unittest.mock import patch
+from typing import Annotated, override
 
 from pydantic import BaseModel, Field, TypeAdapter
 
@@ -84,9 +78,35 @@ def _domain() -> ComponentDomainSpec:
     )
 
 
-@patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-class TestRecordsRenderThemselves(unittest.TestCase):
-    def test_a_process(self, _rules):
+class _NoRuleJudge(unittest.TestCase):
+    """Construct real records without the LLM judge, using the documented skip flag."""
+
+    _MODELS = (
+        Deliverable,
+        ProcessDefinition,
+        Resource,
+        ComponentSpec,
+        ComponentDomainSpec,
+    )
+
+    @classmethod
+    @override
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._saved_skip = {model: model._skip_llm_validation for model in cls._MODELS}
+        for model in cls._MODELS:
+            model._skip_llm_validation = True
+
+    @classmethod
+    @override
+    def tearDownClass(cls):
+        for model, value in cls._saved_skip.items():
+            model._skip_llm_validation = value
+        super().tearDownClass()
+
+
+class TestRecordsRenderThemselves(_NoRuleJudge):
+    def test_a_process(self):
         text = render_result(
             ProcessDefinition(
                 stages=[
@@ -106,7 +126,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("You are the only person involved", flat)
         self.assertIn("You keep it moving", flat)
 
-    def test_a_resource(self, _rules):
+    def test_a_resource(self):
         text = render_result(
             Resource(
                 source="Raw notes",
@@ -120,7 +140,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("Raw notes — Bullet points", text)
         self.assertIn("Needs The agenda first", text)
 
-    def test_a_deliverable(self, _rules):
+    def test_a_deliverable(self):
         text = render_result(_deliverable(), RenderContext())
 
         self.assertIn("Meeting Minutes — The written record", text)
@@ -133,7 +153,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertNotIn("Who gets it", text)
         self.assertNotIn("Where it is kept", text)
 
-    def test_a_full_stop_is_not_doubled(self, _rules):
+    def test_a_full_stop_is_not_doubled(self):
         deliverable = _deliverable().model_copy(
             update={"format": "A shared document.", "success_criteria": "Every decision has an owner."}
         )
@@ -143,7 +163,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("A shared document.\n", text)
         self.assertNotIn("..", text)
 
-    def test_a_component(self, _rules):
+    def test_a_component(self):
         text = render_result(_component(), RenderContext())
 
         self.assertIn("Meeting Minutes — Write up", text)
@@ -151,13 +171,13 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("Owned by: You", text)
         self.assertNotIn("component owns", text)
 
-    def test_a_domain_spec(self, _rules):
+    def test_a_domain_spec(self):
         text = render_result(_domain(), RenderContext())
 
         self.assertIn("Fields: meeting_date — When it happened", text)
         self.assertIn("The role is Note Taker", text)
 
-    def test_a_structure_uses_the_domain_hints(self, _rules):
+    def test_a_structure_uses_the_domain_hints(self):
         text = render_result(
             ComponentStructure(
                 description="The artifact",
@@ -188,7 +208,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         self.assertIn("attendees: list of person names", text)
         self.assertIn("Rule: Every action item has an owner", text)
 
-    def test_a_list_and_an_empty_list(self, _rules):
+    def test_a_list_and_an_empty_list(self):
         text = render_result(
             [
                 Resource(
