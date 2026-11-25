@@ -5,12 +5,11 @@
 #
 # The house provider is Cloudflare AI Gateway: routes through OpenCode Go
 # (primary) with automatic failover to DeepSeek-direct. For forkers: set
-# your own OPENAI_BASE_URL, model, and OPENAI_KEY secret.
+# your own api_base, model, and OPENAI_KEY secret.
 #
 # DO NOT CHANGE:
-# - api_base is supplied by OPENAI_BASE_URL in the review workflow, never
-#   hardcoded here. The workflow has no checkout for exactly this reason: a
-#   PR branch must not supply its own provider.
+# - api_base points at the house provider. Never let a PR branch override
+#   it (the workflow has no checkout for exactly this reason).
 # - model stays "openai/dynamic/fallback2": the action's handler strips the
 #   openai/ prefix and sends "dynamic/fallback2" to api_base. Cloudflare
 #   routes this to the fallback2 dynamic route (OpenCode -> DeepSeek).
@@ -28,8 +27,7 @@
 
 [openai]
 custom_llm_provider = "openai"
-# api_base is supplied by OPENAI_BASE_URL in the review workflow (a repo
-# variable), so a fork changes one variable and does not edit this file.
+api_base = "https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat"
 
 [config]
 model = "openai/dynamic/fallback2"
