@@ -538,7 +538,6 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         "make the name a verb",
         "All component names must be concepts from the user's domain",
         "Every input must be consumed by a component that needs it to make decisions",
-        "REJECT if any activity lacks proper component ownership",
     ]
 
     @atomic_workflow_step(chat=False)

@@ -143,8 +143,7 @@ def weekly_meal_plan_spec() -> ComponentSpec:
         required_inputs=["Dietary preferences"],
         scope_description=(
             "Creates and updates the weekly meal plan (including the associated "
-            "grocery list) for one week. Does not include shopping, cooking, or "
-            "reviewing the plan."
+            "grocery list) for one week. Does not include shopping or cooking."
         ),
         component_type="artifact_producing",
         owner_role="Home Cook",

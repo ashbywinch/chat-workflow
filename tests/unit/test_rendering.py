@@ -95,9 +95,9 @@ class TestRecordsRenderThemselves(unittest.TestCase):
         )
 
         flat = " ".join(text.split())
-        self.assertIn("The work has 2 stages", flat)
-        self.assertIn("Stage 1 — Capture: Scribble notes", flat)
-        self.assertIn("Stage 2 — Write: Type them up", flat)
+        self.assertIn("The work has 2 parts", flat)
+        self.assertIn("1 — Capture: Scribble notes", flat)
+        self.assertIn("2 — Write: Type them up", flat)
         self.assertIn("You are the only person involved", flat)
         self.assertIn("You keep it moving", flat)
 

@@ -181,12 +181,12 @@ class ProcessDefinition(LLMValidated):
             else f"{owner} keeps it moving."
         )
 
-        stages = [
-            f"Stage {index} — {stage.name}: {'; '.join(stage.steps)}."
+        parts = [
+            f"{index} — {stage.name}: {'; '.join(stage.steps)}."
             for index, stage in enumerate(self.stages, 1)
         ]
-        return f"The work has {len(stages)} stages. " + " ".join(
-            [*stages, f"{people} {keeps}"]
+        return f"The work has {len(parts)} parts. " + " ".join(
+            [*parts, f"{people} {keeps}"]
         )
 
 
@@ -266,7 +266,9 @@ name; a step that says "submit for approval" does not name an approver, so leave
 confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
 say the user does it all, the orchestrating component and the sole participant are "You"; do not invent a job title
 such as "Meal Planner" for the user. Do not invent people or
-steps the notes do not support. A name the notes say the user is unsure about — "I don't know if JD is John or a
+steps the notes do not support. A consequence of the work — the boss gets annoyed, the team reads it — is not a stage,
+and the recipient is not a participant in the work; only what the user does, and the people who do it with them, is in
+the breakdown. A name the notes say the user is unsure about — "I don't know if JD is John or a
 project" — is not a participant; leave it out. An example is not a fact.
 
 Return the complete ProcessDefinition."""

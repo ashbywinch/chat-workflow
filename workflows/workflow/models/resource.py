@@ -146,7 +146,7 @@ failure because there is no process description. For each, in the user's words:
 - what it needs first, if anything;
 - the check they apply: something true of the finished thing, not an action, an outcome, or a state of mind. Start
   the check with the thing, not with "you".
-Use the deliverable's name; do not ask what to call it. In your message, call these "the things you start with" or name them; never call them "materials". Return the complete list."""
+Use the deliverable's name; do not ask what to call it. In your message, call these "the things you start with" or name them; never call them "materials". Never coin a label for a thing — "allowed foods list", "pantry-and-fridge list" — unless the user said it: use what they call it, or describe it in their words. Return the complete list."""
     ...  # type: ignore[reportReturnType]
 
 
