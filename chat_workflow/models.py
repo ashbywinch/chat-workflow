@@ -3,15 +3,45 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Generic, Literal, TypeVar
+from typing import Annotated, ClassVar, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+__all__ = [
+    "AgentAnswer",
+    "AgentIntent",
+    "AgentResponse",
+    "Continue",
+    "Failure",
+    "FinalAnswer",
+    "FinalResponse",
+    "Success",
+    "TextReply",
+    "TurnResult",
+    "as_final",
+    "as_turn",
+]
+
 TResult = TypeVar("TResult")
 
-# The name of the tool that carries a step's answer. The endpoint enforces a
-# tool's schema where it ignores `response_format`, so the answer is a call.
-ANSWER_TOOL = "answer"
+
+def _require_success_result(intent: AgentIntent, result: object) -> None:
+    if intent is AgentIntent.SUCCESS and result is None:
+        raise ValueError(
+            "A success must carry `result`: the complete object the step "
+            "was asked for."
+        )
+
+
+def _success_carries_its_result(self):
+    _require_success_result(self.intent, self.result)
+    return self
+
+
+class _CarriesResult:
+    """A success answer must carry the object the step was asked for."""
+
+    _a_success_carries_its_result = model_validator(mode="after")(_success_carries_its_result)
 
 
 class AgentIntent(StrEnum):
@@ -88,7 +118,7 @@ The wire shape is :class:`FinalAnswer`, for the same reason.
 """
 
 
-class AgentAnswer(BaseModel, Generic[TResult]):
+class AgentAnswer(_CarriesResult, BaseModel, Generic[TResult]):
     """The wire answer: one flat object, the shape the protocol describes.
 
     A union output type makes PydanticAI wrap the answer under ``response``,
@@ -100,6 +130,10 @@ class AgentAnswer(BaseModel, Generic[TResult]):
     """
 
     model_config = ConfigDict(extra="forbid")
+
+    # The name of the tool that carries a step's answer. The endpoint enforces
+    # a tool's schema where it ignores `response_format`, so the answer is a call.
+    TOOL_NAME: ClassVar[str] = "answer"
 
     intent: AgentIntent = Field(
         description="continue while another turn is needed; success with the "
@@ -115,17 +149,7 @@ class AgentAnswer(BaseModel, Generic[TResult]):
         description="The complete object, on a success; absent otherwise.",
     )
 
-    @model_validator(mode="after")
-    def _a_success_carries_its_result(self) -> AgentAnswer[TResult]:
-        if self.intent is AgentIntent.SUCCESS and self.result is None:
-            raise ValueError(
-                "A success must carry `result`: the complete object the step "
-                "was asked for."
-            )
-        return self
-
-
-class FinalAnswer(BaseModel, Generic[TResult]):
+class FinalAnswer(_CarriesResult, BaseModel, Generic[TResult]):
     """The last turn's wire answer: success or failure, never a question."""
 
     model_config = ConfigDict(extra="forbid")
@@ -133,16 +157,6 @@ class FinalAnswer(BaseModel, Generic[TResult]):
     intent: Literal[AgentIntent.SUCCESS, AgentIntent.FAILURE]
     message: str = Field(min_length=1)
     result: TResult | None = Field(default=None)
-
-    @model_validator(mode="after")
-    def _a_success_carries_its_result(self) -> FinalAnswer[TResult]:
-        if self.intent is AgentIntent.SUCCESS and self.result is None:
-            raise ValueError(
-                "A success must carry `result`: the complete object the step "
-                "was asked for."
-            )
-        return self
-
 
 def as_turn(answer: AgentAnswer[TResult]) -> Continue | Success[TResult] | Failure:
     """Turn the flat wire answer into the three-shape turn the loop uses."""

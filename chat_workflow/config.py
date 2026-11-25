@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .exceptions import ConfigFileError, ConfigurationError
 from .model_provider import PROVIDERS, ProviderType
 
 
@@ -18,9 +19,8 @@ class Config:
 
     _VALID_PROVIDERS = PROVIDERS
 
+    # lucidlint: ignore record-shape config.json is user-authored nested JSON; fields are checked after the merge
     def __init__(self, config_path: Path, overrides: dict[str, Any] | None = None):
-        from .exceptions import ConfigFileError, ConfigurationError
-
         self._config_data: dict[str, Any] = {
             "llm": {
                 "temperature": 0.7,
@@ -59,6 +59,7 @@ class Config:
         if not self._config_data.get("llm", {}).get("model"):
             raise ConfigurationError("Missing required field in config.json: llm.model")
 
+    # lucidlint: ignore record-shape the merge walks arbitrary nested JSON; both sides are user trees
     def _merge_config(self, base: dict[str, Any], overlay: dict[str, Any]):
         for key, value in overlay.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
@@ -117,9 +118,12 @@ class Config:
         """Environment variable holding the API key. None = provider default (e.g. OPENAI_API_KEY)."""
         return self._config_data["llm"].get("api_key_env")
 
+    # The environment variable that turns on debug output.
+    _DEBUG_ENV = "CHAT_WORKFLOW_DEBUG"
+
     @property
     def debug(self) -> bool:
-        return os.environ.get("CHAT_WORKFLOW_DEBUG", "").lower() in ("1", "true", "yes")
+        return os.environ.get(self._DEBUG_ENV, "").lower() in ("1", "true", "yes")
 
     def __str__(self) -> str:
         return json.dumps(self._config_data, indent=2)

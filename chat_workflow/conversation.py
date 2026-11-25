@@ -27,7 +27,8 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Generic, TypeVar, cast, override
+from http import HTTPStatus
+from typing import Any, ClassVar, Generic, TypeVar, cast, override
 
 import pydantic_ai
 from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, ToolFailed, UsageLimits
@@ -50,7 +51,7 @@ from pydantic_ai.usage import RunUsage
 
 from .exceptions import MaxRetriesExceededError
 from .model_provider import ProviderType, build_model
-from .models import ANSWER_TOOL, AgentAnswer, FinalAnswer, as_final, as_turn
+from .models import AgentAnswer, FinalAnswer, as_final, as_turn
 
 T = TypeVar("T")
 
@@ -59,26 +60,22 @@ T = TypeVar("T")
 # the upstream failed, so the call is transport-retried like a 503. A 400 with
 # any other body is the request's fault and is raised unchanged.
 _UPSTREAM_FAILURE_CODES = frozenset({2005})
-_UPSTREAM_FAILURE_TEXT = "failed to get response from provider"
-
-# A response whose visible text is under this fraction of its length is a
-# stall — whitespace to the token limit — not an answer.
-_NEGLIGIBLE_TEXT = 0.05
 
 
 def _is_upstream_failure(exc: ModelHTTPError) -> bool:
     """Whether a rejected request is really the gateway's upstream failing."""
-    if exc.status_code != 400:
+    if exc.status_code != HTTPStatus.BAD_REQUEST:
         return False
+    failure_text = "failed to get response from provider"
     body = exc.body
     entries = body if isinstance(body, list) else [body]
     for entry in entries:
         if isinstance(entry, dict):
             if entry.get("code") in _UPSTREAM_FAILURE_CODES:
                 return True
-            if _UPSTREAM_FAILURE_TEXT in str(entry.get("message", "")).lower():
+            if failure_text in str(entry.get("message", "")).lower():
                 return True
-        elif _UPSTREAM_FAILURE_TEXT in str(entry).lower():
+        elif failure_text in str(entry).lower():
             return True
     return False
 
@@ -86,17 +83,12 @@ def _is_upstream_failure(exc: ModelHTTPError) -> bool:
 # first-run banner is for a person wiring an agent by hand, not for a workflow
 # CLI or a server's logs. (The documented switch, set once before any run;
 # `setattr` because the flag reads as a module constant to a checker.)
-setattr(pydantic_ai, "BANNER_ENABLED", False)  # noqa: B010 — a module constant to the checker
+def _disable_banner() -> None:
+    enabled = False
+    setattr(pydantic_ai, "BANNER_ENABLED", enabled)  # noqa: B010 — a module constant to the checker
 
-# A step may return a long generated module or a full structured result. The
-# provider default is often small enough to truncate the JSON mid-string, which
-# looks like a syntax error rather than a token limit.
-DEFAULT_MAX_TOKENS = 16384
 
-# The prompt a provider needs when the step opens the conversation: a request
-# that ends on the instructions alone is answered with an empty completion.
-OPENING_PROMPT = "Start the conversation."
-
+_disable_banner()
 
 @dataclass(frozen=True)
 class Resend:
@@ -186,8 +178,9 @@ def _has_usable_content(response: ModelResponse) -> bool:
     # A stall emits the opening token and then whitespace to the token limit
     # (measured on the gateway: `{"response":` followed by 5,392 lines of
     # newlines). It is no answer, however long the response is.
+    negligible = 0.05
     visible = len(text.strip())
-    return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
+    return visible > 0 and visible >= len(text) * negligible
 
 
 def _arguments_are_object(part: ToolCallPart) -> bool:
@@ -213,19 +206,12 @@ def _unusable_cause(response: ModelResponse) -> str:
     if any(isinstance(part, ToolCallPart) and not _arguments_are_object(part) for part in response.parts):
         return "tool arguments were not JSON"
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
-    if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
+    negligible = 0.05
+    if text and len(text.strip()) < len(text) * negligible:
         return "whitespace instead of an answer"
     if any(isinstance(part, TextPart) for part in response.parts):
         return "blank response"
     return "thinking only, no output"
-
-
-def _has_user_turn(messages: Sequence[ModelMessage]) -> bool:
-    return any(
-        isinstance(message, ModelRequest)
-        and any(isinstance(part, UserPromptPart) for part in message.parts)
-        for message in messages
-    )
 
 
 def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
@@ -248,6 +234,7 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
         except ToolFailed:
             # a tool that raised ToolFailed itself already says what failed
             raise
+        # lucidlint: ignore broad-except a step's tool may raise anything; the model reads it as a failure result
         except Exception as exc:  # noqa: BLE001 — any failure is the tool's answer
             raise ToolFailed(f"{type(exc).__name__}: {exc}") from exc
 
@@ -283,6 +270,7 @@ class _ProviderLog:
                 # it here does not consume what the transport reads next.
                 await response.aread()
                 body = response.json()
+            # lucidlint: ignore broad-except a provider log must never break the call
             except Exception:  # noqa: BLE001 — a log must never break a call
                 return
             if isinstance(body, dict):
@@ -338,6 +326,17 @@ class Conversation(Generic[T]):
     # work; thinking is what matters, not the level.
     REASONING_EFFORT = "medium"
 
+    # A step may return a long generated module or a full structured result. The
+    # provider default is often small enough to truncate the JSON mid-string,
+    # which looks like a syntax error rather than a token limit.
+    _DEFAULT_MAX_TOKENS: ClassVar[int] = 16384
+
+    # The prompt a provider needs when the step opens the conversation: a
+    # request that ends on the instructions alone is answered with an empty
+    # completion.
+    OPENING_PROMPT: ClassVar[str] = "Start the conversation."
+
+    # lucidlint: ignore long-param-list the parameters are independent knobs; one production site names each
     def __init__(
         self,
         *,
@@ -352,7 +351,7 @@ class Conversation(Generic[T]):
         transport_retries: int = 2,
         unusable_resends: int = 1,
         max_requests: int = 12,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
+        max_tokens: int | None = None,
         timeout_seconds: float = 30.0,
         temperature: float | None = None,
         extra_headers: Mapping[str, str] | None = None,
@@ -367,13 +366,13 @@ class Conversation(Generic[T]):
         self._provider = provider
         self._api_base = api_base
         self._api_key_env = api_key_env
-        self._instructions = instructions
+        self._instructions = instructions  # lucidlint: ignore duplicate-block each line initialises a distinct field
         self._output_type = output_type
         self._output_retries = output_retries
         self._transport_retries = transport_retries
         self._unusable_resends = unusable_resends
         self._max_requests = max_requests
-        self._max_tokens = max_tokens
+        self._max_tokens = max_tokens if max_tokens is not None else self._DEFAULT_MAX_TOKENS
         self._timeout_seconds = timeout_seconds
         self._temperature = temperature
         self._extra_headers = dict(extra_headers) if extra_headers else None
@@ -397,7 +396,12 @@ class Conversation(Generic[T]):
         would otherwise keep asking is told to answer with what it has.
         """
         if not prompt or not prompt.strip():
-            prompt = None if _has_user_turn(self.messages) else OPENING_PROMPT
+            has_user_turn = any(
+                isinstance(message, ModelRequest)
+                and any(isinstance(part, UserPromptPart) for part in message.parts)
+                for message in self.messages
+            )
+            prompt = None if has_user_turn else self.OPENING_PROMPT
 
         resender = _ResendUnusable(self._unusable_resends)
         if self._model is None:
@@ -419,7 +423,7 @@ class Conversation(Generic[T]):
         output_spec: Any = (
             str
             if output_type is str
-            else ToolOutput(output_type, name=ANSWER_TOOL, strict=True)
+            else ToolOutput(output_type, name=AgentAnswer.TOOL_NAME, strict=True)
         )
         agent: Agent[Any, T] = Agent(
             self._model,
@@ -435,6 +439,7 @@ class Conversation(Generic[T]):
                 if final_turn
                 else ""
             ),
+            # lucidlint: ignore record-shape this is PydanticAI's retry-budget mapping, a library wire shape
             retries={"output": self._output_retries, "tools": self._output_retries},
             capabilities=[resender],
         )

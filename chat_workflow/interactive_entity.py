@@ -16,12 +16,18 @@ from pydantic import BaseModel
 
 from chat_workflow.exceptions import ValidationError
 
-# Regex patterns for parsing _validation_rules
-_NON_EMPTY_RE = re.compile(r"(\w+)\s+must be non-empty")
-_REQUIRED_RE = re.compile(r"(\w+)\s+is required")
-_BETWEEN_RE = re.compile(r"(\w+)\s+must be between\s+(\d+)\s+and\s+(\d+)\s*(?:\(inclusive\))?")
-_AFTER_RE = re.compile(r"(\w+)\s+must be after\s+(\w+)")
-_CONDITIONAL_RE = re.compile(r"if\s+(\w+)\s*>\s*(\d+)\s*,\s*(\w+)\s+is required")
+# Regex patterns for parsing _validation_rules. Named groups name what each
+# capture is, so the enforcement reads the rule rather than a position.
+_NON_EMPTY_RE = re.compile(r"(?P<field>\w+)\s+must be non-empty")
+_REQUIRED_RE = re.compile(r"(?P<field>\w+)\s+is required")
+_BETWEEN_RE = re.compile(
+    r"(?P<field>\w+)\s+must be between\s+(?P<lower>\d+)\s+and\s+(?P<upper>\d+)"
+    r"\s*(?:\(inclusive\))?"
+)
+_AFTER_RE = re.compile(r"(?P<field>\w+)\s+must be after\s+(?P<other>\w+)")
+_CONDITIONAL_RE = re.compile(
+    r"if\s+(?P<field>\w+)\s*>\s*(?P<threshold>\d+)\s*,\s*(?P<required>\w+)\s+is required"
+)
 
 
 class InteractiveEntity(BaseModel):
@@ -79,59 +85,76 @@ class InteractiveEntity(BaseModel):
         Raises:
             ValidationError: If the rule is violated.
         """
-        # if X > N, Y is required
+        handlers = (
+            self._enforce_conditional,
+            self._enforce_between,
+            self._enforce_after,
+            self._enforce_presence,
+        )
+        for handler in handlers:
+            if handler(rule):
+                return
+
+    def _enforce_conditional(self, rule: str) -> bool:
+        """Enforce ``if X > N, Y is required``."""
         m = _CONDITIONAL_RE.fullmatch(rule)
-        if m:
-            field_x = self._resolve_field_name(m.group(1))
-            threshold = int(m.group(2))
-            field_y = self._resolve_field_name(m.group(3))
-            if field_x is not None and field_y is not None:
-                val_x = getattr(self, field_x, 0)
-                val_y = getattr(self, field_y, "")
-                if val_x > threshold and not val_y:
-                    raise ValidationError(f"Validation rule violated: '{rule}'")
-            return
+        if not m:
+            return False
+        field_x = self._resolve_field_name(m.group("field"))
+        threshold = int(m.group("threshold"))
+        field_y = self._resolve_field_name(m.group("required"))
+        if (
+            field_x is not None
+            and field_y is not None
+            and getattr(self, field_x, 0) > threshold
+            and not getattr(self, field_y, "")
+        ):
+            self._violated(rule)
+        return True
 
-        # X must be between A and B
+    def _enforce_between(self, rule: str) -> bool:
+        """Enforce ``X must be between A and B``."""
         m = _BETWEEN_RE.fullmatch(rule)
-        if m:
-            field_name = self._resolve_field_name(m.group(1))
-            lower = int(m.group(2))
-            upper = int(m.group(3))
-            if field_name is not None:
-                val = getattr(self, field_name, 0)
-                if not (lower <= val <= upper):
-                    raise ValidationError(f"Validation rule violated: '{rule}'")
-            return
+        if not m:
+            return False
+        field_name = self._resolve_field_name(m.group("field"))
+        lower = int(m.group("lower"))
+        upper = int(m.group("upper"))
+        if field_name is not None:
+            val = getattr(self, field_name, 0)
+            if not (lower <= val <= upper):
+                self._violated(rule)
+        return True
 
-        # X must be after Y
+    def _enforce_after(self, rule: str) -> bool:
+        """Enforce ``X must be after Y``."""
         m = _AFTER_RE.fullmatch(rule)
-        if m:
-            field_x = self._resolve_field_name(m.group(1))
-            field_y = self._resolve_field_name(m.group(2))
-            if field_x is not None and field_y is not None:
-                val_x = getattr(self, field_x, 0)
-                val_y = getattr(self, field_y, 0)
-                if not (val_x > val_y):
-                    raise ValidationError(f"Validation rule violated: '{rule}'")
-            return
+        if not m:
+            return False
+        field_x = self._resolve_field_name(m.group("field"))
+        field_y = self._resolve_field_name(m.group("other"))
+        if (
+            field_x is not None
+            and field_y is not None
+            and not (getattr(self, field_x, 0) > getattr(self, field_y, 0))
+        ):
+            self._violated(rule)
+        return True
 
-        # X must be non-empty
-        m = _NON_EMPTY_RE.fullmatch(rule)
-        if m:
-            field_name = self._resolve_field_name(m.group(1))
-            if field_name is not None:
-                val = getattr(self, field_name, "")
-                if not val:
-                    raise ValidationError(f"Validation rule violated: '{rule}'")
-            return
+    def _enforce_presence(self, rule: str) -> bool:
+        """Enforce ``X must be non-empty`` and ``X is required``."""
+        for pattern in (_NON_EMPTY_RE, _REQUIRED_RE):
+            m = pattern.fullmatch(rule)
+            if m:
+                self._require_present(self._resolve_field_name(m.group("field")), rule)
+                return True
+        return False
 
-        # X is required
-        m = _REQUIRED_RE.fullmatch(rule)
-        if m:
-            field_name = self._resolve_field_name(m.group(1))
-            if field_name is not None:
-                val = getattr(self, field_name, "")
-                if not val:
-                    raise ValidationError(f"Validation rule violated: '{rule}'")
-            return
+    @staticmethod
+    def _violated(rule: str) -> None:
+        raise ValidationError(f"Validation rule violated: '{rule}'")
+
+    def _require_present(self, field_name: str | None, rule: str) -> None:
+        """Raise when a resolved field holds an empty value."""
+        if field_name is not None and not getattr(self, field_name, ""):
+            self._violated(rule)

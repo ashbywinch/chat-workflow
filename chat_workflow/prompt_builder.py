@@ -10,6 +10,7 @@ It is consumed by the ``@atomic_workflow_step`` / ``@composite_workflow_step`` d
 
 import inspect
 import json
+import re
 import types
 import typing
 from collections.abc import Callable
@@ -18,12 +19,19 @@ from typing import Any
 from pydantic import BaseModel
 
 from .metadata import (
-    _format_param_value,
-    _format_type_name,
-    _get_param_description,
-    _get_typed_hint,
-    _unwrap_annotated,
+    format_param_value,
+    format_type_name,
+    get_param_description,
+    get_typed_hint,
+    unwrap_annotated,
 )
+
+__all__ = [
+    "build_params_section",
+    "format_docstring",
+    "input_models",
+    "user_parameter_labels",
+]
 
 # Internal params that the @atomic_workflow_step decorator consumes and should NOT
 # appear in the auto-generated parameters section of the system prompt.
@@ -31,7 +39,7 @@ from .metadata import (
 _INTERNAL_PARAMS: frozenset[str] = frozenset({"session", "debug", "self", "cls"})
 
 
-def _format_docstring(docstring: str | None, **kwargs) -> str:
+def format_docstring(docstring: str | None, **kwargs) -> str:
     """Format a docstring with kwargs, supporting method calls like {var.method()}.
 
     Python's str.format() does NOT support method calls - {obj.method()} is
@@ -47,8 +55,6 @@ def _format_docstring(docstring: str | None, **kwargs) -> str:
         The formatted docstring, or an empty string if docstring was
         None or empty.
     """
-    import re
-
     if not docstring:
         return ""
 
@@ -94,7 +100,7 @@ def _model_for_hint(hint: Any) -> type[BaseModel] | None:
     Handles ``Model``, ``list[Model]``, ``Model | None`` and
     ``list[Model] | None`` (including ``Annotated`` wrappers).
     """
-    hint = _unwrap_annotated(hint)
+    hint = unwrap_annotated(hint)
     origin = typing.get_origin(hint)
     if origin is typing.Union or origin is types.UnionType:
         args = [arg for arg in typing.get_args(hint) if arg is not type(None)]
@@ -122,7 +128,7 @@ def input_models(func: Callable[..., Any]) -> tuple[type[BaseModel], ...]:
     for name in inspect.signature(func).parameters:
         if name in _INTERNAL_PARAMS:
             continue
-        model = _model_for_hint(_get_typed_hint(func, name))
+        model = _model_for_hint(get_typed_hint(func, name))
         if model is not None and model not in models:
             models.append(model)
     return tuple(models)
@@ -139,14 +145,15 @@ def user_parameter_labels(func: Callable[..., Any]) -> dict[str, str]:
     for name in inspect.signature(func).parameters:
         if name in _INTERNAL_PARAMS:
             continue
-        description = _get_param_description(func, name)
+        description = get_param_description(func, name)
         if description:
             labels[name] = description
     return labels
 
 
-def _build_params_section(
+def build_params_section(
     func: Callable[..., Any],
+    # lucidlint: ignore record-shape the call-time kwargs are arbitrary per workflow function
     runtime_kwargs: dict[str, Any],
     *,
     skip_shapes: frozenset[str] = frozenset(),
@@ -180,8 +187,8 @@ def _build_params_section(
         if param_name in _INTERNAL_PARAMS:
             continue
 
-        type_name = _format_type_name(_get_typed_hint(func, param_name))
-        description = _get_param_description(func, param_name)
+        type_name = format_type_name(get_typed_hint(func, param_name))
+        description = get_param_description(func, param_name)
 
         # Build one parameter entry
         parts = [f"- `{param_name}` ({type_name})"]
@@ -190,14 +197,14 @@ def _build_params_section(
 
         # Show the effective value
         if param_name in runtime_kwargs:
-            parts.append(f"\n  Value: {_format_param_value(runtime_kwargs[param_name])}")
+            parts.append(f"\n  Value: {format_param_value(runtime_kwargs[param_name])}")
         elif param.default is not inspect.Parameter.empty:
-            parts.append(f"\n  Default: {_format_param_value(param.default)}")
+            parts.append(f"\n  Default: {format_param_value(param.default)}")
 
         # Include the annotated shape of Pydantic model parameters. The value
         # above shows data; the schema shows the field descriptions and
         # constraints the model needs.
-        model = _model_for_hint(_get_typed_hint(func, param_name))
+        model = _model_for_hint(get_typed_hint(func, param_name))
         if model is not None and model.__name__ not in skip_shapes:
             schema = json.dumps(model.model_json_schema(), indent=2)
             parts.append(f"\n  Shape:\n```json\n{schema}\n```")

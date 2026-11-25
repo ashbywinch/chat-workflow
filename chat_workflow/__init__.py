@@ -4,8 +4,16 @@ from .atomic_workflow_config import AtomicWorkflowConfig
 from .code_generator import generate_class, verify_code
 from .config import Config
 from .conversation import Conversation, ModelTurn
-from .debug import StreamingDebug
-from .decorators import atomic_workflow, composite_workflow
+from .decorators import (
+    atomic_workflow,
+    composite_workflow,
+)
+from .decorators import (
+    atomic_workflow as atomic_workflow_step,
+)
+from .decorators import (
+    composite_workflow as composite_workflow_step,
+)
 from .exceptions import (
     APIKeyError,
     AtomicWorkflowFailedError,
@@ -37,11 +45,7 @@ from .models import (
 from .session import Session
 from .session_component import SessionComponent
 from .session_log import SessionLog
-
-# The framework's decorator names before the model-path refactor. A workflow
-# author's existing steps and the generated components keep working.
-atomic_workflow_step = atomic_workflow
-composite_workflow_step = composite_workflow
+from .streamingdebug import StreamingDebug
 
 __all__ = [
     "APIKeyError",

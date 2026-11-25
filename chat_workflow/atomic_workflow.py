@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -25,29 +25,21 @@ from .transcript import render
 
 TResult = TypeVar("TResult")
 
-# A rejection's own words are the rule that was broken, with its evidence and
-# a suggested repair; the turn keeps the rule and drops the bulk.
-_REJECTION_CORRECTION_LIMIT = 2000
-
-# The turn a chat-off step gets when it asks for an answer nobody can give.
-# It is a correction, not an authored prompt, so it states the job again.
-_NO_USER_ANSWER = (
-    "No user is available to answer. Return success with the completed "
-    "result, or failure if it cannot be produced."
-)
-
+__all__ = ["AtomicWorkflow"]
 
 def _rejection_correction(exc: MaxRetriesExceededError) -> str:
     """The turn a rejected result earns: ask for the facts it could not hold.
 
     Resampling cannot fix a rule that failed for data the conversation does
-    not contain — every retry answers from the same history. The rejection is
-    therefore fed back as a turn, where the model can ask the user and the
-    user can answer, bounded by the step's turn budget like any correction.
+    not contain — every retry answers from the same history. The rejection
+    is therefore fed back as a turn, where the model can ask the user and
+    the user can answer, bounded by the step's turn budget like any
+    correction.
     """
     reasons = " ".join(exc.reason.split())
-    if len(reasons) > _REJECTION_CORRECTION_LIMIT:
-        reasons = reasons[: _REJECTION_CORRECTION_LIMIT - 1].rstrip() + "…"
+    limit = AtomicWorkflow._REJECTION_CORRECTION_LIMIT
+    if len(reasons) > limit:
+        reasons = reasons[: limit - 1].rstrip() + "…"
     return (
         "Your result was rejected by its own rules:\n"
         f"{reasons}\n\n"
@@ -55,6 +47,7 @@ def _rejection_correction(exc: MaxRetriesExceededError) -> str:
         "result again and do not invent them. Ask for what is still missing, "
         "then return the completed result."
     )
+
 
 
 class AtomicWorkflow(Generic[TResult]):
@@ -68,6 +61,17 @@ class AtomicWorkflow(Generic[TResult]):
     :class:`~chat_workflow.conversation.Conversation`; this class owns the turn
     rules (intent, turn limit) and nothing about the model.
     """
+
+    # A rejection's own words are the rule that was broken, with its evidence
+    # and a suggested repair; the turn keeps the rule and drops the bulk.
+    _REJECTION_CORRECTION_LIMIT: ClassVar[int] = 2000
+
+    # The turn a chat-off step gets when it asks for an answer nobody can give.
+    # It is a correction, not an authored prompt, so it states the job again.
+    _NO_USER_ANSWER: ClassVar[str] = (
+        "No user is available to answer. Return success with the completed "
+        "result, or failure if it cannot be produced."
+    )
 
     # Whether this step had a user of its own. A chat-off step's turns are
     # internal; the transcript projection must not show them as conversation.
@@ -181,7 +185,7 @@ class AtomicWorkflow(Generic[TResult]):
                 if (response.message or "").strip().endswith("?") and self.turn_count < self.max_turns:
                     # A success is a completion. Asking the user something
                     # while claiming the step is done leaves the answer unread.
-                    user_input = (
+                    user_input = (  # lucidlint: ignore duplicate-block each correction is a distinct authored prompt
                         "A success message cannot ask the user a question. If "
                         "you still need an answer, return intent='continue'. "
                         "Otherwise return the result with a statement of what "
@@ -235,7 +239,7 @@ class AtomicWorkflow(Generic[TResult]):
         while not result.is_complete:
             if echo:
                 echo(f"\nAssistant: {result.message}")
-            result = self.process_turn(_NO_USER_ANSWER)
+            result = self.process_turn(self._NO_USER_ANSWER)
         return result
 
     def _call_llm(self, user_input: str | None = None, *, final_turn: bool = False) -> Any:

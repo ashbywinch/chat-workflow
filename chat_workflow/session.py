@@ -9,7 +9,8 @@ from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, Text
 
 from .atomic_workflow import AtomicWorkflow
 from .models import TurnResult
-from .session_log import SessionLog, _record_atomic_workflow
+from .rendering import RenderContext, render_result
+from .session_log import SessionLog, record_atomic_workflow
 
 if TYPE_CHECKING:
     from .rendering import Renderable
@@ -155,8 +156,6 @@ class Session:
         wrong shape is a type error here rather than a ``RenderError`` in the
         middle of a conversation.
         """
-        from .rendering import RenderContext, render_result
-
         text = render_result(result, RenderContext())
         if not text:
             return
@@ -222,7 +221,7 @@ class Session:
                     self._raw_io.echo(f"\nAssistant: {result.message}")
                     result = workflow.process_turn(self._raw_io.prompt("\nYou"))
         finally:
-            _record_atomic_workflow(self.state, workflow)
+            record_atomic_workflow(self.state, workflow)
 
         assert result is not None
         # A conversational step does not finish silently: the success message

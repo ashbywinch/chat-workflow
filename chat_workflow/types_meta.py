@@ -5,11 +5,14 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+__all__ = ["resolve_return_type"]
+
 
 def resolve_return_type(
     raw_func: Callable[..., Any],
     func: Callable[..., Any],
     args: tuple[Any, ...],
+    # lucidlint: ignore record-shape the call-time kwargs are arbitrary per decorated function; they have no fixed shape
     kwargs: dict[str, Any],
 ) -> Any | None:
     """Resolve the actual return type of a function.

@@ -7,6 +7,10 @@ using ``typing.Annotated`` to control behavior like file materialization
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
+
+__all__ = ["Blob", "UserLabel", "UserLabels", "Validation", "user_labels"]
+
 
 class Blob:
     """Annotation: field content should be materialized to a file on disk.
@@ -61,9 +65,15 @@ class UserLabel:
     leakage.
     """
 
-    def __init__(self, phrase: str, *aliases: str, guard: bool = True):
+    def __init__(
+        self,
+        phrase: str,
+        aliases: str | tuple[str, ...] = (),
+        *,
+        guard: bool = True,
+    ):
         self.phrase = phrase
-        self.aliases = aliases
+        self.aliases = (aliases,) if isinstance(aliases, str) else tuple(aliases)
         self.guard = guard
 
     def __get_pydantic_json_schema__(self, schema, handler):
@@ -79,12 +89,32 @@ class UserLabel:
         return json_schema
 
 
-def user_labels(model: object) -> dict[str, UserLabel]:
-    """Return ``{field_name: UserLabel}`` for a Pydantic model."""
-    labels: dict[str, UserLabel] = {}
-    for name, field in getattr(model, "model_fields", {}).items():
-        for metadata in field.metadata:
-            if isinstance(metadata, UserLabel):
-                labels[name] = metadata
-                break
-    return labels
+class UserLabels(Mapping[str, "UserLabel"]):
+    """The user-facing label for each field of a Pydantic model.
+
+    The map is a domain object: callers read it by field name and iterate the
+    pairs, and the build rule lives here rather than in every call site.
+    """
+
+    def __init__(self, model: object):
+        labels: dict[str, UserLabel] = {}
+        for name, field in getattr(model, "model_fields", {}).items():
+            for metadata in field.metadata:
+                if isinstance(metadata, UserLabel):
+                    labels[name] = metadata
+                    break
+        self._labels = labels
+
+    def __getitem__(self, name: str) -> UserLabel:
+        return self._labels[name]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._labels)
+
+    def __len__(self) -> int:
+        return len(self._labels)
+
+
+def user_labels(model: object) -> UserLabels:
+    """Return the label for each field of a Pydantic model."""
+    return UserLabels(model)

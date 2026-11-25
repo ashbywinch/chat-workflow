@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -34,10 +34,26 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from .models import ANSWER_TOOL
+from .models import AgentAnswer
 from .session_log import TranscriptSegment
 
+__all__ = ["AnswerEnvelope", "TranscriptEntry", "dump", "entries", "load", "render"]
+
 Audience = Literal["all", "user"]
+
+
+class TranscriptEntry(NamedTuple):
+    """One line of the transcript: what kind of turn, and its text."""
+
+    kind: str
+    text: str
+
+
+class AnswerEnvelope(NamedTuple):
+    """The answer body a tool call carries."""
+
+    intent: str | None = None
+    message: str | None = None
 
 # Entry kinds. ``output`` is the final structured response (the request's
 # schema made it, the caller validated it); ``structured-result`` is the typed
@@ -106,7 +122,7 @@ def entries(
     messages: Sequence[ModelMessage],
     *,
     suppress_corrected: bool = False,
-) -> list[tuple[str, str]]:
+) -> list[TranscriptEntry]:
     """The transcript as ``(kind, text)``, in the order the model saw it.
 
     The last response's text is ``output``: it is the structured answer, not a
@@ -127,7 +143,7 @@ def entries(
             ):
                 suppressed.add(last_response)
     last_answer = _last_answer_index(messages)
-    result: list[tuple[str, str]] = []
+    result: list[TranscriptEntry] = []
     for index, message in enumerate(messages):
         if index in suppressed:
             continue
@@ -138,7 +154,12 @@ def entries(
     # An output retry can leave the same assistant text twice in a row: the
     # rejected attempt and the accepted one. A person saw it once, so the
     # transcript shows it once.
-    deduped: list[tuple[str, str]] = []
+    deduped: list[TranscriptEntry] = []
+    _dedupe_assistant_repeats(deduped, result)
+    return deduped
+
+
+def _dedupe_assistant_repeats(deduped, result):
     for kind, text in result:
         if (
             deduped
@@ -147,8 +168,7 @@ def entries(
             and deduped[-1][1].strip() == text.strip()
         ):
             continue
-        deduped.append((kind, text))
-    return deduped
+        deduped.append(TranscriptEntry(kind=kind, text=text))
 
 
 def render(
@@ -170,55 +190,77 @@ def render(
     final answer, and only the step's own answer may be dropped as internal.
     A chat-off step's turns are dropped entirely — no user saw them.
     """
-    parts: list[tuple[str, str]] = []
     if audience == "user" and segments:
-        # Steps cover slices of the log; the composite's own turns (echoes and
-        # spoken messages) sit in the gaps between them and must stay: they are
-        # exactly what the user saw happen between steps.
-        ranges: list[tuple[int, int, bool]] = []
-        cursor = 0
-        for segment in segments:
-            if segment.start > cursor:
-                ranges.append((cursor, segment.start, True))
-            ranges.append((segment.start, segment.end, segment.chat))
-            cursor = segment.end
-        if cursor < len(messages):
-            ranges.append((cursor, len(messages), True))
-        for start, end, chat in ranges:
-            if not chat:
-                continue
-            for kind, text in entries(messages[start:end], suppress_corrected=True):
-                if kind == "output":
-                    continue
-                if kind == "user" and text.strip() in _INTERNAL_PROMPTS:
-                    continue
-                parts.append((kind, text))
+        parts = _user_segment_entries(messages, segments)
     else:
-        for kind, text in entries(
-            messages, suppress_corrected=audience == "user"
-        ):
-            if kind == "output":
-                # In the audit view a failed run keeps its last answer as
-                # evidence. A judge never sees it: the raw envelope is internal.
-                if audience == "all" and result is None:
-                    parts.append((kind, text))
-                continue
-            if audience == "user" and kind not in _USER_KINDS:
-                continue
-            if audience == "user" and kind == "user" and text.strip() in _INTERNAL_PROMPTS:
-                continue
-            parts.append((kind, text))
+        parts = _conversation_entries(messages, audience, result)
     if result is not None:
-        rendered = (
-            result.model_dump_json(indent=2)
-            if hasattr(result, "model_dump_json")
-            else json.dumps(result, indent=2, default=str)
-        )
-        if audience == "user":
-            parts.append(("structured-result", "(the workflow produced its validated result)"))
-        else:
-            parts.append(("structured-result", rendered))
+        parts.append(_structured_result_entry(result, audience))
     return "\n---\n".join(f"[{kind}]\n{text}" for kind, text in parts)
+
+
+def _user_segment_entries(
+    messages: Sequence[ModelMessage],
+    segments: Sequence[TranscriptSegment],
+) -> list[TranscriptEntry]:
+    # Steps cover slices of the log; the composite's own turns (echoes and
+    # spoken messages) sit in the gaps between them and must stay: they are
+    # exactly what the user saw happen between steps.
+    ranges: list[tuple[int, int, bool]] = []
+    cursor = 0
+    for segment in segments:
+        if segment.start > cursor:
+            ranges.append((cursor, segment.start, True))
+        ranges.append((segment.start, segment.end, segment.chat))
+        cursor = segment.end
+    if cursor < len(messages):
+        ranges.append((cursor, len(messages), True))
+    parts: list[TranscriptEntry] = []
+    for start, end, chat in ranges:
+        if not chat:
+            continue
+        for kind, text in entries(messages[start:end], suppress_corrected=True):
+            if kind == "output":
+                continue
+            if kind == "user" and text.strip() in _INTERNAL_PROMPTS:
+                continue
+            parts.append(TranscriptEntry(kind=kind, text=text))
+    return parts
+
+
+def _conversation_entries(
+    messages: Sequence[ModelMessage],
+    audience: Audience,
+    result: Any,
+) -> list[TranscriptEntry]:
+    parts: list[TranscriptEntry] = []
+    for kind, text in entries(messages, suppress_corrected=audience == "user"):
+        if kind == "output":
+            # In the audit view a failed run keeps its last answer as
+            # evidence. A judge never sees it: the raw envelope is internal.
+            if audience == "all" and result is None:
+                parts.append(TranscriptEntry(kind=kind, text=text))
+            continue
+        if audience == "user" and kind not in _USER_KINDS:
+            continue
+        if audience == "user" and kind == "user" and text.strip() in _INTERNAL_PROMPTS:
+            continue
+        parts.append(TranscriptEntry(kind=kind, text=text))
+    return parts
+
+
+def _structured_result_entry(result: Any, audience: Audience) -> TranscriptEntry:
+    if audience == "user":
+        return TranscriptEntry(
+            kind="structured-result",
+            text="(the workflow produced its validated result)",
+        )
+    rendered = (
+        result.model_dump_json(indent=2)
+        if hasattr(result, "model_dump_json")
+        else json.dumps(result, indent=2, default=str)
+    )
+    return TranscriptEntry(kind="structured-result", text=rendered)
 
 
 def dump(messages: Sequence[ModelMessage]) -> bytes:
@@ -231,7 +273,7 @@ def load(data: bytes | str) -> list[ModelMessage]:
     return ModelMessagesTypeAdapter.validate_json(data)
 
 
-def _answer_envelope(part: ToolCallPart) -> dict[str, Any] | None:
+def _answer_envelope(part: ToolCallPart) -> AnswerEnvelope | None:
     args = part.args
     if isinstance(args, str):
         try:
@@ -241,11 +283,13 @@ def _answer_envelope(part: ToolCallPart) -> dict[str, Any] | None:
     if not isinstance(args, dict):
         return None
     body = args.get("response", args)
-    return body if isinstance(body, dict) else None
+    if not isinstance(body, dict):
+        return None
+    return AnswerEnvelope(intent=body.get("intent"), message=body.get("message"))
 
 
-def _is_final_answer(envelope: dict[str, Any] | None) -> bool:
-    return bool(envelope) and envelope.get("intent") in ("success", "failure")
+def _is_final_answer(envelope: AnswerEnvelope | None) -> bool:
+    return envelope is not None and envelope.intent in ("success", "failure")
 
 
 def _text_is_an_envelope(text: str) -> bool:
@@ -278,7 +322,7 @@ def _last_answer_index(messages: Sequence[ModelMessage]) -> int | None:
         for part in message.parts:
             if (
                 isinstance(part, ToolCallPart)
-                and part.tool_name == ANSWER_TOOL
+                and part.tool_name == AgentAnswer.TOOL_NAME
                 and _is_final_answer(_answer_envelope(part))
             ):
                 return index
@@ -287,26 +331,26 @@ def _last_answer_index(messages: Sequence[ModelMessage]) -> int | None:
     return None
 
 
-def _request_entries(message: ModelRequest) -> Iterable[tuple[str, str]]:
+def _request_entries(message: ModelRequest) -> Iterable[TranscriptEntry]:
     for part in message.parts:
         if isinstance(part, SystemPromptPart):
             # The instructions are the same every turn; the step's own record
             # of them is the prompt, not a transcript entry.
             continue
         if isinstance(part, UserPromptPart):
-            yield "user", _text(part.content)
+            yield TranscriptEntry(kind="user", text=_text(part.content))
         elif isinstance(part, RetryFeedbackPart):
-            yield "validation", _text(part.content)
+            yield TranscriptEntry(kind="validation", text=_text(part.content))
         elif isinstance(part, ToolReturnPart):
-            if part.tool_name == ANSWER_TOOL:
+            if part.tool_name == AgentAnswer.TOOL_NAME:
                 # the answer itself, already shown as its call
                 continue
             outcome = getattr(part, "outcome", "success")
             kind = "validation" if outcome == "retried" else "tool-return"
-            yield kind, _tool_return_text(part)
+            yield TranscriptEntry(kind=kind, text=_tool_return_text(part))
 
 
-def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tuple[str, str]]:
+def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[TranscriptEntry]:
     for part in message.parts:
         if isinstance(part, TextPart):
             if part.content.strip():
@@ -317,19 +361,19 @@ def _response_entries(message: ModelResponse, *, is_answer: bool) -> Iterable[tu
                     if _text_is_an_envelope(part.content) or is_answer
                     else "assistant"
                 )
-                yield kind, part.content
+                yield TranscriptEntry(kind=kind, text=part.content)
         elif isinstance(part, ThinkingPart):
-            yield "thinking", part.content
+            yield TranscriptEntry(kind="thinking", text=part.content)
         elif isinstance(part, ToolCallPart):
-            if part.tool_name == ANSWER_TOOL:
+            if part.tool_name == AgentAnswer.TOOL_NAME:
                 envelope = _answer_envelope(part)
-                spoken = envelope.get("message") if envelope else None
+                spoken = envelope.message if envelope else None
                 # A continue answer is the assistant's question and is shown;
                 # a success/failure answer is the structured result and is not.
                 kind = "output" if _is_final_answer(envelope) else "assistant"
-                yield kind, spoken or part.args_as_json_str()
+                yield TranscriptEntry(kind=kind, text=spoken or part.args_as_json_str())
             else:
-                yield "tool-call", f"{part.tool_name}({part.args_as_json_str()})"
+                yield TranscriptEntry(kind="tool-call", text=f"{part.tool_name}({part.args_as_json_str()})")
 
 
 def _tool_return_text(part: ToolReturnPart) -> str:

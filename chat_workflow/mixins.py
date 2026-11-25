@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import concurrent.futures
 from pathlib import Path
-from typing import Annotated, ClassVar, Literal, Self, override
+from typing import Annotated, ClassVar, Literal, NamedTuple, Self, override
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
@@ -141,6 +141,13 @@ def _is_actionable_failure(verdict: RulePassed | RuleFailed) -> bool:
     return isinstance(verdict, RuleFailed)
 
 
+class FieldRules(NamedTuple):
+    """The validation rules declared on one field."""
+
+    field_name: str
+    rules: list[str]
+
+
 class LLMValidated(BaseModel):
     """Mixin that validates natural-language rules via LLM during validation.
 
@@ -157,28 +164,25 @@ class LLMValidated(BaseModel):
     _skip_llm_validation: ClassVar[bool] = False
 
     @classmethod
-    def collect_per_field_rules(cls) -> dict[str, list[str]]:
-        """Collect ``Validation`` rules from field annotations.
-
-        Returns ``{field_name: [rule_strings]}``.
-        """
-        rules: dict[str, list[str]] = {}
-        for name, field in cls.model_fields.items():
-            field_rules: list[str] = []
-            for meta in field.metadata:
-                if isinstance(meta, Validation):
-                    field_rules.append(meta.rule)
-            if field_rules:
-                rules[name] = field_rules
-        return rules
+    def collect_per_field_rules(cls) -> list[FieldRules]:
+        """Collect ``Validation`` rules from field annotations, in field order."""
+        collected = [
+            FieldRules(
+                name,
+                [meta.rule for meta in field.metadata if isinstance(meta, Validation)],
+            )
+            for name, field in cls.model_fields.items()
+        ]
+        return [entry for entry in collected if entry.rules]
 
     @classmethod
     def collect_all_rules(cls) -> list[str]:
         """Collect per-field and per-model rules as a flat list of strings."""
-        rules: list[str] = []
-        for field_name, field_rules in cls.collect_per_field_rules().items():
-            for rule in field_rules:
-                rules.append(f"[{field_name}] {rule}")
+        rules = [
+            f"[{entry.field_name}] {rule}"
+            for entry in cls.collect_per_field_rules()
+            for rule in entry.rules
+        ]
         rules.extend(cls._validation_rules)
         return rules
 
@@ -197,11 +201,10 @@ class LLMValidated(BaseModel):
         super().__pydantic_init_subclass__(**kwargs)
         for name, label in user_labels(cls).items():
             cls.model_fields[name].title = label.phrase
-        per_field = cls.collect_per_field_rules()
-        for name, field_rules in per_field.items():
-            field = cls.model_fields[name]
+        for entry in cls.collect_per_field_rules():
+            field = cls.model_fields[entry.field_name]
             existing = field.description or ""
-            bullets = "\n".join(f"- {r}" for r in field_rules)
+            bullets = "\n".join(f"- {r}" for r in entry.rules)
             if existing:
                 field.description = f"{existing}\n{bullets}"
             else:
@@ -275,6 +278,7 @@ class LLMValidated(BaseModel):
 
         try:
             config = Config(Path(__file__).parent.parent / "config.json")
+        # lucidlint: ignore broad-except validation must not fail a model construction when infra is absent
         except Exception:
             return self
 
@@ -324,6 +328,7 @@ class LLMValidated(BaseModel):
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 turn = pool.submit(conversation.send, prompt).result()
             verdicts = turn.output
+        # lucidlint: ignore broad-except a judge that cannot run leaves the object valid; the caller sees no verdict
         except Exception:
             return self
 

@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import sys
 from datetime import datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic_ai.messages import ModelMessage
 
+from .transcript import TranscriptEntry
 from .transcript import entries as transcript_entries
 from .transcript import render as render_transcript
 
@@ -21,6 +22,9 @@ class StreamingDebug:
         workflow = AtomicWorkflow(..., debug=debug)
     """
 
+    # ``%f`` prints microseconds; three digits of them are milliseconds.
+    _MILLISECOND_DIGITS: ClassVar[int] = 3
+
     def __init__(self, file: Any = None, include_timestamps: bool = True):
         self.file = file or sys.stderr
         self.include_timestamps = include_timestamps
@@ -30,13 +34,14 @@ class StreamingDebug:
 
     def _timestamp(self) -> str:
         if self.include_timestamps:
-            return f"[{datetime.now().strftime('%H:%M:%S.%f')[:-3]}] "
+            now = datetime.now().strftime("%H:%M:%S.%f")
+            return f"[{now[: -self._MILLISECOND_DIGITS]}] "
         return ""
 
     def _print(self, message: str) -> None:
         print(message, file=self.file, flush=True)
 
-    def _print_entries(self, entries: list[tuple[str, str]], start: int, truncate: bool = True) -> None:
+    def _print_entries(self, entries: list[TranscriptEntry], start: int, truncate: bool = True) -> None:
         for kind, text in entries[start:]:
             if truncate and len(text) > 500:
                 text = text[:500] + "..."
@@ -61,6 +66,7 @@ class StreamingDebug:
                 self._print(f"{self._timestamp()}{json.dumps(response.model_dump(), indent=2, default=str)}")
             else:
                 self._print(f"{self._timestamp()}{response}")
+        # lucidlint: ignore swallow debug rendering is a boundary: an unrenderable response still prints its repr
         except Exception:
             self._print(f"{self._timestamp()}{response}")
 

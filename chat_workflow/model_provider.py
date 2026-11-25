@@ -14,7 +14,7 @@ failing later with an import error from inside the agent loop.
 from __future__ import annotations
 
 import os
-from typing import Literal
+from typing import ClassVar, Literal
 
 from dotenv import load_dotenv
 from pydantic_ai.models import Model
@@ -35,31 +35,37 @@ PROVIDERS: frozenset[str] = frozenset(
     ("openai", "google", "anthropic", "groq", "together", "azure", "openrouter")
 )
 
-_KEY_ENV = {
-    "openai": "OPENAI_API_KEY",
-    "google": "GOOGLE_API_KEY",
-    "anthropic": "ANTHROPIC_API_KEY",
-    "groq": "GROQ_API_KEY",
-    "together": "TOGETHER_API_KEY",
-    "azure": "AZURE_OPENAI_API_KEY",
-    "openrouter": "OPENROUTER_API_KEY",
-}
+__all__ = ["PROVIDERS", "ProviderCatalog", "ProviderType", "build_model", "list_available_providers"]
 
-# Services that speak the OpenAI wire format but have their own host. The
-# gateway and a direct OpenAI account have no default here: their endpoint is
-# configuration (OPENAI_BASE_URL or api_base), never a guess.
-_OPENAI_COMPATIBLE_BASE_URLS = {
-    "openrouter": "https://openrouter.ai/api/v1",
-    "groq": "https://api.groq.com/openai/v1",
-    "together": "https://api.together.xyz/v1",
-}
 
-# The SDK extra each unwired service needs. Naming it is the whole fix; an
-# "unsupported provider" with no next step is a dead end.
-_EXTRA_FOR = {
-    "google": "google",
-    "anthropic": "anthropic",
-}
+class ProviderCatalog:
+    """The provider facts that do not vary at run time."""
+
+    KEY_ENV: ClassVar[dict[str, str]] = {
+        "openai": "OPENAI_API_KEY",
+        "google": "GOOGLE_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "groq": "GROQ_API_KEY",
+        "together": "TOGETHER_API_KEY",
+        "azure": "AZURE_OPENAI_API_KEY",
+        "openrouter": "OPENROUTER_API_KEY",
+    }
+
+    # Services that speak the OpenAI wire format but have their own host. The
+    # gateway and a direct OpenAI account have no default here: their endpoint
+    # is configuration (OPENAI_BASE_URL or api_base), never a guess.
+    OPENAI_COMPATIBLE_BASE_URLS: ClassVar[dict[str, str]] = {
+        "openrouter": "https://openrouter.ai/api/v1",
+        "groq": "https://api.groq.com/openai/v1",
+        "together": "https://api.together.xyz/v1",
+    }
+
+    # The SDK extra each unwired service needs. Naming it is the whole fix; an
+    # "unsupported provider" with no next step is a dead end.
+    EXTRA_FOR: ClassVar[dict[str, str]] = {
+        "google": "google",
+        "anthropic": "anthropic",
+    }
 
 
 def _model_id(provider: str, model: str) -> str:
@@ -96,10 +102,10 @@ def build_model(
     names the *selected* provider (see ``_model_id``).
     """
     provider = provider.lower()
-    if provider in _EXTRA_FOR:
+    if provider in ProviderCatalog.EXTRA_FOR:
         raise ProviderNotSupportedError(
             f"Provider {provider!r} needs its own SDK extra, which this build does not install. "
-            f'Install it with `pip install "pydantic-ai-slim[{_EXTRA_FOR[provider]}]"`, '
+            f'Install it with `pip install "pydantic-ai-slim[{ProviderCatalog.EXTRA_FOR[provider]}]"`, '
             "or use the house gateway (provider 'openai')."
         )
     if provider not in PROVIDERS:
@@ -107,7 +113,7 @@ def build_model(
             f"Unsupported provider: {provider}. Supported: {', '.join(sorted(PROVIDERS))}"
         )
 
-    key_env = api_key_env or _KEY_ENV[provider]
+    key_env = api_key_env or ProviderCatalog.KEY_ENV[provider]
     api_key = os.getenv(key_env)
     if not api_key:
         raise APIKeyError(f"{key_env} not set. Get your API key and set this environment variable.")
@@ -132,7 +138,7 @@ def build_model(
         model,
         provider=OpenAICompatibleProvider(
             provider,
-            base_url=api_base or _OPENAI_COMPATIBLE_BASE_URLS[provider],
+            base_url=api_base or ProviderCatalog.OPENAI_COMPATIBLE_BASE_URLS[provider],
             api_key=api_key,
         ),
     )
@@ -140,4 +146,4 @@ def build_model(
 
 def list_available_providers() -> dict[str, bool]:
     """Which providers have a key in the environment, for CLI/help output."""
-    return {provider: bool(os.getenv(env)) for provider, env in _KEY_ENV.items()}
+    return {provider: bool(os.getenv(env)) for provider, env in ProviderCatalog.KEY_ENV.items()}

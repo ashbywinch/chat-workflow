@@ -13,6 +13,8 @@ from typing import Any, Protocol, TypeVar
 
 from .rendering import RenderContext, render_result
 
+__all__ = ["ConfirmationSession", "confirm_draft"]
+
 T = TypeVar("T")
 
 
@@ -28,11 +30,6 @@ class ConfirmationSession(Protocol):
     ) -> None: ...
 
     def say(self, text: str) -> None: ...
-
-
-# One correction round plus its confirmation. A user who keeps changing the
-# draft is in a different task, not a confirmation.
-_MAX_CHANGES = 2
 
 
 def _rendered(value: Any) -> str:
@@ -51,10 +48,13 @@ def confirm_draft(
     draft: T,
     step: Callable[..., T],
     max_turns: int = 4,
+    # One correction round plus its confirmation. A user who keeps changing the
+    # draft is in a different task, not a confirmation.
+    max_changes: int = 2,
 ) -> T:
     """Run a confirmation step, presenting every changed draft it returns."""
     current = draft
-    for _ in range(_MAX_CHANGES + 1):
+    for _ in range(max_changes + 1):
         confirmed = step(draft=current, session=session, max_turns=max_turns)
         if _same(confirmed, current):
             return confirmed

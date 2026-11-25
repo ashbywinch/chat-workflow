@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from inspect import cleandoc
-from typing import TypeVar
+from typing import ClassVar, TypeVar
 
 from .conversation_rules import WARM_OPEN
 from .decorators import atomic_workflow, composite_workflow
@@ -22,21 +22,21 @@ from .session import Session
 
 T = TypeVar("T")
 
-_FALLBACK_GREETING = (
-    "Hi there — I am here to help you describe what you do so it can be "
-    "built into something you can use. What are you working on?"
-)
-_FALLBACK_CLOSING = "I have what I need."
-
-
 class SessionComponent:
     """Runs one conversation: a greeting, the step, and a closing."""
+
+    _FALLBACK_GREETING: ClassVar[str] = (
+        "Hi there — I am here to help you describe what you do so it can be "
+        "built into something you can use. What are you working on?"
+    )
+    _FALLBACK_CLOSING: ClassVar[str] = "I have what I need."
 
     @atomic_workflow(
         chat=False,
         single_turn=True,
         conversation_validation_rules=[WARM_OPEN],
     )
+    # lucidlint: ignore detached-method the step decorator injects the session; the method stays on the component
     def greet(self, *, session: Session, max_turns: int = 1) -> TextReply:
         """Open the conversation.
 
@@ -54,6 +54,7 @@ class SessionComponent:
         ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @atomic_workflow(chat=False, single_turn=True)
+    # lucidlint: ignore detached-method the step decorator injects the session; the method stays on the component
     def sign_off(self, *, session: Session, max_turns: int = 1) -> TextReply:
         """Close the conversation.
 
@@ -108,32 +109,42 @@ class SessionComponent:
         session.active = True
         try:
             if not session.state.messages:
-                try:
-                    greeting = self.greet(
-                        session=session,
-                        _first_user_input="Start the conversation.",
-                    ).text.strip()
-                except Exception:
-                    greeting = _FALLBACK_GREETING
-                session.say(greeting or _FALLBACK_GREETING)
+                greeting = self._spoken(
+                    self.greet,
+                    fallback=self._FALLBACK_GREETING,
+                    prompt="Start the conversation.",
+                    session=session,
+                )
+                session.say(greeting or self._FALLBACK_GREETING)
             result = step(session=session)
             session.state.final_result = result
-            try:
-                closing = self.sign_off(
-                    session=session,
-                    _first_user_input=(
-                        "The user has finished. Say in one sentence that you "
-                        "have what they need."
-                    ),
-                ).text.strip()
-            except Exception:
-                # The close is cosmetic. A closing that fails, or that asks a
-                # question, must not fail a workflow that already produced its
-                # result, so the wrapper owns a plain fallback.
-                closing = _FALLBACK_CLOSING
+            closing = self._spoken(
+                self.sign_off,
+                fallback=self._FALLBACK_CLOSING,
+                prompt=(
+                    "The user has finished. Say in one sentence that you "
+                    "have what they need."
+                ),
+                session=session,
+            )
             if not closing or "?" in closing:
-                closing = _FALLBACK_CLOSING
+                closing = self._FALLBACK_CLOSING
             session.say(closing)
             return result
         finally:
             session.active = False
+
+    @staticmethod
+    def _spoken(
+        step: Callable[..., TextReply],
+        *,
+        fallback: str,
+        prompt: str,
+        session: Session,
+    ) -> str:
+        """The cosmetic open or close; its failure must not fail the workflow."""
+        try:
+            return step(session=session, _first_user_input=prompt).text.strip()
+        # lucidlint: ignore broad-except the open/close is cosmetic: a failure falls back to plain text
+        except Exception:
+            return fallback

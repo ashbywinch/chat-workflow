@@ -8,16 +8,46 @@ Provides a ``generate_code()`` function that accepts either:
 
 from __future__ import annotations
 
+import importlib
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 import libcst as cst
+
+# lucidlint: ignore-file duplicate-block this module assembles source line by line; repeated append calls are the output
+
+__all__ = [
+    "FieldSpec",
+    "generate_class",
+    "generate_code",
+    "generate_field",
+    "generate_model_validator",
+    "generate_workflow_method",
+    "import_module",
+    "reload_module",
+    "verify_code",
+]
+
+
+@dataclass(frozen=True, kw_only=True)
+class FieldSpec:
+    """One field of a generated class: its name, type and optional description."""
+
+    name: str
+    field_type: str
+    description: str = ""
 
 
 def generate_code(
     source: str | None = None,
     *,
     class_name: str | None = None,
-    fields: list[tuple[str, str]] | None = None,
+    fields: Sequence[FieldSpec] | None = None,
 ) -> str:
     """Generate Python source code.
 
@@ -28,8 +58,7 @@ def generate_code(
     class_name:
         Name of the class to generate (requires ``fields``).
     fields:
-        List of ``(field_name, field_type)`` tuples describing the class
-        attributes.
+        The fields describing the class attributes.
 
     Returns
     -------
@@ -49,16 +78,15 @@ def generate_code(
     )
 
 
-def _generate_model_class(class_name: str, fields: list[tuple[str, str]]) -> str:
+def _generate_model_class(class_name: str, fields: Sequence[FieldSpec]) -> str:
     """Build a class definition using libcst nodes."""
-    field_statements: list[cst.BaseSmallStatement] = []
-
-    for field_name, field_type in fields:
-        ann = cst.AnnAssign(
-            target=cst.Name(field_name),
-            annotation=cst.Annotation(cst.Name(field_type)),
+    field_statements: list[cst.BaseSmallStatement] = [
+        cst.AnnAssign(
+            target=cst.Name(field.name),
+            annotation=cst.Annotation(cst.Name(field.field_type)),
         )
-        field_statements.append(ann)
+        for field in fields
+    ]
 
     # Build the class body as an IndentedBlock containing SimpleStatementLines
     body = cst.IndentedBlock(
@@ -178,10 +206,6 @@ def verify_code(code: str, max_attempts: int = 3) -> str:
     RuntimeError
         If the code cannot be fixed after ``max_attempts``.
     """
-    import os
-    import subprocess
-    import tempfile
-
     ruff_path = _find_ruff()
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
@@ -230,25 +254,22 @@ def verify_code(code: str, max_attempts: int = 3) -> str:
 
         # All attempts exhausted
         parts = [f"Code failed ruff checks after {max_attempts} attempts."]
-        if fmt_result is not None:
-            parts.append("--- format --check ---")
-            parts.append(fmt_result.stdout)
-            parts.append(fmt_result.stderr)
-        if lint_result is not None:
-            parts.append("--- check ---")
-            parts.append(lint_result.stdout)
-            parts.append(lint_result.stderr)
+        parts.extend(_ruff_details("format --check", fmt_result))
+        parts.extend(_ruff_details("check", lint_result))
         raise RuntimeError("\n".join(parts))
 
     finally:
         os.unlink(tmp_path)
 
 
+def _ruff_details(label: str, result: subprocess.CompletedProcess | None) -> list[str]:
+    if result is None:
+        return []
+    return [f"--- {label} ---", result.stdout, result.stderr]
+
+
 def _find_ruff() -> str:
     """Locate the ``ruff`` executable, searching the venv bin dir first."""
-    import shutil
-    import sys
-
     # Check alongside the current Python interpreter first (venv bin dir)
     venv_bin = os.path.dirname(sys.executable)
     candidate = os.path.join(venv_bin, "ruff")
@@ -276,8 +297,6 @@ def import_module(path: str):
     module or None
         The imported module, or ``None`` if the path could not be imported.
     """
-    import importlib
-
     try:
         return importlib.import_module(path)
     except ImportError:
@@ -297,14 +316,12 @@ def reload_module(path: str):
     module
         The reloaded module.
     """
-    import importlib
-
     return importlib.reload(importlib.import_module(path))
 
 
 def generate_class(
     name: str,
-    fields: list[dict[str, str]],
+    fields: Sequence[FieldSpec],
     validation_rules: str | None = None,
 ) -> str:
     """Generate a complete ``InteractiveEntity`` subclass.
@@ -314,8 +331,7 @@ def generate_class(
     name:
         The class name.
     fields:
-        List of dicts with keys ``"name"``, ``"type"``, and optionally
-        ``"desc"``.
+        The fields of the generated class.
     validation_rules:
         Optional validation rule string. When provided, a
         ``_validation_rules`` class attribute and a ``@model_validator``
@@ -337,33 +353,28 @@ def generate_class(
         lines.append(f'    _validation_rules: str = "{validation_rules}"')
         lines.append("")
 
-    for field in fields:
-        field_desc = field.get("desc", "")
-        if field_desc:
-            lines.append(f'    {field["name"]}: {field["type"]} = Field(..., description="{field_desc}")')
-        else:
-            lines.append(f"    {field['name']}: {field['type']} = Field(...)")
+    lines.extend(_field_lines(fields))
 
-    lines.append("")
-    lines.append('    @model_validator(mode="after")')
-    lines.append("    def validate_business_rules(self):")
+    _method_header(
+        lines,
+        ['    @model_validator(mode="after")'],
+        "    def validate_business_rules(self):",
+    )
 
     if validation_rules:
-        v_field = validation_rules.split()[0]
-        lines.append(f"        if not self.{v_field}:")
-        lines.append(f'            raise ValidationError("{validation_rules}")')
+        lines.extend(_empty_guard(validation_rules.split()[0], validation_rules))
     elif fields:
-        first_field = fields[0]["name"]
-        lines.append(f"        if not self.{first_field}:")
-        lines.append(f'            raise ValidationError("{first_field} must be non-empty")')
+        first_field = fields[0].name
+        lines.extend(_empty_guard(first_field, f"{first_field} must be non-empty"))
     else:
         lines.append("        pass")
 
     lines.append("        return self")
-    lines.append("")
-    lines.append("    @atomic_workflow_step")
-    lines.append("    @classmethod")
-    lines.append("    def generate_from_chat(")
+    _method_header(
+        lines,
+        ["    @atomic_workflow_step", "    @classmethod"],
+        "    def generate_from_chat(",
+    )
     lines.append("        cls,")
     lines.append("        context: str,")
     lines.append("        max_turns: int = 10,")
@@ -374,3 +385,25 @@ def generate_class(
     lines.append("")
 
     return "\n".join(lines)
+
+
+def _field_lines(fields: Sequence[FieldSpec]) -> list[str]:
+    return [
+        f'    {field.name}: {field.field_type} = Field(..., description="{field.description}")'
+        if field.description
+        else f"    {field.name}: {field.field_type} = Field(...)"
+        for field in fields
+    ]
+
+
+def _empty_guard(field: str, message: str) -> list[str]:
+    return [
+        f"        if not self.{field}:",
+        f'            raise ValidationError("{message}")',
+    ]
+
+
+def _method_header(lines: list[str], decorators: list[str], signature: str) -> None:
+    lines.append("")
+    lines.extend(decorators)
+    lines.append(signature)

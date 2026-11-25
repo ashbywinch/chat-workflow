@@ -2,7 +2,29 @@
 Custom exceptions for chat-workflow with helpful error messages.
 """
 
-from typing import Any
+from typing import Any, override
+
+# lucidlint: ignore-file class-module the exceptions are one hierarchy; one module keeps the family together
+__all__ = [
+    "APIError",
+    "APIKeyError",
+    "AtomicWorkflowError",
+    "AtomicWorkflowFailedError",
+    "AuthenticationError",
+    "ChatWorkflowError",
+    "ConfigFileError",
+    "ConfigurationError",
+    "ConnectionError",
+    "InvalidResponseError",
+    "MaxRetriesExceededError",
+    "ModelError",
+    "ProviderError",
+    "ProviderNotFoundError",
+    "ProviderNotSupportedError",
+    "RateLimitError",
+    "TurnLimitExceededError",
+    "ValidationError",
+]
 
 
 class ChatWorkflowError(Exception):
@@ -12,6 +34,7 @@ class ChatWorkflowError(Exception):
         super().__init__(message)
         self.message = message
 
+    @override
     def __str__(self):
         return self.message if self.message else super().__str__()
 

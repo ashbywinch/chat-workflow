@@ -9,6 +9,8 @@ from pydantic_ai.usage import RunUsage
 if TYPE_CHECKING:
     from .atomic_workflow import AtomicWorkflow
 
+__all__ = ["SessionLog", "TranscriptSegment", "record_atomic_workflow"]
+
 
 @dataclass(frozen=True)
 class TranscriptSegment:
@@ -45,7 +47,7 @@ class SessionLog:
     final_result: Any = None
 
 
-def _record_atomic_workflow[T](
+def record_atomic_workflow[T](
     log: SessionLog,
     workflow: AtomicWorkflow[T],
 ) -> None:

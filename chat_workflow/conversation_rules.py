@@ -10,6 +10,7 @@ on ``@atomic_workflow_step``. The framework applies ``UNIVERSAL_RULES`` to every
 chat-on workflow; author declarations add to that floor.
 """
 
+# lucidlint: ignore-file global-state this module is the public rule catalogue; authors import each named rule
 WARM_OPEN: tuple[str, str] = (
     "Warm open",
     "The assistant's first response includes a greeting or context-setting "

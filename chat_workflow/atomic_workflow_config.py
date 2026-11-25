@@ -3,15 +3,18 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from .conversation import Conversation
-from .debug import StreamingDebug
 from .exceptions import AtomicWorkflowFailedError
 from .model_provider import ProviderType
 from .models import Continue, Failure, Success, TurnResult
+from .streamingdebug import StreamingDebug
 
 TResult = TypeVar("TResult")
 
+__all__ = ["AtomicWorkflowConfig"]
+
 
 @dataclass
+# lucidlint: ignore duplicate-module the module holds exactly its namesake class; a module and its class are not copies
 class AtomicWorkflowConfig(Generic[TResult]):
     """Configuration for an :class:`AtomicWorkflow`.
 

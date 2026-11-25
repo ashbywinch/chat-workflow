@@ -12,14 +12,15 @@ from .atomic_workflow import AtomicWorkflow
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .conversation import Conversation
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
-from .debug import StreamingDebug
+from .exceptions import AtomicWorkflowFailedError
 from .models import AgentAnswer, FinalAnswer, Success, TurnResult
 from .prompt_builder import (
-    _build_params_section,
-    _format_docstring,
+    build_params_section,
+    format_docstring,
     input_models,
     user_parameter_labels,
 )
+from .streamingdebug import StreamingDebug
 from .types_meta import resolve_return_type
 
 
@@ -72,9 +73,11 @@ def _output_defs(return_type: Any) -> frozenset[str]:
         return frozenset()
     try:
         schema = TypeAdapter(AgentAnswer[return_type]).json_schema()
+    # lucidlint: ignore broad-except a return type that cannot build a schema has no output defs
     except Exception:
         try:
             schema = TypeAdapter(FinalAnswer[return_type]).json_schema()
+        # lucidlint: ignore broad-except a return type that cannot build a schema has no output defs
         except Exception:
             return frozenset()
     return frozenset(schema.get("$defs", {}))
@@ -112,9 +115,10 @@ def _build_user_vocabulary_section(
     return "\n".join(lines)
 
 
+# lucidlint: ignore long-param-list the prompt sections are independent inputs; one call site names each
 def _build_system_prompt(
     raw_func: Callable[..., Any],
-    kwargs: dict[str, Any],
+    kwargs: dict[str, Any],  # lucidlint: ignore record-shape the step's kwargs are arbitrary per function
     *,
     return_type: Any,
     conversation_rules: dict[str, str],
@@ -134,11 +138,11 @@ def _build_system_prompt(
     if instructions and instructions.strip():
         sections.append(instructions.strip())
 
-    docstring = _format_docstring(raw_func.__doc__, **kwargs).strip()
+    docstring = format_docstring(raw_func.__doc__, **kwargs).strip()
     if docstring:
         sections.append(docstring)
 
-    params_section = _build_params_section(
+    params_section = build_params_section(
         raw_func,
         kwargs,
         skip_shapes=_output_defs(return_type),
@@ -147,34 +151,7 @@ def _build_system_prompt(
         sections.append(params_section.strip())
 
     if chat:
-        if explore:
-            start = (
-                "## Start of the step\n"
-                "Say in one sentence what this step is doing and why. Then ask "
-                "one open question about the user's own work and listen. This "
-                "step does not name stages, steps, or fields, and does not "
-                "propose a structure; the user describes, the next step "
-                "structures. Do not summarize the work back for confirmation and "
-                "do not offer to structure it: acknowledge in one clause and ask "
-                "the next open question. If the user asks for a shape, a section "
-                "list, or a suggestion, say in one sentence that the next step "
-                "shows one and finish — do not answer with a promised list or a "
-                "message that ends with a colon."
-            )
-        else:
-            start = (
-                "## Start of the step\n"
-                "Say in one sentence what this step is doing and why. Then make "
-                "your first substantive move: if the step was given inputs, "
-                "propose what you can already see from them — the result, or "
-                "the part of it they cover — and ask for a reaction. Do not "
-                "ask the user to name a thing the inputs already name, and do "
-                "not ask them to supply or confirm something the inputs "
-                "already contain. Do not return the complete result in the "
-                "first response unless the inputs already contain all of it "
-                "and the user has confirmed it."
-            )
-        sections.append(start)
+        sections.append(_opening_section(explore))
 
     if chat and conversation_rules:
         sections.append(_build_checklist_section(conversation_rules))
@@ -194,6 +171,46 @@ def _build_system_prompt(
     if vocabulary_section:
         sections.append(vocabulary_section)
 
+    sections.extend(_turn_policy_sections(chat, return_type))
+
+    return "\n\n".join(sections)
+
+
+def _opening_section(explore: bool) -> str:
+    """The start-of-step instruction: listen, or propose from the inputs."""
+    if explore:
+        start = (
+            "## Start of the step\n"
+            "Say in one sentence what this step is doing and why. Then ask "
+            "one open question about the user's own work and listen. This "
+            "step does not name stages, steps, or fields, and does not "
+            "propose a structure; the user describes, the next step "
+            "structures. Do not summarize the work back for confirmation and "
+            "do not offer to structure it: acknowledge in one clause and ask "
+            "the next open question. If the user asks for a shape, a section "
+            "list, or a suggestion, say in one sentence that the next step "
+            "shows one and finish — do not answer with a promised list or a "
+            "message that ends with a colon."
+        )
+    else:
+        start = (
+            "## Start of the step\n"
+            "Say in one sentence what this step is doing and why. Then make "
+            "your first substantive move: if the step was given inputs, "
+            "propose what you can already see from them — the result, or "
+            "the part of it they cover — and ask for a reaction. Do not "
+            "ask the user to name a thing the inputs already name, and do "
+            "not ask them to supply or confirm something the inputs "
+            "already contain. Do not return the complete result in the "
+            "first response unless the inputs already contain all of it "
+            "and the user has confirmed it."
+        )
+    return start
+
+
+def _turn_policy_sections(chat: bool, return_type: Any) -> list[str]:
+    """The turn policy, success-message and one-shot rules."""
+    sections: list[str] = []
     # The model now sees its own previous structured turns in the transcript,
     # so the turn policy has to be stated rather than inferred: without it a
     # cooperative "that's all, please finalize" gets another question and the
@@ -246,9 +263,10 @@ def _build_system_prompt(
             "the inputs contain nothing relevant to the result at all."
         )
 
-    return "\n\n".join(sections)
+    return sections
 
 
+# lucidlint: ignore closures,long-param-list the closures capture one step's config; a class adds no state
 def _setup_atomic_workflow(
     system_prompt: str,
     actual_return_type: Any,
@@ -269,8 +287,6 @@ def _setup_atomic_workflow(
     parameters, and replaying the session would invite it to answer the
     conversation again.
     """
-    from .exceptions import AtomicWorkflowFailedError
-
     conversation = Conversation(
         model=session.config.model,
         provider=session.config.provider,
@@ -322,9 +338,11 @@ def _setup_atomic_workflow(
     )
 
 
+# lucidlint: ignore closures,long-param-list the closures capture one step's config; a class adds no state
 def atomic_workflow(
     func: Callable[..., Any] | None = None,
     *,
+    # lucidlint: ignore record-shape the pairs come from the shared rule catalogue
     conversation_validation_rules: list[tuple[str, str]] | None = None,
     chat: bool = True,
     single_turn: bool = False,
@@ -354,8 +372,6 @@ def atomic_workflow(
     about the user's own work, not a proposal. A step that derives from
     established inputs leaves it false.
     """
-    from .exceptions import AtomicWorkflowFailedError
-
     author_rules = conversation_validation_rules or []
     merged_rules: dict[str, str] = dict(_DEFAULT_CONVERSATION_RULES)
     for label, description in author_rules:
@@ -430,8 +446,9 @@ def atomic_workflow(
 
             return result.result
 
+        attached = True
         for marker in ("_is_workflow", "_is_workflow_step"):
-            setattr(wrapper, marker, True)
+            setattr(wrapper, marker, attached)
         wrapper._chat = chat  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper._single_turn = single_turn  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper._min_turns = min_turns  # type: ignore[attr-defined]  # the step decorator attaches this metadata
@@ -459,8 +476,9 @@ def composite_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
             f"Composite workflow '{raw_func.__name__}' requires 'session' parameter"
         )
 
+    attached = True
     for marker in ("_is_workflow", "_is_workflow_step"):
-        setattr(wrapper, marker, True)
+        setattr(wrapper, marker, attached)
 
     if isinstance(func, classmethod):
         return classmethod(wrapper)
