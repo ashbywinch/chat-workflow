@@ -71,8 +71,15 @@ def make_config() -> Config:
     config = Config(_CONFIG_PATH, overrides=_EVAL_OVERRIDES)
     if config.provider == "openai" and not config.api_base:
         raise RuntimeError(
-            "OPENAI_BASE_URL is not set. Evals must route through Cloudflare AI "
-            "Gateway — run `make setup` to create .env from .env.example."
+            "OPENAI_BASE_URL is not set. Evals route through Cloudflare AI Gateway: "
+            "set OPENAI_BASE_URL and OPENAI_API_KEY in .env or the shell environment. "
+            "`make setup` only creates the blank .env from .env.example."
+        )
+    key_env = config.api_key_env or "OPENAI_API_KEY"
+    if not os.getenv(key_env):
+        raise RuntimeError(
+            f"{key_env} is not set. Evals call the real model through Cloudflare AI "
+            "Gateway; put the gateway token in .env or the shell environment."
         )
     return config
 
