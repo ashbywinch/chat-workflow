@@ -334,6 +334,10 @@ class Conversation(Generic[T]):
     model that never concludes fails instead of billing forever.
     """
 
+    # The effort every reasoning request asks for. Medium is enough for this
+    # work; thinking is what matters, not the level.
+    REASONING_EFFORT = "medium"
+
     def __init__(
         self,
         *,
@@ -356,7 +360,6 @@ class Conversation(Generic[T]):
         tools: Sequence[Callable[..., Any]] = (),
         deps: Any = None,
         thinking: bool = False,
-        reasoning_effort: str | None = None,
         model_client: Model | None = None,
     ) -> None:
         self.model = model
@@ -379,13 +382,6 @@ class Conversation(Generic[T]):
         self._deps = deps
         self._provider_log = _ProviderLog()
         self._thinking = thinking
-        # ``thinking=True`` is the portable switch, but PydanticAI only maps it
-        # to an effort for a model id its profile knows. A gateway route such as
-        # ``openai/dynamic/fallback2`` is unknown, so the request carries no
-        # effort and the provider reasons not at all. An explicit effort is the
-        # one setting that survives that route; the response's reasoning is then
-        # parsed from its ``reasoning``/``reasoning_content`` field.
-        self._reasoning_effort = reasoning_effort
         # The injection seam for tests: a FunctionModel scripts a whole turn
         # without a network or a provider SDK. Production builds the real one
         # on the first send — constructing a step must not need a key — and
@@ -528,8 +524,14 @@ class Conversation(Generic[T]):
         )
         if self._temperature is not None:
             settings["temperature"] = self._temperature
-        if self._reasoning_effort is not None:
-            settings["openai_reasoning_effort"] = self._reasoning_effort
+        # ``thinking=True`` is the portable switch, but PydanticAI only maps it
+        # to an effort for a model id its profile knows. A gateway route such as
+        # ``openai/dynamic/fallback2`` is unknown, so the request would carry no
+        # effort and the provider would reason not at all. Medium is enough for
+        # this work; the response's reasoning is then parsed from its
+        # ``reasoning``/``reasoning_content`` field.
+        if self._thinking and self._provider == "openai":
+            settings["openai_reasoning_effort"] = self.REASONING_EFFORT
         if self._extra_headers:
             settings["extra_headers"] = self._extra_headers
         return cast(ModelSettings, settings)

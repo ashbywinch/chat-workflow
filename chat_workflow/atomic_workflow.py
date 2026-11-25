@@ -14,7 +14,12 @@ from pydantic_ai.usage import RunUsage
 
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .conversation import Conversation
-from .exceptions import AtomicWorkflowFailedError, MaxRetriesExceededError
+from .exceptions import (
+    AtomicWorkflowFailedError,
+    InvalidResponseError,
+    MaxRetriesExceededError,
+    TurnLimitExceededError,
+)
 from .models import AgentIntent, Continue, Failure, Success, TurnResult
 from .transcript import render
 
@@ -104,7 +109,6 @@ class AtomicWorkflow(Generic[TResult]):
             extra_headers=config.extra_headers,
             temperature=config.temperature,
             thinking=True,
-            reasoning_effort="high" if config.provider == "openai" else None,
             final_output_type=config.final_response_model,
             tools=config.tools,
             deps=config.deps,
@@ -128,8 +132,6 @@ class AtomicWorkflow(Generic[TResult]):
         The budget at the top of this loop is what ends a model that will not
         stop asking; no branch can add a turn past it or pass it to a callee.
         """
-        from .exceptions import InvalidResponseError, TurnLimitExceededError
-
         while True:
             if self.turn_count >= self.max_turns:
                 raise TurnLimitExceededError(self.max_turns)

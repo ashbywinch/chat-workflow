@@ -285,11 +285,8 @@ def _setup_atomic_workflow(
         timeout_seconds=session.config.request_timeout_seconds,
         extra_headers=getattr(session.config, "extra_headers", None),
         temperature=getattr(session.config, "temperature", None),
-        # Every step reasons. The gateway's dynamic route has no profile, so the
-        # portable switch alone sends no effort; the explicit effort is what
-        # makes the provider return thinking.
+        # Every step reasons; the conversation supplies the gateway's effort.
         thinking=True,
-        reasoning_effort="high" if session.config.provider == "openai" else None,
         tools=tools,
         deps=deps,
     )
@@ -435,11 +432,11 @@ def atomic_workflow(
 
         for marker in ("_is_workflow", "_is_workflow_step"):
             setattr(wrapper, marker, True)
-        wrapper._chat = chat  # type: ignore[attr-defined]
-        wrapper._single_turn = single_turn  # type: ignore[attr-defined]
-        wrapper._min_turns = min_turns  # type: ignore[attr-defined]
-        wrapper._explore = explore  # type: ignore[attr-defined]
-        wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]
+        wrapper._chat = chat  # type: ignore[attr-defined]  # the step decorator attaches this metadata
+        wrapper._single_turn = single_turn  # type: ignore[attr-defined]  # the step decorator attaches this metadata
+        wrapper._min_turns = min_turns  # type: ignore[attr-defined]  # the step decorator attaches this metadata
+        wrapper._explore = explore  # type: ignore[attr-defined]  # the step decorator attaches this metadata
+        wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         return wrapper
 
     if func is not None:

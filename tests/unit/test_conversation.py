@@ -481,16 +481,26 @@ class TestRequestSettings(unittest.TestCase):
         self.assertNotIn("openai_reasoning_effort", settings)
         self.assertEqual(settings["max_retries"], 2)
 
-    def test_an_explicit_reasoning_effort_reaches_the_provider(self):
+    def test_thinking_on_the_gateway_asks_for_medium_effort(self):
         """A gateway route has no profile, so the portable switch needs the effort."""
         conversation = make_conversation(
-            [VALID], thinking=True, reasoning_effort="high"
+            [VALID], thinking=True, provider="openai"
         )
 
         settings = conversation.model_settings()
 
         self.assertTrue(settings["thinking"])
-        self.assertEqual(settings["openai_reasoning_effort"], "high")
+        self.assertEqual(settings["openai_reasoning_effort"], "medium")
+
+    def test_a_non_gateway_provider_leaves_the_effort_to_its_profile(self):
+        conversation = make_conversation(
+            [VALID], thinking=True, provider="openrouter"
+        )
+
+        settings = conversation.model_settings()
+
+        self.assertTrue(settings["thinking"])
+        self.assertNotIn("openai_reasoning_effort", settings)
 
     def test_the_request_limit_bounds_one_turn(self):
         conversation = make_conversation([VALID], max_requests=1)

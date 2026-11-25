@@ -7,12 +7,15 @@ LLM calls.
 
 from __future__ import annotations
 
+import concurrent.futures
 from pathlib import Path
 from typing import Annotated, ClassVar, Literal, Self, override
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from .annotations import Blob, Validation, user_labels
+from .config import Config
+from .conversation import Conversation
 from .exceptions import ValidationError
 
 
@@ -259,9 +262,6 @@ class LLMValidated(BaseModel):
         Skips silently when infrastructure is unavailable (no config file or
         API key), so models can be constructed in test environments.
         """
-        from .config import Config
-        from .conversation import Conversation
-
         # Deterministic first: cheap, precise, and no judge tokens wasted on
         # an object that is structurally invalid.
         self.validate_deterministic_rules()
@@ -315,19 +315,12 @@ class LLMValidated(BaseModel):
                 timeout_seconds=config.request_timeout_seconds,
                 temperature=0.0,
                 thinking=True,
-                # The house gateway's route is a dynamic model id, so the
-                # portable switch above does not reach the provider. The
-                # explicit effort is what makes the judge actually reason;
-                # without it the response's reasoning is empty.
-                reasoning_effort="high" if config.provider == "openai" else None,
                 extra_headers=config.extra_headers,
             )
             # This validator runs inside the agent's own event loop, where
             # `Conversation.send` cannot start one. A thread gives the judge
             # its own loop; the validator stays synchronous, as Pydantic
             # requires.
-            import concurrent.futures
-
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 turn = pool.submit(conversation.send, prompt).result()
             verdicts = turn.output

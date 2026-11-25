@@ -155,7 +155,7 @@ There is one path from the library to a model: `Conversation.send()` in
 user simulation are all conversations. Nothing else imports a provider SDK.
 
 - **Every step and the rule judge reason.** Their requests carry an explicit
-  reasoning effort (`high` on the OpenAI gateway). The portable `thinking`
+  reasoning effort (`medium` on the OpenAI gateway). The portable `thinking`
   switch alone is not enough for a dynamic gateway model id: PydanticAI has no
   profile for it, so no effort is sent and the provider returns no reasoning.
 
