@@ -184,7 +184,7 @@ evals-test: deps lint-check typecheck merge-markers-check
 	@CHAT_WORKFLOW_EVAL_REPORT=1 $(PYTHON) scripts/run_with_timeout.py --timeout $(EVAL_TIMEOUT) -- $(UNITTEST) $(TEST)
 
 evals-smoke: deps lint-check typecheck
-	@$(PYTHON) scripts/run_with_timeout.py --timeout 600 -- $(UNITTEST) tests.evals.single.test_real_api tests.evals.composite.test_debug_streaming_api -v
+	@$(PYTHON) scripts/run_with_timeout.py --timeout 600 -- $(UNITTEST) tests.evals.test_real_api tests.evals.test_debug_streaming -v
 
 evals-incremental: deps lint-check typecheck
 	@echo "${YELLOW}Updating dependency graph...${NC}"
