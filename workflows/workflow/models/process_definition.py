@@ -241,7 +241,7 @@ def _gather_notes(
 
 The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
 it is what they already told you: do not ask "What do you do?" again; ask only "Is there anything else?" once, then return. Otherwise
-ask "What do you do?" once; after their first answer, return what they told you, in their words. If their answer is a high-level summary ("I plan team events"), ask them to walk you through one example from start to finish before you return. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
+ask "What do you do?" once; after their first answer, return what they told you, in their words. If their answer is a high-level summary ("I plan team events"), ask them to walk you through one example from start to finish before you return. Ask for that one walk-through, not a list of details: do not interrogate the form's fields, the categories, or the approver in this step — the next step fills those gaps with one concrete possibility at a time. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
 do you actually do, step by step?" — and return their answer. If they ask for a template or an example rather than
 describing their work, say the template comes after you understand the work, and ask what they do step by step.
 
