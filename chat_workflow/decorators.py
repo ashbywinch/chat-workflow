@@ -391,10 +391,6 @@ def atomic_workflow(
             # the params section.
             tools = kwargs.pop("tools", ())
             deps = kwargs.pop("deps", None)
-            # A one-shot step has no conversation to open. The wrapper's
-            # caller may name the first input; otherwise Session supplies the
-            # "produce the result" prompt below.
-            first_user_input = kwargs.pop("_first_user_input", "")
 
             if session is None:
                 raise TypeError(
@@ -435,11 +431,7 @@ def atomic_workflow(
                 deps=deps,
                 min_turns=min_turns,
             )
-            result = session.run(
-                workflow=workflow,
-                first_user_input=first_user_input,
-                chat=chat,
-            )
+            result = session.run(workflow=workflow, chat=chat)
             state.initial_result = result
 
             if result.result is None:

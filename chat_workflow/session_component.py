@@ -112,7 +112,6 @@ class SessionComponent:
                 greeting = self._spoken(
                     self.greet,
                     fallback=self._FALLBACK_GREETING,
-                    prompt="Start the conversation.",
                     session=session,
                 )
                 session.say(greeting or self._FALLBACK_GREETING)
@@ -121,10 +120,6 @@ class SessionComponent:
             closing = self._spoken(
                 self.sign_off,
                 fallback=self._FALLBACK_CLOSING,
-                prompt=(
-                    "The user has finished. Say in one sentence that you "
-                    "have what they need."
-                ),
                 session=session,
             )
             if not closing or "?" in closing:
@@ -139,12 +134,11 @@ class SessionComponent:
         step: Callable[..., TextReply],
         *,
         fallback: str,
-        prompt: str,
         session: Session,
     ) -> str:
         """The cosmetic open or close; its failure must not fail the workflow."""
         try:
-            return step(session=session, _first_user_input=prompt).text.strip()
+            return step(session=session).text.strip()
         # lucidlint: ignore broad-except the open/close is cosmetic: a failure falls back to plain text
         except Exception:
             return fallback

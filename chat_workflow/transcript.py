@@ -68,12 +68,6 @@ _FRAMEWORK_PROMPTS = frozenset(
         "Start the conversation.",
         "No user is available. Produce the result now from the instructions "
         "and the inputs.",
-        "The conversation is over. Close it in one sentence.",
-        "The user has finished. Say in one sentence that you have what they "
-        "need.",
-        "The user has finished. Say in one sentence that you have what they "
-        "need. ",
-        "Describe the result to the user in their words.",
         "You are finishing too early. Do the task's next step before returning "
         "the result.",
         "No user is available to answer. Return success with the completed "

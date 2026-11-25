@@ -182,7 +182,6 @@ class Session:
     def run[TResult](
         self,
         workflow: AtomicWorkflow[TResult],
-        first_user_input: str,
         *,
         chat: bool = True,
     ) -> TurnResult[TResult]:
@@ -195,27 +194,19 @@ class Session:
         """
         result: TurnResult[TResult] | None = None
         try:
-            first = first_user_input
-            if not first and not chat:
-                # A one-shot step has no user to open the conversation. The
-                # opening prompt would make it greet instead of producing the
-                # result, so state the job instead.
-                first = (
-                    "No user is available. Produce the result now from the "
-                    "instructions and the inputs."
-                )
-            elif not first and chat and _last_role(workflow.messages) == "assistant":
-                # The assistant spoke last (a greeting or a composite echo);
-                # the next turn belongs to the user.
-                first = self._raw_io.prompt("\nYou")
             if not chat:
                 # No user to prompt, so the step owns its own retries: its turn
                 # budget, not this loop, is what ends a step that will not
-                # finish. The echo keeps the internal turns in the log.
-                result = workflow.complete_without_user(
-                    first, echo=self._raw_io.echo
-                )
+                # finish. The step's docstring is the instruction; the workflow
+                # supplies the first (no-user) turn. The echo keeps the internal
+                # turns in the log.
+                result = workflow.complete_without_user(echo=self._raw_io.echo)
             else:
+                first = ""
+                if _last_role(workflow.messages) == "assistant":
+                    # The assistant spoke last (a greeting or a composite echo);
+                    # the next turn belongs to the user.
+                    first = self._raw_io.prompt("\nYou")
                 result = workflow.process_turn(first)
                 while not result.is_complete:
                     self._raw_io.echo(f"\nAssistant: {result.message}")

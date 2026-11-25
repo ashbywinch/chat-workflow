@@ -66,6 +66,13 @@ class AtomicWorkflow(Generic[TResult]):
     # and a suggested repair; the turn keeps the rule and drops the bulk.
     _REJECTION_CORRECTION_LIMIT: ClassVar[int] = 2000
 
+    # The first turn a chat-off step gets when nobody can answer. It states
+    # the job; the step's docstring is the instruction for how to do it.
+    _NO_USER_OPENING: ClassVar[str] = (
+        "No user is available. Produce the result now from the instructions "
+        "and the inputs."
+    )
+
     # The turn a chat-off step gets when it asks for an answer nobody can give.
     # It is a correction, not an authored prompt, so it states the job again.
     _NO_USER_ANSWER: ClassVar[str] = (
@@ -223,7 +230,6 @@ class AtomicWorkflow(Generic[TResult]):
 
     def complete_without_user(
         self,
-        opening_input: str,
         *,
         echo: Callable[[str], None] | None = None,
     ) -> TurnResult[TResult]:
@@ -235,7 +241,7 @@ class AtomicWorkflow(Generic[TResult]):
         ``TurnLimitExceededError`` within the budget, so it cannot outlast it.
         ``echo`` receives each internal turn as it happens, for the log.
         """
-        result = self.process_turn(opening_input)
+        result = self.process_turn(self._NO_USER_OPENING)
         while not result.is_complete:
             if echo:
                 echo(f"\nAssistant: {result.message}")

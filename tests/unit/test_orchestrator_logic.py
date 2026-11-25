@@ -76,7 +76,7 @@ class _CapturingSession:
         self.workflows = []
         self._result = result
 
-    def run(self, *, workflow, first_user_input, chat):
+    def run(self, *, workflow, chat):
         self.workflows.append(workflow)
         return TurnResult[EvaluationCriteria].success(self._result, message="Done.")
 
@@ -576,7 +576,7 @@ class TestTheStepOnTheTranscript(unittest.TestCase):
         state = SessionLog()
         session = Session(io=mock_io, state=state, config=FakeConfig())
 
-        session.run(workflow=orchestrator, first_user_input="hello")
+        session.run(workflow=orchestrator)
 
         self.assertEqual(len(state.messages), 4)  # request, answer call, return, words
         self.assertEqual(state.usage.requests, 1)

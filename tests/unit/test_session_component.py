@@ -156,7 +156,7 @@ class TestTheSuccessMessage(unittest.TestCase):
             config=make_atomic_workflow_config(conversation=conversation)
         )
 
-        session.run(workflow, "", chat=True)
+        session.run(workflow, chat=True)
 
         kinds = entries(session.state.messages)
         self.assertIn(("assistant", "Here is what I put together."), kinds)
@@ -176,7 +176,7 @@ class TestTheSuccessMessage(unittest.TestCase):
             config=make_atomic_workflow_config(conversation=conversation)
         )
 
-        session.run(workflow, "", chat=False)
+        session.run(workflow, chat=False)
 
         self.assertNotIn(
             ("assistant", "Internal summary only."),
@@ -200,7 +200,7 @@ class TestTheSuccessMessage(unittest.TestCase):
         )
 
         with self.assertRaises(TurnLimitExceededError):
-            session.run(workflow, "", chat=False)
+            session.run(workflow, chat=False)
 
         self.assertEqual(len(conversation.script.calls), 2)
 
@@ -229,18 +229,12 @@ class _StubComponent(SessionComponent):
         self._closing = closing or (lambda: TextReply(text="I have what I need."))
 
     @override
-    def greet(
-        self, *, session: Session, max_turns: int = 1, _first_user_input: str | None = None
-    ) -> TextReply:
-        del _first_user_input  # the stub ignores the prompt _spoken hands the model
+    def greet(self, *, session: Session, max_turns: int = 1) -> TextReply:
         self.called.append("greet")
         return self._greeting()
 
     @override
-    def sign_off(
-        self, *, session: Session, max_turns: int = 1, _first_user_input: str | None = None
-    ) -> TextReply:
-        del _first_user_input  # the stub ignores the prompt _spoken hands the model
+    def sign_off(self, *, session: Session, max_turns: int = 1) -> TextReply:
         self.called.append("close")
         return self._closing()
 
