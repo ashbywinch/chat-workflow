@@ -43,7 +43,7 @@ class InteractiveEntity(BaseModel):
             rules for this entity's fields and business logic.
     """
 
-    _validation_rules: str = ""
+    _validation_rules: str | list[str] = ""
 
     def __init__(self, **data: Any) -> None:
         try:
@@ -56,7 +56,8 @@ class InteractiveEntity(BaseModel):
         self._enforce_validation_rules()
 
     def _get_validation_rules(self) -> str:
-        return str(self._validation_rules)
+        rules = self._validation_rules
+        return "\n".join(rules) if isinstance(rules, list) else rules
 
     def _resolve_field_name(self, name_from_rule: str) -> str | None:
         model_fields = type(self).model_fields
