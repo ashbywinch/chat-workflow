@@ -96,6 +96,12 @@ chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ide
 
 **AI Agents**: Read [AGENTS.md](AGENTS.md) for agent-specific onboarding and routing.
 
+## Versioning
+
+The package version is `project.version` in `pyproject.toml`. Releases are
+tagged `vMAJOR.MINOR.PATCH` and built from the tag's own tree: a breaking
+change is major, a new capability minor, a fix patch.
+
 ## License
 
 MIT License

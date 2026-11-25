@@ -57,3 +57,11 @@ dev = [
 # execs a temporary module made `coverage report` fail with "No source for
 # code" and the gate could not run at all.
 source = ["chat_workflow", "workflows", "chat_workflow_cli"]
+
+[tool.uv.sources]
+lucidlint = { git = "https://github.com/ashbywinch/lucidlint.git", rev = "v0.8.0" }
+
+[dependency-groups]
+dev = [
+    "lucidlint",
+]

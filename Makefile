@@ -7,19 +7,25 @@
 #   "Illegal option -o pipefail".
 # - `deps` never depends on `install-hooks`: a hook that calls `make check`
 #   would re-copy/refuse the very hook file (the pre-push deadlock).
-# - `check` = lint-check + typecheck — the single gate CI and pre-push both run.
+# - `check` = lint-check + typecheck + lucidlint + merge markers + docs — the
+#   single gate CI and pre-push both run. Lucidlint scans per file: its `--repo`
+#   mode does not walk this tree.
 # - `clean` never touches user data (only .venv + generated reports).
 
 SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 
-.PHONY: help setup deps uv-sync install-hooks run test test-unit test-verbose test-all check lint lint-check lint-github typecheck typecheck-update-baseline format coverage docs-check evals evals-test evals-verbose evals-smoke evals-incremental clean
+.PHONY: help install setup deps uv-sync install-hooks run test test-unit test-verbose test-all check lint lint-check lint-github lucidlint merge-markers-check typecheck typecheck-update-baseline format coverage docs-check fixtures-check dist actionlint gitleaks evals evals-test evals-verbose evals-smoke evals-incremental clean
 
 # Variables
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
 OUT := .venv/bin/chat-workflow
 RUFF := .venv/bin/ruff
+LUCIDLINT := .venv/bin/lucidlint
+TOOLS := .tools
+ACTIONLINT := $(TOOLS)/actionlint
+GITLEAKS := $(TOOLS)/gitleaks
 UNITTEST := $(PYTHON) -m unittest
 COVERAGE := .venv/bin/coverage
 EVAL_TIMEOUT ?= 1800
@@ -32,8 +38,9 @@ NC := \033[0m # No Color
 
 help:
 	@echo "Available commands:"
-	@echo "  ${GREEN}make setup${NC}              Create venv, install deps + hooks, ensure .env exists"
-	@echo "  ${GREEN}make check${NC}              Lint + typecheck — the gate CI and the pre-push hook run"
+	@echo "  ${GREEN}make install${NC}            Create venv, install deps + hooks, ensure .env exists"
+	@echo "  ${GREEN}make setup${NC}              Alias for install"
+	@echo "  ${GREEN}make check${NC}              Lint + typecheck + lucidlint — the pre-push gate"
 	@echo "  ${GREEN}make test${NC}               Run unit tests (no API key required)"
 	@echo "  ${GREEN}make test-verbose${NC}       Run unit tests with verbose output"
 	@echo "  ${GREEN}make test-all${NC}           Run unit tests + evals"
@@ -45,8 +52,15 @@ help:
 	@echo "  ${GREEN}make docs-check${NC}         Every relative markdown link resolves"
 	@echo "  ${GREEN}make lint${NC}               Check code quality with ruff"
 	@echo "  ${GREEN}make format${NC}             Auto-fix linting issues"
+	@echo "  ${GREEN}make lucidlint${NC}          Code-health gate over every Python file"
+	@echo "  ${GREEN}make merge-markers-check${NC} No tracked file has a conflict marker"
+	@echo "  ${GREEN}make actionlint${NC}         Validate the GitHub workflow files"
+	@echo "  ${GREEN}make gitleaks${NC}           Scan every committed object for secrets"
+	@echo "  ${GREEN}make dist${NC}               Build the sdist and wheel"
 	@echo "  ${GREEN}make typecheck${NC}          Pyrefly, gated on the committed baseline"
 	@echo "  ${GREEN}make clean${NC}              Clean up generated files (removes .venv)"
+
+install: setup
 
 setup: deps install-hooks
 	@[ -f .env ] || cp .env.example .env
@@ -78,9 +92,9 @@ run: setup
 # The exact gate a push must pass — run identically by CI and the pre-push
 # hook (single source of truth; no test run — too slow for a hook, and CI's
 # `make test` already includes these).
-check: deps lint-check typecheck
+check: deps lint-check typecheck lucidlint merge-markers-check docs-check
 
-test: deps lint-check typecheck
+test: deps lint-check typecheck merge-markers-check
 	@$(UNITTEST) discover tests/unit/
 
 test-unit: test
@@ -89,6 +103,9 @@ test-verbose: deps lint-check typecheck
 	@$(UNITTEST) discover tests/unit/ -v
 
 test-all: test evals
+
+dist: deps
+	@$(UV) build
 
 coverage: deps
 	@$(COVERAGE) run -m unittest discover tests/unit/
@@ -110,6 +127,34 @@ lint-check: deps  # Shared with the pre-commit hook — single source of truth f
 
 lint-github: deps  # CI only: findings surface as PR annotations
 	@$(RUFF) check chat_workflow/ workflows/ tests/ chat_workflow_cli/ --output-format=github
+
+lucidlint: deps  # per-file: the CLI --repo mode does not walk this tree
+	@$(PYTHON) scripts/lucidlint_all.py $(LUCIDLINT)
+
+merge-markers-check: deps  # a committed marker is a merge someone stopped halfway
+	@$(PYTHON) scripts/check_merge_markers.py
+
+# System binaries live in .tools/, installed by their own target — never
+# assumed preinstalled and never downloaded by a workflow step.
+$(ACTIONLINT):
+	@mkdir -p $(TOOLS)
+	@curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o $(TOOLS)/actionlint.tgz
+	@echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $(TOOLS)/actionlint.tgz" | sha256sum -c -
+	@tar -xzf $(TOOLS)/actionlint.tgz -C $(TOOLS) actionlint
+	@rm $(TOOLS)/actionlint.tgz
+
+actionlint: $(ACTIONLINT)
+	@$(ACTIONLINT) -color .github/workflows/*.yml
+
+$(GITLEAKS):
+	@mkdir -p $(TOOLS)
+	@curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o $(TOOLS)/gitleaks.tgz
+	@echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $(TOOLS)/gitleaks.tgz" | sha256sum -c -
+	@tar -xzf $(TOOLS)/gitleaks.tgz -C $(TOOLS) gitleaks
+	@rm $(TOOLS)/gitleaks.tgz
+
+gitleaks: $(GITLEAKS)
+	@$(GITLEAKS) git --no-banner -v
 
 # pyrefly + BOTH-direction baseline lock (new errors AND stale entries fail)
 typecheck: deps
@@ -133,7 +178,7 @@ evals: deps lint-check typecheck
 evals-verbose: deps lint-check typecheck
 	@CHAT_WORKFLOW_EVAL_REPORT=1 $(PYTHON) scripts/run_with_timeout.py --timeout $(EVAL_TIMEOUT) -- $(UNITTEST) discover tests/evals/ -v
 
-evals-test: deps lint-check typecheck
+evals-test: deps lint-check typecheck merge-markers-check
 	@test -n "$(TEST)" || { echo "${RED}Usage: make evals-test TEST=tests.evals.single...${NC}"; exit 1; }
 	@rm -f test-results/eval-report.txt
 	@CHAT_WORKFLOW_EVAL_REPORT=1 $(PYTHON) scripts/run_with_timeout.py --timeout $(EVAL_TIMEOUT) -- $(UNITTEST) $(TEST)

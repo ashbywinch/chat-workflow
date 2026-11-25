@@ -39,7 +39,7 @@ jobs:
           # The house gateway, the same lane the evals use. This repo's gateway
           # token lives in CHAT_WORKFLOW_API_KEY, not OPENAI_API_KEY.
           OPENAI_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
-          OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # SECURITY: the config comes from a maintainer branch, never the PR
           # head (a same-repo branch could ship its own api_base/config and
@@ -66,7 +66,7 @@ jobs:
       # SECURITY: checkout the DEFAULT branch, not the PR head — the script runs
       # with GITHUB_TOKEN, and a PR could replace it with code that exfiltrates
       # the token.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.repository.default_branch }}
       - name: Fail loud if no review covers the head commit

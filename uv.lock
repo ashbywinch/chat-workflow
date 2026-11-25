@@ -185,6 +185,11 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "lucidlint" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "archunitpython", marker = "extra == 'dev'", specifier = ">=1.5.0" },
@@ -200,6 +205,9 @@ requires-dist = [
     { name = "typer", specifier = ">=0.24.1" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "lucidlint", git = "https://github.com/ashbywinch/lucidlint.git?rev=v0.8.0" }]
 
 [[package]]
 name = "click"
@@ -583,6 +591,14 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/75/86/00b6bd2e60ac09b26c6e147da48d83dc8706defc2ebde8b003ce6de2b059/logfire_api-5.6.0.tar.gz", hash = "sha256:e2341041ebe7bb0283d41e5defa03655f04706b2eeede9b89b6fc23b955ee565", size = 104734, upload-time = "2026-11-11T21:26:48.204Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1a/7c/030b70648c1ee4746805cfe93fc7236e323fe5a032d18b46b353a794cd2f/logfire_api-5.6.0-py3-none-any.whl", hash = "sha256:146c4292b11cc5c8a0a6eab1b0e93713c4575b9028e5693112bb776cb4db5026", size = 158506, upload-time = "2026-11-11T21:26:43.586Z" },
+]
+
+[[package]]
+name = "lucidlint"
+version = "0.8.0"
+source = { git = "https://github.com/ashbywinch/lucidlint.git?rev=v0.8.0#b48530a5f35b6a375b95a01d180f85e30f0de421" }
+dependencies = [
+    { name = "libcst" },
 ]
 
 [[package]]

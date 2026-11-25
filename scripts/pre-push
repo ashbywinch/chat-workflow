@@ -1,13 +1,12 @@
 #!/usr/bin/env sh
-# Pre-push hook: run the same gate as CI — `make check` (lint + typecheck).
+# Pre-push hook: run the same gate as CI — `make check` (lint + typecheck + lucidlint + merge markers).
 #
 # Install: `make install-hooks` (copies this file to .git/hooks/pre-push).
 # Re-run `make install-hooks` after pulling updates — this file is the
 # single source of truth; the copy in .git/hooks is not versioned.
 #
-# Why `make check` and not the tools directly: CI runs `make check` (via
-# `make test`, which includes lint-check + typecheck) — delegating here
-# means the hook and CI can never drift apart. The deadlock that once
+# Why `make check` and not the tools directly: CI runs `make check` —
+# delegating here means the hook and CI can never drift apart. The deadlock that once
 # forced the hook to call the tools directly is gone: check targets depend
 # on `deps` (uv sync), never on install-hooks.
 #

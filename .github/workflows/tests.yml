@@ -32,26 +32,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - run: make setup
+      - run: make install
       - run: make lint-github
-      - name: Workflow syntax (actionlint)
-        # An invalid workflow fails every push with no jobs and only a
-        # banner. This turns that into a normal red PR check.
-        run: |
-          curl -sSfL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o /tmp/actionlint.tgz
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  /tmp/actionlint.tgz" | sha256sum -c -
-          tar -xzf /tmp/actionlint.tgz -C /tmp actionlint
-          /tmp/actionlint -color .github/workflows/*.yml
-      - name: Docs links
-        run: make docs-check
+      - run: make actionlint
       - run: make test
-      - name: Secret scan
-        # Reads git objects, so every committed file is covered — not just the diff.
-        run: |
-          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz -o gitleaks.tgz
-          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
-          tar -xzf gitleaks.tgz gitleaks
-          ./gitleaks git --no-banner -v
+      - run: make gitleaks
+      - run: make dist
+      - name: Upload dist
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
       - run: make coverage
       - name: Coverage summary
         uses: irongut/CodeCoverageSummary@51cc3a756ddcd398d447c044c02cb6aa83fdae95 # v1.3.0
@@ -68,6 +59,9 @@ jobs:
         with:
           recreate: true
           path: code-coverage-results.md
+      # Last, so a red code-health gate does not hide the test, coverage,
+      # lint and artifact results above it.
+      - run: make check
 
   conversation-evals:
     # The full conversation suite calls real models and an LLM judge. It is a
@@ -92,11 +86,11 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - run: make setup
+      - run: make install
       - name: Conversation suite
         env:
           OPENAI_API_KEY: ${{ secrets.CHAT_WORKFLOW_API_KEY }}
-          OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
           CHAT_WORKFLOW_TRANSCRIPT_DIR: test-results/transcripts
           CHAT_WORKFLOW_EVAL_REPORT: 1
           EVAL_TIMEOUT: 14400
