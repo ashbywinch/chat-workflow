@@ -8,8 +8,8 @@ Groups tests by category and shows subtotals plus estimated cost.
 """
 
 import argparse
-import os
 import re
+from itertools import groupby
 from pathlib import Path
 from typing import NamedTuple
 
@@ -22,39 +22,109 @@ class EvalEntry(NamedTuple):
     total_tok: int
 
 
-# Map test names to groups for sensible subtotals.
-GROUP_PATTERNS: list[tuple[str, str]] = [
-    (r"test_component_validation", "Component Validation"),
-    (r"test_conversation_quality", "Conversation Quality"),
-    (r"test_conversation_structure", "Conversation Structure"),
-    (r"test_debug_streaming", "Debug Streaming"),
-    (r"test_domain_exploration", "Domain Exploration"),
-    (r"(test_end_to_end|^end_to_end)", "End-to-End Pipeline"),
-    (r"test_generated_component_codegen", "Generated Component Codegen"),
-    (r"test_generated_component_rules", "Generated Component Rules"),
-    (r"test_interaction_gathering|gather_interaction", "Interaction Gathering"),
-    (r"test_output_|test_resource_", "Output & Resource"),
-    (r"test_process_definition", "Process Definition"),
-    (r"test_real_api", "Real API"),
-    (r"test_structural_design|design_from_domain", "Structural Design"),
-    (r"test_workflow_evals", "Workflow Evals"),
-    (r"test_workflow_pipeline", "Workflow Pipeline"),
-    (r"multi_turn_component_design", "Generated Component Design"),
-    (r"multi_turn_component_identification", "Component Identification"),
-]
+class GroupedEntries(dict[str, list[EvalEntry]]):
+    """Report group name -> the entries that fall in it."""
 
 
-def _group_name(test_name: str) -> str:
-    for pattern, group in GROUP_PATTERNS:
-        if re.search(pattern, test_name):
-            return group
-    return "Other"
+class TestGroups:
+    """Name patterns mapped to groups for sensible subtotals."""
+
+    PATTERNS: list[tuple[str, str]] = [
+        (r"test_component_validation", "Component Validation"),
+        (r"test_conversation_quality", "Conversation Quality"),
+        (r"test_conversation_structure", "Conversation Structure"),
+        (r"test_debug_streaming", "Debug Streaming"),
+        (r"test_domain_exploration", "Domain Exploration"),
+        (r"(test_end_to_end|^end_to_end)", "End-to-End Pipeline"),
+        (r"test_generated_component_codegen", "Generated Component Codegen"),
+        (r"test_generated_component_rules", "Generated Component Rules"),
+        (r"test_interaction_gathering|gather_interaction", "Interaction Gathering"),
+        (r"test_output_|test_resource_", "Output & Resource"),
+        (r"test_process_definition", "Process Definition"),
+        (r"test_real_api", "Real API"),
+        (r"test_structural_design|design_from_domain", "Structural Design"),
+        (r"test_workflow_evals", "Workflow Evals"),
+        (r"test_workflow_pipeline", "Workflow Pipeline"),
+        (r"multi_turn_component_design", "Generated Component Design"),
+        (r"multi_turn_component_identification", "Component Identification"),
+    ]
+
+    @classmethod
+    def for_test(cls, test_name: str) -> str:
+        """Return the group whose pattern first matches *test_name*."""
+        for pattern, group in cls.PATTERNS:
+            if re.search(pattern, test_name):
+                return group
+        return "Other"
 
 
-# Estimated cost per 1M tokens for the current model
-# Gemini 2.5 Flash Lite via OpenRouter: $0.10/1M input, $0.40/1M output
-# Using a blended rate of ~$0.20/1M for mixed input/output
-COST_PER_1M_TOKENS = 0.20  # blended input + output
+class TokenPricing:
+    """Estimated cost per 1M tokens for the current model.
+
+    Gemini 2.5 Flash Lite via OpenRouter: $0.10/1M input, $0.40/1M output,
+    blended to ~$0.20/1M for a mixed input/output run.
+    """
+
+    BLENDED_PER_MILLION = 0.20
+
+
+class ReportLayout:
+    """Rule widths and unit scales for the plain-text report."""
+
+    RULE_WIDTH = 80  # a full-width banner rule, in characters
+    HEADER_COLUMN_RULES = (48, 7, 11, 11, 11, 10)  # dashes under each column
+    GROUP_RULE = 70  # a group's subtotal rule, in characters
+    SECONDS_PER_MINUTE = 60
+    TOKENS_PER_MILLION = 1_000_000
+
+
+def _banner(lines: list[str], title: str) -> None:
+    """Append a full-width title banner to *lines*."""
+    rule = "=" * ReportLayout.RULE_WIDTH
+    lines.extend((rule, title, rule))
+
+
+def _header_line() -> str:
+    """Column headings for the per-test rows."""
+    return (
+        f"  {'Test':<50} {'Time(s)':>7} {'Agent(tok)':>11} {'Judge(tok)':>11} "
+        f"{'Total(tok)':>11} {'Cost($)':>10}"
+    )
+
+
+def _dash_line() -> str:
+    """Dashes under each heading in :func:`_header_line`."""
+    rules = " ".join("-" * width for width in ReportLayout.HEADER_COLUMN_RULES)
+    return f"  {rules}"
+
+
+def _cost(tokens: int) -> float:
+    """Blended dollar cost of *tokens*."""
+    return (tokens / ReportLayout.TOKENS_PER_MILLION) * TokenPricing.BLENDED_PER_MILLION
+
+
+def _entry_line(entry: EvalEntry) -> str:
+    """One test's time, token and cost row."""
+    return (
+        f"  {entry.test_name:<50} {entry.duration_s:>6.0f}s {entry.agent_tok:>10,} "
+        f"{entry.judge_tok:>10,} {entry.total_tok:>10,}  ${_cost(entry.total_tok):.4f}"
+    )
+
+
+def _group_section(group_name: str, group_entries: list[EvalEntry]) -> list[str]:
+    """The heading, test rows and subtotal for one group."""
+    total_s = sum(e.duration_s for e in group_entries)
+    agent_tok = sum(e.agent_tok for e in group_entries)
+    judge_tok = sum(e.judge_tok for e in group_entries)
+    total_tok = sum(e.total_tok for e in group_entries)
+    return [
+        f"  ── {group_name} ──",
+        *(_entry_line(e) for e in sorted(group_entries, key=lambda x: x.test_name)),
+        f"  {'─' * ReportLayout.GROUP_RULE}",
+        f"  {'Group total':<50} {total_s:>6.0f}s {agent_tok:>10,} "
+        f"{judge_tok:>10,} {total_tok:>10,}  ${_cost(total_tok):.4f}",
+        "",
+    ]
 
 
 def parse_report(report_path: Path) -> list[EvalEntry]:
@@ -65,7 +135,7 @@ def parse_report(report_path: Path) -> list[EvalEntry]:
     """
     # Match simple:  [test_name] 10s  11243 tok
     pattern = re.compile(
-        r"^\s+\[(.+?)\]\s+([\d.]+)s\s+(\d+)\s+tok"
+        r"^\s+\[(?P<name>.+?)\]\s+(?P<seconds>[\d.]+)s\s+(?P<tokens>\d+)\s+tok"
     )
 
     # Dedup by taking the last occurrence per test name (in case of retries).
@@ -74,11 +144,11 @@ def parse_report(report_path: Path) -> list[EvalEntry]:
         m = pattern.match(line)
         if not m:
             continue
-        name = m.group(1)
-        tok = int(m.group(3))
+        name = m.group("name")
+        tok = int(m.group("tokens"))
         entries[name] = EvalEntry(
             test_name=name,
-            duration_s=float(m.group(2)),
+            duration_s=float(m.group("seconds")),
             agent_tok=tok,
             judge_tok=0,
             total_tok=tok,
@@ -87,63 +157,50 @@ def parse_report(report_path: Path) -> list[EvalEntry]:
     return list(entries.values())
 
 
+def _grouped(entries: list[EvalEntry]) -> GroupedEntries:
+    """Entries bucketed by report group name."""
+    keyed = sorted(
+        ((TestGroups.for_test(e.test_name), e) for e in entries),
+        key=lambda pair: pair[0],
+    )
+    return GroupedEntries(
+        {
+            name: [entry for _, entry in bucket]
+            for name, bucket in groupby(keyed, key=lambda pair: pair[0])
+        }
+    )
+
+
 def generate_report(entries: list[EvalEntry], output_path: Path | None = None) -> str:
     """Build a human-readable report with groups and subtotals."""
-    # Group entries
-    groups: dict[str, list[EvalEntry]] = {}
-    for e in entries:
-        g = _group_name(e.test_name)
-        groups.setdefault(g, []).append(e)
+    groups = _grouped(entries)
 
     lines: list[str] = []
-    lines.append("=" * 80)
-    lines.append("EVAL TIME & COST REPORT")
-    lines.append("=" * 80)
-    lines.append("")
-    lines.append(f"  {'Test':<50} {'Time(s)':>7} {'Agent(tok)':>11} {'Judge(tok)':>11} {'Total(tok)':>11} {'Cost($)':>10}")
-    lines.append(f"  {'-'*48} {'-'*7} {'-'*11} {'-'*11} {'-'*11} {'-'*10}")
-    lines.append("")
+    _banner(lines, "EVAL TIME & COST REPORT")
+    lines.extend(("", _header_line(), _dash_line(), ""))
+    lines.extend(
+        line
+        for name in sorted(groups)
+        for line in _group_section(name, groups[name])
+    )
 
-    grand_total_s = 0.0
-    grand_agent_tok = 0
-    grand_judge_tok = 0
-    grand_total_tok = 0
+    grand_total_s = sum(e.duration_s for e in entries)
+    grand_agent_tok = sum(e.agent_tok for e in entries)
+    grand_judge_tok = sum(e.judge_tok for e in entries)
+    grand_total_tok = sum(e.total_tok for e in entries)
 
-    for group_name in sorted(groups.keys()):
-        group_entries = groups[group_name]
-        group_total_s = sum(e.duration_s for e in group_entries)
-        group_agent_tok = sum(e.agent_tok for e in group_entries)
-        group_judge_tok = sum(e.judge_tok for e in group_entries)
-        group_total_tok = sum(e.total_tok for e in group_entries)
-        group_cost = (group_total_tok / 1_000_000) * COST_PER_1M_TOKENS
-
-        grand_total_s += group_total_s
-        grand_agent_tok += group_agent_tok
-        grand_judge_tok += group_judge_tok
-        grand_total_tok += group_total_tok
-
-        lines.append(f"  ── {group_name} ──")
-
-        for e in sorted(group_entries, key=lambda x: x.test_name):
-            ecost = (e.total_tok / 1_000_000) * COST_PER_1M_TOKENS
-            lines.append(
-                f"  {e.test_name:<50} {e.duration_s:>6.0f}s {e.agent_tok:>10,} {e.judge_tok:>10,} {e.total_tok:>10,}  ${ecost:.4f}"
-            )
-
-        lines.append(f"  {'─'*70}")
-        lines.append(f"  {'Group total':<50} {group_total_s:>6.0f}s {group_agent_tok:>10,} {group_judge_tok:>10,} {group_total_tok:>10,}  ${group_cost:.4f}")
-        lines.append("")
-
-    lines.append("=" * 80)
-    lines.append("GRAND TOTALS")
-    lines.append("=" * 80)
-    grand_cost = (grand_total_tok / 1_000_000) * COST_PER_1M_TOKENS
-    lines.append(f"  Total time:       {grand_total_s:.0f}s ({grand_total_s/60:.1f} min)")
+    _banner(lines, "GRAND TOTALS")
+    lines.append(
+        f"  Total time:       {grand_total_s:.0f}s "
+        f"({grand_total_s / ReportLayout.SECONDS_PER_MINUTE:.1f} min)"
+    )
     lines.append(f"  Agent tokens:     {grand_agent_tok:>10,}")
     lines.append(f"  Judge tokens:     {grand_judge_tok:>10,}")
     lines.append(f"  Total tokens:     {grand_total_tok:>10,}")
-    lines.append(f"  Estimated cost:   ${grand_cost:.4f}")
-    lines.append(f"  (at ${COST_PER_1M_TOKENS:.2f}/1M tokens blended rate)")
+    lines.append(f"  Estimated cost:   ${_cost(grand_total_tok):.4f}")
+    lines.append(
+        f"  (at ${TokenPricing.BLENDED_PER_MILLION:.2f}/1M tokens blended rate)"
+    )
     lines.append("")
     lines.append(f"  Tests included:   {len(entries)}")
     lines.append(f"  Groups:           {len(groups)}")

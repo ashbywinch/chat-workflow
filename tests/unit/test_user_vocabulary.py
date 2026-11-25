@@ -11,18 +11,18 @@ from chat_workflow.mixins import LLMValidated
 class LabelledResult(LLMValidated):
     success_criteria: Annotated[
         str,
-        UserLabel("how you know it is good", "success criteria", "criteria"),
+        UserLabel(phrase="how you know it is good", aliases=("success criteria", "criteria")),
     ]
 
 
 class LabelledInput(LLMValidated):
     orchestrating_component: Annotated[
         str,
-        UserLabel("who keeps things moving", "orchestrating component", "orchestrating"),
+        UserLabel(phrase="who keeps things moving", aliases=("orchestrating component", "orchestrating")),
     ]
     phases: Annotated[
         list[str],
-        UserLabel("the main stages", "phases", guard=False),
+        UserLabel(phrase="the main stages", aliases="phases", guard=False),
     ]
 
 

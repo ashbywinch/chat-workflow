@@ -1,21 +1,9 @@
 {
  "errors": [
   {
-   "line": 15,
+   "line": 54,
    "column": 9,
-   "stop_line": 15,
-   "stop_column": 16,
-   "path": "chat_workflow/exceptions.py",
-   "code": -2,
-   "name": "missing-override-decorator",
-   "description": "Class member `ChatWorkflowError.__str__` overrides a member in a parent class but is missing an `@override` decorator",
-   "concise_description": "Class member `ChatWorkflowError.__str__` overrides a member in a parent class but is missing an `@override` decorator",
-   "severity": "error"
-  },
-  {
-   "line": 48,
-   "column": 9,
-   "stop_line": 48,
+   "stop_line": 54,
    "stop_column": 24,
    "path": "chat_workflow/interactive_entity.py",
    "code": -2,
@@ -25,9 +13,9 @@
    "severity": "error"
   },
   {
-   "line": 53,
+   "line": 59,
    "column": 19,
-   "stop_line": 53,
+   "stop_line": 59,
    "stop_column": 43,
    "path": "chat_workflow/interactive_entity.py",
    "code": -2,
@@ -35,42 +23,6 @@
    "description": "Unnecessary `str()` call; argument is already of type `str`",
    "concise_description": "Unnecessary `str()` call; argument is already of type `str`",
    "severity": "warn"
-  },
-  {
-   "line": 74,
-   "column": 5,
-   "stop_line": 74,
-   "stop_column": 26,
-   "path": "chat_workflow_cli/cli.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `FunctionType` has no attribute `__signature__`",
-   "concise_description": "Object of class `FunctionType` has no attribute `__signature__`",
-   "severity": "error"
-  },
-  {
-   "line": 24,
-   "column": 9,
-   "stop_line": 24,
-   "stop_column": 13,
-   "path": "chat_workflow_cli/runner.py",
-   "code": -2,
-   "name": "missing-override-decorator",
-   "description": "Class member `TyperUserIO.echo` overrides a member in a parent class but is missing an `@override` decorator",
-   "concise_description": "Class member `TyperUserIO.echo` overrides a member in a parent class but is missing an `@override` decorator",
-   "severity": "error"
-  },
-  {
-   "line": 27,
-   "column": 9,
-   "stop_line": 27,
-   "stop_column": 15,
-   "path": "chat_workflow_cli/runner.py",
-   "code": -2,
-   "name": "missing-override-decorator",
-   "description": "Class member `TyperUserIO.prompt` overrides a member in a parent class but is missing an `@override` decorator",
-   "concise_description": "Class member `TyperUserIO.prompt` overrides a member in a parent class but is missing an `@override` decorator",
-   "severity": "error"
   },
   {
    "line": 145,
@@ -289,42 +241,6 @@
    "severity": "error"
   },
   {
-   "line": 100,
-   "column": 9,
-   "stop_line": 100,
-   "stop_column": 20,
-   "path": "tests/unit/test_cli_visibility.py",
-   "code": -2,
-   "name": "missing-attribute",
-   "description": "Object of class `ModuleType` has no attribute `__all__`",
-   "concise_description": "Object of class `ModuleType` has no attribute `__all__`",
-   "severity": "error"
-  },
-  {
-   "line": 29,
-   "column": 21,
-   "stop_line": 29,
-   "stop_column": 36,
-   "path": "tests/unit/test_config.py",
-   "code": -2,
-   "name": "deprecated",
-   "description": "`tempfile.mktemp` is deprecated\n  Deprecated since Python 2.3. Use `mkstemp()` or `NamedTemporaryFile(delete=False)` instead.",
-   "concise_description": "`tempfile.mktemp` is deprecated",
-   "severity": "warn"
-  },
-  {
-   "line": 41,
-   "column": 21,
-   "stop_line": 41,
-   "stop_column": 36,
-   "path": "tests/unit/test_config.py",
-   "code": -2,
-   "name": "deprecated",
-   "description": "`tempfile.mktemp` is deprecated\n  Deprecated since Python 2.3. Use `mkstemp()` or `NamedTemporaryFile(delete=False)` instead.",
-   "concise_description": "`tempfile.mktemp` is deprecated",
-   "severity": "warn"
-  },
-  {
    "line": 18,
    "column": 5,
    "stop_line": 18,
@@ -397,9 +313,9 @@
    "severity": "error"
   },
   {
-   "line": 35,
+   "line": 34,
    "column": 30,
-   "stop_line": 35,
+   "stop_line": 34,
    "stop_column": 32,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -409,9 +325,9 @@
    "severity": "error"
   },
   {
-   "line": 35,
+   "line": 34,
    "column": 30,
-   "stop_line": 35,
+   "stop_line": 34,
    "stop_column": 32,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -421,9 +337,9 @@
    "severity": "error"
   },
   {
-   "line": 35,
+   "line": 34,
    "column": 30,
-   "stop_line": 35,
+   "stop_line": 34,
    "stop_column": 32,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -433,9 +349,9 @@
    "severity": "error"
   },
   {
-   "line": 72,
+   "line": 71,
    "column": 21,
-   "stop_line": 72,
+   "stop_line": 71,
    "stop_column": 23,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -445,9 +361,9 @@
    "severity": "error"
   },
   {
-   "line": 72,
+   "line": 71,
    "column": 21,
-   "stop_line": 72,
+   "stop_line": 71,
    "stop_column": 23,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -457,9 +373,9 @@
    "severity": "error"
   },
   {
-   "line": 72,
+   "line": 71,
    "column": 21,
-   "stop_line": 72,
+   "stop_line": 71,
    "stop_column": 23,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -469,9 +385,9 @@
    "severity": "error"
   },
   {
-   "line": 90,
+   "line": 89,
    "column": 24,
-   "stop_line": 90,
+   "stop_line": 89,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -481,9 +397,9 @@
    "severity": "error"
   },
   {
-   "line": 90,
+   "line": 89,
    "column": 24,
-   "stop_line": 90,
+   "stop_line": 89,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -493,9 +409,9 @@
    "severity": "error"
   },
   {
-   "line": 90,
+   "line": 89,
    "column": 24,
-   "stop_line": 90,
+   "stop_line": 89,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -505,9 +421,9 @@
    "severity": "error"
   },
   {
-   "line": 90,
+   "line": 89,
    "column": 24,
-   "stop_line": 90,
+   "stop_line": 89,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -517,9 +433,9 @@
    "severity": "error"
   },
   {
-   "line": 90,
+   "line": 89,
    "column": 24,
-   "stop_line": 90,
+   "stop_line": 89,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -529,9 +445,9 @@
    "severity": "error"
   },
   {
-   "line": 90,
+   "line": 89,
    "column": 24,
-   "stop_line": 90,
+   "stop_line": 89,
    "stop_column": 26,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -541,9 +457,9 @@
    "severity": "error"
   },
   {
-   "line": 142,
+   "line": 141,
    "column": 26,
-   "stop_line": 142,
+   "stop_line": 141,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -553,9 +469,9 @@
    "severity": "error"
   },
   {
-   "line": 142,
+   "line": 141,
    "column": 26,
-   "stop_line": 142,
+   "stop_line": 141,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -565,9 +481,9 @@
    "severity": "error"
   },
   {
-   "line": 142,
+   "line": 141,
    "column": 26,
-   "stop_line": 142,
+   "stop_line": 141,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -577,9 +493,9 @@
    "severity": "error"
   },
   {
-   "line": 142,
+   "line": 141,
    "column": 26,
-   "stop_line": 142,
+   "stop_line": 141,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -589,9 +505,9 @@
    "severity": "error"
   },
   {
-   "line": 142,
+   "line": 141,
    "column": 26,
-   "stop_line": 142,
+   "stop_line": 141,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -601,9 +517,9 @@
    "severity": "error"
   },
   {
-   "line": 142,
+   "line": 141,
    "column": 26,
-   "stop_line": 142,
+   "stop_line": 141,
    "stop_column": 28,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -613,9 +529,9 @@
    "severity": "error"
   },
   {
-   "line": 174,
+   "line": 172,
    "column": 58,
-   "stop_line": 174,
+   "stop_line": 172,
    "stop_column": 62,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,
@@ -625,9 +541,9 @@
    "severity": "error"
   },
   {
-   "line": 179,
+   "line": 177,
    "column": 32,
-   "stop_line": 179,
+   "stop_line": 177,
    "stop_column": 34,
    "path": "tests/unit/test_sub_models.py",
    "code": -2,

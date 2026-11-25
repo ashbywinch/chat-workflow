@@ -1,4 +1,4 @@
-"""Tests for ComponentStructure, StructField, and StructValidator models."""
+"""Tests for ComponentStructure, StructField, and ValidationRule models."""
 
 import unittest
 
@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from workflows.workflow.structure import (
     ComponentStructure,
     StructField,
-    StructValidator,
+    ValidationRule,
 )
 
 
@@ -55,16 +55,16 @@ class TestStructField(unittest.TestCase):
             self.make_valid(type_expr="")
 
 
-class TestStructValidator(unittest.TestCase):
-    """Construction and field validation tests for StructValidator."""
+class TestValidationRule(unittest.TestCase):
+    """Construction and field validation tests for ValidationRule."""
 
-    def make_valid(self, **overrides) -> StructValidator:
+    def make_valid(self, **overrides) -> ValidationRule:
         kwargs = dict(
             rule="description must not exceed 3 sentences",
             domain_origin="Descriptions should be concise and scannable",
         )
         kwargs.update(overrides)
-        return StructValidator(**kwargs)
+        return ValidationRule(**kwargs)
 
     # --- Construction ---
 
@@ -122,7 +122,7 @@ class TestComponentStructure(unittest.TestCase):
     def test_with_model_validators(self):
         c = self.make_valid(
             model_validators=[
-                StructValidator(
+                ValidationRule(
                     rule="at least one action item required",
                     domain_origin="Meetings should produce actionable outcomes",
                 ),

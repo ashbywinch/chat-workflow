@@ -22,36 +22,41 @@ from pathlib import Path
 # the same way `python -m unittest` does.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from tests.evals import fixtures  # noqa: E402
+from tests.evals import fixtures  # noqa: E402 — follows the sys.path insert above
 
-FACTORIES = [
-    "meeting_minutes_deliverable",
-    "meeting_notes_resource",
-    "family_dietary_preferences",
-    "weekly_meal_plan_deliverable",
-    "weekly_menu_deliverable",
-    "meal_planning_analysis",
-    "meeting_analysis",
-    "weekly_meal_plan_spec",
-    "minutes_draft_spec",
-    "meeting_minutes_spec",
-]
+
+class FixtureCatalogue:
+    """The fixture factories whose output every eval input must satisfy."""
+
+    NAMES = [
+        "meeting_minutes_deliverable",
+        "meeting_notes_resource",
+        "family_dietary_preferences",
+        "weekly_meal_plan_deliverable",
+        "weekly_menu_deliverable",
+        "meal_planning_analysis",
+        "meeting_analysis",
+        "weekly_meal_plan_spec",
+        "minutes_draft_spec",
+        "meeting_minutes_spec",
+    ]
 
 
 def main() -> int:
     failures = 0
-    for name in FACTORIES:
+    for name in FixtureCatalogue.NAMES:
         factory = getattr(fixtures, name)
         try:
             factory()
-        except Exception as exc:  # noqa: BLE001 - report, do not stop
+        # lucidlint: ignore broad-except each factory validates a different model; report every failure, keep going
+        except Exception as exc:  # noqa: BLE001 — report, do not stop
             failures += 1
             print(f"FAIL {name}: {exc}\n")
             if "--traceback" in sys.argv:
                 traceback.print_exc()
         else:
             print(f"OK   {name}")
-    print(f"\n{len(FACTORIES) - failures}/{len(FACTORIES)} fixtures valid")
+    print(f"\n{len(FixtureCatalogue.NAMES) - failures}/{len(FixtureCatalogue.NAMES)} fixtures valid")
     return 1 if failures else 0
 
 

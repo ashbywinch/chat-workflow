@@ -75,7 +75,7 @@ class TestCodeGeneratorModule(unittest.TestCase):
 
     def test_code_generator_module_import(self):
         """chat_workflow.code_generator should be importable."""
-        from chat_workflow.code_generator import generate_code  # noqa: F401
+        from chat_workflow.code_generator import FieldSpec, generate_code  # noqa: F401
 
     def test_generate_code_function_exists(self):
         """generate_code should be a callable function."""
@@ -103,11 +103,11 @@ class TestCodeGeneratorModule(unittest.TestCase):
 
     def test_generate_code_accepts_class_def_kwargs(self):
         """generate_code should accept keyword arguments for class construction."""
-        from chat_workflow.code_generator import generate_code
+        from chat_workflow.code_generator import FieldSpec, generate_code
 
         result = generate_code(
             class_name="MyModel",
-            fields=[("name", "str"), ("value", "int")],
+            fields=[FieldSpec(name="name", field_type="str"), FieldSpec(name="value", field_type="int")],
         )
         self.assertIsInstance(result, str)
         self.assertIn("class MyModel:", result)
@@ -441,7 +441,7 @@ class TestClassGenerator(unittest.TestCase):
 
     def test_generate_class_import(self):
         """generate_class should be importable from chat_workflow.code_generator."""
-        from chat_workflow.code_generator import generate_class  # noqa: F401
+        from chat_workflow.code_generator import FieldSpec, generate_class  # noqa: F401
 
     def test_generate_class_is_callable(self):
         """generate_class should be a callable function."""
@@ -451,17 +451,17 @@ class TestClassGenerator(unittest.TestCase):
 
     def test_generate_class_returns_string(self):
         """generate_class should return a string."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "test", "type": "str", "desc": "A test field"}]
+        fields = [FieldSpec(name="test", field_type="str", description="A test field")]
         result = generate_class("TestEntity", fields)
         self.assertIsInstance(result, str)
 
     def test_generate_class_contains_class_definition(self):
         """Generated code should contain 'class TestEntity(InteractiveEntity):'."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "test", "type": "str", "desc": "A test field"}]
+        fields = [FieldSpec(name="test", field_type="str", description="A test field")]
         result = generate_class("TestEntity", fields)
         self.assertIn("class TestEntity(InteractiveEntity):", result)
 
@@ -469,18 +469,18 @@ class TestClassGenerator(unittest.TestCase):
         """Generated code should be syntactically valid Python."""
         import libcst as cst
 
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "test", "type": "str", "desc": "A test field"}]
+        fields = [FieldSpec(name="test", field_type="str", description="A test field")]
         result = generate_class("TestEntity", fields)
         tree = cst.parse_module(result)
         self.assertIsNotNone(tree)
 
     def test_generate_class_includes_imports(self):
         """Generated code should include required imports."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "test", "type": "str", "desc": "A test field"}]
+        fields = [FieldSpec(name="test", field_type="str", description="A test field")]
         result = generate_class("TestEntity", fields)
         self.assertIn("from __future__ import annotations", result)
         self.assertIn("from pydantic import", result)
@@ -488,11 +488,11 @@ class TestClassGenerator(unittest.TestCase):
 
     def test_generate_class_includes_fields(self):
         """Generated code should include the specified fields with Field descriptors."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
         fields = [
-            {"name": "name", "type": "str", "desc": "The name"},
-            {"name": "count", "type": "int", "desc": "The count"},
+            FieldSpec(name="name", field_type="str", description="The name"),
+            FieldSpec(name="count", field_type="int", description="The count"),
         ]
         result = generate_class("TestEntity", fields)
         self.assertIn('name: str = Field(..., description="The name")', result)
@@ -500,9 +500,9 @@ class TestClassGenerator(unittest.TestCase):
 
     def test_generate_class_includes_validation_rules(self):
         """Generated code should include _validation_rules class attribute."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class(
             "TestEntity",
             fields,
@@ -513,18 +513,18 @@ class TestClassGenerator(unittest.TestCase):
 
     def test_generate_class_includes_model_validator(self):
         """Generated code should include a model_validator method."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn("model_validator", result)
         self.assertIn("validate_business_rules", result)
 
     def test_generate_class_includes_workflow_classmethod(self):
         """Generated code should include a generate_from_chat classmethod."""
-        from chat_workflow.code_generator import generate_class
+        from chat_workflow.code_generator import FieldSpec, generate_class
 
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn("generate_from_chat", result)
         self.assertIn("atomic_workflow_step", result)

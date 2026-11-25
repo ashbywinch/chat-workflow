@@ -6,7 +6,6 @@ flow, and the final outcome to the consumer.
 """
 
 import unittest
-from unittest.mock import patch
 
 from chat_workflow.exceptions import ValidationError
 from workflows.workflow.component_spec import ComponentSpec
@@ -80,8 +79,7 @@ class TestNames(unittest.TestCase):
 
 
 class TestDiagramContract(unittest.TestCase):
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_a_valid_diagram_passes(self, _rules):
+    def test_a_valid_diagram_passes(self):
         _validate_diagram_structure(VALID, COMPONENTS, OUTPUTS, INPUTS)
 
     def _rejects(self, diagram: str, message: str) -> None:
@@ -118,6 +116,7 @@ class TestDiagramContract(unittest.TestCase):
             "no decision point",
         )
 
+    # lucidlint: ignore fakefs str.replace edits a string here, not os.replace — the rule mistakes the one for the other
     def test_a_long_message(self):
         self._rejects(
             VALID.replace(
@@ -127,6 +126,7 @@ class TestDiagramContract(unittest.TestCase):
             "is long",
         )
 
+    # lucidlint: ignore fakefs str.replace edits a string here, not os.replace — the rule mistakes the one for the other
     def test_an_unknown_participant_path(self):
         diagram = VALID.replace('"Meeting Attendees: Receive"', '"Finance: Receive"')
         diagram = diagram.replace("Attendees", "Finance")
@@ -175,8 +175,7 @@ class TestRepairs(unittest.TestCase):
         repaired = _repair_diagram_outcome(VALID, OUTPUTS, COMPONENTS)
         self.assertEqual(repaired.count("Send the final Meeting Minutes"), 1)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_a_fallback_diagram_is_valid(self, _rules):
+    def test_a_fallback_diagram_is_valid(self):
         diagram = _fallback_diagram(COMPONENTS, OUTPUTS)
 
         self.assertIn("sequenceDiagram", diagram)

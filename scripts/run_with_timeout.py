@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 
@@ -38,8 +39,6 @@ def main() -> int:
         print("No command specified", file=sys.stderr)
         return 2
 
-    import threading
-
     _env = dict(os.environ)
     _env["PYTHONUNBUFFERED"] = "1"
     process = subprocess.Popen(
@@ -50,18 +49,20 @@ def main() -> int:
         env=_env,
     )
 
-    def _stream() -> None:
+    def _stream(chunk_bytes: int = 4096) -> None:
         """Forward raw chunks as they arrive, not line-buffered.
 
         unittest's default output is a stream of dots with no newlines; a
         readline() loop would hold them until the next failure or test name.
-        Reading the pipe directly makes the run legible while it is happening.
+        Reading the pipe directly in 4 KiB chunks makes the run legible while
+        it is happening: small enough to surface output promptly, large enough
+        not to issue one syscall per byte.
         """
         assert process.stdout is not None
         fd = process.stdout.fileno()
         while True:
             try:
-                chunk = os.read(fd, 4096)
+                chunk = os.read(fd, chunk_bytes)
             except OSError:
                 break
             if not chunk:
@@ -93,11 +94,14 @@ def main() -> int:
         total_tok = 0
         total_s = 0.0
         for line in report_path.read_text().strip("\n").split("\n"):
-            m = re.match(r"\s+\[(.+?)\]\s+([\d.]+)s\s+(\d+)\s+tok", line)
+            m = re.match(
+                r"\s+\[(?P<name>.+?)\]\s+(?P<seconds>[\d.]+)s\s+(?P<tokens>\d+)\s+tok",
+                line,
+            )
             if m:
-                entries.append(m.group(1))
-                total_s += float(m.group(2))
-                total_tok += int(m.group(3))
+                entries.append(m.group("name"))
+                total_s += float(m.group("seconds"))
+                total_tok += int(m.group("tokens"))
         if entries:
             tag = "⏰ PARTIAL (timed out)" if timed_out else "✓"
             print(

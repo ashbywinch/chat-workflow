@@ -2,7 +2,6 @@
 
 import types
 import unittest
-from unittest.mock import patch
 
 from chat_workflow_cli.cli import (
     _build_workflow_sub_app,
@@ -42,16 +41,16 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
         def wf_func():
             pass
 
-        wf_func._is_workflow = True  # type: ignore[attr-defined]
+        wf_func._is_workflow = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow
 
         def plain_func():
             pass
 
-        module.wf_func = wf_func  # type: ignore[attr-defined]
-        module.plain_func = plain_func  # type: ignore[attr-defined]
+        module.wf_func = wf_func  # type: ignore[attr-defined]  # a module is built by hand for the test
+        module.plain_func = plain_func  # type: ignore[attr-defined]  # a module is built by hand for the test
 
         result = discover_workflow_functions(module)
-        self.assertEqual(result, {"wf_func": wf_func})
+        self.assertEqual([(command.name, command.func) for command in result], [("wf_func", wf_func)])
 
     def test_empty_when_no_workflow_functions(self):
         module = types.ModuleType("test_mod")
@@ -59,32 +58,30 @@ class TestDiscoverWorkflowFunctions(unittest.TestCase):
         def plain_func():
             pass
 
-        module.plain_func = plain_func  # type: ignore[attr-defined]
+        module.plain_func = plain_func  # type: ignore[attr-defined]  # a module is built by hand for the test
 
         result = discover_workflow_functions(module)
-        self.assertEqual(result, {})
+        self.assertEqual(result, [])
 
     def test_empty_module(self):
         module = types.ModuleType("empty_mod")
         result = discover_workflow_functions(module)
-        self.assertEqual(result, {})
+        self.assertEqual(result, [])
 
 
 class TestBuildWorkflowSubApp(unittest.TestCase):
     """_build_workflow_sub_app wraps a module's @workflow functions into a Typer sub-app."""
 
     def test_import_error_returns_none(self):
-        with patch("chat_workflow_cli.cli.importlib.import_module", side_effect=ImportError("no such module")):
-            result = _build_workflow_sub_app("nonexistent")
-            self.assertIsNone(result)
+        def failing_importer(name):
+            raise ImportError(f"no such module: {name}")
+
+        self.assertIsNone(_build_workflow_sub_app("nonexistent", importer=failing_importer))
 
     def test_no_workflow_functions_returns_none(self):
         fake_module = types.ModuleType("fake_workflow")
-        with (
-            patch("chat_workflow_cli.cli.importlib.import_module", return_value=fake_module),
-        ):
-            result = _build_workflow_sub_app("empty_workflow")
-            self.assertIsNone(result)
+        result = _build_workflow_sub_app("empty_workflow", importer=lambda name: fake_module)
+        self.assertIsNone(result)
 
     def test_creates_sub_app_with_command(self):
         fake_module = types.ModuleType("fake_workflow")
@@ -92,12 +89,11 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
         def my_workflow(context: str = "", *, tools):
             pass
 
-        my_workflow._is_workflow = True  # type: ignore[attr-defined]
+        my_workflow._is_workflow = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow
 
-        fake_module.my_workflow = my_workflow  # type: ignore[attr-defined]
+        fake_module.my_workflow = my_workflow  # type: ignore[attr-defined]  # a module is built by hand for the test
 
-        with patch("chat_workflow_cli.cli.importlib.import_module", return_value=fake_module):
-            sub_app = _build_workflow_sub_app("test_workflow")
+        sub_app = _build_workflow_sub_app("test_workflow", importer=lambda name: fake_module)
 
         self.assertIsNotNone(sub_app)
         self.assertEqual(len(sub_app.registered_commands), 1)
@@ -108,22 +104,24 @@ class TestBuildWorkflowSubApp(unittest.TestCase):
 class TestDiscoverWorkflows(unittest.TestCase):
     """discover_workflows finds subdirectories with __init__.py."""
 
+    # lucidlint: ignore fakefs the subject is the checked-in workflows/ tree this repo ships
     def test_returns_workflow_dirs(self):
         """When run from the actual project root, the evaluation_criteria workflow should be found."""
         from chat_workflow_cli.cli import discover_workflows
 
-        result = discover_workflows()
-        self.assertIn("evaluation_criteria", result)
-        path = result["evaluation_criteria"]
+        modules = {module.name: module for module in discover_workflows()}
+        self.assertIn("evaluation_criteria", modules)
+        path = modules["evaluation_criteria"].path
         self.assertTrue(path.is_dir())
         self.assertTrue((path / "__init__.py").exists())
 
+    # lucidlint: ignore fakefs the subject is the checked-in workflows/ tree this repo ships
     def test_skips_non_package_dirs(self):
         """Subdirectories without __init__.py are not workflows."""
         from chat_workflow_cli.cli import discover_workflows
 
-        result = discover_workflows()
-        self.assertNotIn("__pycache__", result)
+        names = {module.name for module in discover_workflows()}
+        self.assertNotIn("__pycache__", names)
 
 
 if __name__ == "__main__":

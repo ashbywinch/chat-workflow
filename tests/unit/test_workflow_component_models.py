@@ -2,9 +2,9 @@
 
 import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
+from pyfakefs.fake_filesystem_unittest import Patcher
 
 from chat_workflow.mixins import get_blob_fields
 from workflows.workflow.component import Component
@@ -79,8 +79,8 @@ class TestWorkflowModel(unittest.TestCase):
 
     def test_materialize_blobs(self):
         wf = self.make_valid_workflow()
-        with TemporaryDirectory() as tmpdir:
-            wf.materialize_blobs(Path(tmpdir))
+        with Patcher():
+            wf.materialize_blobs(Path("/workflows"))
             path = wf.get_blob_path("diagram")
             self.assertIsNotNone(path)
             self.assertTrue(path.exists())

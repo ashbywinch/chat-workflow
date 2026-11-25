@@ -12,6 +12,8 @@ Mirrors the pattern from workflows/evaluation_criteria/evaluation_criteria.py:43
 which uses Self as a classmethod return type.
 """
 
+# lucidlint: ignore-file fakefs importlib execs the temp module this test writes, which needs a real file
+
 import importlib.util
 import os
 import sys

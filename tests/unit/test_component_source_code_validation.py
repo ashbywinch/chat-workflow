@@ -8,8 +8,11 @@ Tests the @model_validator(mode="after") on ComponentSourceCode that checks:
 Also tests that new _validation_rules entries are collected.
 """
 
+# lucidlint: ignore-file fakefs validating a component runs `ruff` as a subprocess over the candidate
+# module (reading this repo's pyproject.toml) and resolves each generated import with
+# importlib.util.find_spec — a faked filesystem would defeat exactly what these tests assert
+
 import unittest
-from unittest.mock import patch
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -28,6 +31,16 @@ from tests.sample_code import (
     VALID_COMPONENT_CODE,
 )
 from workflows.workflow.component_source_code import ComponentSourceCode
+
+
+class _DeterministicOnly(ComponentSourceCode):
+    """The real model with the LLM judge switched off at its documented seam.
+
+    These tests assert the deterministic rules; a judge call would need an API
+    key and would answer the wrong question.
+    """
+
+    _skip_llm_validation = True
 
 
 class TestSourceLines(unittest.TestCase):
@@ -70,21 +83,19 @@ class TestSourceLines(unittest.TestCase):
 class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
     """Tests for the programmatic @model_validator on ComponentSourceCode."""
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_valid_code_passes_validation(self, mock_collect):
+    def test_valid_code_passes_validation(self):
         """Valid code with one BaseModel and @atomic_workflow_step should pass."""
-        component = ComponentSourceCode(code=VALID_COMPONENT_CODE)
+        component = _DeterministicOnly(code=VALID_COMPONENT_CODE)
         self.assertIn("class MinutesDraft", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_ruff_violation_is_reported_with_rule_and_line(self, mock_collect):
+    def test_ruff_violation_is_reported_with_rule_and_line(self):
         """A generated ruff error must name the rule and line, not just fail."""
         from chat_workflow.exceptions import ValidationError
 
         # E501 is not auto-fixed by `_ruff_fix`, so it reaches validation.
         code = VALID_COMPONENT_CODE + "\n# " + "x" * 130 + "\n"
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         message = str(ctx.exception)
         self.assertIn("Generated code must pass `ruff check`", message)
@@ -92,54 +103,47 @@ class TestComponentSourceCodeProgrammaticValidation(unittest.TestCase):
         self.assertIn("x" * 20, message)
         self.assertRegex(message, r"line \d+: '# x")
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_invalid_syntax_raises_validation_error(self, mock_collect):
+    def test_invalid_syntax_raises_validation_error(self):
         """Invalid Python syntax should raise ValidationError."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=INVALID_SYNTAX_CODE)
+            _DeterministicOnly(code=INVALID_SYNTAX_CODE)
 
         self.assertIn("not valid Python", str(ctx.exception))
         self.assertIn("Offending line", str(ctx.exception))
         self.assertIn("plain ASCII Python", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_no_basemodel_raises_validation_error(self, mock_collect):
+    def test_no_basemodel_raises_validation_error(self):
         """Code with no BaseModel subclass should raise ValidationError."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=NO_BASEMODEL_CODE)
+            _DeterministicOnly(code=NO_BASEMODEL_CODE)
 
         self.assertIn("at least one BaseModel", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_multiple_basemodels_raises_validation_error(self, mock_collect):
+    def test_multiple_basemodels_raises_validation_error(self):
         """Code with multiple independent BaseModel subclasses should raise."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=MULTIPLE_BASEMODEL_CODE)
+            _DeterministicOnly(code=MULTIPLE_BASEMODEL_CODE)
 
         self.assertIn("multiple BaseModel", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_no_atomic_workflow_step_raises_validation_error(self, mock_collect):
+    def test_no_atomic_workflow_step_raises_validation_error(self):
         """Code without @atomic_workflow_step decorator should raise ValidationError."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=NO_WORKFLOW_CODE)
+            _DeterministicOnly(code=NO_WORKFLOW_CODE)
 
         self.assertIn("at least one public method", str(ctx.exception))
 
 
 class TestSessionPromptPlacement(unittest.TestCase):
     """The framework supplies the session wrapper; generated steps follow it."""
-
-    class _DeterministicOnly(ComponentSourceCode):
-        _skip_llm_validation = True
 
     def test_protocol_text_in_a_step_docstring_is_rejected(self):
         from chat_workflow.exceptions import ValidationError
@@ -149,7 +153,7 @@ class TestSessionPromptPlacement(unittest.TestCase):
             "Return JSON with intent and result.",
         )
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            self._DeterministicOnly(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("response protocol", str(ctx.exception))
 
@@ -158,7 +162,7 @@ class TestSessionPromptPlacement(unittest.TestCase):
 
         code = VALID_COMPONENT_CODE + "\n\nclass SessionComponent:\n    pass\n"
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            self._DeterministicOnly(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("must not define a SessionComponent", str(ctx.exception))
 
@@ -167,7 +171,7 @@ class TestSessionPromptPlacement(unittest.TestCase):
 
         code = VALID_COMPONENT_CODE.replace("def create(", "def greet(")
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            self._DeterministicOnly(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("greeting or closing", str(ctx.exception))
 
@@ -251,79 +255,68 @@ class Draft(LLMValidated):
 class TestPrimaryArtifactRule(unittest.TestCase):
     """One primary artifact; nested BaseModels are allowed when used as fields."""
 
-    class _DeterministicOnly(ComponentSourceCode):
-        """Skip the LLM judge; the rule itself must still run."""
-
-        _skip_llm_validation = True
-
     def test_rule_runs_in_model_validation_without_judge(self):
         """The check is part of the component's validation, not the test harness."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            self._DeterministicOnly(code=SECOND_ARTIFACT_CODE)
+            _DeterministicOnly(code=SECOND_ARTIFACT_CODE)
 
         self.assertIn("outside the primary artifact", str(ctx.exception))
         self.assertIn("Invoice", str(ctx.exception))
 
     def test_nested_basemodel_passes_in_model_validation(self):
         """Nested models are accepted by the component's own validation."""
-        component = self._DeterministicOnly(code=NESTED_BASEMODEL_CODE)
+        component = _DeterministicOnly(code=NESTED_BASEMODEL_CODE)
 
         self.assertIn("class ActionItem", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_nested_basemodel_is_allowed(self, mock_collect):
+    def test_nested_basemodel_is_allowed(self):
         """A BaseModel used as a field of the primary model is not an artifact."""
-        component = ComponentSourceCode(code=NESTED_BASEMODEL_CODE)
+        component = _DeterministicOnly(code=NESTED_BASEMODEL_CODE)
 
         self.assertIn("class ActionItem", component.code)
         self.assertIn("class MinutesDraft", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_second_independent_artifact_is_rejected(self, mock_collect):
+    def test_second_independent_artifact_is_rejected(self):
         """A BaseModel not reachable from the primary model is a second artifact."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=SECOND_ARTIFACT_CODE)
+            _DeterministicOnly(code=SECOND_ARTIFACT_CODE)
 
         self.assertIn("outside the primary artifact", str(ctx.exception))
         self.assertIn("Invoice", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_multiple_return_types_are_rejected(self, mock_collect):
+    def test_multiple_return_types_are_rejected(self):
         """Independent returned models mean two artifacts."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=MULTIPLE_RETURN_TYPES_CODE)
+            _DeterministicOnly(code=MULTIPLE_RETURN_TYPES_CODE)
 
         self.assertIn("independent BaseModel types", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_create_and_update_on_one_artifact_are_allowed(self, mock_collect):
+    def test_create_and_update_on_one_artifact_are_allowed(self):
         """A component's methods may create and update the same artifact."""
-        component = ComponentSourceCode(code=CREATE_UPDATE_CODE)
+        component = _DeterministicOnly(code=CREATE_UPDATE_CODE)
 
         self.assertIn("def create", component.code)
         self.assertIn("def update", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_auxiliary_return_type_is_not_a_second_artifact(self, mock_collect):
+    def test_auxiliary_return_type_is_not_a_second_artifact(self):
         """A helper type a method returns is not the component's artifact."""
-        component = ComponentSourceCode(code=AUXILIARY_RETURN_CODE)
+        component = _DeterministicOnly(code=AUXILIARY_RETURN_CODE)
 
         self.assertIn("class RevisionSummary", component.code)
         self.assertIn("class MeetingMinutes", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_multi_artifact_code_is_rejected(self, mock_collect):
+    def test_multi_artifact_code_is_rejected(self):
         """Two independent artifacts with no single returned primary are rejected."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=MULTI_ARTIFACT_CODE)
+            _DeterministicOnly(code=MULTI_ARTIFACT_CODE)
 
         self.assertIn("multiple BaseModel subclasses", str(ctx.exception))
 
@@ -331,8 +324,7 @@ class TestPrimaryArtifactRule(unittest.TestCase):
 class TestDeterministicConstraints(unittest.TestCase):
     """Schema-supported constraints are filled in or rejected deterministically."""
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_required_str_gets_min_length(self, mock_collect):
+    def test_required_str_gets_min_length(self):
         """A required str field without min_length is normalised to min_length=1."""
         code = VALID_COMPONENT_CODE.replace(
             '..., description="When the meeting took place", min_length=1',
@@ -340,34 +332,31 @@ class TestDeterministicConstraints(unittest.TestCase):
         )
         self.assertNotIn('min_length=1\n    )\n    attendees', code)
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn('description="When the meeting took place", min_length=1', component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_field_without_ellipsis_gets_min_length(self, mock_collect):
+    def test_field_without_ellipsis_gets_min_length(self):
         """A required Field(description=...) with no default is still required."""
         code = VALID_COMPONENT_CODE.replace(
             '..., description="When the meeting took place", min_length=1',
             'description="When the meeting took place"',
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn('description="When the meeting took place", min_length=1', component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_explicit_min_length_zero_is_preserved(self, mock_collect):
+    def test_explicit_min_length_zero_is_preserved(self):
         """min_length=0 means empty is allowed and must not be rewritten."""
         code = VALID_COMPONENT_CODE.replace("min_length=1", "min_length=0")
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertNotIn("min_length=1", component.code)
         self.assertIn("min_length=0", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_workflow_docstring_repeating_class_docstring_is_rejected(self, mock_collect):
+    def test_workflow_docstring_repeating_class_docstring_is_rejected(self):
         """A shared phrase between the class and workflow docstrings is duplication."""
         from chat_workflow.exceptions import ValidationError
 
@@ -391,12 +380,11 @@ class MinutesDraft(BaseModel):
 '''
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("repeats the class docstring", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_workflow_docstring_repeating_field_description_is_rejected(self, mock_collect):
+    def test_workflow_docstring_repeating_field_description_is_rejected(self):
         """A shared phrase with a field description is duplication too."""
         from chat_workflow.exceptions import ValidationError
 
@@ -421,12 +409,11 @@ class MinutesDraft(BaseModel):
 '''
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("description of field 'key_decisions'", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_shared_phrase_across_a_sentence_boundary_is_allowed(self, mock_collect):
+    def test_shared_phrase_across_a_sentence_boundary_is_allowed(self):
         """Punctuation is a boundary: two sentences are not a repeated phrase."""
         code = VALID_COMPONENT_CODE.replace(
             'meeting_date: str = Field(\n'
@@ -443,24 +430,22 @@ class MinutesDraft(BaseModel):
             '"""It may be the user owner. Ask who is accountable. Start from what',
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn("It may be the user owner", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_ruff_autofix_removes_unused_imports(self, mock_collect):
+    def test_ruff_autofix_removes_unused_imports(self):
         """Mechanical ruff fixes are applied, not pushed back to the model."""
         code = VALID_COMPONENT_CODE.replace(
             "from chat_workflow import atomic_workflow_step",
             "import os\nfrom chat_workflow import atomic_workflow_step",
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertNotIn("import os", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_unfixable_ruff_violation_is_rejected(self, mock_collect):
+    def test_unfixable_ruff_violation_is_rejected(self):
         """Ruff violations it cannot fix (long lines) still fail validation."""
         from chat_workflow.exceptions import ValidationError
 
@@ -471,26 +456,24 @@ class MinutesDraft(BaseModel):
         )
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("ruff", str(ctx.exception))
         self.assertIn("E501", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_legacy_framework_import_is_rewritten(self, mock_collect):
+    def test_legacy_framework_import_is_rewritten(self):
         """The old path has an exact replacement, so it is fixed, not rejected."""
         code = VALID_COMPONENT_CODE.replace(
             "from chat_workflow import atomic_workflow_step",
             "from chat_workflow.workflow import atomic_workflow_step",
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn("from chat_workflow import atomic_workflow_step", component.code)
         self.assertNotIn("chat_workflow.workflow", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_an_invented_dependency_is_still_rejected(self, mock_collect):
+    def test_an_invented_dependency_is_still_rejected(self):
         """Rewriting is for known aliases only; a made-up package still fails."""
         from chat_workflow.exceptions import ValidationError
 
@@ -500,30 +483,28 @@ class MinutesDraft(BaseModel):
         )
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("invented_package_xyz", str(ctx.exception))
 
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_noop_model_validator_is_rejected(self, mock_collect):
+    def test_noop_model_validator_is_rejected(self):
         """A validator that only does `pass` enforces nothing."""
         from chat_workflow.exceptions import ValidationError
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=NOOP_VALIDATOR_CODE)
+            _DeterministicOnly(code=NOOP_VALIDATOR_CODE)
 
         self.assertIn("no-op 'pass'", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_a_tuple_description_is_joined(self, mock_collect):
+    def test_a_tuple_description_is_joined(self):
         """A wrapped description with commas is a tuple, not concatenation."""
         code = VALID_COMPONENT_CODE.replace(
             'description="When the meeting took place"',
             'description=("When the meeting took place", "in local time")',
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn(
             'description="When the meeting took place in local time"', component.code
@@ -585,15 +566,14 @@ class MinutesDraft(BaseModel):
         self.assertIn('"Summary — of the meeting", min_length=1)', fixed)
         compile(fixed, "generated", "exec")
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_wrapped_line_with_a_non_ascii_character_still_fits(self, mock_collect):
+    def test_wrapped_line_with_a_non_ascii_character_still_fits(self):
         """A non-ASCII character costs six characters once escaped."""
         description = "Summary of the meeting — " + "decision " * 20
         code = VALID_COMPONENT_CODE.replace(
             '"A short description."', f'"{description.strip()}"'
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         compile(component.code, "generated", "exec")
         self.assertTrue(
@@ -601,8 +581,7 @@ class MinutesDraft(BaseModel):
             "every wrapped line must fit the limit",
         )
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_field_validator_self_is_renamed_to_cls(self, mock_collect):
+    def test_field_validator_self_is_renamed_to_cls(self):
         """A field validator receives the class; `self` raises at import."""
         code = VALID_COMPONENT_CODE.replace(
             "from pydantic import BaseModel, Field",
@@ -616,14 +595,13 @@ class MinutesDraft(BaseModel):
             1,
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn("def _check_date(cls, value: str)", component.code)
         self.assertNotIn("def _check_date(self", component.code)
         self.assertIn("@classmethod", component.code)
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_model_validator_with_field_name_is_rejected(self, mock_collect):
+    def test_model_validator_with_field_name_is_rejected(self):
         """`@model_validator('field')` parses but fails at import time."""
         from chat_workflow.exceptions import ValidationError
 
@@ -640,12 +618,11 @@ class MinutesDraft(BaseModel):
         )
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("@field_validator('meeting_date')", str(ctx.exception))
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_long_field_call_is_wrapped(self, mock_collect):
+    def test_long_field_call_is_wrapped(self):
         """A long single-line Field(...) is split at its arguments."""
         long_description = (
             "The date the meeting took place, written at the top of the first "
@@ -658,7 +635,7 @@ class MinutesDraft(BaseModel):
             f'    meeting_date: str = Field(..., description="{long_description}", min_length=1)',
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertIn("Field(\n", component.code)
         self.assertNotIn(
@@ -666,8 +643,7 @@ class MinutesDraft(BaseModel):
             component.code,
         )
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_long_validation_rule_is_wrapped(self, mock_collect):
+    def test_long_validation_rule_is_wrapped(self):
         """A long `_validation_rules` entry is split like a long Field string."""
         long_rule = (
             "The raw notes should be sufficiently clear that a person can "
@@ -679,7 +655,7 @@ class MinutesDraft(BaseModel):
             f'"{long_rule}",',
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertNotIn(f'"{long_rule}"', component.code)
         self.assertIn("The raw notes should be sufficiently clear", component.code)
@@ -688,8 +664,7 @@ class MinutesDraft(BaseModel):
             "every wrapped line must fit the limit",
         )
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_long_string_inside_multiline_field_is_wrapped(self, mock_collect):
+    def test_long_string_inside_multiline_field_is_wrapped(self):
         """A long description segment inside a wrapped Field is split too."""
         long_description = (
             "The date the meeting took place, written at the top of the first "
@@ -706,7 +681,7 @@ class MinutesDraft(BaseModel):
             '    )',
         )
 
-        component = ComponentSourceCode(code=code)
+        component = _DeterministicOnly(code=code)
 
         self.assertNotIn(f'description="{long_description}"', component.code)
         self.assertIn("The date the meeting took place", component.code)
@@ -715,8 +690,7 @@ class MinutesDraft(BaseModel):
             "every wrapped line must fit the limit",
         )
 
-    @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-    def test_private_validation_rules_are_rejected(self, mock_collect):
+    def test_private_validation_rules_are_rejected(self):
         """An annotated list[str] is a Pydantic private attribute, not a rule."""
         from chat_workflow.exceptions import ValidationError
 
@@ -725,7 +699,7 @@ class MinutesDraft(BaseModel):
         )
 
         with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=code)
+            _DeterministicOnly(code=code)
 
         self.assertIn("ClassVar[list[str]]", str(ctx.exception))
 

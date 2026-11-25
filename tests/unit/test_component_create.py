@@ -4,11 +4,17 @@ The phase steps are model conversations; this test replaces them and checks
 the wiring: the record, the output file, and the legacy path.
 """
 
+# lucidlint: ignore-file monkeypatch Component.create constructs ComponentDomainSpec, ComponentStructure,
+# ComponentInteractionContext, ComponentSourceCode and calls verify_code in its own body — there is no
+# injectable seam for that pipeline, and changing production is out of scope here
+
 import tempfile
 import unittest
 from pathlib import Path
 from typing import override
 from unittest.mock import patch
+
+from pyfakefs.fake_filesystem_unittest import TestCase
 
 from chat_workflow import Session, SessionLog
 from chat_workflow.session import UserIO
@@ -70,7 +76,11 @@ class _Generated:
 
 
 @patch("chat_workflow.mixins.LLMValidated.collect_all_rules", return_value=[])
-class TestComponentCreate(unittest.TestCase):
+class TestComponentCreate(TestCase):
+    @override
+    def setUp(self) -> None:
+        self.setUpPyfakefs()
+
     @patch("workflows.workflow.component.verify_code", return_value="clean code")
     @patch("workflows.workflow.component.ComponentSourceCode")
     @patch("workflows.workflow.component.ComponentInteractionContext")

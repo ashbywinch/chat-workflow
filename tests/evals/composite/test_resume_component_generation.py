@@ -10,6 +10,8 @@ Environment:
     RESUME_NAMES  Optional comma-separated component names to resume
 """
 
+# lucidlint: ignore-file fakefs Component.create's write of generated Python is the behaviour under test
+
 import json
 import os
 import tempfile

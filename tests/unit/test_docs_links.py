@@ -1,3 +1,5 @@
+# lucidlint: ignore-file fakefs the subject is the checked-in README/AGENTS/docs tree this repo ships
+
 import re
 import unittest
 from pathlib import Path

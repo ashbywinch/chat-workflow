@@ -208,3 +208,6 @@ class TestEndToEndGeneratedComponent(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+# File-level suppression sits at the end so the pyrefly baseline's line numbers stay stable.
+# lucidlint: ignore-file fakefs generated Python is written to a temp dir and imported; the loader needs a real file

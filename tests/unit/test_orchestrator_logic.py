@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+
+# lucidlint: ignore-file monkeypatch the decorated step builds its own Conversation, so _call_llm is the only model seam
+
 import unittest
 from unittest.mock import Mock, patch
 
@@ -452,16 +455,16 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
 
 
 class TestAutoParamInjection(unittest.TestCase):
-    """Tests for automatic parameter injection via _build_params_section."""
+    """Tests for automatic parameter injection via build_params_section."""
 
-    def test_build_params_section_basic_params(self):
+    def testbuild_params_section_basic_params(self):
         """Params without Annotated metadata show type, name, and value."""
-        from chat_workflow.prompt_builder import _build_params_section
+        from chat_workflow.prompt_builder import build_params_section
 
         def sample(context: str = "", max_turns: int = 10):
             pass
 
-        section = _build_params_section(sample, {"context": "party", "max_turns": 5})
+        section = build_params_section(sample, {"context": "party", "max_turns": 5})
 
         self.assertIn("## Parameters", section)
         self.assertIn("`context` (str)", section)
@@ -469,11 +472,11 @@ class TestAutoParamInjection(unittest.TestCase):
         self.assertIn("`max_turns` (int)", section)
         self.assertIn("5", section)
 
-    def test_build_params_section_with_annotated(self):
+    def testbuild_params_section_with_annotated(self):
         """Annotated[T, 'desc'] descriptions appear in the output."""
         from typing import Annotated
 
-        from chat_workflow.prompt_builder import _build_params_section
+        from chat_workflow.prompt_builder import build_params_section
 
         def sample(
             context: Annotated[str, "The party theme"] = "",
@@ -481,16 +484,16 @@ class TestAutoParamInjection(unittest.TestCase):
         ):
             pass
 
-        section = _build_params_section(sample, {"context": "birthday"})
+        section = build_params_section(sample, {"context": "birthday"})
 
         self.assertIn("The party theme", section)
         self.assertIn("Turn limit", section)
         self.assertIn("`context` (str)", section)
         self.assertIn("`max_turns` (int)", section)
 
-    def test_build_params_section_excludes_internal(self):
+    def testbuild_params_section_excludes_internal(self):
         """tools, io, state, debug are excluded from the section."""
-        from chat_workflow.prompt_builder import _build_params_section
+        from chat_workflow.prompt_builder import build_params_section
 
         def sample(
             context: str = "",
@@ -500,20 +503,20 @@ class TestAutoParamInjection(unittest.TestCase):
         ):
             pass
 
-        section = _build_params_section(sample, {"context": "test"})
+        section = build_params_section(sample, {"context": "test"})
 
         self.assertIn("context", section)
         self.assertNotIn("session", section)
         self.assertNotIn("debug", section)
 
-    def test_build_params_section_shows_default_when_no_runtime_value(self):
+    def testbuild_params_section_shows_default_when_no_runtime_value(self):
         """When a param is not in kwargs, its default is shown instead."""
-        from chat_workflow.prompt_builder import _build_params_section
+        from chat_workflow.prompt_builder import build_params_section
 
         def sample(max_turns: int = 10):
             pass
 
-        section = _build_params_section(sample, {})
+        section = build_params_section(sample, {})
 
         self.assertIn("Default: 10", section)
 

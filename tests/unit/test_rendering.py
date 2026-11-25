@@ -5,6 +5,11 @@ plain-text format, and the guardrail that stops schema vocabulary, Python
 types, or markup from reaching a user.
 """
 
+# lucidlint: ignore-file monkeypatch the class constructs the real workflow records (Deliverable, Resource,
+# ProcessDefinition, ComponentSpec, ComponentDomainSpec, ComponentStructure) so their own rendering is
+# exercised; the LLM rule judge is stubbed by patching collect_all_rules because those records expose no
+# injectable seam, and rendering, not rule judgement, is the subject
+
 import json
 import unittest
 from typing import Annotated
@@ -35,7 +40,7 @@ from workflows.workflow.models.resource import Resource
 from workflows.workflow.structure import (
     ComponentStructure,
     StructField,
-    StructValidator,
+    ValidationRule,
 )
 
 
@@ -170,7 +175,7 @@ class TestRecordsRenderThemselves(unittest.TestCase):
                     ),
                 ],
                 model_validators=[
-                    StructValidator(
+                    ValidationRule(
                         rule="Every action item has an owner.",
                         domain_origin="A missed owner is a missed task.",
                     ),
@@ -291,13 +296,13 @@ class TestRulesAreProse(unittest.TestCase):
     def test_a_rule_with_a_type_expression_is_rejected(self):
         """A type expression is not a rule; the model must say the words."""
         with self.assertRaises(ValueError):
-            StructValidator(
+            ValidationRule(
                 rule="each action item has a description (str) and an owner (str).",
                 domain_origin="Every action item has an owner.",
             )
 
     def test_a_rule_in_the_user_words_is_accepted(self):
-        validator = StructValidator(
+        validator = ValidationRule(
             rule="every action item has an owner and a due date.",
             domain_origin="Every action item has an owner.",
         )

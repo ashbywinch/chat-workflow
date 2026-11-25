@@ -8,6 +8,8 @@ user bot, then verifies:
 - The conversation quality passes an LLM judge
 """
 
+# lucidlint: ignore-file fakefs the checkpoint under .sisyphus/ is read by the resume eval in another process
+
 import json
 import tempfile
 import unittest

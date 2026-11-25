@@ -23,7 +23,7 @@ class TestInteractionGatheringEval(unittest.TestCase):
             ComponentInteractionContext,
             ComponentStructure,
             StructField,
-            StructValidator,
+            ValidationRule,
         )
 
         domain_spec = ComponentDomainSpec(
@@ -91,11 +91,11 @@ class TestInteractionGatheringEval(unittest.TestCase):
                 ),
             ],
             model_validators=[
-                StructValidator(
+                ValidationRule(
                     rule="Every decision must include enough context to stand on its own",
                     domain_origin=("Someone who missed the meeting can understand what happened without asking"),
                 ),
-                StructValidator(
+                ValidationRule(
                     rule="Every action item must have both an owner and a due date",
                     domain_origin=("An action item names an owner and a due date."),
                 ),

@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import ast
 import os
 import sqlite3
 import subprocess
@@ -21,24 +22,31 @@ import sys
 from collections import deque
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-GRAPH_DB = PROJECT_ROOT / ".code-review-graph" / "graph.db"
-EVAL_DIR = PROJECT_ROOT / "tests" / "evals"
 
-# Files whose changes trigger ALL evals (they're imported by everything).
-UNIVERSAL_DEPS = {
-    "tests/evals/helpers.py",
-    "tests/conftest.py",
-    "tests/__init__.py",
-    "tests/evals/__init__.py",
-}
+class DependencyMap(dict[str, set[str]]):
+    """Eval file relative path -> the source files it transitively imports."""
+
+
+class ProjectLayout:
+    """Where the checkout, its graph DB and the eval suite live."""
+
+    ROOT = Path(__file__).resolve().parent.parent
+    GRAPH_DB = ROOT / ".code-review-graph" / "graph.db"
+    EVAL_DIR = ROOT / "tests" / "evals"
+    # Files whose changes trigger ALL evals (they're imported by everything).
+    UNIVERSAL_DEPS = {
+        "tests/evals/helpers.py",
+        "tests/conftest.py",
+        "tests/__init__.py",
+        "tests/evals/__init__.py",
+    }
 
 
 def get_changed_files(git_base: str) -> list[str]:
     """Get list of changed file paths (relative to project root) since *git_base*."""
     result = subprocess.run(
         ["git", "diff", "--name-only", git_base],
-        capture_output=True, text=True, cwd=PROJECT_ROOT,
+        capture_output=True, text=True, cwd=ProjectLayout.ROOT,
     )
     if result.returncode != 0:
         print(f"Error: git diff failed: {result.stderr.strip()}", file=sys.stderr)
@@ -48,7 +56,7 @@ def get_changed_files(git_base: str) -> list[str]:
 
 def get_all_eval_files() -> list[Path]:
     """Return all ``test_*.py`` files in the evals directory tree."""
-    return sorted(EVAL_DIR.rglob("test_*.py"))
+    return sorted(ProjectLayout.EVAL_DIR.rglob("test_*.py"))
 
 
 def _file_for_qualified(cursor, qualified: str) -> str | None:
@@ -61,17 +69,17 @@ def _file_for_qualified(cursor, qualified: str) -> str | None:
     return row[0] if row else None
 
 
-def get_transitive_dep_map() -> dict[str, set[str]]:
+def get_transitive_dep_map() -> DependencyMap:
     """Build ``{eval_relpath: set(source_relpaths)}`` via BFS on the graph.
 
     For each eval file, follows ``IMPORTS_FROM`` edges transitively so
     that a change to ``llm_interaction.py`` triggers evals that import
     ``atomic_workflow_step.py`` (which imports ``llm_interaction.py``).
     """
-    if not GRAPH_DB.exists():
+    if not ProjectLayout.GRAPH_DB.exists():
         return _fallback_ast_deps()
 
-    conn = sqlite3.connect(str(GRAPH_DB))
+    conn = sqlite3.connect(str(ProjectLayout.GRAPH_DB))
     cursor = conn.cursor()
 
     # Find all eval test files known to the graph
@@ -81,10 +89,10 @@ def get_transitive_dep_map() -> dict[str, set[str]]:
     )
     eval_paths = {row[0] for row in cursor.fetchall()}
 
-    dep_map: dict[str, set[str]] = {}
+    dep_map = DependencyMap()
 
     for eval_path in sorted(eval_paths):
-        rel = os.path.relpath(eval_path, str(PROJECT_ROOT))
+        rel = os.path.relpath(eval_path, str(ProjectLayout.ROOT))
 
         # BFS from every node in this eval file
         cursor.execute(
@@ -116,7 +124,7 @@ def get_transitive_dep_map() -> dict[str, set[str]]:
                     queue.append(target)
                 target_file = _file_for_qualified(cursor, target)
                 if target_file:
-                    target_rel = os.path.relpath(target_file, str(PROJECT_ROOT))
+                    target_rel = os.path.relpath(target_file, str(ProjectLayout.ROOT))
                     sources.add(target_rel)
 
         if sources:
@@ -126,13 +134,11 @@ def get_transitive_dep_map() -> dict[str, set[str]]:
     return dep_map
 
 
-def _fallback_ast_deps() -> dict[str, set[str]]:
+def _fallback_ast_deps() -> DependencyMap:
     """Fallback: parse import statements from eval files (no graph DB)."""
-    import ast
-
-    dep_map: dict[str, set[str]] = {}
+    dep_map = DependencyMap()
     for ef in get_all_eval_files():
-        rel = os.path.relpath(str(ef), str(PROJECT_ROOT))
+        rel = os.path.relpath(str(ef), str(ProjectLayout.ROOT))
         try:
             tree = ast.parse(ef.read_text())
             sources: set[str] = set()
@@ -144,14 +150,15 @@ def _fallback_ast_deps() -> dict[str, set[str]]:
                     sources.add(node.module.replace(".", "/"))
             if sources:
                 dep_map[rel] = sources
-        except SyntaxError:
-            pass
+        except SyntaxError as exc:
+            print(f"skipping unparsable {ef}: {exc}", file=sys.stderr)
+            continue
     return dep_map
 
 
 def find_affected_evals(
     changed_files: list[str],
-    dep_map: dict[str, set[str]],
+    dep_map: DependencyMap,
 ) -> list[str]:
     """Return sorted list of eval file paths affected by *changed_files*.
 
@@ -167,7 +174,7 @@ def find_affected_evals(
 
     # Check universal deps first
     for cf in changed_files:
-        if cf in UNIVERSAL_DEPS or cf.startswith("tests/evals/"):
+        if cf in ProjectLayout.UNIVERSAL_DEPS or cf.startswith("tests/evals/"):
             return all_evals
 
     affected: set[str] = set()
@@ -191,7 +198,7 @@ def find_affected_evals(
     return sorted(affected)
 
 
-def show_dependency_map(dep_map: dict[str, set[str]]) -> None:
+def show_dependency_map(dep_map: DependencyMap) -> None:
     """Pretty-print the transitive dependency map."""
     for eval_path in sorted(dep_map):
         sources = dep_map[eval_path]
@@ -199,6 +206,14 @@ def show_dependency_map(dep_map: dict[str, set[str]]) -> None:
         for src in sorted(sources):
             print(f"  <- {src}")
         print()
+
+
+def _print_items(label: str, items: list[str]) -> None:
+    """Print a labelled list with its item count, then a blank line."""
+    print(f"{label} ({len(items)}):")
+    for item in items:
+        print(f"  {item}")
+    print()
 
 
 def main():
@@ -222,23 +237,19 @@ def main():
     dep_map = get_transitive_dep_map()
 
     if args.verbose:
-        print(f"Changed files ({len(changed_files)}):")
-        for cf in changed_files:
-            print(f"  {cf}")
-        print()
+        _print_items("Changed files", changed_files)
 
     affected = find_affected_evals(changed_files, dep_map)
 
-    if args.verbose:
-        if affected:
-            print(f"Affected evals ({len(affected)}):")
-            for af in affected:
-                print(f"  {af}")
-        else:
-            print("No evals affected by current changes.")
-    else:
+    if not args.verbose:
         if affected:
             print(" ".join(affected))
+        return
+
+    if affected:
+        _print_items("Affected evals", affected)
+    else:
+        print("No evals affected by current changes.")
 
 
 if __name__ == "__main__":

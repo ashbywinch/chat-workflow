@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from chat_workflow.annotations import Validation
 from chat_workflow.decorators import _build_system_prompt
 from chat_workflow.mixins import LLMValidated
-from chat_workflow.prompt_builder import _build_params_section
+from chat_workflow.prompt_builder import build_params_section
 
 
 class InnerShape(BaseModel):
@@ -26,7 +26,7 @@ def example_workflow(
 
 class TestBuildParamsSection(unittest.TestCase):
     def test_includes_pydantic_model_shape(self):
-        section = _build_params_section(
+        section = build_params_section(
             example_workflow,
             {"inner": InnerShape(name="x"), "max_turns": 3},
         )
@@ -36,7 +36,7 @@ class TestBuildParamsSection(unittest.TestCase):
         self.assertIn("Shape", section)
 
     def test_skips_shape_already_in_output_schema(self):
-        section = _build_params_section(
+        section = build_params_section(
             example_workflow,
             {"inner": InnerShape(name="x"), "max_turns": 3},
             skip_shapes=frozenset({"InnerShape"}),

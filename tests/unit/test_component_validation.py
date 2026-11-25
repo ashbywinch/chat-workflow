@@ -2,7 +2,6 @@
 
 import unittest
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 from workflows.workflow import ComponentSourceCode
 from workflows.workflow.component import Component
@@ -42,30 +41,25 @@ class TestComponentValidation(unittest.TestCase):
 
     def test_valid_component_passes_validation(self):
         """A properly constructed Component should not raise."""
-        with TemporaryDirectory() as tmpdir:
-            p = Path(tmpdir) / "test.py"
-            p.write_text("")
-            c = Component.model_construct(
-                name="Test",
-                purpose="Test",
-                code_path=p,
-                model_class="TestModel",
-                expert_role="Test Expert",
-                component_type="artifact_producing",
-                owner_role="Owner",
-            )
-            self.assertEqual(c.name, "Test")
+        c = Component.model_construct(
+            name="Test",
+            purpose="Test",
+            code_path=Path("test.py"),
+            model_class="TestModel",
+            expert_role="Test Expert",
+            component_type="artifact_producing",
+            owner_role="Owner",
+        )
+        self.assertEqual(c.name, "Test")
 
     # --- Programmatic validation rules ---
 
-    def _make_component(self, purpose: str, tmpdir: str) -> Component:
+    def _make_component(self, purpose: str) -> Component:
         """Helper to construct a Component with a given purpose."""
-        p = Path(tmpdir) / "test.py"
-        p.write_text("")
         return Component.model_construct(
             name="TestComponent",
             purpose=purpose,
-            code_path=p,
+            code_path=Path("test.py"),
             model_class="TestModel",
             expert_role="Domain Expert",
             component_type="artifact_producing",
@@ -74,34 +68,26 @@ class TestComponentValidation(unittest.TestCase):
 
     def test_purpose_with_and_has_a_single_responsibility_rule(self):
         """Purpose containing 'and' should be rejected (single responsibility)."""
-        with TemporaryDirectory() as tmpdir:
-            self._make_component(
-                purpose="Manages user authentication and handles profile management",
-                tmpdir=tmpdir,
-            )
-            rules = Component.collect_all_rules()
-            purpose_rule = [r for r in rules if "single responsibility" in r.lower() or "one sentence" in r.lower()]
-            self.assertTrue(len(purpose_rule) > 0, "Should have a single responsibility rule")
+        self._make_component(
+            purpose="Manages user authentication and handles profile management",
+        )
+        rules = Component.collect_all_rules()
+        purpose_rule = [r for r in rules if "single responsibility" in r.lower() or "one sentence" in r.lower()]
+        self.assertTrue(len(purpose_rule) > 0, "Should have a single responsibility rule")
 
     def test_purpose_with_also_has_a_single_responsibility_rule(self):
         """Purpose containing 'also' should be rejected (single responsibility)."""
-        with TemporaryDirectory() as tmpdir:
-            self._make_component(
-                purpose="Manages user authentication also handles profile management",
-                tmpdir=tmpdir,
-            )
-            rules = Component.collect_all_rules()
-            purpose_rule = [r for r in rules if "single responsibility" in r.lower() or "one sentence" in r.lower()]
-            self.assertTrue(len(purpose_rule) > 0, "Should have a single responsibility rule")
+        self._make_component(
+            purpose="Manages user authentication also handles profile management",
+        )
+        rules = Component.collect_all_rules()
+        purpose_rule = [r for r in rules if "single responsibility" in r.lower() or "one sentence" in r.lower()]
+        self.assertTrue(len(purpose_rule) > 0, "Should have a single responsibility rule")
 
     def test_purpose_without_and_or_also_passes(self):
         """Purpose without 'and' or 'also' should pass validation."""
-        with TemporaryDirectory() as tmpdir:
-            c = self._make_component(
-                purpose="Manages user authentication",
-                tmpdir=tmpdir,
-            )
-            self.assertEqual(c.purpose, "Manages user authentication")
+        c = self._make_component(purpose="Manages user authentication")
+        self.assertEqual(c.purpose, "Manages user authentication")
 
 
 if __name__ == "__main__":

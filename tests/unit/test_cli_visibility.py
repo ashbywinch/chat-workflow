@@ -13,6 +13,14 @@ from chat_workflow_cli.cli import (
 )
 
 
+def _commands(result) -> dict:
+    return {command.name: command.func for command in result}
+
+
+def _classes(result) -> dict[str, dict]:
+    return {group.name: _commands(group.commands) for group in result}
+
+
 class TestModuleLevelVisibility(unittest.TestCase):
     """Module-level workflow function discovery rules."""
 
@@ -23,11 +31,11 @@ class TestModuleLevelVisibility(unittest.TestCase):
         def public_wf(context: str = "", max_turns: int = 10):
             pass
 
-        public_wf._is_workflow_step = True  # type: ignore[attr-defined]
+        public_wf._is_workflow_step = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow step
 
-        mod.public_wf = public_wf  # type: ignore[attr-defined]
+        mod.public_wf = public_wf  # type: ignore[attr-defined]  # a module is built by hand for the test
 
-        result = discover_workflow_functions(mod)
+        result = _commands(discover_workflow_functions(mod))
         self.assertIn("public_wf", result)
         self.assertIs(result["public_wf"], public_wf)
 
@@ -38,27 +46,27 @@ class TestModuleLevelVisibility(unittest.TestCase):
         def public_func():
             pass
 
-        public_func._is_workflow_step = True  # type: ignore[attr-defined]
+        public_func._is_workflow_step = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow step
 
         def _private_func():
             pass
 
-        _private_func._is_workflow_step = True  # type: ignore[attr-defined]
+        _private_func._is_workflow_step = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow step
 
-        mod.public_func = public_func  # type: ignore[attr-defined]
-        mod._private_func = _private_func  # type: ignore[attr-defined]
+        mod.public_func = public_func  # type: ignore[attr-defined]  # a module is built by hand for the test
+        mod._private_func = _private_func  # type: ignore[attr-defined]  # a module is built by hand for the test
 
-        result = discover_workflow_functions(mod)
+        result = _commands(discover_workflow_functions(mod))
         self.assertIn("public_func", result)
         self.assertNotIn("_private_func", result)
 
     def test_generate_reviewed_criteria_discovered(self):
         """The real generate_reviewed_criteria in the example workflow is discoverable."""
-        import workflows.evaluation_criteria  # noqa: F811
+        import workflows.evaluation_criteria  # noqa: F811 — the import is the fixture; discovery reads the module
 
         # discover_workflow_functions doesn't check __all__, just _is_workflow_step + public name
         mod = workflows.evaluation_criteria
-        functions = discover_workflow_functions(mod)
+        functions = _commands(discover_workflow_functions(mod))
         self.assertIn("generate_reviewed_criteria", functions)
 
 
@@ -69,7 +77,7 @@ class TestClassMethodVisibility(unittest.TestCase):
         """WorkflowSpec.create is exported and public — should be discovered."""
         import workflows.workflow
 
-        classes = _discover_class_workflow_methods(workflows.workflow)
+        classes = _classes(_discover_class_workflow_methods(workflows.workflow))
         self.assertIn("WorkflowSpec", classes)
         self.assertIn("create", classes["WorkflowSpec"])
 
@@ -77,7 +85,7 @@ class TestClassMethodVisibility(unittest.TestCase):
         """Private classmethods like _generate_diagram are excluded even with _is_workflow_step."""
         import workflows.workflow
 
-        classes = _discover_class_workflow_methods(workflows.workflow)
+        classes = _classes(_discover_class_workflow_methods(workflows.workflow))
         # The class is exported, but private methods inside it should not appear
         workflow_methods = classes.get("WorkflowSpec", {})
         for mname in workflow_methods:
@@ -91,13 +99,13 @@ class TestClassMethodVisibility(unittest.TestCase):
         """Component is not in __all__, so its methods are not discovered."""
         import workflows.workflow
 
-        classes = _discover_class_workflow_methods(workflows.workflow)
+        classes = _classes(_discover_class_workflow_methods(workflows.workflow))
         self.assertNotIn("Component", classes)
 
     def test_mock_private_method_not_discovered(self):
         """A mock private method with _is_workflow_step on an exported class is excluded."""
         mod = types.ModuleType("test_mod")
-        mod.__all__ = ["MyClass"]
+        mod.__all__ = ["MyClass"]  # type: ignore[attr-defined]  # a module is built by hand for the test
 
         class MyClass:
             pass
@@ -105,18 +113,18 @@ class TestClassMethodVisibility(unittest.TestCase):
         def public_method():
             pass
 
-        public_method._is_workflow_step = True  # type: ignore[attr-defined]
+        public_method._is_workflow_step = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow step
 
         def _private_method():
             pass
 
-        _private_method._is_workflow_step = True  # type: ignore[attr-defined]
+        _private_method._is_workflow_step = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow step
 
-        MyClass.public_method = staticmethod(public_method)  # type: ignore[attr-defined]
-        MyClass._private_method = staticmethod(_private_method)  # type: ignore[attr-defined]
-        mod.MyClass = MyClass  # type: ignore[attr-defined]
+        MyClass.public_method = staticmethod(public_method)  # type: ignore[attr-defined]  # the test attaches a step to a hand-built class
+        MyClass._private_method = staticmethod(_private_method)  # type: ignore[attr-defined]  # the test attaches a step to a hand-built class
+        mod.MyClass = MyClass  # type: ignore[attr-defined]  # a module is built by hand for the test
 
-        classes = _discover_class_workflow_methods(mod)
+        classes = _classes(_discover_class_workflow_methods(mod))
         self.assertIn("MyClass", classes)
         self.assertIn("public_method", classes["MyClass"])
         self.assertNotIn("_private_method", classes["MyClass"])

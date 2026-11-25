@@ -1,32 +1,36 @@
 #!/usr/bin/env python3
-"""Tests for generic exception handling in WorkflowRunner.run()."""
+"""Tests for generic exception handling in WorkflowConsole.run()."""
+
+# lucidlint: ignore-file monkeypatch run() builds Config/Session/log_session itself, no seam to inject
+# and typer is module-level; the crash path is reachable only by patching those globals.
+# lucidlint: ignore-file fakefs the subject is the companion -exception.txt file written beside the session log
 
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from chat_workflow_cli.workflow_runner import WorkflowRunner
+from chat_workflow_cli.workflowconsole import WorkflowConsole
 
 
-class TestWorkflowRunnerErrorHandling(unittest.TestCase):
+class TestWorkflowConsoleErrorHandling(unittest.TestCase):
     """Verifies the generic Exception handler saves logs + companion file before handle_error."""
 
     def _failing_func(self, **kwargs):
         """A workflow function that raises an unhandled exception."""
         raise ValueError("test crash: something went wrong")
 
-    def _get_runner(self, config_path: Path) -> WorkflowRunner:
-        """Create a WorkflowRunner with the given config path."""
-        return WorkflowRunner(config_path=config_path)
+    def _get_runner(self, config_path: Path) -> WorkflowConsole:
+        """Create a WorkflowConsole with the given config path."""
+        return WorkflowConsole(config_path=config_path)
 
     # ----------------------------------------------------------------
     # Test 1: Companion -exception.txt file is created with traceback
     # ----------------------------------------------------------------
-    @patch("chat_workflow_cli.workflow_runner.Config")
-    @patch("chat_workflow_cli.workflow_runner.Session")
-    @patch("chat_workflow_cli.workflow_runner.handle_error")
-    @patch("chat_workflow_cli.workflow_runner.typer")
+    @patch("chat_workflow_cli.workflowconsole.Config")
+    @patch("chat_workflow_cli.workflowconsole.Session")
+    @patch("chat_workflow_cli.workflowconsole.handle_error")
+    @patch("chat_workflow_cli.workflowconsole.typer")
     def test_companion_exception_file_created(
         self,
         mock_typer,
@@ -41,7 +45,7 @@ class TestWorkflowRunnerErrorHandling(unittest.TestCase):
             log_path.write_text("{}")
 
             with patch(
-                "chat_workflow_cli.workflow_runner.log_session",
+                "chat_workflow_cli.workflowconsole.log_session",
                 return_value=log_path,
             ) as mock_log_session:
                 runner = self._get_runner(config_path=Path(tmpdir) / "config.json")
@@ -63,18 +67,18 @@ class TestWorkflowRunnerErrorHandling(unittest.TestCase):
 
             # log_session must have been called with crash-specific args
             mock_log_session.assert_called_once()
-            _, kwargs = mock_log_session.call_args
-            self.assertFalse(kwargs["success_judgement"])
-            self.assertEqual(kwargs["feedback_text"], "Unhandled exception")
-            self.assertIsNone(kwargs["criteria"])
+            record = mock_log_session.call_args.args[0]
+            self.assertFalse(record.success_judgement)
+            self.assertEqual(record.feedback_text, "Unhandled exception")
+            self.assertIsNone(record.criteria)
 
     # ----------------------------------------------------------------
     # Test 2: handle_error() IS called after companion file save
     # ----------------------------------------------------------------
-    @patch("chat_workflow_cli.workflow_runner.Config")
-    @patch("chat_workflow_cli.workflow_runner.Session")
-    @patch("chat_workflow_cli.workflow_runner.log_session")
-    @patch("chat_workflow_cli.workflow_runner.typer")
+    @patch("chat_workflow_cli.workflowconsole.Config")
+    @patch("chat_workflow_cli.workflowconsole.Session")
+    @patch("chat_workflow_cli.workflowconsole.log_session")
+    @patch("chat_workflow_cli.workflowconsole.typer")
     def test_handle_error_called_after_save(
         self,
         mock_typer,
@@ -89,7 +93,7 @@ class TestWorkflowRunnerErrorHandling(unittest.TestCase):
         mock_log_path = Path(tempfile.gettempdir()) / "session_test_handle.json"
 
         with patch(
-            "chat_workflow_cli.workflow_runner.handle_error",
+            "chat_workflow_cli.workflowconsole.handle_error",
         ) as mock_handle_error:
             mock_log_session.return_value = mock_log_path
 
@@ -104,10 +108,10 @@ class TestWorkflowRunnerErrorHandling(unittest.TestCase):
     # ----------------------------------------------------------------
     # Test 3: typer.confirm is NOT called on the crash path
     # ----------------------------------------------------------------
-    @patch("chat_workflow_cli.workflow_runner.Config")
-    @patch("chat_workflow_cli.workflow_runner.Session")
-    @patch("chat_workflow_cli.workflow_runner.log_session")
-    @patch("chat_workflow_cli.workflow_runner.handle_error")
+    @patch("chat_workflow_cli.workflowconsole.Config")
+    @patch("chat_workflow_cli.workflowconsole.Session")
+    @patch("chat_workflow_cli.workflowconsole.log_session")
+    @patch("chat_workflow_cli.workflowconsole.handle_error")
     def test_no_feedback_prompt_on_crash(
         self,
         mock_handle_error,
@@ -119,7 +123,7 @@ class TestWorkflowRunnerErrorHandling(unittest.TestCase):
         mock_log_path = Path("/tmp/session_test_noprompt.json")
 
         with patch(
-            "chat_workflow_cli.workflow_runner.typer.confirm",
+            "chat_workflow_cli.workflowconsole.typer.confirm",
         ) as mock_confirm:
             mock_log_session.return_value = mock_log_path
 

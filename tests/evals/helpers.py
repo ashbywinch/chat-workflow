@@ -649,7 +649,7 @@ def run_multi_turn_eval(
 
     # The closure hides the step's chat flag; carry it so a chat-off top-level
     # step is not greeted or closed.
-    run_step._chat = getattr(model_method, "_chat", True)  # type: ignore[attr-defined]
+    run_step._chat = getattr(model_method, "_chat", True)  # type: ignore[attr-defined]  # no class body to declare it
 
     try:
         # The harness wraps a real workflow step in a session: greet, run, sign

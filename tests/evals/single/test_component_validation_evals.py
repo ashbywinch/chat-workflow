@@ -7,6 +7,8 @@ validate it through ``ComponentSourceCode`` — proving the framework's
 classes satisfy the rules they impose on generated code.
 """
 
+# lucidlint: ignore-file fakefs the subject is a checked-in framework source file the repo ships
+
 from __future__ import annotations
 
 import unittest

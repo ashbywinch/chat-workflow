@@ -1,7 +1,6 @@
 """Tests for workflow sub-models."""
 
 import unittest
-from unittest.mock import patch
 
 from pydantic import ValidationError
 
@@ -157,8 +156,7 @@ class TestComponentSpec(unittest.TestCase):
 
 
 class TestComponentSourceCode(unittest.TestCase):
-    @patch("chat_workflow.mixins.LLMValidated.validate_llm_rules", return_value=None)
-    def test_valid_instance(self, mock_validate):
+    def test_valid_instance(self):
         code = (
             "from chat_workflow import atomic_workflow_step\n"
             "from pydantic import BaseModel, Field\n\n"

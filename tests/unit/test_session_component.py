@@ -6,6 +6,7 @@ message is the model's own words, spoken by ``Session.run``.
 """
 
 import unittest
+from collections.abc import Callable
 from inspect import cleandoc
 from typing import override
 
@@ -54,7 +55,7 @@ class _Draft:
 class TestRecursiveSession(unittest.TestCase):
     def test_spawn_creates_a_child_with_clean_context(self):
         root = _session()
-        root.state.messages.append(object())  # type: ignore[arg-type]
+        root.say("an earlier turn")
 
         child = root.spawn(title="Meeting", instructions="the brief")
 
@@ -204,32 +205,72 @@ class TestTheSuccessMessage(unittest.TestCase):
         self.assertEqual(len(conversation.script.calls), 2)
 
 
+def _no_route() -> TextReply:
+    """A model call that cannot reach the provider."""
+    raise RuntimeError("no route")
+
+
+class _StubComponent(SessionComponent):
+    """An object fake for the cosmetic open and close.
+
+    ``converse`` is the subject; the open and the close are model calls, so a
+    test hands them fixed text (or a failure) and reads ``called`` to see which
+    of the two ran.
+    """
+
+    def __init__(
+        self,
+        *,
+        greeting: Callable[[], TextReply] | None = None,
+        closing: Callable[[], TextReply] | None = None,
+    ) -> None:
+        self.called: list[str] = []
+        self._greeting = greeting or (lambda: TextReply(text="Hi there! I help describe what you do."))
+        self._closing = closing or (lambda: TextReply(text="I have what I need."))
+
+    @override
+    def greet(
+        self, *, session: Session, max_turns: int = 1, _first_user_input: str | None = None
+    ) -> TextReply:
+        del _first_user_input  # the stub ignores the prompt _spoken hands the model
+        self.called.append("greet")
+        return self._greeting()
+
+    @override
+    def sign_off(
+        self, *, session: Session, max_turns: int = 1, _first_user_input: str | None = None
+    ) -> TextReply:
+        del _first_user_input  # the stub ignores the prompt _spoken hands the model
+        self.called.append("close")
+        return self._closing()
+
+
+class _ChatOffStep:
+    """A step with no user of its own: ``converse`` reads ``_chat`` off it."""
+
+    _chat = False
+
+    def __call__(self, *, session: Session) -> str:
+        session.say("a step with nothing to ask")
+        return "done"
+
+
 class TestSessionComponent(unittest.TestCase):
     def test_converse_greets_runs_the_step_and_signs_off(self):
         session = _session()
+        component = _StubComponent()
         seen: dict[str, bool] = {}
 
         def step(*, session: Session) -> str:
             seen["active"] = session.active
-            session.state.messages.append(object())  # type: ignore[arg-type]
+            session.say("a turn the step took")
             return "the result"
 
-        original_greet = SessionComponent.greet
-        original_sign_off = SessionComponent.sign_off
-        SessionComponent.greet = lambda self, *, session, **kwargs: TextReply(  # type: ignore[method-assign]
-            text="Hi there! I help describe what you do."
-        )
-        SessionComponent.sign_off = lambda self, *, session, **kwargs: (  # type: ignore[method-assign]
-            TextReply(text="I have what I need.")
-        )
-        try:
-            result = SessionComponent().converse(step, session=session)
-        finally:
-            SessionComponent.greet = original_greet  # type: ignore[method-assign]
-            SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
+        result = component.converse(step, session=session)
 
         self.assertEqual(result, "the result")
         self.assertTrue(seen["active"])
+        self.assertEqual(component.called, ["greet", "close"])
         self.assertFalse(session.active)
         self.assertEqual(
             session.instructions,
@@ -239,80 +280,45 @@ class TestSessionComponent(unittest.TestCase):
 
     def test_converse_does_not_greet_a_session_that_has_messages(self):
         session = _session()
-        session.state.messages.append(object())  # type: ignore[arg-type]
-        calls: list[str] = []
+        session.say("an earlier turn")
+        component = _StubComponent()
 
-        original_greet = SessionComponent.greet
-        original_sign_off = SessionComponent.sign_off
-        SessionComponent.greet = lambda self, *, session, **kwargs: calls.append("greet")  # type: ignore[method-assign]
-        SessionComponent.sign_off = lambda self, *, session, **kwargs: TextReply(text="Done.")  # type: ignore[method-assign]
-        try:
-            SessionComponent().converse(lambda *, session: "result", session=session)
-        finally:
-            SessionComponent.greet = original_greet  # type: ignore[method-assign]
-            SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
+        component.converse(lambda *, session: "result", session=session)
 
-        self.assertEqual(calls, [])
+        self.assertEqual(component.called, ["close"])
 
     def test_a_chat_off_step_has_no_greeting_or_closing(self):
         session = _session()
-        called: list[str] = []
-        original_greet = SessionComponent.greet
-        original_sign_off = SessionComponent.sign_off
-        SessionComponent.greet = lambda self, *, session, **kwargs: called.append("greet")  # type: ignore[method-assign]
-        SessionComponent.sign_off = lambda self, *, session, **kwargs: called.append("close")  # type: ignore[method-assign]
+        component = _StubComponent()
 
-        def step(*, session):
-            session.state.messages.append(object())  # type: ignore[arg-type]
-            return "done"
+        self.assertEqual(component.converse(_ChatOffStep(), session=session), "done")
 
-        step._chat = False  # type: ignore[attr-defined]
-        try:
-            self.assertEqual(SessionComponent().converse(step, session=session), "done")
-        finally:
-            SessionComponent.greet = original_greet  # type: ignore[method-assign]
-            SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
-
-        self.assertEqual(called, [])
+        self.assertEqual(component.called, [])
 
     def test_a_failed_greeting_falls_back(self):
         session = _session()
-        original_greet = SessionComponent.greet
-        original_sign_off = SessionComponent.sign_off
-        SessionComponent.greet = lambda self, *, session, **kwargs: (_ for _ in ()).throw(RuntimeError("no route"))  # type: ignore[method-assign]
-        SessionComponent.sign_off = lambda self, *, session, **kwargs: TextReply(text="Done.")  # type: ignore[method-assign]
-        try:
-            SessionComponent().converse(lambda *, session: "the result", session=session)
-        finally:
-            SessionComponent.greet = original_greet  # type: ignore[method-assign]
-            SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
+        component = _StubComponent(greeting=_no_route)
+
+        component.converse(lambda *, session: "the result", session=session)
 
         self.assertTrue(
             any("here to help you describe" in str(m) for m in session.state.messages)
         )
 
     def test_a_failed_or_questioning_closing_is_a_statement(self):
-        session = _session()
-        original_greet = SessionComponent.greet
-        original_sign_off = SessionComponent.sign_off
-        SessionComponent.greet = lambda self, *, session, **kwargs: TextReply(text="Hi.")  # type: ignore[method-assign]
-
         for closing in (
-            lambda self, *, session, **kwargs: (_ for _ in ()).throw(RuntimeError("no route")),
-            lambda self, *, session, **kwargs: TextReply(text="Anything else?"),
+            _no_route,
+            lambda: TextReply(text="Anything else?"),
         ):
-            SessionComponent.sign_off = closing  # type: ignore[method-assign]
-            try:
-                SessionComponent().converse(lambda *, session: "the result", session=session)
-            finally:
-                pass
+            with self.subTest(closing=closing):
+                session = _session()
+                component = _StubComponent(closing=closing)
 
-        SessionComponent.greet = original_greet  # type: ignore[method-assign]
-        SessionComponent.sign_off = original_sign_off  # type: ignore[method-assign]
+                component.converse(lambda *, session: "the result", session=session)
 
-        self.assertTrue(
-            any("I have what I need" in str(m) for m in session.state.messages)
-        )
+                self.assertTrue(
+                    any("I have what I need" in str(m) for m in session.state.messages)
+                )
 
 
 if __name__ == "__main__":

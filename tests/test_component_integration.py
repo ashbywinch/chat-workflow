@@ -21,7 +21,7 @@ from workflows.workflow.interaction_context import (
 from workflows.workflow.structure import (
     ComponentStructure,
     StructField,
-    StructValidator,
+    ValidationRule,
 )
 
 
@@ -103,7 +103,7 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
                 ),
             ],
             model_validators=[
-                StructValidator(
+                ValidationRule(
                     rule="description must not exceed 3 sentences",
                     domain_origin=("Attendees can immediately understand decisions made"),
                 ),
@@ -494,3 +494,8 @@ class TestComponentCreateWithResponsibilities(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+# File-level suppressions sit at the end so the pyrefly baseline's line numbers stay stable.
+# lucidlint: ignore-file monkeypatch Component.create calls explore/design/gather/generate/verify_code
+# as class- and module-level globals; there is no collaborator seam to inject, and production is out of scope
+# lucidlint: ignore-file fakefs the write-to-disk step is the subject: the test asserts code_path holds the code

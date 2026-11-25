@@ -11,6 +11,8 @@ Tests the full flow:
 7. Edge cases: empty fields list, no validation rules
 """
 
+# lucidlint: ignore-file fakefs importlib imports the temp module this test writes, which needs a real file
+
 import importlib
 import sys
 import tempfile
@@ -20,7 +22,7 @@ from pathlib import Path
 import libcst as cst
 
 from chat_workflow import InteractiveEntity, ValidationError
-from chat_workflow.code_generator import generate_class, verify_code
+from chat_workflow.code_generator import FieldSpec, generate_class, verify_code
 from chat_workflow_cli.cli import discover_workflows
 
 
@@ -29,26 +31,26 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
 
     def test_generate_class_returns_string(self):
         """generate_class should return a string."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIsInstance(result, str)
 
     def test_generated_code_is_valid_python(self):
         """Generated code should be syntactically valid Python."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         tree = cst.parse_module(result)
         self.assertIsNotNone(tree)
 
     def test_generated_code_is_interactive_entity_subclass(self):
         """Generated class should inherit from InteractiveEntity."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn("class TestEntity(InteractiveEntity):", result)
 
     def test_generated_code_includes_required_imports(self):
         """Generated code should include all required imports."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn("from __future__ import annotations", result)
         self.assertIn("from pydantic import BaseModel, Field, model_validator", result)
@@ -57,8 +59,8 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
     def test_generated_code_includes_fields(self):
         """Generated code should include the specified fields."""
         fields = [
-            {"name": "name", "type": "str", "desc": "The name"},
-            {"name": "count", "type": "int", "desc": "The count"},
+            FieldSpec(name="name", field_type="str", description="The name"),
+            FieldSpec(name="count", field_type="int", description="The count"),
         ]
         result = generate_class("TestEntity", fields)
         self.assertIn('name: str = Field(..., description="The name")', result)
@@ -66,14 +68,14 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
 
     def test_generated_code_includes_model_validator(self):
         """Generated code should include a model_validator method."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn('@model_validator(mode="after")', result)
         self.assertIn("def validate_business_rules(self):", result)
 
     def test_generated_code_includes_workflow_classmethod(self):
         """Generated code should include a generate_from_chat classmethod."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertIn("@atomic_workflow_step", result)
         self.assertIn("@classmethod", result)
@@ -81,7 +83,7 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
 
     def test_generated_code_includes_validation_rules(self):
         """Generated code should include _validation_rules when provided."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class(
             "TestEntity",
             fields,
@@ -91,7 +93,7 @@ class TestGenerateClassProducesValidCode(unittest.TestCase):
 
     def test_generated_code_without_validation_rules(self):
         """Generated code should work without validation_rules."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         result = generate_class("TestEntity", fields)
         self.assertNotIn("_validation_rules", result)
 
@@ -101,7 +103,7 @@ class TestVerifyCodeOnGeneratedCode(unittest.TestCase):
 
     def test_verify_code_passes_on_generated_code(self):
         """Generated code should pass ruff linting and formatting."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("TestEntity", fields)
         result = verify_code(code)
         self.assertIsInstance(result, str)
@@ -111,7 +113,7 @@ class TestVerifyCodeOnGeneratedCode(unittest.TestCase):
 
     def test_verify_code_passes_with_validation_rules(self):
         """Generated code with validation rules should pass ruff checks."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("TestEntity", fields, validation_rules="name must be non-empty")
         result = verify_code(code)
         self.assertIsInstance(result, str)
@@ -120,9 +122,9 @@ class TestVerifyCodeOnGeneratedCode(unittest.TestCase):
     def test_verify_code_passes_with_multiple_fields(self):
         """Generated code with multiple fields should pass ruff checks."""
         fields = [
-            {"name": "name", "type": "str", "desc": "The name"},
-            {"name": "count", "type": "int", "desc": "The count"},
-            {"name": "active", "type": "bool", "desc": "Is active"},
+            FieldSpec(name="name", field_type="str", description="The name"),
+            FieldSpec(name="count", field_type="int", description="The count"),
+            FieldSpec(name="active", field_type="bool", description="Is active"),
         ]
         code = generate_class("TestEntity", fields)
         result = verify_code(code)
@@ -157,7 +159,7 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
 
     def test_import_generated_class(self):
         """Generated code should be importable as a Python module."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("TestEntity", fields)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -167,7 +169,7 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
 
     def test_instantiate_with_valid_data(self):
         """Imported class should instantiate with valid field values."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("TestEntity", fields)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -179,9 +181,9 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
     def test_instantiate_with_multiple_fields(self):
         """Imported class should handle multiple fields correctly."""
         fields = [
-            {"name": "title", "type": "str", "desc": "The title"},
-            {"name": "count", "type": "int", "desc": "The count"},
-            {"name": "active", "type": "bool", "desc": "Is active"},
+            FieldSpec(name="title", field_type="str", description="The title"),
+            FieldSpec(name="count", field_type="int", description="The count"),
+            FieldSpec(name="active", field_type="bool", description="Is active"),
         ]
         code = generate_class("MultiFieldEntity", fields)
 
@@ -194,7 +196,7 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
 
     def test_validation_rejects_invalid_data(self):
         """Imported class should reject invalid data via model_validator."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("ValidatedEntity", fields)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -205,7 +207,7 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
 
     def test_validation_rejects_invalid_data_with_rules(self):
         """Imported class with _validation_rules should reject invalid data."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class(
             "RuledEntity",
             fields,
@@ -220,7 +222,7 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
 
     def test_valid_data_passes_validation(self):
         """Valid data should pass all validation checks."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class(
             "PassingEntity",
             fields,
@@ -234,7 +236,7 @@ class TestDynamicImportAndInstantiation(unittest.TestCase):
 
     def test_validation_error_message(self):
         """ValidationError should include context about the violation."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("ErrorEntity", fields)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -259,7 +261,7 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_no_validation_rules(self):
         """generate_class should work without validation_rules."""
-        fields = [{"name": "name", "type": "str", "desc": "The name"}]
+        fields = [FieldSpec(name="name", field_type="str", description="The name")]
         code = generate_class("NoRulesEntity", fields)
         self.assertNotIn("_validation_rules", code)
         # Should still have a default model_validator
@@ -267,37 +269,37 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_field_without_description(self):
         """generate_class should handle fields without a description."""
-        fields = [{"name": "name", "type": "str"}]
+        fields = [FieldSpec(name="name", field_type="str")]
         code = generate_class("NoDescEntity", fields)
         self.assertIn("name: str = Field(...)", code)
 
     def test_optional_field_type(self):
         """generate_class should handle optional field types (str | None)."""
-        fields = [{"name": "nickname", "type": "str | None", "desc": "Optional nickname"}]
+        fields = [FieldSpec(name="nickname", field_type="str | None", description="Optional nickname")]
         code = generate_class("OptionalEntity", fields)
         self.assertIn("nickname: str | None = Field(", code)
 
     def test_int_field_type(self):
         """generate_class should handle int field type."""
-        fields = [{"name": "count", "type": "int", "desc": "The count"}]
+        fields = [FieldSpec(name="count", field_type="int", description="The count")]
         code = generate_class("IntEntity", fields)
         self.assertIn("count: int = Field(", code)
 
     def test_float_field_type(self):
         """generate_class should handle float field type."""
-        fields = [{"name": "price", "type": "float", "desc": "The price"}]
+        fields = [FieldSpec(name="price", field_type="float", description="The price")]
         code = generate_class("FloatEntity", fields)
         self.assertIn("price: float = Field(", code)
 
     def test_bool_field_type(self):
         """generate_class should handle bool field type."""
-        fields = [{"name": "active", "type": "bool", "desc": "Is active"}]
+        fields = [FieldSpec(name="active", field_type="bool", description="Is active")]
         code = generate_class("BoolEntity", fields)
         self.assertIn("active: bool = Field(", code)
 
     def test_list_field_type(self):
         """generate_class should handle list field type."""
-        fields = [{"name": "tags", "type": "list", "desc": "List of tags"}]
+        fields = [FieldSpec(name="tags", field_type="list", description="List of tags")]
         code = generate_class("ListEntity", fields)
         self.assertIn("tags: list = Field(", code)
 
@@ -328,13 +330,13 @@ class TestCliDiscovery(unittest.TestCase):
 
     def test_workflow_discovered(self):
         """discover_workflows should find the workflow directory."""
-        workflows = discover_workflows()
-        self.assertIn("workflow", workflows)
+        names = {module.name for module in discover_workflows()}
+        self.assertIn("workflow", names)
 
     def test_workflow_has_init_py(self):
         """The workflow directory should have an __init__.py."""
-        workflows = discover_workflows()
-        workflow_path = workflows["workflow"]
+        modules = {module.name: module for module in discover_workflows()}
+        workflow_path = modules["workflow"].path
         self.assertTrue((workflow_path / "__init__.py").exists())
 
     def test_workflow_discoverable_by_cli(self):
@@ -356,8 +358,8 @@ class TestFullEndToEndFlow(unittest.TestCase):
         """Complete flow: generate -> verify -> write -> import -> instantiate -> validate."""
         # 1. Generate
         fields = [
-            {"name": "title", "type": "str", "desc": "The title"},
-            {"name": "priority", "type": "int", "desc": "Priority level"},
+            FieldSpec(name="title", field_type="str", description="The title"),
+            FieldSpec(name="priority", field_type="int", description="Priority level"),
         ]
         code = generate_class(
             "FullFlowEntity",
