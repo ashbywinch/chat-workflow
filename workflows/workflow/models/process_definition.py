@@ -18,6 +18,7 @@ from chat_workflow.conversation_rules import WARM_OPEN
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext
 
+# lucidlint: ignore-file global-state the no-executor rule is a prompt constant shared by the class and module-level steps
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
     "The assistant defines what good looks like — it does not generate "
@@ -36,7 +37,7 @@ _CONFIRMS_THE_SHOWN_DRAFT: tuple[str, str] = (
 class ProcessStage(BaseModel):
     """One broad stage of the work, with the concrete steps inside it."""
 
-    name: Annotated[str, UserLabel("the stage", "stage")] = Field(
+    name: Annotated[str, UserLabel(phrase="the stage", aliases="stage")] = Field(
         ...,
         description=(
             "A broad stage of the work, named as the user names it (for "
@@ -44,7 +45,7 @@ class ProcessStage(BaseModel):
         ),
         min_length=1,
     )
-    steps: Annotated[list[str], UserLabel("the steps", "steps")] = Field(
+    steps: Annotated[list[str], UserLabel(phrase="the steps", aliases="steps")] = Field(
         ...,
         description=(
             "The concrete steps inside this stage, in the user's words (for "
@@ -86,7 +87,7 @@ class ProcessDefinition(LLMValidated):
 
     stages: Annotated[
         list[ProcessStage],
-        UserLabel("the main stages", "stages", guard=False),
+        UserLabel(phrase="the main stages", aliases="stages", guard=False),
     ] = Field(
         ...,
         description=(
@@ -109,9 +110,8 @@ class ProcessDefinition(LLMValidated):
     orchestrating_component: Annotated[
         str,
         UserLabel(
-            "who is in charge",
-            "orchestrating component",
-            "orchestrating",
+            phrase="who is in charge",
+            aliases=("orchestrating component", "orchestrating"),
             guard=False,
         ),
     ] = Field(
@@ -127,7 +127,7 @@ class ProcessDefinition(LLMValidated):
     )
     participants: Annotated[
         list[str],
-        UserLabel("everyone involved", "participants", guard=False),
+        UserLabel(phrase="everyone involved", aliases="participants", guard=False),
     ] = Field(
         ..., description="Everyone involved (people, roles, or systems)", min_length=1
     )
@@ -322,7 +322,8 @@ def generate_from_chat(
     # Exploration follows the user's threads: one question per new part of
     # the work, and it stops when they have nothing new. It is not an
     # interrogation, so it is bounded well below the overall turn budget.
-    gather_turns = min(max_turns, 6)
+    gather_turn_limit = 6
+    gather_turns = min(max_turns, gather_turn_limit)
     if process_description:
         gathered = _gather_notes(
             process_description=process_description,
@@ -341,13 +342,14 @@ def generate_from_chat(
     # the confirmation turn. A confirmation turn that skips the presentation
     # would leave the user (and the judge) with no proposal at all.
     session.propose(draft)
+    confirm_turn_limit = 4
     return confirm_draft(
         session=session,
         draft=draft,
         step=_confirm_process_definition,
-        max_turns=min(max_turns, 4),
+        max_turns=min(max_turns, confirm_turn_limit),
     )
 
 
 # Import Session at runtime to break circular dependency
-from chat_workflow import Session  # noqa: E402
+from chat_workflow import Session  # noqa: E402 — imported after the models to break the chat_workflow cycle

@@ -4,6 +4,8 @@ from pydantic import Field
 
 from chat_workflow import InteractiveEntity, atomic_workflow_step
 
+# lucidlint: ignore-file class-module Letter is this package's one model; models.py is the package's model home
+
 
 class Letter(InteractiveEntity):
     _validation_rules: str = "The letter should flow well and achieve the author's aims"

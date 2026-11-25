@@ -77,7 +77,7 @@ class ComponentSpec(LLMValidated):
 
     name: Annotated[
         str,
-        UserLabel("what you call it", "name", guard=False),
+        UserLabel(phrase="what you call it", aliases="name", guard=False),
     ] = Field(
         ...,
         description=(
@@ -88,7 +88,7 @@ class ComponentSpec(LLMValidated):
     )
     purpose: Annotated[
         str,
-        UserLabel("what it is for", "purpose", guard=False),
+        UserLabel(phrase="what it is for", aliases="purpose", guard=False),
     ] = Field(
         ...,
         description=(
@@ -100,7 +100,7 @@ class ComponentSpec(LLMValidated):
     )
     scope_description: Annotated[
         str,
-        UserLabel("what it covers", "scope description", "scope"),
+        UserLabel(phrase="what it covers", aliases=("scope description", "scope")),
     ] = Field(
         ...,
         description=(
@@ -115,7 +115,7 @@ class ComponentSpec(LLMValidated):
     )
     owner_role: Annotated[
         str,
-        UserLabel("who it belongs to", "owner role", "owner"),
+        UserLabel(phrase="who it belongs to", aliases=("owner role", "owner")),
     ] = Field(
         ...,
         description=(
@@ -128,7 +128,7 @@ class ComponentSpec(LLMValidated):
     )
     required_inputs: Annotated[
         list[str],
-        UserLabel("what it needs to start", "required inputs", "inputs"),
+        UserLabel(phrase="what it needs to start", aliases=("required inputs", "inputs")),
     ] = Field(
         ...,
         description=(
@@ -138,10 +138,8 @@ class ComponentSpec(LLMValidated):
     component_type: Annotated[
         Literal["value_stream", "artifact_producing", "planning_service"],
         UserLabel(
-            "what kind of thing it is",
-            "component type",
-            "artifact producing",
-            "produces",
+            phrase="what kind of thing it is",
+            aliases=("component type", "artifact producing", "produces"),
         ),
     ] = Field(
         ...,
@@ -154,7 +152,7 @@ class ComponentSpec(LLMValidated):
     )
     incidental_notes: Annotated[
         str,
-        UserLabel("anything else you mentioned", "incidental notes"),
+        UserLabel(phrase="anything else you mentioned", aliases="incidental notes"),
     ] = Field(
         "",
         description=("Any incidental details the user mentioned about how the work is done"),
@@ -193,6 +191,7 @@ class ComponentSpec(LLMValidated):
 
     @composite_workflow_step
     @classmethod
+    # lucidlint: ignore long-param-list the step's inputs are independent records, named at its one call site
     def identify_from_chat(
         cls,
         analysis: Annotated[
@@ -238,11 +237,12 @@ class ComponentSpec(LLMValidated):
             changed=bool(already_shown),
             note="Everything else stays as we agreed." if already_shown else None,
         )
+        confirm_turn_limit = 6
         confirmed = confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_components,
-            max_turns=min(max_turns, 6),
+            max_turns=min(max_turns, confirm_turn_limit),
         )
         # The user may say there are no separate roles at all. That is a fact
         # about the work, not a new part: make them the owner and say so.
@@ -282,9 +282,9 @@ def _says_self_only(text: str) -> bool:
     )
 
 
-from .models.deliverable import Deliverable  # noqa: E402
-from .models.process_definition import ProcessDefinition  # noqa: E402
-from .models.resource import Resource  # noqa: E402
+from .models.deliverable import Deliverable  # noqa: E402 — after the class, to break the model cycle
+from .models.process_definition import ProcessDefinition  # noqa: E402 — after the class, to break the cycle
+from .models.resource import Resource  # noqa: E402 — after the class, to break the model cycle
 
 
 @atomic_workflow_step(chat=False, single_turn=True)

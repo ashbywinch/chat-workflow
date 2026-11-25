@@ -6,6 +6,8 @@ from collections.abc import Callable
 
 from .evaluation_criteria import EvaluationCriteria
 
+__all__ = ["echo_criteria"]
+
 
 def echo_criteria(
     criteria: EvaluationCriteria,

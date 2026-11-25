@@ -27,7 +27,7 @@ class ComponentInteractionContext(BaseModel):
 
     must_prioritize: Annotated[
         list[str],
-        UserLabel("what I should always cover", "must prioritize"),
+        UserLabel(phrase="what I should always cover", aliases="must prioritize"),
     ] = Field(
         ...,
         description=(
@@ -37,7 +37,7 @@ class ComponentInteractionContext(BaseModel):
     )
     auto_suggest: Annotated[
         list[str],
-        UserLabel("what I should suggest", "auto suggest"),
+        UserLabel(phrase="what I should suggest", aliases="auto suggest"),
     ] = Field(
         ...,
         description=(
@@ -47,7 +47,7 @@ class ComponentInteractionContext(BaseModel):
     )
     tone_preference: Annotated[
         str | None,
-        UserLabel("how I should sound", "tone preference"),
+        UserLabel(phrase="how I should sound", aliases="tone preference"),
     ] = Field(
         default=None,
         description=(
@@ -57,7 +57,7 @@ class ComponentInteractionContext(BaseModel):
     )
     user_pain_points: Annotated[
         list[str],
-        UserLabel("what usually goes wrong", "user pain points"),
+        UserLabel(phrase="what usually goes wrong", aliases="user pain points"),
     ] = Field(
         ...,
         description=("Common pitfalls the assistant should watch for, e.g. 'Users often forget to list attendees'"),
@@ -107,11 +107,12 @@ class ComponentInteractionContext(BaseModel):
             session=session,
         )
         session.propose(draft)
+        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_interaction_context,
-            max_turns=min(max_turns, 4),
+            max_turns=min(max_turns, confirm_turn_limit),
         )
 
 

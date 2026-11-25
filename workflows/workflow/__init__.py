@@ -6,7 +6,7 @@ from .domain_spec import ComponentDomainSpec as ComponentDomainSpec
 from .interaction_context import ComponentInteractionContext as ComponentInteractionContext
 from .structure import ComponentStructure as ComponentStructure
 from .structure import StructField as StructField
-from .structure import StructValidator as StructValidator
+from .structure import ValidationRule as ValidationRule
 from .workflow_spec import WorkflowSpec
 
 # Only WorkflowSpec is a user-facing workflow class.

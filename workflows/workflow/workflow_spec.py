@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import re
+import tempfile
 from pathlib import Path
-from typing import Annotated, Any, ClassVar, override
+from typing import Annotated, Any, ClassVar, NamedTuple, override
 
 from pydantic import Field, field_validator, model_validator
 
@@ -21,8 +22,11 @@ from .models import (
 )
 from .models.gap_analysis import GapAnalysis as _GapAnalysis
 
-_PARTICIPANT_LINE = re.compile(r'^participant\s+(\w+)\s+as\s+"([^"]+)"\s*$')
-_ARROW_LINE = re.compile(r"^(\w+)\s*(-->>|->>|-->|->|--x|-x)\s*(\w+)\s*:\s*(.+)$")
+_PARTICIPANT_LINE = re.compile(r'^participant\s+(?P<alias>\w+)\s+as\s+"(?P<label>[^"]+)"\s*$')
+_ARROW_LINE = re.compile(
+    r"^(?P<source>\w+)\s*(?P<arrow>-->>|->>|-->|->|--x|-x)\s*"
+    r"(?P<target>\w+)\s*:\s*(?P<label>.+)$"
+)
 _BLOCK_LINE = re.compile(r"^(alt|opt)\b")
 
 # Determiners and possessives do not change which party a name refers to.
@@ -64,6 +68,7 @@ def _matches_known(path: str, known: set[str]) -> bool:
     return False
 
 
+# lucidlint: ignore complexity,large-function the validator is one pass over the diagram's lines
 def _validate_diagram_structure(
     diagram: str,
     components: list[ComponentSpec],
@@ -87,14 +92,14 @@ def _validate_diagram_structure(
             continue
         participant = _PARTICIPANT_LINE.match(stripped)
         if participant:
-            participants[participant.group(1)] = participant.group(2)
+            participants[participant.group("alias")] = participant.group("label")
             continue
         if _BLOCK_LINE.match(stripped):
             blocks.append(stripped.split()[0])
             continue
         arrow = _ARROW_LINE.match(stripped)
         if arrow:
-            arrows.append((arrow.group(1), arrow.group(3), arrow.group(4)))
+            arrows.append((arrow.group("source"), arrow.group("target"), arrow.group("label")))
 
     if not participants:
         raise ValidationError(
@@ -207,7 +212,22 @@ def _item_field(items: Any, field: str) -> list[str]:
     return values
 
 
-def _primary_output(outputs: Any, components: Any = None) -> tuple[str, str] | None:
+class PrimaryOutput(NamedTuple):
+    """The output the final arrow carries, and its consumer."""
+
+    name: str
+    consumer: str
+
+
+class GapResolution(NamedTuple):
+    """The components a gap pass produced, and the gaps it found."""
+
+    components: list[ComponentSpec]
+    gap_analysis: GapAnalysis
+
+
+# lucidlint: ignore data-clump components and outputs are the diagram's two input collections; four helpers read them
+def _primary_output(outputs: Any, components: Any = None) -> PrimaryOutput | None:
     """The output the final arrow should carry, and its consumer.
 
     A private working copy — the notes the user writes for themselves, or a
@@ -234,8 +254,8 @@ def _primary_output(outputs: Any, components: Any = None) -> tuple[str, str] | N
             continue
         if _normalise_name(consumer.split(":", 1)[0]) in owner_roles:
             continue
-        return name, consumer
-    return pairs[0]
+        return PrimaryOutput(name, consumer)
+    return PrimaryOutput(*pairs[0])
 
 
 _GENERIC_PARTICIPANTS = frozenset(
@@ -262,7 +282,7 @@ def _repair_generic_participants(diagram: str, components: Any, outputs: Any) ->
         if not match:
             lines.append(line)
             continue
-        alias, label = match.group(1), match.group(2)
+        alias, label = match.group("alias"), match.group("label")
         path, _, playbook = label.partition(":")
         if path.strip().casefold() not in _GENERIC_PARTICIPANTS:
             lines.append(line)
@@ -276,6 +296,7 @@ def _repair_generic_participants(diagram: str, components: Any, outputs: Any) ->
     return "\n".join(lines)
 
 
+# lucidlint: ignore complexity one repair pass over the diagram's lines and participants
 def _repair_diagram_outcome(diagram: str, outputs: Any, components: Any = None) -> str:
     """Make the final message the outcome to the consumer.
 
@@ -293,7 +314,7 @@ def _repair_diagram_outcome(diagram: str, outputs: Any, components: Any = None) 
     for line in lines:
         match = _PARTICIPANT_LINE.match(line.strip())
         if match:
-            participants[match.group(1)] = match.group(2)
+            participants[match.group("alias")] = match.group("label")
 
     consumer_alias = next(
         (
@@ -310,7 +331,7 @@ def _repair_diagram_outcome(diagram: str, outputs: Any, components: Any = None) 
         lines.append(f'    participant {consumer_alias} as "{consumer}: Receive"')
 
     arrows = [
-        (match.group(1), match.group(3))
+        (match.group("source"), match.group("target"))
         for line in lines
         if (match := _ARROW_LINE.match(line.strip()))
     ]
@@ -542,6 +563,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
 
     @atomic_workflow_step(chat=False)
     @classmethod
+    # lucidlint: ignore long-param-list the diagram's inputs are independent records, named at one call site
     def _generate_diagram(
         cls,
         analysis: Annotated[ProcessDefinition, "The process definition"],
@@ -653,6 +675,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @classmethod
+    # lucidlint: ignore long-param-list the diagram's inputs are independent records, named at one call site
     def _create_diagram(
         cls,
         analysis: ProcessDefinition,
@@ -664,9 +687,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         session: Session,
         max_refinements: int = 3,
     ) -> WorkflowSpec:
-        import tempfile
-        from pathlib import Path
-
+        # lucidlint: ignore inline-import refine imports this module; deferring breaks the cycle
         from workflows.evaluation_criteria.refine import refine
 
         tmp_dir = tempfile.mkdtemp(prefix="workflow_diagram_")
@@ -765,6 +786,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         for req in components:
             session.io.echo(f"  Creating component: {req.name}")
             try:
+                # lucidlint: ignore inline-import component imports this module; deferring breaks the cycle
                 from .component import Component as ComponentModel
 
                 component = ComponentModel.create(
@@ -774,6 +796,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
                     deliverables=outputs,
                 )
                 session.io.echo(f"  ✓ {req.name} created at {component.code_path}")
+            # lucidlint: ignore swallow one component failing is reported and the run continues
             except Exception as e:
                 session.io.echo(f"  ✗ Failed to create {req.name}: {e}")
 
@@ -820,7 +843,7 @@ def _resolve_gaps(
     existing_components: list[str] | None = None,
     *,
     session: Session,
-) -> tuple[list[ComponentSpec], GapAnalysis]:
+) -> GapResolution:
     """Loop: identify components -> analyze gaps -> refine until clean.
 
     Returns ComponentSpec objects with incidental notes captured from the user.
@@ -848,7 +871,7 @@ def _resolve_gaps(
             # Convert to ComponentSpec and capture incidental notes
             components = _normalize_component_specs(requirements)
             components = _capture_incidental_notes(components, session=session)
-            return components, gaps
+            return GapResolution(components=components, gap_analysis=gaps)
 
         # Pass gap info back — the LLM sub-workflows will see it and adjust
         # by including gap context in the next iteration
@@ -864,11 +887,14 @@ def _resolve_gaps(
     )
     components = _normalize_component_specs(requirements)
     components = _capture_incidental_notes(components, session=session)
-    return components, _GapAnalysis.analyze_from_chat(
-        components=requirements,
-        analysis=analysis,
-        existing_components=existing,
-        session=session,
+    return GapResolution(
+        components=components,
+        gap_analysis=_GapAnalysis.analyze_from_chat(
+            components=requirements,
+            analysis=analysis,
+            existing_components=existing,
+            session=session,
+        ),
     )
 
 

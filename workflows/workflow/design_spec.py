@@ -10,6 +10,8 @@ from .domain_spec import ComponentDomainSpec
 from .interaction_context import ComponentInteractionContext
 from .structure import ComponentStructure
 
+# lucidlint: ignore-file class-module ComponentDesignSpec is this module's one model; the name states its role
+
 
 class ComponentDesignSpec(BaseModel):
     """Assembled complete design for a generated component.

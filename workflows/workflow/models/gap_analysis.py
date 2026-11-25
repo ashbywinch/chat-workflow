@@ -11,6 +11,8 @@ from chat_workflow.mixins import LLMValidated
 
 from .process_definition import ProcessDefinition
 
+# lucidlint: ignore-file class-module the gap records are one closely related family and change together
+
 
 @dataclass
 class IntegrationGap:
@@ -44,7 +46,7 @@ class GapAnalysis(LLMValidated):
 
     missing_components: Annotated[
         list[str],
-        UserLabel("parts that are missing", "missing components"),
+        UserLabel(phrase="parts that are missing", aliases="missing components"),
     ] = Field(
         default_factory=list,
         description="Parts of the work that are named but not yet designed",
@@ -52,7 +54,7 @@ class GapAnalysis(LLMValidated):
     )
     missing_playbooks: Annotated[
         list[str],
-        UserLabel("steps that are not written down", "missing playbooks"),
+        UserLabel(phrase="steps that are not written down", aliases="missing playbooks"),
     ] = Field(
         default_factory=list,
         description="Named sets of steps that are referred to but not described",
@@ -60,21 +62,21 @@ class GapAnalysis(LLMValidated):
     )
     integration_gaps: Annotated[
         list[IntegrationGap],
-        UserLabel("connections between steps", "integration gaps"),
+        UserLabel(phrase="connections between steps", aliases="integration gaps"),
     ] = Field(
         default_factory=list,
         description="Where one part passes work to another and the connection is unclear",
     )
     organizational_gaps: Annotated[
         list[OwnershipGap],
-        UserLabel("work with no one in charge", "organizational gaps"),
+        UserLabel(phrase="work with no one in charge", aliases="organizational gaps"),
     ] = Field(
         default_factory=list,
         description="Work that no one has taken responsibility for",
     )
     recommendations: Annotated[
         list[str],
-        UserLabel("what to do next", "recommendations"),
+        UserLabel(phrase="what to do next", aliases="recommendations"),
     ] = Field(
         default_factory=list,
         description="Concrete next steps that address each gap",

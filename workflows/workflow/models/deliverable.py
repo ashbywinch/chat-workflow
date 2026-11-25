@@ -14,6 +14,7 @@ from chat_workflow.rendering import RenderContext, without_full_stop
 
 from .process_definition import ProcessDefinition
 
+# lucidlint: ignore-file global-state the no-executor rule is a prompt constant shared by the class and module-level steps
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
     "The assistant defines what good looks like — it does not generate "
@@ -41,7 +42,7 @@ class Deliverable(LLMValidated):
 
     name: Annotated[
         str,
-        UserLabel("what you call it", "name", guard=False),
+        UserLabel(phrase="what you call it", aliases="name", guard=False),
     ] = Field(
         ...,
         description="What the person calls what they make, e.g. 'Meeting Minutes', 'Invoice PDF'",
@@ -49,7 +50,7 @@ class Deliverable(LLMValidated):
     )
     description: Annotated[
         str | None,
-        UserLabel("what it is", "description", guard=False),
+        UserLabel(phrase="what it is", aliases="description", guard=False),
     ] = Field(
         default=None,
         description="Plain-English description of what it contains — "
@@ -58,7 +59,7 @@ class Deliverable(LLMValidated):
     )
     consumer: Annotated[
         str,
-        UserLabel("who it is for", "consumer"),
+        UserLabel(phrase="who it is for", aliases="consumer"),
     ] = Field(
         ...,
         description="Who uses or receives it (a person, role, or team); name the party only — what they do with it belongs in integration_points",
@@ -66,7 +67,7 @@ class Deliverable(LLMValidated):
     )
     format: Annotated[
         str,
-        UserLabel("what it looks like", "format"),
+        UserLabel(phrase="what it looks like", aliases="format"),
     ] = Field(
         ...,
         description="What it looks like: its exact layout (e.g. 'one-page PDF', 'shared spreadsheet')",
@@ -74,7 +75,7 @@ class Deliverable(LLMValidated):
     )
     success_criteria: Annotated[
         str,
-        UserLabel("how you know it is good", "success criteria", "criteria"),
+        UserLabel(phrase="how you know it is good", aliases=("success criteria", "criteria")),
     ] = Field(
         ...,
         description=(
@@ -85,7 +86,7 @@ class Deliverable(LLMValidated):
     )
     integration_points: Annotated[
         str,
-        UserLabel("who gets it next", "integration points"),
+        UserLabel(phrase="who gets it next", aliases="integration points"),
     ] = Field(
         ...,
         description="Who receives it next, and what they do with it",
@@ -93,7 +94,7 @@ class Deliverable(LLMValidated):
     )
     storage_requirements: Annotated[
         str,
-        UserLabel("where it is kept", "storage requirements"),
+        UserLabel(phrase="where it is kept", aliases="storage requirements"),
     ] = Field(
         ...,
         description="Where it is kept",
@@ -156,10 +157,11 @@ class Deliverable(LLMValidated):
         shown as a proposal the user corrects. A shape that is never shown is
         not a proposal, so this step never hands the user a form to fill in.
         """
+        gather_turn_limit = 6
         gathered = _gather_deliverable(
             analysis=analysis,
             session=session,
-            max_turns=min(max_turns, 6),
+            max_turns=min(max_turns, gather_turn_limit),
         )
         draft = _draft_deliverables(
             notes=gathered.notes,
@@ -167,11 +169,12 @@ class Deliverable(LLMValidated):
             session=session,
         )
         session.propose(draft)
+        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_deliverables,
-            max_turns=min(max_turns, 4),
+            max_turns=min(max_turns, confirm_turn_limit),
         )
 
 

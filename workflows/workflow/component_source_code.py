@@ -11,7 +11,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, override
 
-from pydantic import Field
+from pydantic import BaseModel, Field
+from pydantic_core import core_schema
 
 from chat_workflow import atomic_workflow_step
 from chat_workflow.exceptions import ValidationError
@@ -19,19 +20,46 @@ from chat_workflow.mixins import LLMValidated
 
 from .design_spec import ComponentDesignSpec
 
+# lucidlint: ignore-file record-shape the repair layer exchanges AST nodes, schema fragments and tuples with libcst/ast
+# lucidlint: ignore-file data-clump the repair helpers take (code, tree) because that pair is the module's working state
+# lucidlint: ignore-file assembly-class each repair threads code through its helpers in one ordered pass
+# lucidlint: ignore-file complexity each repair is a branch per AST case in one pass
+# lucidlint: ignore-file large-function the deterministic validator is the ordered repair chain; splitting scatters it
+# lucidlint: ignore-file duplicate the two long-string wrappers share a traversal, not a behaviour
+# lucidlint: ignore-file duplicate-block the repair branches repeat apply-reparse-keep, which is the loop
+# lucidlint: ignore-file swallow exec of generated code can fail arbitrarily; the AST fallback is the surface
+# lucidlint: ignore-file closure-cluster the validator's repair closures are its ordered steps over code/tree
+
+
 _BASE_MODEL_SOURCES = frozenset({"pydantic", "chat_workflow.mixins"})
 
-# Phrases that restate the response protocol. The envelope and Instructor own
-# these; a generated step docstring must describe the conversation instead.
-_PROTOCOL_PHRASES = (
-    "return json",
-    "return only a json",
-    "put the user-facing text in",
-    "put the text in `message`",
-    "never reply with plain text",
-    "set `intent`",
-    "set intent to",
-)
+class SourceRules:
+    """The fixed facts a generated module is checked against."""
+
+    # Phrases that restate the response protocol. The envelope and Instructor
+    # own these; a generated step docstring must describe the conversation.
+    PROTOCOL_PHRASES: ClassVar[tuple[str, ...]] = (
+        "return json",
+        "return only a json",
+        "put the user-facing text in",
+        "put the text in `message`",
+        "never reply with plain text",
+        "set `intent`",
+        "set intent to",
+    )
+
+    # The package was reorganised; the old import paths still appear in the wild.
+    FRAMEWORK_IMPORT_ALIASES: ClassVar[dict[str, str]] = {
+        "chat_workflow.workflow": "chat_workflow",
+        "chat_workflow.workflow.decorators": "chat_workflow",
+    }
+
+    # Re-wrapping a long generated line: the limit, the narrowest a split may
+    # get before it stops helping, an argument's indent, and room for a quote.
+    MAX_LINE: ClassVar[int] = 120
+    MIN_SPLIT_WIDTH: ClassVar[int] = 20
+    FIELD_INDENT: ClassVar[int] = 4
+    ESCAPE_ROOM: ClassVar[int] = 3
 
 
 def _basemodel_class_names(tree: ast.AST) -> set[str]:
@@ -56,10 +84,9 @@ def _join_source_lines(value: Any) -> Any:
     mechanically instead of spending a retry on the escape.
     """
     if isinstance(value, list):
-        lines: list[str] = []
-        for item in value:
-            lines.extend(str(item).split("\n"))
-        return "\n".join(lines)
+        return "\n".join(
+            line for item in value for line in str(item).split("\n")
+        )
     return value
 
 
@@ -74,8 +101,6 @@ class SourceLines(str):
 
     @classmethod
     def __get_pydantic_core_schema__(cls, source_type: Any, handler: Any) -> Any:
-        from pydantic_core import core_schema
-
         return core_schema.no_info_before_validator_function(
             _join_source_lines, core_schema.str_schema()
         )
@@ -261,7 +286,7 @@ def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
             continue
         arguments: list[str] = []
         indent = " " * node.col_offset
-        argument_indent = " " * (node.col_offset + 4)
+        argument_indent = " " * (node.col_offset + SourceRules.FIELD_INDENT)
         for argument in [*node.args, *node.keywords]:
             if isinstance(argument, ast.keyword):
                 if argument.arg is None:
@@ -278,7 +303,13 @@ def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
                 ):
                     arguments.append(single)
                     continue
-                width = max(20, 120 - len(argument_indent) - 4 - 3)
+                width = max(
+                    SourceRules.MIN_SPLIT_WIDTH,
+                    SourceRules.MAX_LINE
+                    - len(argument_indent)
+                    - SourceRules.FIELD_INDENT
+                    - SourceRules.ESCAPE_ROOM,
+                )
                 chunks = _split_description(
                     argument.value.value, width, _escaped_length
                 )
@@ -292,8 +323,9 @@ def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
                 arguments.append(segment)
         if not arguments:
             continue
+        newline = "\n"
         rendered = [
-            f"{argument_indent}{argument.replace(chr(10), chr(10) + argument_indent)}"
+            f"{argument_indent}{argument.replace(newline, newline + argument_indent)}"
             for argument in arguments
         ]
         wrapped = "Field(\n" + ",\n".join(rendered) + ",\n" + indent + ")"
@@ -308,6 +340,32 @@ def _wrap_long_field_calls(code: str, tree: ast.AST) -> str:
             content[:start_index] + wrapped + content[end_index:] + newline
         )
     return "".join(lines)
+
+
+def _wrapped_string(
+    value: str,
+    column: int,
+    lines: list[str],
+    start_line: int,
+    end_line: int,
+) -> str | None:
+    """Wrap one long string at word boundaries, or None when it already fits."""
+    if not any(
+        len(lines[index].rstrip("\n")) > SourceRules.MAX_LINE
+        for index in range(start_line, end_line + 1)
+    ):
+        return None
+    width = max(
+        SourceRules.MIN_SPLIT_WIDTH,
+        SourceRules.MAX_LINE - column - SourceRules.ESCAPE_ROOM,
+    )
+    chunks = _split_description(value, width, _escaped_length)
+    indent = " " * column
+    newline = "\n"
+    rendered = json.dumps(chunks[0])
+    for chunk in chunks[1:]:
+        rendered += newline + indent + json.dumps(chunk)
+    return rendered
 
 
 def _wrap_long_field_strings(code: str, tree: ast.AST) -> str:
@@ -337,23 +395,15 @@ def _wrap_long_field_strings(code: str, tree: ast.AST) -> str:
                 continue
             start_line = value.lineno - 1
             end_line = value.end_lineno - 1
-            if not any(
-                len(lines[index].rstrip("\n")) > 120
-                for index in range(start_line, end_line + 1)
-            ):
-                continue
             # `_split_description` keeps a trailing space on every line but the
             # last so concatenation preserves the text; leave room for it.
             # AST columns are UTF-8 byte offsets; indentation is characters.
-            char_column = _column_to_index(
-                lines[value.lineno - 1], value.col_offset
+            char_column = _column_to_index(lines[value.lineno - 1], value.col_offset)
+            rendered = _wrapped_string(
+                value.value, char_column, lines, start_line, end_line
             )
-            width = max(20, 120 - char_column - 3)
-            chunks = _split_description(value.value, width, _escaped_length)
-            indent = " " * char_column
-            rendered = json.dumps(chunks[0])
-            for chunk in chunks[1:]:
-                rendered += "\n" + indent + json.dumps(chunk)
+            if rendered is None:
+                continue
             start = _absolute_index(code, start_line + 1, value.col_offset)
             end = _absolute_index(code, end_line + 1, value.end_col_offset)
             replacements.append((start, end, rendered))
@@ -384,17 +434,11 @@ def _wrap_long_list_strings(code: str, tree: ast.AST) -> str:
                 continue
             start_line = element.lineno - 1
             end_line = element.end_lineno - 1
-            if not any(
-                len(lines[index].rstrip("\n")) > 120
-                for index in range(start_line, end_line + 1)
-            ):
+            rendered = _wrapped_string(
+                element.value, element.col_offset, lines, start_line, end_line
+            )
+            if rendered is None:
                 continue
-            width = max(20, 120 - element.col_offset - 3)
-            chunks = _split_description(element.value, width, _escaped_length)
-            indent = " " * element.col_offset
-            rendered = json.dumps(chunks[0])
-            for chunk in chunks[1:]:
-                rendered += "\n" + indent + json.dumps(chunk)
             start = _absolute_index(code, start_line + 1, element.col_offset)
             end = _absolute_index(code, end_line + 1, element.end_col_offset)
             replacements.append((start, end, rendered))
@@ -471,20 +515,18 @@ def _fix_field_validator_self(code: str, tree: ast.AST) -> str:
                 for decorator in node.decorator_list
             )
             insertions.append((last, " " * node.col_offset + "@classmethod\n"))
-        for argument in [*node.args.args, *node.args.kwonlyargs]:
-            if argument.arg == "self" and argument.end_col_offset is not None:
-                replacements.append(
-                    (argument.lineno, argument.col_offset, argument.end_col_offset)
-                )
-        for child in ast.walk(node):
-            if (
-                isinstance(child, ast.Name)
-                and child.id == "self"
-                and child.end_col_offset is not None
-            ):
-                replacements.append(
-                    (child.lineno, child.col_offset, child.end_col_offset)
-                )
+        replacements.extend(
+            (argument.lineno, argument.col_offset, argument.end_col_offset)
+            for argument in [*node.args.args, *node.args.kwonlyargs]
+            if argument.arg == "self" and argument.end_col_offset is not None
+        )
+        replacements.extend(
+            (child.lineno, child.col_offset, child.end_col_offset)
+            for child in ast.walk(node)
+            if isinstance(child, ast.Name)
+            and child.id == "self"
+            and child.end_col_offset is not None
+        )
     lines = code.splitlines(keepends=True)
     for lineno, start, end in sorted(replacements, reverse=True):
         line = lines[lineno - 1]
@@ -956,13 +998,6 @@ def _words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
-_FRAMEWORK_IMPORT_ALIASES: dict[str, str] = {
-    # The package was reorganised; the old paths still appear in the wild.
-    "chat_workflow.workflow": "chat_workflow",
-    "chat_workflow.workflow.decorators": "chat_workflow",
-}
-
-
 def _repair_imports(code: str, _tree: ast.AST) -> str:
     """The import repair has the repair-chain signature."""
     return _canonical_framework_imports(code)
@@ -970,7 +1005,7 @@ def _repair_imports(code: str, _tree: ast.AST) -> str:
 
 def _canonical_framework_imports(code: str) -> str:
     """Rewrite a framework import path that has an exact replacement."""
-    for legacy, canonical in _FRAMEWORK_IMPORT_ALIASES.items():
+    for legacy, canonical in SourceRules.FRAMEWORK_IMPORT_ALIASES.items():
         if legacy not in code:
             continue
         code = re.sub(
@@ -1267,9 +1302,7 @@ class ComponentSourceCode(LLMValidated):
         }
         try:
             namespace: dict = {}
-            exec(compile(tree, "<generated>", "exec"), namespace)
-            from pydantic import BaseModel
-
+            exec(compile(tree, filename="<generated>", mode="exec"), namespace)
             base_model_subclasses = [
                 obj
                 for obj in namespace.values()
@@ -1355,7 +1388,7 @@ class ComponentSourceCode(LLMValidated):
             if not is_atomic or is_chat_off:
                 continue
             docstring = (ast.get_docstring(node) or "").lower()
-            for phrase in _PROTOCOL_PHRASES:
+            for phrase in SourceRules.PROTOCOL_PHRASES:
                 if phrase in docstring:
                     raise ValidationError(
                         f"Workflow docstring for '{node.name}' states the "

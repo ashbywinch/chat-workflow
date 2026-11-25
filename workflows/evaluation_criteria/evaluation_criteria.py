@@ -4,7 +4,10 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from chat_workflow import atomic_workflow
+from chat_workflow import ValidationError, atomic_workflow
+
+__all__ = ["Criterion", "EvaluationCriteria"]
+# lucidlint: ignore-file class-module Criterion is part of the EvaluationCriteria model family; they change together
 
 
 class Criterion(BaseModel):
@@ -98,8 +101,6 @@ class EvaluationCriteria(BaseModel):
         Raises:
             ValidationError: If no criterion is named 'budget'.
         """
-        from chat_workflow import ValidationError
-
         if not any(c.name.lower() == "budget" for c in self.criteria):
             raise ValidationError("Must include a criterion named 'budget' (case-insensitive)")
         return self

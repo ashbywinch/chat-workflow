@@ -67,7 +67,7 @@ _TYPE_IN_RULE = re.compile(
 )
 
 
-class StructValidator(BaseModel):
+class ValidationRule(BaseModel):
     """A validation rule for the generated Pydantic model.
 
     Captures a business rule or quality criterion that should be enforced
@@ -124,7 +124,7 @@ class ComponentStructure(BaseModel):
         default_factory=list,
         description="Fields that make up the generated Pydantic model",
     )
-    model_validators: list[StructValidator] = Field(
+    model_validators: list[ValidationRule] = Field(
         default_factory=list,
         description="Validation rules for the generated model",
     )
@@ -166,11 +166,12 @@ class ComponentStructure(BaseModel):
         """Derive the structure from the domain spec, then confirm it."""
         draft = _draft_structure(domain_spec=domain_spec, session=session)
         session.propose(draft)
+        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_structure,
-            max_turns=min(max_turns, 4),
+            max_turns=min(max_turns, confirm_turn_limit),
         )
 
 

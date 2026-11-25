@@ -14,6 +14,7 @@ from chat_workflow.rendering import RenderContext, without_full_stop
 from .deliverable import Deliverable
 from .process_definition import ProcessDefinition
 
+# lucidlint: ignore-file global-state the no-executor rule is a prompt constant shared by the class and module-level steps
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
     "The assistant defines what good looks like — it does not generate "
@@ -45,13 +46,13 @@ class Resource(LLMValidated):
 
     source: Annotated[
         str,
-        UserLabel("where it comes from", "source"),
+        UserLabel(phrase="where it comes from", aliases="source"),
     ] = Field(
         ..., description="Where it comes from (a person, system, document, or place)", min_length=1
     )
     format: Annotated[
         str,
-        UserLabel("what it looks like", "format"),
+        UserLabel(phrase="what it looks like", aliases="format"),
     ] = Field(
         ...,
         description=(
@@ -62,7 +63,7 @@ class Resource(LLMValidated):
     )
     dependencies: Annotated[
         list[str],
-        UserLabel("what it needs first", "dependencies"),
+        UserLabel(phrase="what it needs first", aliases="dependencies"),
     ] = Field(
         default_factory=list,
         description="Other things it needs first",
@@ -70,9 +71,8 @@ class Resource(LLMValidated):
     validation_criteria: Annotated[
         str,
         UserLabel(
-            "how you know you have everything",
-            "validation criteria",
-            "criteria",
+            phrase="how you know you have everything",
+            aliases=("validation criteria", "criteria"),
         ),
     ] = Field(
         ...,
@@ -111,11 +111,12 @@ class Resource(LLMValidated):
             session=session,
         )
         session.propose(draft)
+        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_resources,
-            max_turns=min(max_turns, 4),
+            max_turns=min(max_turns, confirm_turn_limit),
         )
 
 

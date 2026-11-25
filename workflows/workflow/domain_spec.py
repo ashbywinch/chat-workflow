@@ -85,7 +85,7 @@ class ComponentDomainSpec(LLMValidated):
 
     name: Annotated[
         str,
-        UserLabel("what you call it", "name", guard=False),
+        UserLabel(phrase="what you call it", aliases="name", guard=False),
     ] = Field(
         ...,
         description="Matches ComponentSpec.name — the artifact name",
@@ -94,7 +94,7 @@ class ComponentDomainSpec(LLMValidated):
 
     description: Annotated[
         str,
-        UserLabel("what it is", "description", guard=False),
+        UserLabel(phrase="what it is", aliases="description", guard=False),
     ] = Field(
         ...,
         description="What this artifact represents in the user's domain",
@@ -103,7 +103,7 @@ class ComponentDomainSpec(LLMValidated):
 
     fields: Annotated[
         list[ComponentDomainField],
-        UserLabel("the parts of it", "fields"),
+        UserLabel(phrase="the parts of it", aliases="fields"),
     ] = Field(
         ...,
         description="Fields that make up this artifact, described in domain terms",
@@ -112,7 +112,7 @@ class ComponentDomainSpec(LLMValidated):
 
     what_good_looks_like: Annotated[
         list[str],
-        UserLabel("what makes it good", "what good looks like"),
+        UserLabel(phrase="what makes it good", aliases="what good looks like"),
     ] = Field(
         ...,
         description="Holistic quality criteria for the artifact as a whole — what makes it excellent",
@@ -121,7 +121,7 @@ class ComponentDomainSpec(LLMValidated):
 
     expert_role: Annotated[
         str,
-        UserLabel("the expertise I should bring", "expert role"),
+        UserLabel(phrase="the expertise I should bring", aliases="expert role"),
     ] = Field(
         ...,
         description=(
@@ -192,11 +192,12 @@ class ComponentDomainSpec(LLMValidated):
             session=session,
         )
         session.propose(draft)
+        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_domain_spec,
-            max_turns=min(max_turns, 4),
+            max_turns=min(max_turns, confirm_turn_limit),
         )
 
 
@@ -245,4 +246,4 @@ already reported in an earlier turn; say what changed only in the turn where it 
     ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
-from .models.deliverable import Deliverable  # noqa: E402
+from .models.deliverable import Deliverable  # noqa: E402 — imported after the class to break the model cycle
