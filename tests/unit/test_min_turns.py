@@ -96,12 +96,11 @@ class TestTurnShape(unittest.TestCase):
         self.assertEqual(second.message, "What do you make?")
         self.assertEqual(len(conversation.script.calls), 2)
 
-    def test_a_colon_that_promises_content_is_a_correction(self):
+    def test_a_continue_that_leads_into_content_is_returned_as_is(self):
+        """A lead-in is a content defect, not a text shape the runtime can
+        interpret; the contract is in the prompt."""
         conversation = make_conversation(
-            [
-                {"intent": "continue", "message": "Here's the structure:"},
-                {"intent": "continue", "message": "What sections does it have?"},
-            ]
+            [{"intent": "continue", "message": "Here's the structure:"}]
         )
         workflow = AtomicWorkflow(
             config=make_atomic_workflow_config(conversation=conversation)
@@ -109,8 +108,8 @@ class TestTurnShape(unittest.TestCase):
 
         result = workflow.process_turn("go")
 
-        self.assertEqual(result.message, "What sections does it have?")
-        self.assertEqual(len(conversation.script.calls), 2)
+        self.assertEqual(result.message, "Here's the structure:")
+        self.assertEqual(len(conversation.script.calls), 1)
 
     def test_a_failure_is_given_one_turn_to_continue(self):
         conversation = make_conversation(

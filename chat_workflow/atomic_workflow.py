@@ -174,16 +174,6 @@ class AtomicWorkflow(Generic[TResult]):
                         "A chat-off step returned 'continue'; its output schema "
                         "does not permit a question."
                     )
-                message = (response.message or "").strip()
-                if message.endswith(":") and self._has_turn_room():
-                    # A colon introduces content the turn does not hold; the
-                    # model must give the list or finish, not promise it.
-                    user_input = (
-                        "Your message ends with a colon but the turn does not "
-                        "contain the content it introduces. Give the content in "
-                        "the message, or finish and let the next step show it."
-                    )
-                    continue
                 return self.on_continue(response)
             if response.intent == AgentIntent.SUCCESS:
                 if self.chat and self.turn_count < self.min_turns:
@@ -198,7 +188,7 @@ class AtomicWorkflow(Generic[TResult]):
                 if (response.message or "").strip().endswith("?") and self._has_turn_room():
                     # A success is a completion. Asking the user something
                     # while claiming the step is done leaves the answer unread.
-                    user_input = (  # lucidlint: ignore duplicate-block each correction is a distinct authored prompt
+                    user_input = (
                         "A success message cannot ask the user a question. If "
                         "you still need an answer, return intent='continue'. "
                         "Otherwise return the result with a statement of what "

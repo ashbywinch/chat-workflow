@@ -213,8 +213,8 @@ def _opening_section(explore: bool) -> str:
             "do not offer to structure it: acknowledge in one clause and ask "
             "the next open question. If the user asks for a shape, a section "
             "list, or a suggestion, say in one sentence that the next step "
-            "shows one and finish — do not answer with a promised list or a "
-            "message that ends with a colon."
+            "shows one and finish — do not answer with a lead-in that promises "
+            "a list you do not give."
         )
     else:
         start = (

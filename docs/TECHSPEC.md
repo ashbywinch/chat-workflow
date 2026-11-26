@@ -108,9 +108,9 @@ Ten rules shape a conversation, independent of any one step's prompt:
   the question the user is answering.
 - **A turn is not a question it does not ask.** A success message ends with a
   statement, not a question: asking while claiming the step is done leaves the
-  answer unread. A success that ends with `?` is fed back as a correction, and
-  a continue that ends with `:` — a promised list it does not give — is
-  rejected by the response schema.
+  answer unread. A success that ends with `?` is fed back as a correction. A
+  continue says what it has to say in that message; the framework cannot
+  complete a promised list the model did not give.
 - **A turn is not a repeat.** An identical continue message is not a new turn:
   it is fed back with a correction, so a model that did not read the answer it
   was given cannot loop.

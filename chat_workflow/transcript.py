@@ -85,9 +85,6 @@ _CORRECTION_PROMPTS = frozenset(
         "A success message cannot ask the user a question. If you still need "
         "an answer, return intent='continue'. Otherwise return the result "
         "with a statement of what you did.",
-        "Your message ends with a colon but the turn does not contain the "
-        "content it introduces. Give the content in the message, or finish "
-        "and let the next step show it.",
         "You returned failure. Continue with what you were given: propose the "
         "result, or ask the one question you still need. Failure is only for a "
         "user who refuses to engage or input that cannot be interpreted.",

@@ -62,8 +62,8 @@ class Continue(BaseModel):
         min_length=1,
         description=(
             "The question for the user, or a complete statement. Give any "
-            "content you promise: a message that ends with a colon is refused "
-            "and fed back."
+            "content you promise in this message; do not end on a lead-in to "
+            "content that is not here."
         ),
     )
 
