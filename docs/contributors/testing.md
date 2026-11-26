@@ -364,7 +364,7 @@ which routes through OpenRouter's lower-latency endpoints.
 
 ## Prompt Improvement Mindset
 
-When an eval fails, it's tempting to blame the cheap model. **Resist that instinct.** A core purpose of this library is to build agents that work well even with small, fast, cheap models. An eval failure is almost always a signal that the prompt can be improved.
+An eval failure is a defect, full stop. The model is capable; a failure means the prompt, the context, the output contract or the turn budget was insufficient. Never call it model variance or flaky, and never re-run until green: a re-run is a diagnostic, not a fix.
 
 ### What good prompts look like
 
@@ -384,12 +384,25 @@ The best prompts for multi-turn conversation workflows share a few patterns:
 
 ### When debugging a failing eval
 
+Read the failed turn's reasoning in the `.json` before changing anything:
+name the instruction the model followed and the instruction it ignored.
+
 1. Read the judge's verdict — it tells you *which* rule was violated and *why*.
 2. If "No repetition" failed: did the agent ignore or re-ask for information the user already gave? If yes, add guidance to listen and build on answers. If the follow-up was genuinely needed (e.g., user gave a vague answer), the judge prompt may need refining instead.
 3. If "Uses expertise" failed: the agent is asking the user to fill out a form. Add language that tells it to propose, infer, and suggest — "propose the details yourself" — and give a concrete example.
 4. If "Honest about provenance" failed: the agent is hallucinating. Add language that clearly separates proposals from confirmed facts.
-5. Rerun the failing test only — never the full suite until you're ready to verify.
-6. Transcripts are saved to `test-results/transcripts/`: the `.json` file is
+5. Check the final-turn contract: a success with no result, or a confirmation
+   question, means the error the model received did not say what to do at
+   that point. Improve the `FinalAnswer` message or the final-turn
+   instruction; do not add text heuristics to guess intent.
+6. Check the turn budget: the designed flow (gather → draft → confirm →
+   result, plus a late correction) must fit. A final-turn failure often means
+   the ceiling is too tight, not that the model is incapable.
+7. Fix the contract, prompt/context or budget — or agree a framework change
+   with the user before making it. Do not bodge: no text guessing, no
+   suppression, no re-run-until-green. A re-run confirms a change or tests a
+   named nondeterminism hypothesis.
+8. Transcripts are saved to `test-results/transcripts/`: the `.json` file is
    the canonical record (typed events, result, judge verdicts with evidence and
    fix, metadata); the `.txt` file is the rendered human view; the
    `-exception.txt` file has the full traceback.

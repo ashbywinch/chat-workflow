@@ -225,9 +225,10 @@ class TestComponentSourceCodeCodegenEval(unittest.TestCase):
                 model_method=workflow_method,
                 method_kwargs=dict(
                     # Completing a real conversation is the point: questions,
-                    # a draft, its confirmation and the success turn. Five
-                    # turns is a runaway guard, not a question-count bar.
-                    max_turns=10,
+                    # a draft, its confirmation and the success turn. Twelve is
+                    # a runaway guard, not a question-count bar, with room for
+                    # one late correction after the draft.
+                    max_turns=12,
                 ),
                 user_persona=user_persona,
                 judge_rules=judge_rules,

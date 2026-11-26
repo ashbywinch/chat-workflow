@@ -68,6 +68,26 @@ see Organisation). Everything else fakes, with the fake injected per the
 Mocking section (parameter injection first — never `monkeypatch` a module
 constant to point at a tmp dir; make the dependency a parameter).
 
+## An eval failure is a defect
+
+An eval that fails is a defect, full stop — not "model variance", not
+"flaky", and not something a re-run can clear. The model is capable of the
+job; a failure means the prompt, the context, the output contract or the
+turn budget was insufficient. Re-running until green hides the defect; a
+re-run only confirms a change or tests a named nondeterminism hypothesis.
+
+Diagnose from the failed turn's reasoning: name the instruction the model
+followed and the instruction it ignored. Then fix the layer that made the
+failure possible:
+
+- the output contract or the error message the model receives (it must say
+  what to do at this point),
+- the prompt or context (a missing or conflicting instruction),
+- the turn budget (the designed flow does not fit).
+
+Do not add text heuristics to guess intent, and do not suppress the
+failure. If the fix needs a framework change, agree it before making it.
+
 ## Organisation
 
 - **Unit tests:** one function/module in isolation, no API calls.

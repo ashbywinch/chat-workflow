@@ -149,14 +149,32 @@ class AgentAnswer(_CarriesResult, BaseModel, Generic[TResult]):
         description="The complete object, on a success; absent otherwise.",
     )
 
-class FinalAnswer(_CarriesResult, BaseModel, Generic[TResult]):
+class FinalAnswer(BaseModel, Generic[TResult]):
     """The last turn's wire answer: success or failure, never a question."""
 
     model_config = ConfigDict(extra="forbid")
 
     intent: Literal[AgentIntent.SUCCESS, AgentIntent.FAILURE]
-    message: str = Field(min_length=1)
+    message: str = Field(
+        min_length=1,
+        description=(
+            "What the user reads when the step ends: the decision, change, or "
+            "confirmation. This is the final turn; do not ask a question."
+        ),
+    )
     result: TResult | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _a_success_carries_the_result(self) -> FinalAnswer[TResult]:
+        if self.intent is AgentIntent.SUCCESS and self.result is None:
+            raise ValueError(
+                "This is the final turn. A success must carry the complete "
+                "result. There is no further turn to ask the user: apply the "
+                "user's last correction, if any, and return the result you "
+                "built from what they gave; return failure with the reason "
+                "only if a required value cannot be produced."
+            )
+        return self
 
 def as_turn(answer: AgentAnswer[TResult]) -> Continue | Success[TResult] | Failure:
     """Turn the flat wire answer into the three-shape turn the loop uses."""
