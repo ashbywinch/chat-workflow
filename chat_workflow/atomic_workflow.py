@@ -122,24 +122,35 @@ class AtomicWorkflow(Generic[TResult]):
         """The transcript: the conversation's message list, not a rendering."""
         return self._conversation.messages
 
+    def _has_turn_room(self) -> bool:
+        """True while another model turn is allowed.
+
+        ``max_turns=None`` removes the bound: the step ends when the model
+        returns success or failure, so there is no last turn to force.
+        """
+        return self.max_turns is None or self.turn_count < self.max_turns
+
     def process_turn(self, user_input: str | None = None) -> TurnResult[TResult]:
         """Take the next turn, with the corrections that turn needs.
 
         A correction — a rejected result, an answer that promises content it
         does not give, an early finish — is a turn of its own: it is fed back
-        as the next input and spends one of ``max_turns``.
+        as the next input and spends one of ``max_turns`` when the step
+        declares a bound.
         The budget at the top of this loop is what ends a model that will not
         stop asking; no branch can add a turn past it or pass it to a callee.
+        A step with ``max_turns=None`` has no such budget: it ends only on
+        success or failure, and never receives a forced final turn.
         """
         while True:
-            if self.turn_count >= self.max_turns:
+            if self.max_turns is not None and self.turn_count >= self.max_turns:
                 raise TurnLimitExceededError(self.max_turns)
 
             self.turn_count += 1
             # The last turn is told so: a model that would ask again is given
             # one turn to answer with what it has, and the step still fails if
             # it will not.
-            final_turn = self.turn_count >= self.max_turns
+            final_turn = self.max_turns is not None and self.turn_count >= self.max_turns
             try:
                 response = self._call_llm(user_input, final_turn=final_turn)
             except MaxRetriesExceededError as exc:
@@ -164,7 +175,7 @@ class AtomicWorkflow(Generic[TResult]):
                         "does not permit a question."
                     )
                 message = (response.message or "").strip()
-                if message.endswith(":") and self.turn_count < self.max_turns:
+                if message.endswith(":") and self._has_turn_room():
                     # A colon introduces content the turn does not hold; the
                     # model must give the list or finish, not promise it.
                     user_input = (
@@ -184,7 +195,7 @@ class AtomicWorkflow(Generic[TResult]):
                         "before returning the result."
                     )
                     continue
-                if (response.message or "").strip().endswith("?") and self.turn_count < self.max_turns:
+                if (response.message or "").strip().endswith("?") and self._has_turn_room():
                     # A success is a completion. Asking the user something
                     # while claiming the step is done leaves the answer unread.
                     user_input = (  # lucidlint: ignore duplicate-block each correction is a distinct authored prompt
@@ -196,7 +207,7 @@ class AtomicWorkflow(Generic[TResult]):
                     continue
                 return self.on_success(response)
             if response.intent == AgentIntent.FAILURE:
-                if not self._failure_given_a_turn and self.turn_count < self.max_turns:
+                if not self._failure_given_a_turn and self._has_turn_room():
                     # A step sometimes calls failure when the conversation is
                     # hard — a skeptical user, a thin description, a correction
                     # it did not want. Give it one turn to continue before

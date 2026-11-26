@@ -102,7 +102,7 @@ def _success(action) -> TurnResult:
 
 def make_atomic_workflow_config(
     response_model_override: type | None = None,
-    max_turns: int = 10,
+    max_turns: int | None = 10,
     **overrides: Any,
 ) -> AtomicWorkflowConfig:
     """Create a standard AtomicWorkflowConfig for testing."""

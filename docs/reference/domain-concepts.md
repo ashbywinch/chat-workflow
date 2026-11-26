@@ -30,7 +30,7 @@ steps owned by other components.
 
 ## Atomic Workflow Step
 
-**What it is:** The smallest unit of LLM-driven conversation that produces a validated Pydantic object. An atomic workflow step runs a multi-turn loop (user ↔ LLM) until the LLM signals success with a valid result, failure, or the turn limit is reached.
+**What it is:** The smallest unit of LLM-driven conversation that produces a validated Pydantic object. An atomic workflow step runs a multi-turn loop (user ↔ LLM) until the LLM signals success with a valid result or failure, or the turn limit is reached when the step declares one.
 
 **Broadly known as:** In other frameworks this concept appears as a *structured output agent loop*, a *function-calling agent*, a *tool-use loop*, or a *run* (OpenAI SDK). Vercel's AI SDK calls it a multi-step *generation* with `stopWhen`. LangGraph implements it as a *StateGraph* that loops until a condition is met. LlamaIndex has *FunctionAgent* for the same pattern.
 

@@ -32,7 +32,10 @@ class AtomicWorkflowConfig(Generic[TResult]):
     # A model or a union alias: what the request's schema is built from, so it
     # is not `type[...]` — that is the point of the field.
     response_model: Any
-    max_turns: int
+    # The step's conversation bound. ``None`` is the author's explicit "no
+    # limit": the step ends on success or failure, never because a count ran
+    # out, so there is no final turn to force.
+    max_turns: int | None
     # Each turn's outcome reaches the handler that asked for it, so a handler
     # reads the fields that shape actually has: a continue has a message and
     # no result, a success the reverse.

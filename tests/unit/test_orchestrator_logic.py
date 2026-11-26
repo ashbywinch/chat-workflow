@@ -21,6 +21,7 @@ from chat_workflow import (
     Success,
     TurnLimitExceededError,
     TurnResult,
+    atomic_workflow_step,
 )
 from chat_workflow.session import UserIO
 from tests.conftest import (
@@ -39,9 +40,11 @@ class _ScriptedConversation:
         self._outputs = list(outputs)
         self.messages = []
         self.prompts = []
+        self.final_turns = []
 
     def send(self, prompt=None, *, final_turn=False, chat_off=False):
         self.prompts.append(prompt)
+        self.final_turns.append(final_turn)
         index = min(len(self.prompts) - 1, len(self._outputs) - 1)
         output = self._outputs[index]
         if isinstance(output, BaseException):
@@ -218,6 +221,70 @@ class TestAtomicWorkflow(unittest.TestCase):
         self.assertTrue(result3.is_complete)
         self.assertEqual(result3.result, make_valid_criteria())
         self.assertEqual(orchestrator.turn_count, 3)
+
+    def test_no_max_turns_still_honours_min_turns(self):
+        responses = [
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=make_valid_criteria(),
+            ),
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=make_valid_criteria(),
+            ),
+        ]
+        conversation = _ScriptedConversation(responses)
+        orchestrator = AtomicWorkflow(
+            config=make_atomic_workflow_config(
+                max_turns=None,
+                min_turns=2,
+                conversation=conversation,
+            )
+        )
+
+        result = orchestrator.process_turn("Hello")
+
+        self.assertTrue(result.is_complete)
+        self.assertEqual(
+            orchestrator.turn_count,
+            2,
+            "min_turns made the first success a correction, not a completion",
+        )
+        self.assertFalse(any(conversation.final_turns))
+
+    def test_no_max_turns_never_forces_a_final_turn(self):
+        responses = [
+            Continue(intent=AgentIntent.CONTINUE, message="Question 1"),
+            Continue(intent=AgentIntent.CONTINUE, message="Question 2"),
+            Continue(intent=AgentIntent.CONTINUE, message="Question 3"),
+            Success[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Done.",
+                result=make_valid_criteria(),
+            ),
+        ]
+        conversation = _ScriptedConversation(responses)
+        orchestrator = AtomicWorkflow(
+            config=make_atomic_workflow_config(
+                max_turns=None,
+                conversation=conversation,
+            )
+        )
+
+        for answer in ("A1", "A2", "A3"):
+            result = orchestrator.process_turn(answer)
+            self.assertFalse(result.is_complete)
+
+        result = orchestrator.process_turn("A4")
+
+        self.assertTrue(result.is_complete)
+        self.assertEqual(orchestrator.turn_count, 4)
+        self.assertFalse(
+            any(conversation.final_turns),
+            "a step with no turn limit has no final turn to force",
+        )
 
     def test_orchestrator_raises_on_max_turns(self):
         action = Continue(intent=AgentIntent.CONTINUE, message="Another question")
@@ -424,6 +491,44 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         response_model = session.workflows[0].response_model
         self.assertIsNotNone(response_model, "response_model should be set")
         self.assertEqual(response_model, AgentAnswer[EvaluationCriteria])
+
+    def test_a_caller_can_remove_the_turn_limit(self):
+        session = _CapturingSession(make_valid_criteria())
+
+        EvaluationCriteria.generate_from_chat(
+            context="test", max_turns=None, session=session
+        )
+
+        self.assertIsNone(session.workflows[0].max_turns)
+
+    def test_a_step_declared_default_is_the_turn_bound(self):
+        from workflows.evaluation_criteria import Criterion
+        from workflows.evaluation_criteria.refine import refine
+
+        criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget constraint", weight=8.0),
+                Criterion(name="quality", description="Quality level", weight=7.0),
+            ],
+        )
+        session = _CapturingSession(criteria)
+
+        refine(initial_object=criteria, session=session)
+
+        self.assertEqual(session.workflows[0].max_turns, 5)
+
+    def test_a_step_can_declare_no_turn_limit(self):
+        @atomic_workflow_step
+        def step(context: str, max_turns: int | None = None) -> EvaluationCriteria:
+            """Build criteria from {context}."""
+            return make_valid_criteria()
+
+        session = _CapturingSession(make_valid_criteria())
+
+        step(context="test", session=session)
+
+        self.assertIsNone(session.workflows[0].max_turns)
 
 
 class TestAutoParamInjection(unittest.TestCase):

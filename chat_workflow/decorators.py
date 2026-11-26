@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import Annotated, Any, get_args, get_origin
@@ -42,6 +43,29 @@ def _is_result_model(return_type: Any) -> bool:
         return True
     inner = _inner_model(return_type)
     return isinstance(inner, type) and issubclass(inner, BaseModel)
+
+
+def _checked_max_turns(value: Any, func_name: str) -> int | None:
+    """A turn bound is an int, or ``None`` for no bound."""
+    if value is None or isinstance(value, int):
+        return value
+    raise TypeError(
+        f"@atomic_workflow function '{func_name}' declares max_turns={value!r}; "
+        "it must be an int or None (None means no turn limit)."
+    )
+
+
+def _declared_max_turns(func: Callable[..., Any], *, single_turn: bool) -> int | None:
+    """The step's declared turn bound, or the framework's default.
+
+    A component author declares ``max_turns: int | None = None`` to let the
+    conversation run until the step succeeds or fails. A step that does not
+    declare the parameter gets the framework's runaway guard.
+    """
+    parameter = inspect.signature(func).parameters.get("max_turns")
+    if parameter is None or parameter.default is inspect.Parameter.empty:
+        return 1 if single_turn else 10
+    return _checked_max_turns(parameter.default, func.__name__)
 
 
 def _build_checklist_section(rules: dict[str, str]) -> str:
@@ -270,7 +294,7 @@ def _turn_policy_sections(chat: bool, return_type: Any) -> list[str]:
 def _setup_atomic_workflow(
     system_prompt: str,
     actual_return_type: Any,
-    max_turns: int,
+    max_turns: int | None,
     debug: Any,
     session: Any,
     *,
@@ -319,7 +343,7 @@ def _setup_atomic_workflow(
             response_model=AgentAnswer[actual_return_type],
             final_response_model=FinalAnswer[actual_return_type],
             max_turns=max_turns,
-            min_turns=min(min_turns, max_turns),
+            min_turns=min_turns if max_turns is None else min(min_turns, max_turns),
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(
                 response.message
@@ -415,7 +439,10 @@ def atomic_workflow(
                 chat=chat,
                 instructions=session.instructions,
             )
-            max_turns = kwargs.pop("max_turns", 1 if single_turn else 10)
+            if "max_turns" in kwargs:
+                max_turns = _checked_max_turns(kwargs.pop("max_turns"), f.__name__)
+            else:
+                max_turns = _declared_max_turns(raw_func, single_turn=single_turn)
 
             if debug is None and session.config.debug:
                 debug = StreamingDebug()

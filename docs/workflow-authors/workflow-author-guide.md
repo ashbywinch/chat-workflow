@@ -293,6 +293,30 @@ def my_workflow_step(
     ...
 ```
 
+## The Turn Bound
+
+`max_turns` is the step's conversation bound: the number of model turns it may
+take before the run fails. Declare it as `int | None` and set it to `None` when
+the conversation should end only when the step succeeds or fails — for
+example, a step where the user may need to correct the draft more times than a
+fixed budget allows:
+
+```python
+from chat_workflow import atomic_workflow_step
+
+
+@atomic_workflow_step
+def generate_from_chat(
+    context: str,
+    max_turns: int | None = None,
+) -> MyModel:
+    ...
+```
+
+The caller can also pass `max_turns=None`. The value declared in the signature
+is the step's default; a step that does not declare the parameter keeps the
+framework's guard of 10 turns (one for a `single_turn` step).
+
 ## Generic Refinement with TypeVar
 
 Use `TypeVar` to create generic chat functions that work with any Pydantic model type:

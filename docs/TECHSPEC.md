@@ -80,7 +80,7 @@ deferred interface are in [document store](reference/document-store.md).
 
 ## Turn contracts
 
-Nine rules shape a conversation, independent of any one step's prompt:
+Ten rules shape a conversation, independent of any one step's prompt:
 
 - **A success says what it did.** `Success` carries `message`, and the session
   speaks it for a chat-on step. A silent completion is not expressible.
@@ -88,6 +88,10 @@ Nine rules shape a conversation, independent of any one step's prompt:
   number of model turns before a result is accepted. A gather step that must
   ask or propose first declares two; a success on the first turn is fed back
   as a correction ("do the task's next step"), not accepted as a summary.
+- **The turn bound is the author's call.** `max_turns` bounds the step's
+  model turns. `None` removes the bound: the step ends only on success or
+  failure, so there is no last turn and no forced final shape. The
+  conversation is as long as the task and the user need.
 - **Changed drafts are shown again; unchanged drafts finish.** A confirmation
   step returns the draft it was given or a corrected one. The framework shows
   a changed draft through the same proposal turn and asks once more; an
@@ -114,8 +118,10 @@ Nine rules shape a conversation, independent of any one step's prompt:
   not the sample: every retry answers from the same history, so a rule that
   failed for a fact the user has not given cannot be repaired by resampling.
   The rejection is fed back as a correction turn — ask for what is missing —
-  and the conversation continues, bounded by `max_turns`. On the last turn the
-  run fails rather than asking a question it cannot get answered.
+  and the conversation continues, bounded by `max_turns` when the step
+  declares one. On the last turn the run fails rather than asking a question
+  it cannot get answered; a step with `max_turns=None` has no last turn and
+  ends on success or failure.
 
 A question the schema already fixes (the three interaction preferences) is
 asked by the framework, not left to the model: the answer is a parameter to
