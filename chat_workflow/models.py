@@ -25,22 +25,22 @@ __all__ = [
 TResult = TypeVar("TResult")
 
 
-def _require_success_result(intent: AgentIntent, result: object) -> None:
+def _require_success_result(intent: AgentIntent, result: object, message: str) -> None:
     if intent is AgentIntent.SUCCESS and result is None:
-        raise ValueError(
-            "A success must carry `result`: the complete object the step "
-            "was asked for."
-        )
+        raise ValueError(message)
 
 
 def _success_carries_its_result(self):
-    _require_success_result(self.intent, self.result)
+    _require_success_result(self.intent, self.result, self._RESULT_REQUIRED_MESSAGE)
     return self
 
 
 class _CarriesResult:
     """A success answer must carry the object the step was asked for."""
 
+    _RESULT_REQUIRED_MESSAGE: ClassVar[str] = (
+        "A success must carry `result`: the complete object the step was asked for."
+    )
     _a_success_carries_its_result = model_validator(mode="after")(_success_carries_its_result)
 
 
@@ -149,32 +149,22 @@ class AgentAnswer(_CarriesResult, BaseModel, Generic[TResult]):
         description="The complete object, on a success; absent otherwise.",
     )
 
-class FinalAnswer(BaseModel, Generic[TResult]):
+class FinalAnswer(_CarriesResult, BaseModel, Generic[TResult]):
     """The last turn's wire answer: success or failure, never a question."""
+
+    _RESULT_REQUIRED_MESSAGE: ClassVar[str] = (
+        "This is the final turn. A success must carry the complete result. "
+        "There is no further turn to ask the user: apply the user's last "
+        "correction, if any, and return the result you built from what they "
+        "gave; return failure with the reason only if a required value cannot "
+        "be produced."
+    )
 
     model_config = ConfigDict(extra="forbid")
 
     intent: Literal[AgentIntent.SUCCESS, AgentIntent.FAILURE]
-    message: str = Field(
-        min_length=1,
-        description=(
-            "What the user reads when the step ends: the decision, change, or "
-            "confirmation. This is the final turn; do not ask a question."
-        ),
-    )
+    message: str = Field(min_length=1)
     result: TResult | None = Field(default=None)
-
-    @model_validator(mode="after")
-    def _a_success_carries_the_result(self) -> FinalAnswer[TResult]:
-        if self.intent is AgentIntent.SUCCESS and self.result is None:
-            raise ValueError(
-                "This is the final turn. A success must carry the complete "
-                "result. There is no further turn to ask the user: apply the "
-                "user's last correction, if any, and return the result you "
-                "built from what they gave; return failure with the reason "
-                "only if a required value cannot be produced."
-            )
-        return self
 
 def as_turn(answer: AgentAnswer[TResult]) -> Continue | Success[TResult] | Failure:
     """Turn the flat wire answer into the three-shape turn the loop uses."""

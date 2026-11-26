@@ -403,6 +403,21 @@ class TestTheLastTurn(unittest.TestCase):
         self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
         self.assertEqual(len(conversation.script.calls), 2)
 
+    def test_a_final_success_without_a_result_names_the_final_turn(self):
+        """The error says what to do on the last turn, not only that a result
+        is missing."""
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError) as context:
+            FinalAnswer[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS, message="Does that look right?"
+            )
+
+        message = str(context.exception)
+        self.assertIn("This is the final turn", message)
+        self.assertIn("apply the user's last correction", message)
+        self.assertIn("return failure", message)
+
 
 class TestTheUserView(unittest.TestCase):
     def test_it_shows_the_question_not_the_answer_envelope(self):
