@@ -86,7 +86,13 @@ failure possible:
 - the turn budget (the designed flow does not fit).
 
 Do not add text heuristics to guess intent, and do not suppress the
-failure. If the fix needs a framework change, agree it before making it.
+failure. Do not blindly add to prompts: read the prompt as a whole in the
+context of the overall task, and change the instruction that is actually
+missing or conflicting rather than appending a line per failure.
+
+Framework changes are a last resort: only if the change is truly generic,
+fits the existing architecture, and genuinely makes life simpler or easier
+for component authors. All framework changes must be agreed with the user.
 
 ## Organisation
 

@@ -364,7 +364,10 @@ which routes through OpenRouter's lower-latency endpoints.
 
 ## Prompt Improvement Mindset
 
-An eval failure is a defect, full stop. The model is capable; a failure means the prompt, the context, the output contract or the turn budget was insufficient. Never call it model variance or flaky, and never re-run until green: a re-run is a diagnostic, not a fix.
+An eval failure is diagnosed by the rules in
+[Testing Standards](../testing-standards.md#an-eval-failure-is-a-defect), not
+by re-running until green. The patterns below are how to improve the prompt
+once the failure has been diagnosed.
 
 ### What good prompts look like
 
@@ -393,15 +396,15 @@ name the instruction the model followed and the instruction it ignored.
 4. If "Honest about provenance" failed: the agent is hallucinating. Add language that clearly separates proposals from confirmed facts.
 5. Check the final-turn contract: a success with no result, or a confirmation
    question, means the error the model received did not say what to do at
-   that point. Improve the `FinalAnswer` message or the final-turn
-   instruction; do not add text heuristics to guess intent.
+   that point. Improve the `FinalAnswer` message so it says what to return.
 6. Check the turn budget: the designed flow (gather → draft → confirm →
    result, plus a late correction) must fit. A final-turn failure often means
    the ceiling is too tight, not that the model is incapable.
-7. Fix the contract, prompt/context or budget — or agree a framework change
-   with the user before making it. Do not bodge: no text guessing, no
-   suppression, no re-run-until-green. A re-run confirms a change or tests a
-   named nondeterminism hypothesis.
+7. Fix the contract, prompt/context or budget. Follow the
+   [prompt and framework-change rules](../testing-standards.md): a prompt
+   changes as a whole, and a framework change is a last resort that must be
+   agreed with the user. A re-run confirms a change or tests a named
+   nondeterminism hypothesis.
 8. Transcripts are saved to `test-results/transcripts/`: the `.json` file is
    the canonical record (typed events, result, judge verdicts with evidence and
    fix, metadata); the `.txt` file is the rendered human view; the
