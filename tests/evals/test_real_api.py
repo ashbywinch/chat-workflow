@@ -2,8 +2,8 @@
 import unittest
 
 from chat_workflow import (
+    AgentAnswer,
     AgentIntent,
-    AgentResponse,
     AtomicWorkflow,
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
@@ -28,9 +28,7 @@ def _continuing(action) -> TurnResult:
 def _success(action) -> TurnResult:
     if action.result is None:
         raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
-    return TurnResult[EvaluationCriteria].success(
-        action.result, message=action.message
-    )
+    return TurnResult[EvaluationCriteria].success(action.result)
 
 
 def _failure(action) -> AtomicWorkflowFailedError:
@@ -61,9 +59,10 @@ class TestRealAPI(unittest.TestCase):
                     "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
                     "Use intent='continue' to ask questions, intent='success' to return criteria, "
-                    "intent='failure' if unable to help."
+                    "intent='failure' if unable to help. On success, return the "
+                    "result and no message."
                 ),
-                response_model=AgentResponse[EvaluationCriteria],
+                response_model=AgentAnswer[EvaluationCriteria],
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -151,9 +150,10 @@ class TestRealAPI(unittest.TestCase):
                     "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
                     "Use intent='continue' to ask questions, intent='success' to return criteria, "
-                    "intent='failure' if unable to help."
+                    "intent='failure' if unable to help. On success, return the "
+                    "result and no message."
                 ),
-                response_model=AgentResponse[EvaluationCriteria],
+                response_model=AgentAnswer[EvaluationCriteria],
                 max_turns=3,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -176,8 +176,7 @@ class TestRealAPI(unittest.TestCase):
         result = orchestrator.process_turn("")
 
         self.assertIsInstance(result, TurnResult)
-        self.assertIsNotNone(result.message)
-        self.assertTrue(len(result.message) > 0)
+        self.assertIsNone(result.message)
 
         if result.result:
             self.assertIsInstance(result.result, EvaluationCriteria)
@@ -240,9 +239,10 @@ class TestRealAPI(unittest.TestCase):
                     "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
                     "Use intent='continue' to ask questions, intent='success' to return criteria, "
-                    "intent='failure' if unable to help."
+                    "intent='failure' if unable to help. On success, return the "
+                    "result and no message."
                 ),
-                response_model=AgentResponse[EvaluationCriteria],
+                response_model=AgentAnswer[EvaluationCriteria],
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -264,7 +264,7 @@ class TestRealAPI(unittest.TestCase):
 
         result = orchestrator.process_turn("Please include budget as a criterion")
         self.assertIsInstance(result, TurnResult)
-        self.assertIsNotNone(result.message)
+        self.assertIsNone(result.message)
 
 
 if __name__ == "__main__":

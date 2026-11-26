@@ -1192,9 +1192,9 @@ class ComponentSourceCode(LLMValidated):
         "The `create` conversation asks at most two or three questions and "
         "synthesizes a draft from a block of user detail rather than walking "
         "through the fields one by one. Its docstring tells the model that a "
-        "success carries the complete artifact as `result`, and that the "
-        "final turn returns it; never return success with a question or a "
-        "null result. "
+        "success carries the complete artifact as `result` and no message, "
+        "and that the final turn returns it; never return success with a "
+        "question or a null result. "
         "The primary model inherits LLMValidated and declares _validation_rules "
         "for the domain's non-deterministic quality criteria. Derive them from "
         "the design spec and domain knowledge; add as many as the domain "
@@ -1285,8 +1285,8 @@ class ComponentSourceCode(LLMValidated):
         for, not as text to repeat. Use details the user already gave, never
         ask for them again, confirm the draft once, then finish.
         Tell the model in the docstring that a success carries the complete
-        artifact as `result`, and that the final turn returns it; a success
-        with a question or a null result is wrong.
+        artifact as `result` and no message, and that the final turn returns
+        it; a success with a question or a null result is wrong.
         Ask at most two or three questions in the whole conversation. When the
         user gives a block of detail, extract every field you can from it and
         propose the draft; do not walk through the fields one by one.

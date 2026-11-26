@@ -82,8 +82,10 @@ deferred interface are in [document store](reference/document-store.md).
 
 Ten rules shape a conversation, independent of any one step's prompt:
 
-- **A success says what it did.** `Success` carries `message`, and the session
-  speaks it for a chat-on step. A silent completion is not expressible.
+- **A success carries the result, not a message.** `Success` has no `message`
+  field: the object is the answer. A success cannot ask a question because
+  there is no prose to ask with; a question belongs to `Continue`, and a
+  failure carries its reason.
 - **A step declares the turns its task needs.** `min_turns` is the minimum
   number of model turns before a result is accepted. A gather step that must
   ask or propose first declares two; a success on the first turn is fed back
@@ -106,11 +108,10 @@ Ten rules shape a conversation, independent of any one step's prompt:
   the confirm question, so the confirmation step handles the user's answer —
   it corrects a value or confirms, and never re-presents the draft or repeats
   the question the user is answering.
-- **A turn is not a question it does not ask.** A success message ends with a
-  statement, not a question: asking while claiming the step is done leaves the
-  answer unread. A success that ends with `?` is fed back as a correction. A
-  continue says what it has to say in that message; the framework cannot
-  complete a promised list the model did not give.
+- **A turn says only what its shape can say.** A success carries the result and
+  no prose, so it cannot also ask; a question is a `continue`. A continue says
+  what it has to say in that message; the framework cannot complete a promised
+  list the model did not give.
 - **A turn is not a repeat.** An identical continue message is not a new turn:
   it is fed back with a correction, so a model that did not read the answer it
   was given cannot loop.
@@ -151,7 +152,7 @@ shape and the user's words live together instead of in a parallel formatter.
   nothing.
 - **An empty list is the component's decision.** A step that needs at least
   one item declares `Annotated[list[X], Field(min_length=1)]`; a plain
-  `list[X]` allows an empty answer, and the step's success message says why.
+  `list[X]` allows an empty answer, and the result's other fields say why.
   The framework imposes neither rule.
 
 ## The model path
@@ -198,15 +199,15 @@ meeting spawned inside it are the same class:
 - `SessionComponent` is behaviour, not a different session. `converse` sets
   `session.instructions` from its docstring when the session has none, greets
   when the session has no messages, runs the step, then signs off. It does not
-  describe the result: a chat-on step's success message is the last thing the
-  user reads, and the model writes it. The wrap is explicit in the CLI and the
-  eval harness; the decorators never auto-wrap a nested step.
+  describe the result: a chat-on step returns the object, and the next step or
+  the caller presents it. The wrap is explicit in the CLI and the eval
+  harness; the decorators never auto-wrap a nested step.
 - A step whose result is a derived artifact has three turns: a chat-off step
   derives the value from its inputs; the composite renders that value as the
   proposal turn, ending with one confirm question; a chat-on step reads the
-  reply and returns the value. Its success message says what changed, or that
-  it is confirmed. This keeps the model from asking the user to define what it
-  can derive, and leaves one voice on every turn.
+  reply and returns the value. The result is the answer; the chat-on step does
+  not also narrate it. This keeps the model from asking the user to define what
+  it can derive, and leaves one voice on every turn.
 - `greet` and `sign_off` are one-turn text steps (`chat=False`,
   `single_turn=True`): a continue message is the text they produce, so they do
   not ask a user who is not part of that step. They start from an explicit

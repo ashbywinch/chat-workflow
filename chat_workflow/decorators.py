@@ -233,7 +233,7 @@ def _opening_section(explore: bool) -> str:
 
 
 def _turn_policy_sections(chat: bool, return_type: Any) -> list[str]:
-    """The turn policy, success-message and one-shot rules."""
+    """The turn policy, finishing and one-shot rules."""
     sections: list[str] = []
     # The model now sees its own previous structured turns in the transcript,
     # so the turn policy has to be stated rather than inferred: without it a
@@ -255,25 +255,14 @@ def _turn_policy_sections(chat: bool, return_type: Any) -> list[str]:
         "Do not invent a value they did not give to avoid that failure."
     )
     sections.append(
-        "## The success message\n"
-        "A success is still a turn: `message` is what the user reads when the "
-        "step ends. Say what you decided, what changed, or that it is "
-        "confirmed, in one or two sentences in the user's words. Speak to "
-        "the user as 'you'; never describe the conversation in the third "
-        "person or say 'the user'. Do not list the result's values there; "
-        "they are in `result`. If the user's last message asked something, "
-        "answer it in `message` before you finish.\n\n"
-        "When the user corrects or adds something, update the result and say in "
-        "one sentence what changed. Say it in the turn where it changes; in a "
-        "later turn, do not restate a change they already acknowledged. The "
-        "framework shows a changed draft to the user and asks for "
-        "confirmation, so do not present the result yourself, "
-        "do not announce it ('here it is', 'here's your …'), and do not ask "
-        "for a second approval of it. When the result is "
-        "unchanged, finish now; never re-present it or repeat a question the "
-        "user has already answered. If they ask what a word or type means, "
-        "explain it in their own words before you finish. Do not comment on "
-        "the quality of what they said."
+        "## Finishing\n"
+        "A success carries the result and no message: return the complete "
+        "object and stop. Do not write prose to accompany it. When the user "
+        "corrects or adds something, update the result; when it is unchanged, "
+        "return it as it is. Do not present, announce, or ask for a second "
+        "approval of the result: the result itself is the answer. If the user "
+        "asks what a word or type means, answer that in a continue before you "
+        "finish. Do not comment on the quality of what they said."
     )
     if not chat and getattr(_inner_model(return_type), "__name__", "") != "TextReply":
         sections.append(
@@ -335,7 +324,7 @@ def _setup_atomic_workflow(
     )
 
     def _on_success(response: Success[Any]) -> TurnResult[Any]:
-        return TurnResult[Any].success(response.result, message=response.message)
+        return TurnResult[Any].success(response.result)
 
     return AtomicWorkflow(
         config=AtomicWorkflowConfig(

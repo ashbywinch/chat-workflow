@@ -138,49 +138,41 @@ class TestRecursiveSession(unittest.TestCase):
         self.assertIn("Is that the change you meant?", text)
 
 
-class TestTheSuccessMessage(unittest.TestCase):
-    """A conversational step's completion is something the user reads."""
+class TestCompletion(unittest.TestCase):
+    """A success carries the result; there is no success message to read."""
 
-    def test_a_chat_on_step_speaks_its_success_message(self):
+    def test_a_chat_on_success_does_not_speak_a_message(self):
         session = _session()
         conversation = make_conversation(
-            [
-                {
-                    "intent": "success",
-                    "message": "Here is what I put together.",
-                    "result": make_valid_criteria().model_dump(),
-                }
-            ]
+            [{"intent": "success", "result": make_valid_criteria().model_dump()}]
         )
         workflow = AtomicWorkflow(
             config=make_atomic_workflow_config(conversation=conversation)
         )
 
-        session.run(workflow, chat=True)
+        result = session.run(workflow, chat=True)
 
-        kinds = entries(session.state.messages)
-        self.assertIn(("assistant", "Here is what I put together."), kinds)
+        self.assertTrue(result.is_complete)
+        self.assertIsNone(result.message)
+        self.assertFalse(
+            any(kind == "assistant" for kind, _ in entries(session.state.messages))
+        )
 
-    def test_a_chat_off_step_does_not_speak_it(self):
+    def test_a_chat_off_success_does_not_speak_a_message(self):
         session = _session()
         conversation = make_conversation(
-            [
-                {
-                    "intent": "success",
-                    "message": "Internal summary only.",
-                    "result": make_valid_criteria().model_dump(),
-                }
-            ]
+            [{"intent": "success", "result": make_valid_criteria().model_dump()}]
         )
         workflow = AtomicWorkflow(
             config=make_atomic_workflow_config(conversation=conversation)
         )
 
-        session.run(workflow, chat=False)
+        result = session.run(workflow, chat=False)
 
-        self.assertNotIn(
-            ("assistant", "Internal summary only."),
-            entries(session.state.messages),
+        self.assertTrue(result.is_complete)
+        self.assertIsNone(result.message)
+        self.assertFalse(
+            any(kind == "assistant" for kind, _ in entries(session.state.messages))
         )
 
     def test_a_chat_off_step_cannot_continue(self):

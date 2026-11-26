@@ -81,7 +81,7 @@ class _CapturingSession:
 
     def run(self, *, workflow, chat):
         self.workflows.append(workflow)
-        return TurnResult[EvaluationCriteria].success(self._result, message="Done.")
+        return TurnResult[EvaluationCriteria].success(self._result)
 
 
 def _integration_session(responses, io=None) -> Session:
@@ -92,7 +92,7 @@ def _integration_session(responses, io=None) -> Session:
 
 
 def _success_payload(result) -> dict:
-    return {"intent": "success", "message": "Done.", "result": result.model_dump()}
+    return {"intent": "success", "result": result.model_dump()}
 
 
 class TestAtomicWorkflow(unittest.TestCase):
@@ -119,7 +119,6 @@ class TestAtomicWorkflow(unittest.TestCase):
     def test_process_turn_success(self):
         action = Success[EvaluationCriteria](
             intent=AgentIntent.SUCCESS,
-            message="Done.",
             result=make_valid_criteria(),
         )
         orchestrator = AtomicWorkflow(
@@ -196,7 +195,6 @@ class TestAtomicWorkflow(unittest.TestCase):
             Continue(intent=AgentIntent.CONTINUE, message="Question 2"),
             Success[EvaluationCriteria](
                 intent=AgentIntent.SUCCESS,
-                message="Done.",
                 result=make_valid_criteria(),
             ),
         ]
@@ -226,12 +224,10 @@ class TestAtomicWorkflow(unittest.TestCase):
         responses = [
             Success[EvaluationCriteria](
                 intent=AgentIntent.SUCCESS,
-                message="Done.",
                 result=make_valid_criteria(),
             ),
             Success[EvaluationCriteria](
                 intent=AgentIntent.SUCCESS,
-                message="Done.",
                 result=make_valid_criteria(),
             ),
         ]
@@ -261,7 +257,6 @@ class TestAtomicWorkflow(unittest.TestCase):
             Continue(intent=AgentIntent.CONTINUE, message="Question 3"),
             Success[EvaluationCriteria](
                 intent=AgentIntent.SUCCESS,
-                message="Done.",
                 result=make_valid_criteria(),
             ),
         ]
@@ -683,7 +678,7 @@ class TestTheStepOnTheTranscript(unittest.TestCase):
 
         session.run(workflow=orchestrator)
 
-        self.assertEqual(len(state.messages), 4)  # request, answer call, return, words
+        self.assertEqual(len(state.messages), 3)  # request, answer call, return
         self.assertEqual(state.usage.requests, 1)
         self.assertEqual(state.turn_count, 1)
 

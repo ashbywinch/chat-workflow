@@ -165,12 +165,12 @@ class TestRender(unittest.TestCase):
             ModelRequest(parts=[UserPromptPart("Hi")]),
             ModelResponse(parts=[TextPart("What do you make?")]),
             ModelResponse(
-                parts=[TextPart('{"intent": "success", "message": "step one"}')]
+                parts=[TextPart('{"intent": "success", "result": {"step": "one"}}')]
             ),
             # Step 2: a chat-off derivation. Nobody saw any of it.
             ModelRequest(parts=[UserPromptPart("No user is available.")]),
             ModelResponse(
-                parts=[TextPart('{"intent": "success", "message": "internal"}')]
+                parts=[TextPart('{"intent": "success", "result": {"internal": true}}')]
             ),
             # Step 3: the confirmation's first spoken turn.
             ModelResponse(parts=[TextPart("Here's what I've got so far.")]),
@@ -185,8 +185,8 @@ class TestRender(unittest.TestCase):
 
         self.assertIn("What do you make?", text)
         self.assertIn("Here's what I've got so far.", text)
-        self.assertNotIn("step one", text)
-        self.assertNotIn("internal", text)
+        self.assertNotIn('"step": "one"', text)
+        self.assertNotIn('"internal": true', text)
         self.assertNotIn("No user is available", text)
 
     def test_turns_between_steps_are_kept(self):

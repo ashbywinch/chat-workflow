@@ -121,9 +121,9 @@
    "severity": "error"
   },
   {
-   "line": 45,
+   "line": 43,
    "column": 9,
-   "stop_line": 45,
+   "stop_line": 43,
    "stop_column": 13,
    "path": "tests/evals/test_real_api.py",
    "code": -2,
@@ -133,9 +133,9 @@
    "severity": "error"
   },
   {
-   "line": 48,
+   "line": 46,
    "column": 9,
-   "stop_line": 48,
+   "stop_line": 46,
    "stop_column": 15,
    "path": "tests/evals/test_real_api.py",
    "code": -2,
@@ -349,9 +349,9 @@
    "severity": "error"
   },
   {
-   "line": 44,
+   "line": 52,
    "column": 9,
-   "stop_line": 44,
+   "stop_line": 52,
    "stop_column": 14,
    "path": "tests/unit/test_models.py",
    "code": -2,
@@ -361,9 +361,9 @@
    "severity": "error"
   },
   {
-   "line": 247,
+   "line": 273,
    "column": 9,
-   "stop_line": 247,
+   "stop_line": 273,
    "stop_column": 14,
    "path": "tests/unit/test_models.py",
    "code": -2,

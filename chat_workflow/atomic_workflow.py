@@ -185,16 +185,6 @@ class AtomicWorkflow(Generic[TResult]):
                         "before returning the result."
                     )
                     continue
-                if (response.message or "").strip().endswith("?") and self._has_turn_room():
-                    # A success is a completion. Asking the user something
-                    # while claiming the step is done leaves the answer unread.
-                    user_input = (
-                        "A success message cannot ask the user a question. If "
-                        "you still need an answer, return intent='continue'. "
-                        "Otherwise return the result with a statement of what "
-                        "you did."
-                    )
-                    continue
                 return self.on_success(response)
             if response.intent == AgentIntent.FAILURE:
                 if not self._failure_given_a_turn and self._has_turn_room():

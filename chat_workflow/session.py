@@ -207,15 +207,15 @@ class Session:
                     first = self._raw_io.prompt("\nYou")
                 result = workflow.process_turn(first)
                 while not result.is_complete:
-                    self._raw_io.echo(f"\nAssistant: {result.message}")
+                    self._raw_io.echo(f"\nAssistant: {result.message or ''}")
                     result = workflow.process_turn(self._raw_io.prompt("\nYou"))
         finally:
             record_atomic_workflow(self.state, workflow)
 
         assert result is not None
-        # A conversational step does not finish silently: the success message
-        # is the last thing the user reads, and it is the model's own words.
-        # A one-shot step has no user to show it to.
+        # A success carries the result, not a message. A caller that supplies
+        # one through TurnResult still has it spoken; the framework's own
+        # success path does not. A one-shot step has no user to show it to.
         if chat and result.result is not None and result.message:
             self.say(result.message)
         return result

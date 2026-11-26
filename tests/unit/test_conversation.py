@@ -409,14 +409,27 @@ class TestTheLastTurn(unittest.TestCase):
         from pydantic import ValidationError
 
         with self.assertRaises(ValidationError) as context:
-            FinalAnswer[EvaluationCriteria](
-                intent=AgentIntent.SUCCESS, message="Does that look right?"
-            )
+            FinalAnswer[EvaluationCriteria](intent=AgentIntent.SUCCESS)
 
         message = str(context.exception)
         self.assertIn("This is the final turn", message)
         self.assertIn("apply the user's last correction", message)
         self.assertIn("return failure", message)
+
+    def test_a_final_success_cannot_carry_a_message(self):
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError) as context:
+            FinalAnswer[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Does that look right?",
+                result=make_valid_criteria(),
+            )
+
+        self.assertIn(
+            "A success carries its result and no message",
+            str(context.exception),
+        )
 
 
 class TestTheUserView(unittest.TestCase):

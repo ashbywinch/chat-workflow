@@ -44,6 +44,29 @@ class _CarriesResult:
     _a_success_carries_its_result = model_validator(mode="after")(_success_carries_its_result)
 
 
+def _message_belongs_to_the_turn(self):
+    if self.intent is AgentIntent.SUCCESS:
+        if self.message is not None:
+            raise ValueError(self._SUCCESS_HAS_NO_MESSAGE)
+    elif not self.message:
+        raise ValueError(self._TURN_NEEDS_A_MESSAGE)
+    return self
+
+
+class _MessageBelongs:
+    """A success carries its result; a continue or failure carries words."""
+
+    _SUCCESS_HAS_NO_MESSAGE: ClassVar[str] = (
+        "A success carries its result and no message."
+    )
+    _TURN_NEEDS_A_MESSAGE: ClassVar[str] = (
+        "A continue or failure must say what it is."
+    )
+    _a_message_belongs_to_the_turn = model_validator(mode="after")(
+        _message_belongs_to_the_turn
+    )
+
+
 class AgentIntent(StrEnum):
     """What the agent wants the framework to do next."""
 
@@ -74,16 +97,6 @@ class Success(BaseModel, Generic[TResult]):
     model_config = ConfigDict(extra="forbid")
 
     intent: Literal[AgentIntent.SUCCESS]
-    message: str = Field(
-        min_length=1,
-        description=(
-            "What the user reads when the step ends: one or two sentences in "
-            "their own words saying what you decided, what changed, or that it "
-            "is confirmed. Speak to the user as 'you'; never describe the "
-            "conversation in the third person or say 'the user'. Do not list "
-            "the result's values here."
-        ),
-    )
     result: TResult = Field(description="The complete object the caller asked for.")
 
 
@@ -102,11 +115,11 @@ type AgentResponse[TResult] = Annotated[
 """The three turn shapes the loop switches on.
 
 This union is *internal*. The model's tool schema is :class:`AgentAnswer` — one
-flat object with ``intent``, ``message`` and an optional ``result`` — because a
-union output type makes PydanticAI nest the answer under ``response`` while the
-prompt describes a top-level ``intent``. The model follows the prose, the
-wrapper is missing, and retries are spent on a shape nobody asked for.
-``as_turn`` builds these three shapes from the flat answer.
+flat object with ``intent``, an optional ``message`` and an optional
+``result`` — because a union output type makes PydanticAI nest the answer under
+``response`` while the prompt describes a top-level ``intent``. The model
+follows the prose, the wrapper is missing, and retries are spent on a shape
+nobody asked for. ``as_turn`` builds these three shapes from the flat answer.
 """
 
 type FinalResponse[TResult] = Annotated[
@@ -118,7 +131,7 @@ The wire shape is :class:`FinalAnswer`, for the same reason.
 """
 
 
-class AgentAnswer(_CarriesResult, BaseModel, Generic[TResult]):
+class AgentAnswer(_CarriesResult, _MessageBelongs, BaseModel, Generic[TResult]):
     """The wire answer: one flat object, the shape the protocol describes.
 
     A union output type makes PydanticAI wrap the answer under ``response``,
@@ -139,18 +152,19 @@ class AgentAnswer(_CarriesResult, BaseModel, Generic[TResult]):
         description="continue while another turn is needed; success with the "
         "result; failure if it cannot be produced."
     )
-    message: str = Field(
-        min_length=1,
-        description="What the user reads: the question on a continue, or what "
-        "the step decided, changed, or confirmed.",
+    message: str | None = Field(
+        default=None,
+        description="The question on a continue, or the reason on a failure. "
+        "A success carries its result and no message.",
     )
     result: TResult | None = Field(
         default=None,
         description="The complete object, on a success; absent otherwise.",
     )
 
-class FinalAnswer(_CarriesResult, BaseModel, Generic[TResult]):
-    """The last turn's wire answer: success or failure, never a question."""
+
+class FinalAnswer(_CarriesResult, _MessageBelongs, BaseModel, Generic[TResult]):
+    """The last turn's wire answer: the result, or the reason it is impossible."""
 
     _RESULT_REQUIRED_MESSAGE: ClassVar[str] = (
         "This is the final turn. A success must carry the complete result. "
@@ -159,39 +173,49 @@ class FinalAnswer(_CarriesResult, BaseModel, Generic[TResult]):
         "gave; return failure with the reason only if a required value cannot "
         "be produced."
     )
+    _TURN_NEEDS_A_MESSAGE: ClassVar[str] = (
+        "A failure must say why the result cannot be produced."
+    )
 
     model_config = ConfigDict(extra="forbid")
 
     intent: Literal[AgentIntent.SUCCESS, AgentIntent.FAILURE]
-    message: str = Field(min_length=1)
+    message: str | None = Field(
+        default=None,
+        description="The reason on a failure. A success carries its result and "
+        "no message.",
+    )
     result: TResult | None = Field(default=None)
+
+
+def _success_from_result(result: TResult | None) -> Success[TResult]:
+    if result is None:
+        raise ValueError("A success must carry `result`; the caller needs the object.")
+    return Success(intent=AgentIntent.SUCCESS, result=result)
+
+
+def _failure_from_message(message: str | None) -> Failure:
+    if message is None:
+        raise ValueError("A failure must carry its reason.")
+    return Failure(intent=AgentIntent.FAILURE, message=message)
+
 
 def as_turn(answer: AgentAnswer[TResult]) -> Continue | Success[TResult] | Failure:
     """Turn the flat wire answer into the three-shape turn the loop uses."""
     if answer.intent is AgentIntent.CONTINUE:
+        if answer.message is None:
+            raise ValueError("A continue must carry its message.")
         return Continue(intent=AgentIntent.CONTINUE, message=answer.message)
     if answer.intent is AgentIntent.SUCCESS:
-        if answer.result is None:
-            raise ValueError(
-                "A success must carry `result`; the caller needs the object."
-            )
-        return Success(
-            intent=AgentIntent.SUCCESS, message=answer.message, result=answer.result
-        )
-    return Failure(intent=AgentIntent.FAILURE, message=answer.message)
+        return _success_from_result(answer.result)
+    return _failure_from_message(answer.message)
 
 
 def as_final(answer: FinalAnswer[TResult]) -> Success[TResult] | Failure:
     """Turn the flat final answer into a success or failure."""
     if answer.intent is AgentIntent.SUCCESS:
-        if answer.result is None:
-            raise ValueError(
-                "A success must carry `result`; the caller needs the object."
-            )
-        return Success(
-            intent=AgentIntent.SUCCESS, message=answer.message, result=answer.result
-        )
-    return Failure(intent=AgentIntent.FAILURE, message=answer.message)
+        return _success_from_result(answer.result)
+    return _failure_from_message(answer.message)
 
 
 class TextReply(BaseModel):
@@ -207,7 +231,7 @@ class TurnResult(BaseModel, Generic[TResult]):
     """The outcome of processing a single turn in an atomic workflow."""
 
     result: TResult | None = None
-    message: str
+    message: str | None = None
     is_complete: bool
 
     @classmethod
@@ -216,13 +240,9 @@ class TurnResult(BaseModel, Generic[TResult]):
         return cls(result=None, message=message, is_complete=False)
 
     @classmethod
-    def success(
-        cls,
-        result: TResult,
-        message: str = "Completed successfully!",
-    ) -> TurnResult[TResult]:
-        """The workflow completed with a valid result."""
-        return cls(result=result, message=message, is_complete=True)
+    def success(cls, result: TResult) -> TurnResult[TResult]:
+        """The workflow completed with a valid result; there is no message."""
+        return cls(result=result, is_complete=True)
 
     @classmethod
     def failure(cls, message: str) -> TurnResult[TResult]:

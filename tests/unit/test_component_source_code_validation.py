@@ -727,12 +727,10 @@ class TestRuffFeedback(unittest.TestCase):
             [
                 {
                     "intent": "success",
-                    "message": "Done.",
                     "result": {"code": invalid.splitlines()},
                 },
                 {
                     "intent": "success",
-                    "message": "Done.",
                     "result": {"code": VALID_COMPONENT_CODE.splitlines()},
                 },
             ]

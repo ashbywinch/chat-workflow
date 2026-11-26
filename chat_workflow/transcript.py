@@ -68,23 +68,17 @@ _FRAMEWORK_PROMPTS = frozenset(
         "Start the conversation.",
         "You are finishing too early. Do the task's next step before returning "
         "the result.",
-        "A success message cannot ask the user a question. If you still need "
-        "an answer, return intent='continue'. Otherwise return the result "
-        "with a statement of what you did.",
     }
 )
 
 
-# The prompts the framework injects after a turn it refuses: an early success,
-# a success that asks, or a chat-off continue. The refused turn was
-# never delivered to the user, so the user view drops it.
+# The prompts the framework injects after a turn it corrects: an early success,
+# or a failure that gets one more turn. The corrected turn was never delivered
+# to the user, so the user view drops it.
 _CORRECTION_PROMPTS = frozenset(
     {
         "You are finishing too early. Do the task's next step before returning "
         "the result.",
-        "A success message cannot ask the user a question. If you still need "
-        "an answer, return intent='continue'. Otherwise return the result "
-        "with a statement of what you did.",
         "You returned failure. Continue with what you were given: propose the "
         "result, or ask the one question you still need. Failure is only for a "
         "user who refuses to engage or input that cannot be interpreted.",

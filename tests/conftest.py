@@ -92,12 +92,10 @@ def make_valid_criteria() -> EvaluationCriteria:
 
 
 def _success(action) -> TurnResult:
-    """The success callback: a success turn always carries a result."""
+    """The success callback: a success turn carries its result, not a message."""
     if action.result is None:
         raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
-    return TurnResult[EvaluationCriteria].success(
-        action.result, message=action.message
-    )
+    return TurnResult[EvaluationCriteria].success(action.result)
 
 
 def make_atomic_workflow_config(
@@ -127,10 +125,9 @@ def text_response(payload: Any) -> ModelResponse:
     """
     response = payload
     if isinstance(response, dict) and response.get("intent") == "success":
-        # A success is a turn: it says what it did. Scripted tests focus on
-        # the result, so the helper supplies the words; the protocol test
-        # below covers the rejection of a silent success.
-        response.setdefault("message", "Done.")
+        # A success carries its result and no message. Scripted tests focus on
+        # the result, so the helper drops any prose a test wrote by habit.
+        response.pop("message", None)
     return ModelResponse(parts=[ToolCallPart("answer", payload)])
 
 

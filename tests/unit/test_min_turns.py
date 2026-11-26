@@ -20,7 +20,6 @@ class TestMinTurns(unittest.TestCase):
     def _success(self) -> dict:
         return {
             "intent": "success",
-            "message": "Done.",
             "result": make_valid_criteria().model_dump(),
         }
 
@@ -50,32 +49,7 @@ class TestMinTurns(unittest.TestCase):
 
 
 class TestTurnShape(unittest.TestCase):
-    """A turn says what it did, or asks; it does not do both, or repeat itself."""
-
-    def test_a_success_that_asks_is_a_correction(self):
-        conversation = make_conversation(
-            [
-                {
-                    "intent": "success",
-                    "message": "What sections does it have?",
-                    "result": make_valid_criteria().model_dump(),
-                },
-                {
-                    "intent": "success",
-                    "message": "It has the sections you named.",
-                    "result": make_valid_criteria().model_dump(),
-                },
-            ]
-        )
-        workflow = AtomicWorkflow(
-            config=make_atomic_workflow_config(conversation=conversation)
-        )
-
-        result = workflow.process_turn("go")
-
-        self.assertTrue(result.is_complete)
-        self.assertEqual(result.message, "It has the sections you named.")
-        self.assertEqual(len(conversation.script.calls), 2)
+    """A turn says what its shape can say, and does not repeat itself."""
 
     def test_an_identical_continue_is_returned_as_is(self):
         """There is no runtime repetition guard: the judge reads the transcript."""
@@ -117,7 +91,6 @@ class TestTurnShape(unittest.TestCase):
                 {"intent": "failure", "message": "I cannot do this."},
                 {
                     "intent": "success",
-                    "message": "Done.",
                     "result": make_valid_criteria().model_dump(),
                 },
             ]

@@ -3,7 +3,15 @@ import unittest
 
 from pydantic import TypeAdapter, ValidationError
 
-from chat_workflow import AgentIntent, AgentResponse, Continue, Failure, Success, TurnResult
+from chat_workflow import (
+    AgentAnswer,
+    AgentIntent,
+    AgentResponse,
+    Continue,
+    Failure,
+    Success,
+    TurnResult,
+)
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
 
 
@@ -175,10 +183,9 @@ class TestAgentResponseShapes(unittest.TestCase):
         )
 
         action = Success[EvaluationCriteria](
-                intent=AgentIntent.SUCCESS,
-                message="Done.",
-                result=criteria,
-            )
+            intent=AgentIntent.SUCCESS,
+            result=criteria,
+        )
 
         self.assertEqual(action.intent, AgentIntent.SUCCESS)
         self.assertEqual(action.result, criteria)
@@ -189,17 +196,36 @@ class TestAgentResponseShapes(unittest.TestCase):
         self.assertEqual(action.intent, AgentIntent.FAILURE)
         self.assertEqual(action.message, "Can't help with that")
 
-    def test_the_schema_forbids_mixing_the_shapes(self):
-        """`continue` has no result; `success` carries words and the object.
+    def test_a_wire_success_cannot_carry_a_message(self):
+        criteria = EvaluationCriteria(
+            context="test",
+            criteria=[
+                Criterion(name="budget", description="Budget", weight=8.0),
+                Criterion(name="quality", description="Quality", weight=7.0),
+            ],
+        )
 
-        A model validator could only reject such an answer after it was
-        written, and Pydantic never serialises validator logic into the
-        schema the model reads. The union puts the rule in the shape: the
-        forbidden field is absent, and `extra="forbid"` rejects it if sent.
+        answer = AgentAnswer[EvaluationCriteria](
+            intent=AgentIntent.SUCCESS, result=criteria
+        )
+        self.assertEqual(answer.result, criteria)
+
+        with self.assertRaises(ValidationError):
+            AgentAnswer[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Does that look right?",
+                result=criteria,
+            )
+
+    def test_the_schema_forbids_mixing_the_shapes(self):
+        """`continue` has no result; `success` carries only the object.
+
+        The union puts the rule in the shape: the forbidden field is absent,
+        and `extra="forbid"` rejects it if sent.
         """
         branches = {
             "continue": (Continue, ("message",)),
-            "success": (Success[EvaluationCriteria], ("message", "result")),
+            "success": (Success[EvaluationCriteria], ("result",)),
             "failure": (Failure, ("message",)),
         }
         for intent, (variant, expected) in branches.items():
@@ -212,11 +238,12 @@ class TestAgentResponseShapes(unittest.TestCase):
                 {"intent": "continue", "message": "Which?", "result": {"context": "x", "criteria": []}}
             )
 
-        # A success is a turn: it cannot finish without words.
+        # A success is the object: it has no prose to ask with.
         with self.assertRaises(ValueError):
             TypeAdapter(AgentResponse[EvaluationCriteria]).validate_python(
                 {
                     "intent": "success",
+                    "message": "Does that look right?",
                     "result": EvaluationCriteria(
                         context="test",
                         criteria=[
@@ -237,7 +264,6 @@ class TestAgentResponseShapes(unittest.TestCase):
         with self.assertRaises(ValueError):
             Success[EvaluationCriteria](
                 intent=AgentIntent.SUCCESS,
-                message="Done.",
                 result=None,
             )
         with self.assertRaises(ValueError):
@@ -263,7 +289,7 @@ class TestTurnResultModel(unittest.TestCase):
     def test_success_factory_method(self):
         result = TurnResult[EvaluationCriteria].success(self.valid_criteria)
 
-        self.assertEqual(result.message, "Completed successfully!")
+        self.assertIsNone(result.message)
         self.assertEqual(result.result, self.valid_criteria)
         self.assertTrue(result.is_complete)
 
@@ -275,11 +301,13 @@ class TestTurnResultModel(unittest.TestCase):
         self.assertTrue(result.is_complete)
 
     def test_direct_creation(self):
-        result = TurnResult[EvaluationCriteria](result=self.valid_criteria, message="Custom message", is_complete=True)
+        result = TurnResult[EvaluationCriteria](
+            message="Custom message", is_complete=False
+        )
 
-        self.assertEqual(result.result, self.valid_criteria)
+        self.assertIsNone(result.result)
         self.assertEqual(result.message, "Custom message")
-        self.assertTrue(result.is_complete)
+        self.assertFalse(result.is_complete)
 
 
 if __name__ == "__main__":

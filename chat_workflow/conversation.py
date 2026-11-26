@@ -439,10 +439,9 @@ class Conversation(Generic[T]):
             system_prompt=self._instructions
             + (
                 "\n\n## Final turn\n"
-                "No further turn will be offered. Answer now with what the user "
-                "has given: intent='success' with the complete result, or "
-                "intent='failure' if it cannot be produced. "
-                "Do not ask another question."
+                "No further turn will be offered. Return intent='success' with "
+                "the complete result and no message, or intent='failure' with "
+                "the reason it cannot be produced."
                 if final_turn
                 else ""
             ),

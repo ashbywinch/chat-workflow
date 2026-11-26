@@ -23,7 +23,6 @@ from tests.conftest import (
 # failure, not a shape failure, and one no resample of the same history fixes.
 _BUDGETLESS = {
     "intent": "success",
-    "message": "Here are the criteria.",
     "result": {
         "context": "A birthday present",
         "criteria": [
@@ -87,7 +86,6 @@ class TestRejectedResult(unittest.TestCase):
                 {"intent": "continue", "message": "What is your budget?"},
                 {
                     "intent": "success",
-                    "message": "Here are the criteria.",
                     "result": make_valid_criteria().model_dump(),
                 },
             ],

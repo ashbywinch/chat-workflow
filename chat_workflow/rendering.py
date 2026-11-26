@@ -17,7 +17,7 @@ its own shape and the words the user uses. The framework owns the contract:
 Every render is for the user. The renderer prints the record's own values and
 fixed user-facing labels; it must not add schema labels of its own. Each result
 model implements :class:`Renderable`; a list of records renders item by item. A
-step that allows an empty list renders nothing, and its own success message says
+step that allows an empty list renders nothing; the result's other fields say
 why.
 """
 
