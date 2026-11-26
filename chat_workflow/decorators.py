@@ -290,7 +290,6 @@ def _setup_atomic_workflow(
     chat: bool,
     tools: Any = (),
     deps: Any = None,
-    min_turns: int = 1,
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow on the session's transcript.
 
@@ -332,7 +331,6 @@ def _setup_atomic_workflow(
             response_model=AgentAnswer[actual_return_type],
             final_response_model=FinalAnswer[actual_return_type],
             max_turns=max_turns,
-            min_turns=min_turns if max_turns is None else min(min_turns, max_turns),
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(
                 response.message
@@ -362,7 +360,6 @@ def atomic_workflow(
     conversation_validation_rules: list[tuple[str, str]] | None = None,
     chat: bool = True,
     single_turn: bool = False,
-    min_turns: int = 1,
     explore: bool = False,
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
@@ -379,10 +376,6 @@ def atomic_workflow(
 
     ``single_turn=True`` is a one-turn text step: a ``continue`` is not
     offered, so it completes without asking the user.
-
-    ``min_turns`` is the minimum number of model turns the task needs before
-    it may return a result. A task that must ask or propose first declares
-    two; a success on the first turn is fed back as a correction.
 
     ``explore=True`` is a listening step: it opens with one open question
     about the user's own work, not a proposal. A step that derives from
@@ -445,7 +438,6 @@ def atomic_workflow(
                 chat=chat,
                 tools=tools,
                 deps=deps,
-                min_turns=min_turns,
             )
             result = session.run(workflow=workflow, chat=chat)
             state.initial_result = result
@@ -462,7 +454,6 @@ def atomic_workflow(
             setattr(wrapper, marker, attached)
         wrapper._chat = chat  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper._single_turn = single_turn  # type: ignore[attr-defined]  # the step decorator attaches this metadata
-        wrapper._min_turns = min_turns  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper._explore = explore  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         return wrapper

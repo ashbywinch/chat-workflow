@@ -66,19 +66,15 @@ _USER_KINDS = frozenset({"user", "assistant"})
 _FRAMEWORK_PROMPTS = frozenset(
     {
         "Start the conversation.",
-        "You are finishing too early. Do the task's next step before returning "
-        "the result.",
     }
 )
 
 
-# The prompts the framework injects after a turn it corrects: an early success,
-# or a failure that gets one more turn. The corrected turn was never delivered
-# to the user, so the user view drops it.
+# The prompts the framework injects after a turn it corrects: a failure that
+# gets one more turn. The corrected turn was never delivered to the user, so
+# the user view drops it.
 _CORRECTION_PROMPTS = frozenset(
     {
-        "You are finishing too early. Do the task's next step before returning "
-        "the result.",
         "You returned failure. Continue with what you were given: propose the "
         "result, or ask the one question you still need. Failure is only for a "
         "user who refuses to engage or input that cannot be interpreted.",

@@ -220,36 +220,6 @@ class TestAtomicWorkflow(unittest.TestCase):
         self.assertEqual(result3.result, make_valid_criteria())
         self.assertEqual(orchestrator.turn_count, 3)
 
-    def test_no_max_turns_still_honours_min_turns(self):
-        responses = [
-            Success[EvaluationCriteria](
-                intent=AgentIntent.SUCCESS,
-                result=make_valid_criteria(),
-            ),
-            Success[EvaluationCriteria](
-                intent=AgentIntent.SUCCESS,
-                result=make_valid_criteria(),
-            ),
-        ]
-        conversation = _ScriptedConversation(responses)
-        orchestrator = AtomicWorkflow(
-            config=make_atomic_workflow_config(
-                max_turns=None,
-                min_turns=2,
-                conversation=conversation,
-            )
-        )
-
-        result = orchestrator.process_turn("Hello")
-
-        self.assertTrue(result.is_complete)
-        self.assertEqual(
-            orchestrator.turn_count,
-            2,
-            "min_turns made the first success a correction, not a completion",
-        )
-        self.assertFalse(any(conversation.final_turns))
-
     def test_no_max_turns_never_forces_a_final_turn(self):
         responses = [
             Continue(intent=AgentIntent.CONTINUE, message="Question 1"),

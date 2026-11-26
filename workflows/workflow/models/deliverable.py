@@ -193,8 +193,6 @@ class DeliverableNotes(BaseModel):
 
 @atomic_workflow_step(
     explore=True,
-    # The opening asks what they make; their answer is what the notes hold.
-    min_turns=2,
     conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE],
 )
 def _gather_deliverable(

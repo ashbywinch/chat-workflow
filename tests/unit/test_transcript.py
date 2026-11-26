@@ -128,15 +128,19 @@ class TestRender(unittest.TestCase):
         self.assertIn("What do you make?", text)
 
     def test_a_corrected_turn_is_not_a_delivered_turn(self):
-        """A turn the framework refused was never shown to the user."""
+        """A turn the framework corrected was never shown to the user."""
         messages = [
             ModelRequest(parts=[UserPromptPart("What do you make?")]),
-            ModelResponse(parts=[TextPart("A list of meals.")]),
+            ModelResponse(
+                parts=[TextPart('{"intent": "failure", "message": "I cannot."}')]
+            ),
             ModelRequest(
                 parts=[
                     UserPromptPart(
-                        "You are finishing too early. Do the task's next step "
-                        "before returning the result."
+                        "You returned failure. Continue with what you were "
+                        "given: propose the result, or ask the one question you "
+                        "still need. Failure is only for a user who refuses to "
+                        "engage or input that cannot be interpreted."
                     )
                 ]
             ),
@@ -146,9 +150,9 @@ class TestRender(unittest.TestCase):
         audit = render(messages)
         user = render(messages, audience="user")
 
-        self.assertIn("A list of meals.", audit)
-        self.assertNotIn("A list of meals.", user)
-        self.assertNotIn("finishing too early", user)
+        self.assertIn("I cannot.", audit)
+        self.assertNotIn("I cannot.", user)
+        self.assertNotIn("You returned failure", user)
         self.assertIn("How do you keep the list?", user)
 
     def test_a_session_projects_each_step_separately(self):

@@ -226,9 +226,6 @@ class GatheredNotes(BaseModel):
 
 @atomic_workflow_step(
     explore=True,
-    # The opening asks one question; a walk-through needs at least one more
-    # answer before the breakdown can be derived from it.
-    min_turns=3,
     conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE],
 )
 def _gather_notes(

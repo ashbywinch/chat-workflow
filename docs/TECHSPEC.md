@@ -80,16 +80,12 @@ deferred interface are in [document store](reference/document-store.md).
 
 ## Turn contracts
 
-Ten rules shape a conversation, independent of any one step's prompt:
+Nine rules shape a conversation, independent of any one step's prompt:
 
 - **A success carries the result, not a message.** `Success` has no `message`
   field: the object is the answer. A success cannot ask a question because
   there is no prose to ask with; a question belongs to `Continue`, and a
   failure carries its reason.
-- **A step declares the turns its task needs.** `min_turns` is the minimum
-  number of model turns before a result is accepted. A gather step that must
-  ask or propose first declares two; a success on the first turn is fed back
-  as a correction ("do the task's next step"), not accepted as a summary.
 - **The turn bound is the author's call.** `max_turns` bounds the step's
   model turns. `None` removes the bound: the step ends only on success or
   failure, so there is no last turn and no forced final shape. The

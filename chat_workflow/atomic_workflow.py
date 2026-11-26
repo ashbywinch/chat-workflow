@@ -78,9 +78,6 @@ class AtomicWorkflow(Generic[TResult]):
     ):
         self.turn_count = 0
         self.chat = chat
-        # A chat-off step has no user to ask, so it cannot need a minimum
-        # number of conversational turns.
-        self.min_turns = 1 if not chat else max(1, getattr(config, "min_turns", 1))
         self.max_turns = config.max_turns
         # A failure is provisional until the step has had one turn to continue.
         self._failure_given_a_turn = False
@@ -176,15 +173,6 @@ class AtomicWorkflow(Generic[TResult]):
                     )
                 return self.on_continue(response)
             if response.intent == AgentIntent.SUCCESS:
-                if self.chat and self.turn_count < self.min_turns:
-                    # The task declared that it must ask or propose first. Feed
-                    # the early finish back as a correction; it is not a
-                    # completion.
-                    user_input = (
-                        "You are finishing too early. Do the task's next step "
-                        "before returning the result."
-                    )
-                    continue
                 return self.on_success(response)
             if response.intent == AgentIntent.FAILURE:
                 if not self._failure_given_a_turn and self._has_turn_room():

@@ -1,8 +1,7 @@
-"""A step declares the minimum exchanges its task needs.
+"""A turn says only what its shape can say, and does not repeat itself.
 
-A gather step that must ask before it proposes cannot finish on its first
-turn; the framework feeds the early finish back as a correction instead of
-accepting a silent summary.
+There is no runtime text check: a lead-in or a repeat is a prompt defect the
+judge reads in the transcript.
 """
 
 import unittest
@@ -14,38 +13,6 @@ from tests.conftest import (
     make_conversation,
     make_valid_criteria,
 )
-
-
-class TestMinTurns(unittest.TestCase):
-    def _success(self) -> dict:
-        return {
-            "intent": "success",
-            "result": make_valid_criteria().model_dump(),
-        }
-
-    def test_an_early_success_is_a_correction(self):
-        conversation = make_conversation([self._success(), self._success()])
-        workflow = AtomicWorkflow(
-            config=make_atomic_workflow_config(
-                conversation=conversation, min_turns=2
-            )
-        )
-
-        result = workflow.process_turn("go")
-
-        self.assertTrue(result.is_complete)
-        self.assertEqual(len(conversation.script.calls), 2)
-
-    def test_the_default_allows_a_first_turn_success(self):
-        conversation = make_conversation([self._success()])
-        workflow = AtomicWorkflow(
-            config=make_atomic_workflow_config(conversation=conversation)
-        )
-
-        result = workflow.process_turn("go")
-
-        self.assertTrue(result.is_complete)
-        self.assertEqual(len(conversation.script.calls), 1)
 
 
 class TestTurnShape(unittest.TestCase):
