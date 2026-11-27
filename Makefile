@@ -31,7 +31,7 @@ UNITTEST := $(PYTHON) -m unittest
 # real-model suite and fail loudly when credentials are absent.
 UNIT_TEST_ENV := CHAT_WORKFLOW_SKIP_LLM_VALIDATION=1
 COVERAGE := .venv/bin/coverage
-EVAL_TIMEOUT ?= 1800
+EVAL_TIMEOUT ?= 14400
 
 # Colors for output
 GREEN := \033[0;32m

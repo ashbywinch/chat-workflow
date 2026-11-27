@@ -270,10 +270,10 @@ Use multiple layers of protection (belt and braces):
    parameter that limits conversation length regardless of LLM behavior.
 
 3. **Overall suite timeout** — `scripts/run_with_timeout.py` wraps the entire
-   eval suite with a hard kill (1800s by default for `make evals` and
-   `make evals-incremental`; CI sets `EVAL_TIMEOUT=14400` because the full
-   suite takes ~2h). If the suite exceeds this, the process is killed and the
-   remaining tests are reported as incomplete.
+   eval suite with a hard kill (14400s by default for `make evals` and
+   `make evals-incremental`, the same guard CI uses; the full suite takes
+   ~2h). If the suite exceeds this, the process is killed and the remaining
+   tests are reported as incomplete.
 
 These three layers ensure that a buggy workflow or runaway LLM can never
 burn tokens indefinitely, even if all three fail partially.
