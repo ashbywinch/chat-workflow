@@ -11,6 +11,7 @@ from workflows.workflow.component_spec import ComponentSpec
 from workflows.workflow.models import (
     Deliverable,
     ProcessDefinition,
+    ProcessStage,
     Resource,
 )
 from workflows.workflow.models.gap_analysis import GapAnalysis
@@ -163,15 +164,32 @@ class TestJargonFreeEval(unittest.TestCase):
     @timeout(900)
     def test_component_requirement_jargon_free(self):
         """ComponentSpec conversation uses plain language, not field names."""
-        analysis = fixtures.meal_planning_analysis()
-
-        inputs = [fixtures.family_dietary_preferences()]
-        outputs = [fixtures.weekly_meal_plan_deliverable()]
+        analysis = ProcessDefinition(
+            stages=[
+                ProcessStage(
+                    name="Plan the meals",
+                    steps=["Plan the week's meals"],
+                )
+            ],
+            orchestrating_component="You",
+            participants=["You"],
+        )
+        outputs = [
+            Deliverable(
+                name="Weekly Meal Plan",
+                description="A plan of the week's meals.",
+                consumer="The family",
+                format="One-page plan",
+                success_criteria="Each day names a meal.",
+                integration_points="The family reads it.",
+                storage_requirements="On the fridge",
+            )
+        ]
         result = run_multi_turn_eval(
             model_method=ComponentSpec.identify_from_chat,
             method_kwargs={
                 "analysis": analysis,
-                "inputs": inputs,
+                "inputs": [],
                 "outputs": outputs,
                 "max_turns": 16,
             },

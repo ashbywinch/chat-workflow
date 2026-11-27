@@ -176,7 +176,13 @@ class TestRealAPI(unittest.TestCase):
         result = orchestrator.process_turn("")
 
         self.assertIsInstance(result, TurnResult)
-        self.assertIsNone(result.message)
+        if result.is_complete:
+            self.assertIsNone(result.message)
+            self.assertIsInstance(result.result, EvaluationCriteria)
+        else:
+            self.assertIsNotNone(result.message)
+            self.assertTrue(result.message)
+            self.assertIsNone(result.result)
 
         if result.result:
             self.assertIsInstance(result.result, EvaluationCriteria)
