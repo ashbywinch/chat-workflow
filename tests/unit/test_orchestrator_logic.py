@@ -587,6 +587,19 @@ class TestAutoParamInjection(unittest.TestCase):
         self.assertIn("`max_turns` (int)", prompt)
         self.assertNotIn("session", prompt)
 
+    def test_the_opening_leaves_the_first_move_to_the_step(self):
+        session = _CapturingSession(make_valid_criteria())
+
+        EvaluationCriteria.generate_from_chat(context="birthday ideas", session=session)
+
+        prompt = session.workflows[0]._conversation._instructions
+        self.assertIn(
+            "say what you can already see from the inputs, or ask the one "
+            "question the step needs",
+            prompt,
+        )
+        self.assertNotIn("propose what you can already see from them", prompt)
+
     def test_chat_decorator_preserves_inline_interpolation(self):
         """{initial_object.model_dump()} style interpolation still works."""
         from workflows.evaluation_criteria import Criterion, EvaluationCriteria

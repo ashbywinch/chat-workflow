@@ -80,7 +80,7 @@ deferred interface are in [document store](reference/document-store.md).
 
 ## Turn contracts
 
-Nine rules shape a conversation, independent of any one step's prompt:
+Eight rules shape a conversation, independent of any one step's prompt:
 
 - **A success carries the result, not a message.** `Success` has no `message`
   field: the object is the answer. A success cannot ask a question because
@@ -97,9 +97,6 @@ Nine rules shape a conversation, independent of any one step's prompt:
 - **A proposal is one turn.** `Session.propose` says one lead-in, the rendered
   body, and one confirm question. The renderer only renders the body, so a
   deterministic proposal reads as a proposal rather than a field dump.
-- **A listening step declares it.** `explore=True` opens with one open
-  question and does not propose a structure; a step that derives from
-  established inputs leaves it false and proposes from them.
 - **The confirmation answers the proposal.** The proposal turn already asked
   the confirm question, so the confirmation step handles the user's answer —
   it corrects a value or confirms, and never re-presents the draft or repeats

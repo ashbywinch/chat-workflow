@@ -225,7 +225,6 @@ class GatheredNotes(BaseModel):
 
 
 @atomic_workflow_step(
-    explore=True,
     conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE],
 )
 def _gather_notes(

@@ -148,7 +148,6 @@ def _build_system_prompt(
     conversation_rules: dict[str, str],
     chat: bool,
     instructions: str | None = None,
-    explore: bool = False,
 ) -> str:
     """Build the system prompt from the session, the step and its rules.
 
@@ -175,7 +174,7 @@ def _build_system_prompt(
         sections.append(params_section.strip())
 
     if chat:
-        sections.append(_opening_section(explore))
+        sections.append(_opening_section())
 
     if chat and conversation_rules:
         sections.append(_build_checklist_section(conversation_rules))
@@ -200,36 +199,18 @@ def _build_system_prompt(
     return "\n\n".join(sections)
 
 
-def _opening_section(explore: bool) -> str:
-    """The start-of-step instruction: listen, or propose from the inputs."""
-    if explore:
-        start = (
-            "## Start of the step\n"
-            "Say in one sentence what this step is doing and why. Then ask "
-            "one open question about the user's own work and listen. This "
-            "step does not name stages, steps, or fields, and does not "
-            "propose a structure; the user describes, the next step "
-            "structures. Do not summarize the work back for confirmation and "
-            "do not offer to structure it: acknowledge in one clause and ask "
-            "the next open question. If the user asks for a shape, a section "
-            "list, or a suggestion, say in one sentence that the next step "
-            "shows one and finish — do not answer with a lead-in that promises "
-            "a list you do not give."
-        )
-    else:
-        start = (
-            "## Start of the step\n"
-            "Say in one sentence what this step is doing and why. Then make "
-            "your first substantive move: if the step was given inputs, "
-            "propose what you can already see from them — the result, or "
-            "the part of it they cover — and ask for a reaction. Do not "
-            "ask the user to name a thing the inputs already name, and do "
-            "not ask them to supply or confirm something the inputs "
-            "already contain. Do not return the complete result in the "
-            "first response unless the inputs already contain all of it "
-            "and the user has confirmed it."
-        )
-    return start
+def _opening_section() -> str:
+    """The start-of-step instruction; the step's docstring chooses the move."""
+    return (
+        "## Start of the step\n"
+        "Say in one sentence what this step is doing and why. Then make "
+        "your first substantive move: say what you can already see from the "
+        "inputs, or ask the one question the step needs. Do not ask the user "
+        "to name a thing the inputs already name, and do not ask them to "
+        "supply or confirm something the inputs already contain. Do not return "
+        "the complete result in the first response unless the inputs already "
+        "contain all of it and the user has confirmed it."
+    )
 
 
 def _turn_policy_sections(chat: bool, return_type: Any) -> list[str]:
@@ -360,7 +341,6 @@ def atomic_workflow(
     conversation_validation_rules: list[tuple[str, str]] | None = None,
     chat: bool = True,
     single_turn: bool = False,
-    explore: bool = False,
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
@@ -376,10 +356,6 @@ def atomic_workflow(
 
     ``single_turn=True`` is a one-turn text step: a ``continue`` is not
     offered, so it completes without asking the user.
-
-    ``explore=True`` is a listening step: it opens with one open question
-    about the user's own work, not a proposal. A step that derives from
-    established inputs leaves it false.
     """
     author_rules = conversation_validation_rules or []
     merged_rules: dict[str, str] = dict(_DEFAULT_CONVERSATION_RULES)
@@ -454,7 +430,6 @@ def atomic_workflow(
             setattr(wrapper, marker, attached)
         wrapper._chat = chat  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper._single_turn = single_turn  # type: ignore[attr-defined]  # the step decorator attaches this metadata
-        wrapper._explore = explore  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         wrapper.__conversation_rules__ = merged_rules  # type: ignore[attr-defined]  # the step decorator attaches this metadata
         return wrapper
 
