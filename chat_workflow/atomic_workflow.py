@@ -79,6 +79,8 @@ class AtomicWorkflow(Generic[TResult]):
         self.turn_count = 0
         self.chat = chat
         self.max_turns = config.max_turns
+        self.step_name = config.step_name
+        self.step_inputs = config.step_inputs or {}
         # A failure is provisional until the step has had one turn to continue.
         self._failure_given_a_turn = False
         self.model = config.model

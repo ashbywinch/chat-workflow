@@ -18,12 +18,17 @@ class TranscriptSegment:
 
     A session's messages are the concatenation of several steps' transcripts.
     ``chat`` says whether the step had a user of its own: a chat-off step's
-    turns are internal and never appeared in the conversation.
+    turns are internal and never appeared in the conversation. ``step``,
+    ``inputs`` and ``output`` make the slice a call frame: what the step was
+    called with, what it said, and what it returned.
     """
 
     start: int
     end: int
     chat: bool = True
+    step: str | None = None
+    inputs: dict[str, Any] | None = None
+    output: Any = None
 
 
 @dataclass
@@ -50,13 +55,17 @@ class SessionLog:
 def record_atomic_workflow[T](
     log: SessionLog,
     workflow: AtomicWorkflow[T],
+    *,
+    result: Any = None,
 ) -> None:
     """Fold an atomic workflow's new transcript and usage into the session log.
 
     A step may be handed the session's transcript as its starting context. Only
     the messages the step added are folded back, so the history is not
     duplicated. The slice is recorded as a segment so the projection can find
-    each step's own final answer instead of only the run's last one.
+    each step's own final answer instead of only the run's last one. The
+    segment also records the step's name, inputs and output, so the transcript
+    can be read as a call trace rather than one undifferentiated conversation.
     """
     initial = getattr(workflow, "initial_message_count", 0)
     start = len(log.messages)
@@ -66,6 +75,9 @@ def record_atomic_workflow[T](
             start=start,
             end=len(log.messages),
             chat=getattr(workflow, "chat", True),
+            step=getattr(workflow, "step_name", None),
+            inputs=getattr(workflow, "step_inputs", None),
+            output=getattr(result, "result", None),
         )
     )
     log.usage.incr(workflow.usage)

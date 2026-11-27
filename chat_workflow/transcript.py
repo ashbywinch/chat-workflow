@@ -37,7 +37,15 @@ from pydantic_ai.messages import (
 from .models import AgentAnswer
 from .session_log import TranscriptSegment
 
-__all__ = ["AnswerEnvelope", "TranscriptEntry", "dump", "entries", "load", "render"]
+__all__ = [
+    "AnswerEnvelope",
+    "TranscriptEntry",
+    "dump",
+    "entries",
+    "load",
+    "render",
+    "render_call_trace",
+]
 
 Audience = Literal["all", "user"]
 
@@ -236,6 +244,111 @@ def _structured_result_entry(result: Any, audience: Audience) -> TranscriptEntry
         else json.dumps(result, indent=2, default=str)
     )
     return TranscriptEntry(kind="structured-result", text=rendered)
+
+
+def render_call_trace(
+    session: Any,
+    *,
+    result: Any = None,
+    given: dict[str, Any] | None = None,  # lucidlint: ignore record-shape the given context is the eval's kwargs
+    title: str | None = None,
+) -> str:
+    """Render a session tree as the call trace a judge reads.
+
+    Each atomic step is a frame with its input, the turns it added, and its
+    output. Messages outside a step's segment are the caller's own turns. A
+    child session indents under its parent, so a longer conversation reads as
+    calls going in and out rather than one undifferentiated transcript.
+    """
+    lines: list[str] = []
+    if title:
+        lines.append(f"Call trace: {title}")
+    if given:
+        lines.append("Input:")
+        lines.extend(_indented_json(given, "  "))
+    _append_trace_frames(session, lines, depth=0)
+    if result is not None:
+        lines.append("")
+        lines.append("Result:")
+        lines.extend(_indented_json(result, "  "))
+    return "\n".join(lines)
+
+
+def _append_trace_frames(session: Any, lines: list[str], *, depth: int) -> None:
+    indent = "  " * depth
+    messages = session.state.messages
+    cursor = 0
+    for segment in session.state.segments:
+        if segment.start > cursor:
+            _append_caller_turns(messages[cursor : segment.start], lines, indent)
+        _append_step_frame(
+            segment,
+            messages[segment.start : segment.end],
+            lines,
+            indent,
+        )
+        cursor = segment.end
+    if cursor < len(messages):
+        _append_caller_turns(messages[cursor:], lines, indent)
+    for child in session.children:
+        _append_trace_frames(child, lines, depth=depth + 1)
+
+
+def _append_caller_turns(
+    messages: Sequence[ModelMessage],
+    lines: list[str],
+    indent: str,
+) -> None:
+    text = render(messages, audience="user")
+    if not text:
+        return
+    lines.append(f"{indent}[caller]")
+    lines.extend(f"{indent}  {line}" for line in text.splitlines())
+
+
+def _append_step_frame(
+    segment: TranscriptSegment,
+    messages: Sequence[ModelMessage],
+    lines: list[str],
+    indent: str,
+) -> None:
+    name = segment.step or "step"
+    kind = "chat" if segment.chat else "chat-off"
+    lines.append(f"{indent}→ {name} ({kind})")
+    lines.append(f"{indent}  Input:")
+    lines.extend(_indented_json(segment.inputs or {}, f"{indent}    "))
+    lines.append(f"{indent}  Conversation:")
+    if segment.chat:
+        text = render(messages, audience="user")
+        if text:
+            lines.extend(f"{indent}    {line}" for line in text.splitlines())
+        else:
+            lines.append(f"{indent}    (no turns)")
+    else:
+        lines.append(f"{indent}    (chat-off; no user turns)")
+    lines.append(f"{indent}  Output:")
+    if segment.output is None:
+        lines.append(f"{indent}    (none)")
+    else:
+        lines.extend(_indented_json(segment.output, f"{indent}    "))
+    lines.append(f"{indent}← {name}")
+
+
+def _indented_json(value: Any, indent: str) -> list[str]:
+    text = json.dumps(_jsonable(value), indent=2, default=str)
+    return [f"{indent}{line}" for line in text.splitlines()]
+
+
+def _jsonable(value: Any) -> Any:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return repr(value)
 
 
 def dump(messages: Sequence[ModelMessage]) -> bytes:

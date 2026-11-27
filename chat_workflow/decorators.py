@@ -271,6 +271,8 @@ def _setup_atomic_workflow(
     chat: bool,
     tools: Any = (),
     deps: Any = None,
+    step_name: str = "step",
+    step_inputs: dict[str, Any] | None = None,  # lucidlint: ignore record-shape the step's inputs are its parameters
 ) -> AtomicWorkflow:
     """Create and configure an AtomicWorkflow on the session's transcript.
 
@@ -312,6 +314,8 @@ def _setup_atomic_workflow(
             response_model=AgentAnswer[actual_return_type],
             final_response_model=FinalAnswer[actual_return_type],
             max_turns=max_turns,
+            step_name=step_name,
+            step_inputs=step_inputs,
             initial_messages=None,
             on_continue=lambda response: TurnResult[actual_return_type].continuing(
                 response.message
@@ -414,6 +418,8 @@ def atomic_workflow(
                 chat=chat,
                 tools=tools,
                 deps=deps,
+                step_name=f.__name__,
+                step_inputs=dict(kwargs),
             )
             result = session.run(workflow=workflow, chat=chat)
             state.initial_result = result

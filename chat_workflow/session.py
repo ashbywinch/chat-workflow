@@ -210,7 +210,7 @@ class Session:
                     self._raw_io.echo(f"\nAssistant: {result.message or ''}")
                     result = workflow.process_turn(self._raw_io.prompt("\nYou"))
         finally:
-            record_atomic_workflow(self.state, workflow)
+            record_atomic_workflow(self.state, workflow, result=result)
 
         assert result is not None
         # A success carries the result, not a message. A caller that supplies

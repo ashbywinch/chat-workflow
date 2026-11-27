@@ -313,6 +313,18 @@ class TestWorkflowIntegration(unittest.TestCase):
         self.assertIsInstance(result, EvaluationCriteria)
         self.assertEqual(len(result.criteria), 2)
 
+    def test_the_step_frame_records_its_name_inputs_and_output(self):
+        session = _integration_session(
+            [_success_payload(make_valid_criteria())], io=_RecordingIO("test response")
+        )
+
+        EvaluationCriteria.generate_from_chat(context="test", session=session)
+
+        segment = session.state.segments[-1]
+        self.assertEqual(segment.step, "generate_from_chat")
+        self.assertEqual(segment.inputs, {"context": "test"})
+        self.assertEqual(segment.output, make_valid_criteria())
+
     def test_leaf_accepts_tools_via_io(self):
         """Caller can pass io+state+config to build session themselves."""
         session = _integration_session(

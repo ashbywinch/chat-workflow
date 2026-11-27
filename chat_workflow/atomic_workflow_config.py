@@ -42,6 +42,11 @@ class AtomicWorkflowConfig(Generic[TResult]):
     on_continue: Callable[[Continue], TurnResult[TResult]]
     on_success: Callable[[Success[TResult]], TurnResult[TResult]]
     on_failure: Callable[[Failure], AtomicWorkflowFailedError]
+    # The call frame: the step's name, and the user-facing parameters it was
+    # called with. The transcript records these so a multi-step run can be read
+    # as calls going in and out, not as one undifferentiated conversation.
+    step_name: str = "step"
+    step_inputs: dict[str, Any] | None = None
     initial_messages: list[dict[str, str]] | None = None
     debug: StreamingDebug | None = None
     model: str = "default-model"
