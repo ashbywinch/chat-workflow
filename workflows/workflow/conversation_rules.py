@@ -8,10 +8,11 @@ component-spec steps, so the behaviour has one definition.
 # lucidlint: ignore-file global-state this module is the workflow rule catalogue; authors import each named rule
 SELF_ONLY_ROLE: tuple[str, str] = (
     "The user's own role",
-    "When the user says they do the work themselves — 'it's just me', 'no one "
-    "else', 'I do it all' — the person in charge or owner is 'You', and any "
-    "participants are the user too. The assistant does not keep or invent a "
-    "job title for the user.",
+    "When the user says the work is theirs alone — no one else does it — a "
+    "role they do themselves is written '<role> (You)', for example 'Expense "
+    "Reporter (You)', or 'You' when there is no role name. The marker makes "
+    "it the user, not a separate person. The assistant does not propose or "
+    "keep a bare job title for the user, even if a gap seems to need one.",
 )
 
 CONFIRM_THE_DRAFT: tuple[str, str] = (

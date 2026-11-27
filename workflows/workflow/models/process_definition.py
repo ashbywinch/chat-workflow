@@ -62,13 +62,15 @@ class ProcessDefinition(LLMValidated):
         "No stage name is repeated as one of the steps.",
         "The participants may name the user as 'You'. In this conversation "
         "that is the user's own role, not a placeholder, and it is valid "
-        "alongside other named participants. It is optional: a list of the "
-        "other participants is complete without it, and the user's role may "
-        "be named by a job title instead.",
+        "alongside other named participants. A role the user does themselves "
+        "is written '<role> (You)' — for example 'Expense Reporter (You)' — "
+        "so it reads as the user, not a separate person. It is optional: a "
+        "list of the other participants is complete without it.",
         "The person in charge is the person or role that keeps the work moving. The user's own role is valid when they do the work end "
-        "to end (for example 'Freelance Writer' or 'Meal Planner'); a job "
-        "title the user states, such as 'Project Manager', is their own role "
-        "and is accepted. It is not "
+        "to end; it is written '<role> (You)' (for example 'Freelance Writer "
+        "(You)'), or 'You' when there is no role name. A job title the user "
+        "states, such as 'Project Manager', is their own role and is "
+        "accepted with the user marker. It is not "
         "the name of the work as a whole ('Meal Planning', 'Content Creation'), "
         "a label that is only generic ('Manager', 'Coordinator'), "
         "or a software product the user does not use. A role that names what "
@@ -110,11 +112,13 @@ class ProcessDefinition(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "The person or role that keeps the work moving; the user's own "
-            "role is valid (for example 'Meal Planner'), the name of the work "
-            "as a whole ('Meal Planning') is not. A bare 'Coordinator' is too "
-            "generic; 'Meeting Minutes Coordinator' names what it coordinates "
-            "and is specific enough."
+            "The person or role that keeps the work moving. A role the user "
+            "does themselves is written '<role> (You)', for example 'Expense "
+            "Reporter (You)', or 'You' when there is no role name; the user "
+            "marker is what makes it the user, not a separate person. The "
+            "name of the work as a whole ('Meal Planning') is not a role. A "
+            "bare 'Coordinator' is too generic; 'Meeting Minutes Coordinator' "
+            "names what it coordinates and is specific enough."
         ),
         min_length=1,
     )
@@ -122,7 +126,13 @@ class ProcessDefinition(LLMValidated):
         list[str],
         UserLabel(phrase="everyone involved", aliases="participants", guard=False),
     ] = Field(
-        ..., description="Everyone involved (people, roles, or systems)", min_length=1
+        ...,
+        description=(
+            "Everyone involved (people, roles, or systems). A role the user "
+            "does themselves is written '<role> (You)', for example 'Expense "
+            "Reporter (You)', or 'You' when there is no role name."
+        ),
+        min_length=1,
     )
 
     @model_validator(mode="after")
@@ -154,11 +164,8 @@ class ProcessDefinition(LLMValidated):
 
     def render(self, context: RenderContext) -> str:
         """Say the breakdown as a picture, not a field dump."""
-        self_words = {"you", "yourself", "me", "i", "myself", "the user", "user"}
         others = [
-            person
-            for person in self.participants
-            if person.strip().casefold() not in self_words
+            person for person in self.participants if not _is_user_role(person)
         ]
         if not others:
             people = "You are the only person involved."
@@ -170,7 +177,7 @@ class ProcessDefinition(LLMValidated):
         owner = self.orchestrating_component.strip()
         keeps = (
             "You keep it moving."
-            if owner.casefold() in self_words
+            if _is_user_role(owner)
             else f"{owner} keeps it moving."
         )
 
@@ -181,6 +188,17 @@ class ProcessDefinition(LLMValidated):
         return f"The work has {len(parts)} parts. " + " ".join(
             [*parts, f"{people} {keeps}"]
         )
+
+
+_USER_ROLE_WORDS = frozenset(
+    {"you", "yourself", "me", "i", "myself", "the user", "user"}
+)
+
+
+def _is_user_role(role: str) -> bool:
+    """True for 'You' and for a role marked as the user, 'Role (You)'."""
+    value = role.strip().casefold()
+    return value in _USER_ROLE_WORDS or value.endswith("(you)")
 
 
 def _series(items: list[str]) -> str:
@@ -253,8 +271,9 @@ those names and put the actions inside them as steps. When the notes give only s
 stages. A stage is not one of its steps repeated as a heading. List only the people or roles the notes actually
 name; a step that says "submit for approval" does not name an approver, so leave the approver out and let the
 confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
-say the user does it all, the orchestrating component and the sole participant are "You"; do not invent a job title
-such as "Meal Planner" for the user. Do not invent people or
+say the user does it all, write the role they do with the user marker — for example "Expense Reporter (You)" — or "You"
+when the notes do not name a role; the marker makes it the user, not a separate person. Do not invent a bare job title.
+Do not invent people or
 steps the notes do not support. A consequence of the work — the boss gets annoyed, the team reads it — is not a stage,
 and the recipient is not a participant in the work; only what the user does, and the people who do it with them, is in
 the breakdown. A name the notes say the user is unsure about — "I don't know if JD is John or a
@@ -310,18 +329,16 @@ def generate_from_chat(
     provided, start from it instead of asking the user to repeat it.
     """
     # Exploration follows the user's threads: one question per new part of
-    # the work, and it stops when they have nothing new. It is not an
-    # interrogation, so it is bounded well below the overall turn budget.
-    gather_turn_limit = 6
-    gather_turns = min(max_turns, gather_turn_limit)
+    # the work, and it stops when they have nothing new. The session budget is
+    # the only limit.
     if process_description:
         gathered = _gather_notes(
             process_description=process_description,
             session=session,
-            max_turns=gather_turns,
+            max_turns=max_turns,
         )
     else:
-        gathered = _gather_notes(session=session, max_turns=gather_turns)
+        gathered = _gather_notes(session=session, max_turns=max_turns)
     answer = session.io.prompt("Is there anything else?")
     if answer.strip():
         gathered = gathered.model_copy(
@@ -332,12 +349,11 @@ def generate_from_chat(
     # the confirmation turn. A confirmation turn that skips the presentation
     # would leave the user (and the judge) with no proposal at all.
     session.propose(draft)
-    confirm_turn_limit = 4
     return confirm_draft(
         session=session,
         draft=draft,
         step=_confirm_process_definition,
-        max_turns=min(max_turns, confirm_turn_limit),
+        max_turns=max_turns,
     )
 
 

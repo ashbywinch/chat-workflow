@@ -121,8 +121,10 @@ class ComponentSpec(LLMValidated):
         ...,
         description=(
             "The capacity the artifact belongs to — the role whose job "
-            "includes it. It may be the user. 'Owner' only when the artifact "
-            "is the owner's own work; for example Maintenance Manager for a "
+            "includes it. A role the user does themselves is written '<role> "
+            "(You)', for example 'Expense Reporter (You)', or 'You' when "
+            "there is no role name. 'Owner' only when the artifact is the "
+            "owner's own work; for example Maintenance Manager (You) for a "
             "cleaning sign-off sheet."
         ),
         min_length=1,
@@ -238,12 +240,11 @@ class ComponentSpec(LLMValidated):
             changed=bool(already_shown),
             note="Everything else stays as we agreed." if already_shown else None,
         )
-        confirm_turn_limit = 6
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_components,
-            max_turns=min(max_turns, confirm_turn_limit),
+            max_turns=max_turns,
         )
 
 
@@ -273,7 +274,8 @@ each part is the person or role whose job includes producing or maintaining that
 `analysis.orchestrating_component` is the owner only when that role does the work; use
 `analysis.participants` for a part another participant produces — a
 note-taker's notes belong to the note-taker, while the minutes belong to the coordinator. If the analysis says "I" or
-"me", use the role the notes or participants describe; if there is no role name, use "You". Never return failure because
+"me", write the role the notes or participants describe with the user marker — for example "Expense Reporter (You)" —
+or "You" when there is no role name; the marker makes it the user, not a separate person. Never return failure because
 the role is written as a pronoun, and never return failure because the analysis
 does not name the parts directly: each stage is work on some part, and naming
 that part is your job. Include the parts in `existing_components` and add any
