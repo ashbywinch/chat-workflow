@@ -11,7 +11,8 @@ from chat_workflow.annotations import UserLabel
 from chat_workflow.confirmation import confirm_draft
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext
-from chat_workflow.transcript import entries
+
+from .conversation_rules import CONFIRM_THE_DRAFT, SELF_ONLY_ROLE
 
 # Activity nouns the model reaches for when it should name the artifact.
 # A deterministic guard: the LLM judge handles the general case, but these
@@ -238,48 +239,12 @@ class ComponentSpec(LLMValidated):
             note="Everything else stays as we agreed." if already_shown else None,
         )
         confirm_turn_limit = 6
-        confirmed = confirm_draft(
+        return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_components,
             max_turns=min(max_turns, confirm_turn_limit),
         )
-        # The user may say there are no separate roles at all. That is a fact
-        # about the work, not a new part: make them the owner and say so.
-        if _says_self_only(_last_user_text(session)) and any(
-            part.owner_role.strip().casefold() not in {"you", "me", "i"}
-            for part in confirmed
-        ):
-            confirmed = [
-                part.model_copy(update={"owner_role": "You"}) for part in confirmed
-            ]
-            session.say(
-                "Got it — it's all you. I've made you the owner of every part."
-            )
-        return confirmed
-
-
-def _last_user_text(session: Session) -> str:
-    for kind, text in reversed(entries(session.state.messages)):
-        if kind == "user":
-            return text
-    return ""
-
-
-def _says_self_only(text: str) -> bool:
-    lowered = text.casefold()
-    return any(
-        marker in lowered
-        for marker in (
-            "just me",
-            "only me",
-            "no separate roles",
-            "i do it all",
-            "i do everything",
-            "that's me",
-            "all me",
-        )
-    )
 
 
 from .models.deliverable import Deliverable  # noqa: E402 — after the class, to break the model cycle
@@ -323,7 +288,9 @@ it is in plain words — the thing it produces, or the plan or service it is. Ne
     ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
 
-@atomic_workflow_step
+@atomic_workflow_step(
+    conversation_validation_rules=[SELF_ONLY_ROLE, CONFIRM_THE_DRAFT]
+)
 def _confirm_components(
     draft: Annotated[
         list[ComponentSpec],

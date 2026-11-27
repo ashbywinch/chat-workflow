@@ -18,21 +18,14 @@ from chat_workflow.conversation_rules import WARM_OPEN
 from chat_workflow.mixins import LLMValidated
 from chat_workflow.rendering import RenderContext
 
+from ..conversation_rules import CONFIRM_THE_DRAFT, SELF_ONLY_ROLE
+
 # lucidlint: ignore-file global-state the no-executor rule is a prompt constant shared by the class and module-level steps
 _NO_EXECUTOR_MODE: tuple[str, str] = (
     "No executor mode",
     "The assistant defines what good looks like — it does not generate "
     "content or execute the work for the user.",
 )
-
-_CONFIRMS_THE_SHOWN_DRAFT: tuple[str, str] = (
-    "Confirms the draft already shown",
-    "The complete breakdown was shown to the user in the previous turn, and "
-    "this turn answers their reaction to it. The assistant does not present "
-    "the whole breakdown again and does not repeat the question the user has "
-    "just answered; it returns the draft, or the part they corrected.",
-)
-
 
 class ProcessStage(BaseModel):
     """One broad stage of the work, with the concrete steps inside it."""
@@ -274,7 +267,8 @@ Return the complete ProcessDefinition."""
 @atomic_workflow_step(
     conversation_validation_rules=[
         _NO_EXECUTOR_MODE,
-        _CONFIRMS_THE_SHOWN_DRAFT,
+        SELF_ONLY_ROLE,
+        CONFIRM_THE_DRAFT,
     ]
 )
 def _confirm_process_definition(
