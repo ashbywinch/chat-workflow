@@ -17,19 +17,19 @@ from workflows.workflow.models import ProcessDefinition, generate_from_chat
 PROCESS_DEFINITION_RULES = {
     NO_REPETITION[0]: NO_REPETITION[1],
     "Uses expertise": (
-        "The assistant builds the stages, steps, participants, and role in "
-        "charge from the user's description instead of asking the user to name "
-        "each stage or step from scratch. It may present the breakdown in plain "
-        "words; the ProcessDefinition stores the structured result. A "
-        "plain-language presentation is the proposal. Asking for one "
-        "walk-through to fill a gap is not asking the user to name stages: a "
-        "breakdown derived after it still comes from their description."
+        "The `_generate_from_notes` Output contains the stages, steps, "
+        "participants, and role in charge, and they are derived from the step's "
+        "Input notes. The `_gather_notes` Conversation may have proposed a "
+        "plain-language breakdown; that proposal is the rendering of the "
+        "output, and the assistant does not need to re-present the structured "
+        "result in a later message. Asking for one walk-through to fill a gap "
+        "is not asking the user to name stages."
     ),
     "Honest about provenance": (
-        "Every stage, step, participant, and role in the breakdown comes from "
-        "what the user described or is a clearly presented inference. A role "
-        "the user's own description implies (for example 'Writer' for a "
-        "content writer) is acceptable."
+        "Every stage, step, participant, and role in the `_generate_from_notes` "
+        "Output comes from its Input notes or the `_gather_notes` Conversation, "
+        "or is a clearly stated inference. A role the user's own description "
+        "implies (for example 'Writer' for a content writer) is acceptable."
     ),
 }
 
@@ -73,9 +73,10 @@ class TestGatherNotesEval(unittest.TestCase):
             judge_rules={
                 **PROCESS_DEFINITION_RULES,
                 "Anything else?": (
-                    "After the user's first description, the assistant invites "
-                    "elaboration with one open invitation such as 'Anything "
-                    "else?', not a new structural question."
+                    "In the `_gather_notes` Conversation, after the user's "
+                    "first description, the assistant invites elaboration with "
+                    "one open invitation such as 'Anything else?', not a new "
+                    "structural question."
                 ),
             },
         )
@@ -95,13 +96,13 @@ class TestGatherNotesEval(unittest.TestCase):
             judge_rules={
                 **PROCESS_DEFINITION_RULES,
                 "Open exploration": (
-                    "The assistant explores the user's work before naming "
-                    "stages or steps. Before the breakdown is proposed, it asks "
-                    "how the work actually happens; proposing the derived "
-                    "breakdown at the end, for confirmation, is the next phase "
-                    "and is not premature structuring. A proposal in the first "
-                    "response, or before the user has described what they do, "
-                    "is."
+                    "In the `_gather_notes` Conversation, the assistant explores "
+                    "the user's work before naming stages or steps. Before the "
+                    "breakdown is proposed, it asks how the work actually "
+                    "happens; proposing the derived breakdown at the end, for "
+                    "confirmation, is the next phase and is not premature "
+                    "structuring. A proposal in the first response, or before "
+                    "the user has described what they do, is."
                 ),
             },
         )
@@ -142,9 +143,10 @@ class TestGenerateFromNotesEval(unittest.TestCase):
             judge_rules={
                 **PROCESS_DEFINITION_RULES,
                 "Suggests one possibility": (
-                    "When the user has not mentioned a detail the breakdown "
-                    "needs, the assistant proposes one concrete possibility and "
-                    "asks them to confirm it, rather than asking an open question."
+                    "In the `_gather_notes` Conversation, when the user has not "
+                    "mentioned a detail the breakdown needs, the assistant "
+                    "proposes one concrete possibility and asks them to confirm "
+                    "it, rather than asking an open question."
                 ),
             },
         )

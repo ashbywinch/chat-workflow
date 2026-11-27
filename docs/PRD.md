@@ -194,11 +194,11 @@ are:
 5. **A rule is decidable from the artifact it judges.** If the artifact does
    not carry the fact the rule needs, add the field or drop the rule.
 6. **A rule does not repeat a field constraint or validator.**
-7. **A rule names the artifact it judges.** An object rule receives the object
-   and, when it is about provenance or derivation, the input it came from. A
-   conversation rule receives that step's conversation turns. The rule's home
-   and wording name the evidence; the judge is not asked to infer which part of
-   a transcript it may use.
+7. **A rule names the artifact it judges.** A judged object rule is decidable
+   from the object alone; a derivation or provenance eval rule names the step's
+   Input and Output; a conversation rule names that step's Conversation. The
+   rule's home and wording name the evidence; the judge is not asked to infer
+   which part of a trace it may use.
 8. **A conversation rule is generic only for universal invariants.**
    Role-specific rules name the step's role, not a required phrase. The turn
    sequence, not the wording, is what the judge evaluates. One property per

@@ -21,7 +21,7 @@ from chat_workflow import (
     SessionLog,
 )
 from chat_workflow.conversation_rules import NO_REPETITION
-from chat_workflow.transcript import entries, render
+from chat_workflow.transcript import entries, render, render_call_trace
 
 
 @dataclass
@@ -288,17 +288,22 @@ DEFAULT_JUDGE_RULES: dict[str, str] = {
 
 
 JUDGE_SYSTEM_PROMPT = (
-    "You are a strict but fair evaluator of conversation quality. "
-    "Evaluate the conversation transcript below against each rule. "
-    "For each rule, decide PASS or FAIL and explain if it failed. "
-    "The number of verdicts MUST equal the number of rules. "
-    "The transcript contains only the user and assistant turns. "
-    "[structured-result] marks that the workflow produced its validated "
-    "result; it is not a conversation turn. Quote the exact text that "
-    "supports a FAIL in 'evidence', and give the concrete correction in 'fix'. "
-    "Your verdict must agree with your explanation: if the explanation does "
-    "not name a violation, set passed=true. Do not fail a rule for something "
-    "the explanation itself excuses or judges acceptable."
+    "You are a strict but fair evaluator of a workflow execution. "
+    "The execution trace shows each step as a frame with Input, Conversation "
+    "and Output. Input is what the step was called with; Conversation is the "
+    "user and assistant turns the step added; Output is the typed result the "
+    "step returned. Turns outside a step frame are the caller's own turns. "
+    "A rule that names a step and a part is judged on that step's part; a rule "
+    "about conversation behaviour is judged on the Conversation frames; a rule "
+    "about the artifact is judged on the step's Input and Output. If a rule "
+    "names no part, use the part that matches its subject; do not use a part "
+    "the rule does not name. Decide PASS or FAIL for each rule and explain "
+    "if it failed. The number of verdicts MUST equal the number of rules. "
+    "Quote the exact text that supports a FAIL in 'evidence', and give the "
+    "concrete correction in 'fix'. Your verdict must agree with your "
+    "explanation: if the explanation does not name a violation, set "
+    "passed=true. Do not fail a rule for something the explanation itself "
+    "excuses or judges acceptable."
 )
 JUDGE_MODEL_ENV = "CHAT_WORKFLOW_JUDGE_MODEL"
 
@@ -334,7 +339,7 @@ def llm_judge(
         extra_headers=config.extra_headers,
     )
     turn = conversation.send(
-        f"Rules to evaluate:\n{rules_text}\n\nConversation transcript:\n{transcript}"
+        f"Rules to evaluate:\n{rules_text}\n\nExecution trace:\n{transcript}"
     )
     return turn.output
 
@@ -719,8 +724,11 @@ def run_multi_turn_eval(
             )
 
     transcript = format_transcript(session, result=result, given=given)
-    judge_transcript = format_transcript(
-        session, result=result, audience="user", given=given
+    judge_transcript = render_call_trace(
+        session,
+        result=result,
+        given=given,
+        title=model_method.__name__,
     )
 
     # The judge runs only after the workflow produced a typed result and a
