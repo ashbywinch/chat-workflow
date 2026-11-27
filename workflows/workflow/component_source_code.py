@@ -1340,31 +1340,13 @@ class ComponentSourceCode(LLMValidated):
         Every entry in `domain_spec.what_good_looks_like` must be represented by
         a `_validation_rules` entry or a `@model_validator`; do not drop a
         quality criterion. If it is not mechanically checkable, express it as a
-        domain-quality rule. A criterion about the artifact as a whole —
-        "someone who missed the meeting can understand it" — becomes a rule
-        about the artifact, not a per-item demand. A rule for a field is
-        satisfiable from that field's content; do not require it to carry facts
-        the artifact has no field for.
+        domain-quality rule.
 
-        Every `_validation_rules` entry must be decidable from the generated
-        model's own fields. If a rule needs a fact the artifact does not carry
-        — whether a named owner attended, whether a list is in chronological
-        order without an order field, whether a covered topic has a matching
-        decision when nothing links them — add the field that carries the fact
-        or drop the rule. A rule the user cannot satisfy from the artifact is
-        a defect even when the quality is real. A rule also does not rest on an
-        unstated reference: "specific enough" must say for whom or with respect
-        to what, or list the parts that must be present. That is the same
-        distinction as the domain spec's quality rules.
-
-        A rule that code can check — "notes are required when conditions were
-        discussed" — belongs in a @model_validator, not in _validation_rules.
-        Never write a @model_validator that only does `pass`: raise ValueError
-        with a specific message, or drop the validator and the rule. Declare
-        `_validation_rules: ClassVar[list[str]] = [...]` (import `ClassVar`
-        from typing) or a bare `_validation_rules = [...]`; never annotate it
-        as `list[str]`. Do not list a condition a field constraint or
-        @model_validator already enforces.
+        The generated code must satisfy the `Generated code validation rules`
+        below. That section is the checkable list; this procedure does not
+        restate it. A mechanically checkable condition belongs in a field
+        constraint or `@model_validator`; declare `_validation_rules` as
+        `ClassVar[list[str]]` or a bare list.
 
         Nested value objects may be BaseModels, but they must be fields of the
         primary model (directly or through another nested model) or a type the

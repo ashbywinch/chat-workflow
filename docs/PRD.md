@@ -143,6 +143,75 @@ The object invariants are not judged by the conversation judge. The checklist is
 not object quality. The procedure is not the checklist; the docstring describes
 how to do the work, the checklist evaluates whether the conversation was good.
 
+A rule's home is its kind. A deterministic object rule is a field constraint or
+validator; a judged field rule is a `Validation`; a judged whole-object rule is
+a model `_validation_rules` entry; a conversation rule is on the step's
+`conversation_validation_rules`. The construct names the artifact, so the judge
+receives the matching evidence rather than a blob it has to interpret.
+
+### Rules about rules
+
+A rule is one of three kinds:
+
+| Kind | Example | Evaluated by |
+|---|---|---|
+| **Deterministic** | “any action has a date” | code — a field constraint or validator |
+| **Unambiguous, non-deterministic** | “the minutes capture the actions agreed” | the judge |
+| **Ambiguous** | “the description must be specific enough” | nobody — it is a defect |
+
+An **overfit** rule — one example turned into a universal constraint, such as
+“Location must be Zoom” — is a fourth defect.
+
+The checkable rules about rules live on the components that carry them:
+
+- `ComponentDomainSpec._validation_rules` — what a quality criterion must be.
+- `ComponentSourceCode._validation_rules` — what generated code, docstrings and
+  generated rules must be.
+- `chat_workflow/conversation_rules.py` and a step's
+  `conversation_validation_rules` — the conversation rules themselves; the
+  checkable rule about what a conversation rule may say lives on
+  `ComponentSourceCode._validation_rules`.
+
+They are rendered into the author's prompt and executed by the judge; a
+standards document does not restate them. The principles they are derived from
+are:
+
+1. **One requirement per rule.** A compound rule hides one failure behind the
+   other. Two attributes of the same thing (“an owner and a due date”) are one
+   requirement; two different outcomes are two entries.
+2. **A quality word carries its standard.** A word whose standard is intrinsic
+   and shared — “concise”, “readable”, “polite” — is fine. A relation whose
+   other end is unstated — “complete” (with respect to what?), “sufficient”
+   (for what?), “appropriate” (to what?), “specific” (about what?) — must name
+   its reference or be replaced by the parts that must be present.
+   Non-deterministic is not ambiguous: never demand a mechanical test for
+   “concise”.
+3. **No example values as constraints.** An example belongs in the exemplar,
+   not in the rule.
+4. **Mechanical rules are code.** If a machine can decide it exactly, it is a
+   field constraint or validator, not a judged rule. A deterministic rule
+   written as a judged rule is a defect too.
+5. **A rule is decidable from the artifact it judges.** If the artifact does
+   not carry the fact the rule needs, add the field or drop the rule.
+6. **A rule does not repeat a field constraint or validator.**
+7. **A rule names the artifact it judges.** An object rule receives the object
+   and, when it is about provenance or derivation, the input it came from. A
+   conversation rule receives that step's conversation turns. The rule's home
+   and wording name the evidence; the judge is not asked to infer which part of
+   a transcript it may use.
+8. **A conversation rule is generic only for universal invariants.**
+   Role-specific rules name the step's role, not a required phrase. The turn
+   sequence, not the wording, is what the judge evaluates. One property per
+   rule; a rule that can only fail on a wording mismatch is too specific.
+9. **Scope is the author's intent.** Do not impose a blanket rule about empty
+   collections or missing optional facts; the author answers that when it
+   matters.
+
+The author communicates a rule's fit by where it lives: `Field` or validator
+for deterministic, `Validation` for a judged field, `_validation_rules` for a
+judged object, `conversation_validation_rules` for a conversation. A rule in
+the wrong construct is rejected by the component's own rules about rules.
+
 ### One conversation, one session
 
 A conversation is one **session**. A meeting inside it is also a session,

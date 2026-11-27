@@ -1,8 +1,9 @@
 # Rules and Authority
 
-A rule is a statement of what "good" means for an artifact. This note explains
-the three kinds of rule, how each is evaluated, what a failure means, and who
-may change the standard.
+A rule is a statement of what "good" means for an artifact. The kinds of rule
+and the principles behind them are in the PRD's
+[Rules about rules](../PRD.md#rules-about-rules). This note explains how each
+kind is evaluated, what a failure means, and who may change the standard.
 
 **Status:** proposal. Scope: one user, present, actively authoring a component.
 The absent-author case is out of scope here.
@@ -24,24 +25,16 @@ model, with no author.
 
 ## Three kinds of rule
 
-Ambiguous and non-deterministic are different things. A rule can be impossible
-to check mechanically and still be perfectly clear; that is the kind of rule this
-system exists to evaluate.
-
-| Kind | Example | Evaluated by |
-| --- | --- | --- |
-| **Deterministic** | "any action has a date" | code — a field constraint or validator |
-| **Unambiguous, non-deterministic** | "the minutes capture the actions agreed, as per the notes" | the judge |
-| **Ambiguous** | "the description must be specific enough" | nobody — it is a defect |
+The kinds — deterministic, unambiguous non-deterministic, ambiguous — and the
+overfit defect are defined in the PRD. The checkable rules about rules live on
+`ComponentDomainSpec._validation_rules` and `ComponentSourceCode._validation_rules`.
 
 A deterministic rule written as a judged rule is a defect too: it spends a model
 call on something a validator can decide exactly, and it makes the outcome
 stochastic.
 
-A fourth defect is **overfit**: a rule that encodes one example ("Location must
-be Zoom"). It is unambiguous, so it cannot be detected from its text with
-certainty. It surfaces when the user declares that an artifact is correct
-despite the rule.
+Overfit is the exception the gate cannot catch with confidence. It surfaces when
+the user declares that an artifact is correct despite the rule.
 
 The judge returns a typed verdict per rule: `pass` or `fail`, a `reasoning`
 field for its argument, and an `evidence` field quoting the data. Keeping the
@@ -59,46 +52,26 @@ fed back with a failure.
 
 ## Writing a rule
 
-Rules are authored by the author, and
-`ComponentDomainSpec._validation_rules` carries a small set of rules about the
-rules themselves:
+The checkable rules about the rules live on
+`ComponentDomainSpec._validation_rules` and
+`ComponentSourceCode._validation_rules`; the principles are in the PRD. They are
+the model's rules, and the judge is their executor: the authoring prompt renders
+them, and the judge's own prompt and code carry none of them. The authoring step
+proposes the set as a typed artifact; the judge applies the class rules to that
+set; a failure is fed back to the model, which asks the author which reading
+they mean and updates it; the framework shows the change; the author confirms.
+There is no separate classifier or linter: the model that writes the rules
+classifies them — a deterministic rule becomes a code check, an unambiguous one
+a judged check — and the author's confirmation is the gate. Code generation
+does not start until the set is confirmed.
 
-1. **One requirement per rule.** A compound rule hides one failure behind the
-   other. Two attributes of the same thing ("an owner and a due date") are one
-   requirement; two different outcomes are two entries.
-2. **A quality word carries its standard.** A word whose standard is intrinsic
-   and shared — "concise", "readable", "polite" — is fine, because a reader can
-   judge it. A relation whose other end is unstated is ambiguous — "complete"
-   (with respect to what?), "sufficient" (for what?), "appropriate" (to what?),
-   "specific" (about what?) — and must name its reference or be replaced by the
-   parts that must be present. Non-deterministic is not ambiguous: never demand a
-   mechanical test for "concise".
-3. **No example values as constraints.** An example belongs in the exemplar,
-   not in the rule.
-4. **If it can be checked mechanically, it belongs in the fields and
-   validators**, not in the quality list.
+**Quantifying scope is the author's, not a blanket rule.** A mechanical "say
+what happens when there are none" rule was tried and removed: it made the judge
+argue about wording instead of evaluating the artifact. The author answers scope
+when it matters, and the gate records the answer.
 
-These are **the model's rules, and the judge is their executor**: they live on
-`ComponentDomainSpec`, and the judge's own prompt and code carry none of them.
-The authoring step proposes the set as a typed artifact; the judge applies the
-four to that list; a failure is fed back to the model, which asks the author
-which reading they mean and updates it; the framework shows the change; the
-author confirms. There is no separate classifier or linter: the model that
-writes the rules classifies them — a deterministic rule becomes a code check, an
-unambiguous one a judged check — and the author's confirmation is the gate. Code
-generation does not start until the set is confirmed.
-
-**Quantifying scope is the author's, not a rule about rules.** An entry that says
-"every decision has an owner" may mean that a meeting with no decisions is
-acceptable, or that a meeting with no decisions is itself a failure. That is a
-question about the author's intent, not a property the text can settle. We do not
-enforce a blanket "say what happens when there are none" rule: the author answers
-it when it matters, and the gate records the answer. A mechanical version of that
-rule was tried and removed — it made the judge argue about wording instead of
-evaluating the artifact.
-
-Overfit is the exception the gate cannot catch with confidence — it is handled at
-runtime when the author declares an artifact correct despite the rule.
+Overfit is the exception the gate cannot catch with confidence — it is handled
+at runtime when the author declares an artifact correct despite the rule.
 
 ## What a failure means
 
@@ -154,7 +127,8 @@ classification is by the evidence in the conversation and the rule's text.
 - The **requirement step is the gate**: the model proposes the rule set (a
   deterministic rule as a code check, an unambiguous one as a judged check), the
   framework shows it for confirmation, and the author's acceptance is the gate.
-  The rules about rules live on `ComponentDomainSpec`; the judge executes them.
+  The rules about rules live on `ComponentDomainSpec._validation_rules` and
+  `ComponentSourceCode._validation_rules`; the judge executes them.
 - **The feedback loop already exists**: a rejected result is an error message fed
   back to the model, which continues the conversation. The work is the content of
   those messages, not new plumbing.
