@@ -34,12 +34,13 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-from .models import AgentAnswer
+from .models import AgentAnswer, AgentIntent
 from .session_log import TranscriptSegment
 
 __all__ = [
     "AnswerEnvelope",
     "TranscriptEntry",
+    "conversation_messages",
     "dump",
     "entries",
     "load",
@@ -244,6 +245,61 @@ def _structured_result_entry(result: Any, audience: Audience) -> TranscriptEntry
         else json.dumps(result, indent=2, default=str)
     )
     return TranscriptEntry(kind="structured-result", text=rendered)
+
+
+def conversation_messages(
+    messages: Sequence[ModelMessage],
+) -> list[ModelMessage]:
+    """Project a session log to the user-visible conversation as messages.
+
+    The log holds every step's raw traffic: system prompts, tool calls, tool
+    returns, thinking and validation corrections. A later chat-on step should
+    see the conversation a person had — user text, assistant text, and the
+    assistant's continue questions — not the previous step's protocol. The
+    previous step's result reaches it as an input parameter, not as an old
+    tool call under a different schema.
+    """
+    visible: list[ModelMessage] = []
+    for message in messages:
+        projected = _visible_message(message)
+        if projected is not None:
+            visible.append(projected)
+    return visible
+
+
+def _visible_message(message: ModelMessage) -> ModelMessage | None:
+    if isinstance(message, ModelRequest):
+        parts = [
+            part
+            for part in message.parts
+            if isinstance(part, UserPromptPart)
+            and _text(part.content).strip() not in _INTERNAL_PROMPTS
+        ]
+        return ModelRequest(parts=parts) if parts else None
+    if not isinstance(message, ModelResponse):
+        return None
+    parts = _visible_response_parts(message)
+    return ModelResponse(parts=parts) if parts else None
+
+
+def _visible_response_parts(message: ModelResponse) -> list[Any]:
+    parts: list[Any] = []
+    for part in message.parts:
+        if isinstance(part, TextPart):
+            if part.content.strip():
+                parts.append(part)
+        elif (
+            isinstance(part, ToolCallPart)
+            and part.tool_name == AgentAnswer.TOOL_NAME
+        ):
+            envelope = _answer_envelope(part)
+            if (
+                envelope is not None
+                and envelope.intent == AgentIntent.CONTINUE.value
+                and envelope.message
+            ):
+                parts.append(TextPart(envelope.message))
+    return parts
 
 
 def render_call_trace(

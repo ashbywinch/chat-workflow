@@ -22,6 +22,7 @@ from .prompt_builder import (
     user_parameter_labels,
 )
 from .streamingdebug import StreamingDebug
+from .transcript import conversation_messages
 from .types_meta import resolve_return_type
 
 
@@ -288,7 +289,7 @@ def _setup_atomic_workflow(
         instructions=system_prompt,
         output_type=AgentAnswer[actual_return_type],
         final_output_type=FinalAnswer[actual_return_type],
-        messages=list(session.state.messages) if chat else [],
+        messages=conversation_messages(session.state.messages) if chat else [],
         api_base=session.config.api_base,
         api_key_env=session.config.api_key_env,
         output_retries=getattr(session.config, "max_retries", 2),

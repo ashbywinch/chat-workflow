@@ -9,11 +9,19 @@ conversation with a structured result at the end.
 import unittest
 from typing import override
 
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    SystemPromptPart,
+    TextPart,
+    ThinkingPart,
+    ToolCallPart,
+    UserPromptPart,
+)
 
 from chat_workflow.session import Session, UserIO
 from chat_workflow.session_log import SessionLog, TranscriptSegment
-from chat_workflow.transcript import render_call_trace
+from chat_workflow.transcript import conversation_messages, render_call_trace
 
 
 class _IO(UserIO):
@@ -85,6 +93,60 @@ class TestCallTrace(unittest.TestCase):
         self.assertIn('"text": "I have what I need."', trace)
 
         self.assertIn("Result:\n  {\n    \"stages\": [", trace)
+
+    def test_inherited_history_is_only_the_visible_conversation(self):
+        """The next step gets user text, assistant text and continue questions.
+
+        It must not inherit the previous step's system prompt, success tool
+        call, thinking, or framework prompts: those are protocol, not turns the
+        user saw.
+        """
+        messages = [
+            ModelRequest(
+                parts=[
+                    SystemPromptPart("Open the conversation and greet."),
+                    UserPromptPart("Start the conversation."),
+                ]
+            ),
+            ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        "answer",
+                        {"intent": "success", "result": {"text": "Hi there!"}},
+                    )
+                ]
+            ),
+            ModelResponse(parts=[TextPart("Hi there!")]),
+            ModelRequest.user_text_prompt("Team events are chaos"),
+            ModelResponse(
+                parts=[
+                    ToolCallPart(
+                        "answer",
+                        {"intent": "continue", "message": "What do you make?"},
+                    )
+                ]
+            ),
+            ModelResponse(parts=[ThinkingPart("A private thought.")]),
+        ]
+
+        visible = conversation_messages(messages)
+
+        self.assertEqual(len(visible), 3)
+        self.assertIsInstance(visible[0].parts[0], TextPart)
+        self.assertEqual(visible[0].parts[0].content, "Hi there!")
+        self.assertIsInstance(visible[1].parts[0], UserPromptPart)
+        self.assertEqual(
+            visible[1].parts[0].content, "Team events are chaos"
+        )
+        self.assertIsInstance(visible[2].parts[0], TextPart)
+        self.assertEqual(visible[2].parts[0].content, "What do you make?")
+        self.assertFalse(
+            any(
+                isinstance(part, (SystemPromptPart, ToolCallPart, ThinkingPart))
+                for message in visible
+                for part in message.parts
+            )
+        )
 
     def test_a_chat_step_with_no_turns_says_so(self):
         log = SessionLog()
