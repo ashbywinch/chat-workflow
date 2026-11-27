@@ -31,8 +31,10 @@ def _declared_max_turns(step: Callable[..., object]) -> int | None:
         parameter = inspect.signature(step).parameters.get("max_turns")
     except (TypeError, ValueError):
         return 10
-    if parameter is not None and isinstance(parameter.default, int):
-        return parameter.default
+    if parameter is not None:
+        default = parameter.default
+        if default is None or isinstance(default, int):
+            return default
     return 10
 
 class SessionComponent:

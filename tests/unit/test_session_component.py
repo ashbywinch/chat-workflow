@@ -238,6 +238,24 @@ class _ChatOffStep:
         return "done"
 
 
+class TestDeclaredBudget(unittest.TestCase):
+    def test_a_declared_none_is_no_limit(self):
+        from chat_workflow.session_component import _declared_max_turns
+
+        def step(*, session, max_turns: int | None = None):
+            ...
+
+        self.assertIsNone(_declared_max_turns(step))
+
+    def test_a_declared_int_is_the_limit(self):
+        from chat_workflow.session_component import _declared_max_turns
+
+        def step(*, session, max_turns: int = 5):
+            ...
+
+        self.assertEqual(_declared_max_turns(step), 5)
+
+
 class TestSessionComponent(unittest.TestCase):
     def test_converse_greets_runs_the_step_and_signs_off(self):
         session = _session()
