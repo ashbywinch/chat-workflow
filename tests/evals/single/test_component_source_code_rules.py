@@ -13,7 +13,6 @@ from pydantic import ValidationError as PydanticValidationError
 from tests.conftest import timeout
 from tests.evals.helpers import make_config
 from tests.sample_code import (
-    INCOMPLETE_CODE,
     LOW_COHESION_CODE,
     VALID_COMPONENT_CODE,
 )
@@ -46,17 +45,6 @@ class TestComponentSourceCodeLlmValidationEval(unittest.TestCase):
             ComponentSourceCode(code=LOW_COHESION_CODE)
 
         self.assertIn("cross-cutting", str(ctx.exception).lower())
-
-    @timeout(120)
-    def test_incomplete_code_fails_llm_validation(self):
-        """Code with only type checks should fail Complete Functionality."""
-        from chat_workflow.exceptions import ValidationError
-
-        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
-            ComponentSourceCode(code=INCOMPLETE_CODE)
-
-        self.assertIn("domain business rule", str(ctx.exception).lower())
-
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

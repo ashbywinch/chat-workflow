@@ -199,7 +199,7 @@ from chat_workflow import atomic_workflow_step
 class Skeleton(BaseModel):
     """A bare-bones model."""
 
-    name: str = Field(..., description="Name")
+    name: str = Field(..., description="Name", min_length=1)
 
     @atomic_workflow_step
     @classmethod

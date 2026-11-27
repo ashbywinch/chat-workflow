@@ -648,13 +648,18 @@ class ComponentSourceCode(LLMValidated):
             ) from e
 
         # Formatting is deterministic and semantics-preserving; it is not a
-        # lint repair. Format once, then hold the formatted code to ruff and
-        # feed the actual violation back to the model through the output retry.
+        # lint repair. Format once, but never let formatting create a
+        # violation the authored code did not have: a formatted module that
+        # fails ruff is rejected in favour of the authored source, and the
+        # final check reports the authored violations instead.
         formatted = _ruff_format(code)
         if formatted != code:
-            self.code = SourceLines(formatted)
-            code = formatted
-            tree = ast.parse(code)
+            if _ruff_violations(formatted):
+                formatted = code
+            else:
+                self.code = SourceLines(formatted)
+                code = formatted
+                tree = ast.parse(code)
 
         unknown = _unresolvable_imports(tree)
         if unknown:
@@ -674,6 +679,7 @@ class ComponentSourceCode(LLMValidated):
                 for node in cls.body
                 if isinstance(node, ast.AnnAssign)
                 and isinstance(node.target, ast.Name)
+                and "ClassVar" not in _annotation_names(node.annotation)
                 and any(
                     isinstance(sub, ast.Name) and sub.id == "tuple"
                     for sub in ast.walk(node.annotation)

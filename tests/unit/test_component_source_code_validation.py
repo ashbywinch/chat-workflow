@@ -13,12 +13,14 @@ Also tests that new _validation_rules entries are collected.
 # importlib.util.find_spec — a faked filesystem would defeat exactly what these tests assert
 
 import unittest
+from pathlib import Path
 
 from pydantic import ValidationError as PydanticValidationError
 
 from tests.sample_code import (
     AUXILIARY_RETURN_CODE,
     CREATE_UPDATE_CODE,
+    INCOMPLETE_CODE,
     INVALID_SYNTAX_CODE,
     MULTI_ARTIFACT_CODE,
     MULTIPLE_BASEMODEL_CODE,
@@ -751,3 +753,43 @@ class TestRuffFeedback(unittest.TestCase):
         self.assertIsInstance(turn.output, Success)
         self.assertNotIn("import os", turn.output.result.code)
         self.assertEqual(len(script.calls), 2)
+
+
+class TestDeterministicSourceChecks(unittest.TestCase):
+    """The deterministic rules run in the unit gate, without an API call."""
+
+    def test_only_type_checks_fails_the_domain_rule(self):
+        from chat_workflow.exceptions import ValidationError
+
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=INCOMPLETE_CODE)
+
+        self.assertIn("domain business rule", str(ctx.exception).lower())
+
+    def test_framework_component_spec_source_survives_formatting(self):
+        root = Path(__file__).resolve().parents[2]
+        code = (root / "workflows" / "workflow" / "component_spec.py").read_text()
+
+        component = _DeterministicOnly(code=code)
+
+        self.assertIn("class ComponentSpec", component.code)
+
+    def test_generator_source_passes_with_a_classvar_tuple(self):
+        root = Path(__file__).resolve().parents[2]
+        code = (root / "workflows" / "workflow" / "component_source_code.py").read_text()
+
+        component = _DeterministicOnly(code=code)
+
+        self.assertIn("class ComponentSourceCode", component.code)
+
+    def test_a_model_tuple_field_is_still_rejected(self):
+        from chat_workflow.exceptions import ValidationError
+
+        code = VALID_COMPONENT_CODE.replace(
+            "attendees: list[str]", "attendees: tuple[str, ...]"
+        )
+
+        with self.assertRaises((ValidationError, PydanticValidationError)) as ctx:
+            _DeterministicOnly(code=code)
+
+        self.assertIn("tuple", str(ctx.exception).lower())
