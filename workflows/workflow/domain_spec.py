@@ -192,12 +192,11 @@ class ComponentDomainSpec(LLMValidated):
             session=session,
         )
         session.propose(draft)
-        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_domain_spec,
-            max_turns=min(max_turns, confirm_turn_limit),
+            max_turns=max_turns,
         )
 
 

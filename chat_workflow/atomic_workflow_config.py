@@ -7,6 +7,7 @@ from .exceptions import AtomicWorkflowFailedError
 from .model_provider import ProviderType
 from .models import Continue, Failure, Success, TurnResult
 from .streamingdebug import StreamingDebug
+from .turn_budget import TurnBudget
 
 TResult = TypeVar("TResult")
 
@@ -47,6 +48,11 @@ class AtomicWorkflowConfig(Generic[TResult]):
     # as calls going in and out, not as one undifferentiated conversation.
     step_name: str = "step"
     step_inputs: dict[str, Any] | None = None
+    # The session-wide budget. A direct AtomicWorkflow without one gets a
+    # local budget from ``max_turns``.
+    budget: TurnBudget | None = None
+    # A one-turn shape: the step has no `continue` and must finish this turn.
+    single_turn: bool = False
     initial_messages: list[dict[str, str]] | None = None
     debug: StreamingDebug | None = None
     model: str = "default-model"

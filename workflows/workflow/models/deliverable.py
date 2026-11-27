@@ -157,11 +157,10 @@ class Deliverable(LLMValidated):
         shown as a proposal the user corrects. A shape that is never shown is
         not a proposal, so this step never hands the user a form to fill in.
         """
-        gather_turn_limit = 6
         gathered = _gather_deliverable(
             analysis=analysis,
             session=session,
-            max_turns=min(max_turns, gather_turn_limit),
+            max_turns=max_turns,
         )
         draft = _draft_deliverables(
             notes=gathered.notes,
@@ -169,12 +168,11 @@ class Deliverable(LLMValidated):
             session=session,
         )
         session.propose(draft)
-        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_deliverables,
-            max_turns=min(max_turns, confirm_turn_limit),
+            max_turns=max_turns,
         )
 
 

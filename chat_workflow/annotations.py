@@ -77,15 +77,21 @@ class UserLabel:
         self.guard = guard
 
     def __get_pydantic_json_schema__(self, schema, handler):
-        """Give the field the user's phrase as its schema title.
+        """Give the field the user's label as its schema title and description.
 
         The model reads the tool schema, so the title is where a field's name
-        would otherwise become the model's word for it. With this, the schema
-        itself says "how you know it is good", not "success criteria".
+        would otherwise become the model's word for it. The description says
+        that the title is a user facing label, so the model does not have to
+        infer it from a separate prompt section.
         """
         json_schema = handler(schema)
         resolved = handler.resolve_ref_schema(json_schema)
         resolved["title"] = self.phrase
+        label = f'User facing label: "{self.phrase}".'
+        description = resolved.get("description")
+        resolved["description"] = (
+            f"{label} {description}" if description else label
+        )
         return json_schema
 
 

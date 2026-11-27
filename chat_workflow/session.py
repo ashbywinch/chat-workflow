@@ -11,6 +11,7 @@ from .atomic_workflow import AtomicWorkflow
 from .models import TurnResult
 from .rendering import RenderContext, render_result
 from .session_log import SessionLog, record_atomic_workflow
+from .turn_budget import TurnBudget
 
 if TYPE_CHECKING:
     from .rendering import Renderable
@@ -79,6 +80,9 @@ class Session:
     io: UserIO
     state: SessionLog
     config: Any = None
+    # The session-wide runaway guard. A child shares its parent's budget; the
+    # counter is not reset by entering a step.
+    budget: TurnBudget | None = None
     parent: Session | None = None
     children: list[Session] = dataclasses.field(default_factory=list)
     # The overall how for this session. ``SessionComponent.converse`` fills it
@@ -118,6 +122,7 @@ class Session:
             io=self._raw_io,
             state=SessionLog(),
             config=self.config,
+            budget=self.budget,
             parent=self,
             instructions=instructions,
             title=title,
@@ -193,6 +198,10 @@ class Session:
         correction and retried within the turn budget.
         """
         result: TurnResult[TResult] | None = None
+        # A direct Session.run gets the step's budget; a wrapped session was
+        # already given the top-level step's max_turns before the greeting.
+        if self.budget is None:
+            self.budget = TurnBudget(workflow.max_turns)
         try:
             if not chat:
                 # No user turn to add: the step's docstring is the instruction,

@@ -22,6 +22,7 @@ from chat_workflow import (
 )
 from chat_workflow.conversation_rules import NO_REPETITION
 from chat_workflow.transcript import entries, render, render_call_trace
+from chat_workflow.turn_budget import TurnBudget
 
 
 @dataclass
@@ -628,8 +629,10 @@ def run_multi_turn_eval(
 
     user_bot = AgentIO(persona_prompt=user_persona, config=config)
 
-    # Create session — state.messages records the conversation
+    # Create session — state.messages records the conversation. The eval's
+    # max_turns is the whole-session budget, not a leaf step's allowance.
     session = make_tools(user_bot, config=config)
+    session.budget = TurnBudget(method_kwargs.get("max_turns", 10))
 
     # The harness owns the root session and passes it to the step; a session
     # in method_kwargs belongs to a prebuilt harness, not to this run.

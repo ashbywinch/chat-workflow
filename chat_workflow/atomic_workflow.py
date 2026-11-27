@@ -18,10 +18,10 @@ from .exceptions import (
     AtomicWorkflowFailedError,
     InvalidResponseError,
     MaxRetriesExceededError,
-    TurnLimitExceededError,
 )
 from .models import AgentIntent, Continue, Failure, Success, TurnResult
 from .transcript import render
+from .turn_budget import TurnBudget
 
 TResult = TypeVar("TResult")
 
@@ -79,6 +79,10 @@ class AtomicWorkflow(Generic[TResult]):
         self.turn_count = 0
         self.chat = chat
         self.max_turns = config.max_turns
+        # The session-wide guard. A direct AtomicWorkflow without a session
+        # budget gets its own from the config.
+        self.budget = config.budget or TurnBudget(config.max_turns)
+        self.single_turn = config.single_turn
         self.step_name = config.step_name
         self.step_inputs = config.step_inputs or {}
         # A failure is provisional until the step has had one turn to continue.
@@ -122,34 +126,31 @@ class AtomicWorkflow(Generic[TResult]):
         return self._conversation.messages
 
     def _has_turn_room(self) -> bool:
-        """True while another model turn is allowed.
+        """True while the session budget has another model turn.
 
         ``max_turns=None`` removes the bound: the step ends when the model
         returns success or failure, so there is no last turn to force.
         """
-        return self.max_turns is None or self.turn_count < self.max_turns
+        return not self.budget.exhausted
 
     def process_turn(self, user_input: str | None = None) -> TurnResult[TResult]:
         """Take the next turn, with the corrections that turn needs.
 
         A correction — a rejected result, an answer that promises content it
-        does not give, an early finish — is a turn of its own: it is fed back
-        as the next input and spends one of ``max_turns`` when the step
-        declares a bound.
-        The budget at the top of this loop is what ends a model that will not
+        does not give, an early finish — is a turn of its own and consumes the
+        session's shared budget. The budget is what ends a model that will not
         stop asking; no branch can add a turn past it or pass it to a callee.
-        A step with ``max_turns=None`` has no such budget: it ends only on
+        A session with ``max_turns=None`` has no such budget: it ends only on
         success or failure, and never receives a forced final turn.
         """
         while True:
-            if self.max_turns is not None and self.turn_count >= self.max_turns:
-                raise TurnLimitExceededError(self.max_turns)
-
+            last_turn = self.budget.take()
             self.turn_count += 1
             # The last turn is told so: a model that would ask again is given
             # one turn to answer with what it has, and the step still fails if
-            # it will not.
-            final_turn = self.max_turns is not None and self.turn_count >= self.max_turns
+            # it will not. A one-turn step is always on its last turn, even
+            # when the session budget has room.
+            final_turn = self.single_turn or last_turn
             try:
                 response = self._call_llm(user_input, final_turn=final_turn)
             except MaxRetriesExceededError as exc:

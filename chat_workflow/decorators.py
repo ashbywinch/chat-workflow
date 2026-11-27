@@ -15,14 +15,10 @@ from .conversation import Conversation
 from .conversation_rules import DEFAULT_RULES as _DEFAULT_CONVERSATION_RULES
 from .exceptions import AtomicWorkflowFailedError
 from .models import AgentAnswer, FinalAnswer, Success, TurnResult
-from .prompt_builder import (
-    build_params_section,
-    format_docstring,
-    input_models,
-    user_parameter_labels,
-)
+from .prompt_builder import build_params_section, format_docstring
 from .streamingdebug import StreamingDebug
 from .transcript import conversation_messages
+from .turn_budget import TurnBudget
 from .types_meta import resolve_return_type
 
 
@@ -108,38 +104,6 @@ def _output_defs(return_type: Any) -> frozenset[str]:
     return frozenset(schema.get("$defs", {}))
 
 
-def _build_user_vocabulary_section(
-    return_type: Any,
-    inputs: tuple[type[BaseModel], ...] = (),
-    parameter_labels: dict[str, str] | None = None,
-) -> str:
-    """Tell the model which names are internal and where each phrase lives."""
-    parameter_labels = parameter_labels or {}
-    type_names = [
-        model.__name__
-        for model in (*inputs, _inner_model(return_type))
-        if isinstance(model, type) and issubclass(model, BaseModel)
-    ]
-    if not parameter_labels and not type_names:
-        return ""
-    lines = [
-        "## Use the user's words",
-        "Each field's title is the phrase to use for it; the key and the type "
-        "names are internal engineering text. Refer to a parameter by its "
-        "description, and to a type by the thing itself. Never say a field "
-        "name, a parameter name, or a type name aloud.",
-    ]
-    if parameter_labels:
-        lines.append("Parameters are how the step receives what it was given:")
-        lines.extend(
-            f'- `{name}` -> "{description}"'
-            for name, description in parameter_labels.items()
-        )
-    if type_names:
-        lines.append("Describe the thing itself; the type names above are internal.")
-    return "\n".join(lines)
-
-
 # lucidlint: ignore long-param-list the prompt sections are independent inputs; one call site names each
 def _build_system_prompt(
     raw_func: Callable[..., Any],
@@ -183,17 +147,6 @@ def _build_system_prompt(
     validation_section = _build_validation_rules_section(return_type)
     if validation_section:
         sections.append(validation_section)
-
-    # Last, because the schemas and rules above are full of the internal words
-    # the model must not say. The instruction to translate them has to be the
-    # most recent thing it reads, not the thing it read before the schema.
-    vocabulary_section = _build_user_vocabulary_section(
-        return_type,
-        input_models(raw_func),
-        user_parameter_labels(raw_func),
-    )
-    if vocabulary_section:
-        sections.append(vocabulary_section)
 
     sections.extend(_turn_policy_sections(chat, return_type))
 
@@ -272,6 +225,7 @@ def _setup_atomic_workflow(
     chat: bool,
     tools: Any = (),
     deps: Any = None,
+    single_turn: bool = False,
     step_name: str = "step",
     step_inputs: dict[str, Any] | None = None,  # lucidlint: ignore record-shape the step's inputs are its parameters
 ) -> AtomicWorkflow:
@@ -315,6 +269,8 @@ def _setup_atomic_workflow(
             response_model=AgentAnswer[actual_return_type],
             final_response_model=FinalAnswer[actual_return_type],
             max_turns=max_turns,
+            budget=getattr(session, "budget", None),
+            single_turn=single_turn,
             step_name=step_name,
             step_inputs=step_inputs,
             initial_messages=None,
@@ -406,6 +362,11 @@ def atomic_workflow(
                 max_turns = _checked_max_turns(kwargs.pop("max_turns"), f.__name__)
             else:
                 max_turns = _declared_max_turns(raw_func, single_turn=single_turn)
+
+            if getattr(session, "budget", None) is None:
+                # A step called directly, outside SessionComponent, owns the
+                # session's runaway guard.
+                session.budget = TurnBudget(max_turns)
 
             if debug is None and session.config.debug:
                 debug = StreamingDebug()

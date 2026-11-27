@@ -4,7 +4,6 @@ import unittest
 from typing import Annotated
 
 from chat_workflow.annotations import UserLabel, user_labels
-from chat_workflow.decorators import _build_user_vocabulary_section
 from chat_workflow.mixins import LLMValidated
 
 
@@ -47,24 +46,15 @@ class TestVocabularyPrompt(unittest.TestCase):
         self.assertEqual(titles["orchestrating_component"]["title"], "who keeps things moving")
         self.assertEqual(titles["phases"]["title"], "the main stages")
 
-    def test_the_section_points_at_the_field_title(self):
-        section = _build_user_vocabulary_section(LabelledResult)
+    def test_the_description_calls_the_title_a_user_facing_label(self):
+        """A model reading the schema sees that the title is for the user."""
+        description = LabelledResult.model_json_schema()["properties"][
+            "success_criteria"
+        ]["description"]
 
-        self.assertIn("Each field's title is the phrase", section)
-        self.assertIn("internal engineering text", section)
-        self.assertNotIn("success_criteria", section)
-        self.assertNotIn("`message`", section)
-
-    def test_parameter_and_type_names_get_the_same_treatment(self):
-        """A parameter name and a model name are internal too, not user words."""
-        section = _build_user_vocabulary_section(
-            LabelledResult,
-            (LabelledInput,),
-            {"analysis": "What the person already told you"},
+        self.assertIn(
+            'User facing label: "how you know it is good".', description
         )
-
-        self.assertIn("`analysis` -> \"What the person already told you\"", section)
-        self.assertIn("type names above are internal", section)
 
     def test_input_models_are_read_from_the_signature(self):
         from chat_workflow.prompt_builder import input_models, user_parameter_labels

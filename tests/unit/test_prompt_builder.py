@@ -114,19 +114,6 @@ class TestNoProtocolText(unittest.TestCase):
         ):
             self.assertNotIn(phrase, lowered)
 
-    def test_vocabulary_section_does_not_name_the_message_field(self):
-        from chat_workflow.decorators import _build_user_vocabulary_section
-
-        section = _build_user_vocabulary_section(
-            InnerShape,
-            (),
-            {"inner": "The inner shape"},
-        )
-
-        self.assertIn("## Use the user's words", section)
-        self.assertNotIn("`message`", section)
-
-
 class TestValidationSchema(unittest.TestCase):
     def test_validation_rule_reaches_json_schema(self):
         class Validated(LLMValidated):

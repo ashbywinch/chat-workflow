@@ -23,7 +23,10 @@ _NO_EXECUTOR_MODE: tuple[str, str] = (
 
 
 class Resource(LLMValidated):
-    """A single workflow resource."""
+    """One thing the person starts with.
+
+    User facing label: "what you start with".
+    """
 
     model_config = ConfigDict(title="what you start with")
 
@@ -111,12 +114,11 @@ class Resource(LLMValidated):
             session=session,
         )
         session.propose(draft)
-        confirm_turn_limit = 4
         return confirm_draft(
             session=session,
             draft=draft,
             step=_confirm_resources,
-            max_turns=min(max_turns, confirm_turn_limit),
+            max_turns=max_turns,
         )
 
 

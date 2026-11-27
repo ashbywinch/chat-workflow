@@ -11,6 +11,7 @@ does not greet or sign off unless the caller asks for it.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from inspect import cleandoc
 from typing import ClassVar, TypeVar
@@ -19,8 +20,20 @@ from .conversation_rules import WARM_OPEN
 from .decorators import atomic_workflow, composite_workflow
 from .models import TextReply
 from .session import Session
+from .turn_budget import TurnBudget
 
 T = TypeVar("T")
+
+
+def _declared_max_turns(step: Callable[..., object]) -> int | None:
+    """The top-level step's declared runaway guard, or the framework default."""
+    try:
+        parameter = inspect.signature(step).parameters.get("max_turns")
+    except (TypeError, ValueError):
+        return 10
+    if parameter is not None and isinstance(parameter.default, int):
+        return parameter.default
+    return 10
 
 class SessionComponent:
     """Runs one conversation: a greeting, the step, and a closing."""
@@ -94,6 +107,12 @@ class SessionComponent:
         """
         if session.instructions is None:
             session.instructions = cleandoc(self.converse.__doc__ or "")
+
+        # The budget belongs to the session, so it is set once from the
+        # top-level step, before the greeting and any nested step can consume
+        # a turn or reset it.
+        if session.budget is None:
+            session.budget = TurnBudget(_declared_max_turns(step))
 
         # A top-level step that makes no user turns is not a conversation: it
         # has nothing to greet or close. Composite steps default to chat-on.
