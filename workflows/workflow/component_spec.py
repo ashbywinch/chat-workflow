@@ -30,39 +30,38 @@ _ABSTRACT_ACTIVITY_NAMES = frozenset(
     }
 )
 
-
 class ComponentSpec(LLMValidated):
-    """The component spec: what a component is responsible for in the user's domain."""
+    """A part of the work: what it covers, who owns it, and what it produces."""
 
     model_config = ConfigDict(title="a part of the work")
 
     _validation_rules: ClassVar[list[str]] = [
         # The name is enforced by the `_name_is_a_concrete_artifact` field
         # validator: it is a structural check, not a domain-quality rule.
-        # Q1 — overall responsibility. May span subcomponents, because those
-        # are other components; it is one coherent reason to change.
+        # Q1 — overall responsibility. May span subparts, because those
+        # are other parts; it is one coherent reason to change.
         "The overall responsibility states the end-to-end responsibility this part of the work "
         "delivers: one coherent outcome for one group of people who would ask "
-        "for it to change. It may include work this component delegates to "
-        "other components; it must not combine unrelated responsibilities.",
-        # Q2 — own responsibility. No subcomponents, existing or latent.
+        "for it to change. It may include work this part delegates to "
+        "other parts; it must not combine unrelated responsibilities.",
+        # Q2 — own responsibility. No subparts, existing or latent.
         "The scope states what this part of the work itself does, as "
-        "opposed to other components. It describes exactly one artifact — the "
-        "data members of the model this component defines — and the work that "
+        "opposed to other parts. It describes exactly one artifact — the "
+        "data members of the model this part defines — and the work that "
         "produces and changes it. Several operations on that artifact "
         "(creating, updating, reviewing, approving, sending it) are one "
         "artifact, not several. A part of the work that is itself an artifact — a section "
         "with its own content, audience, or quality criteria (for example a "
         "strategy section or a financial projection inside a business plan), a "
         "separate record, deliverable, or unrelated technical work such as "
-        "parsing or file handling — is a latent subcomponent and does not "
+        "parsing or file handling — is a latent subpart and does not "
         "belong here. It also states at least one thing it does not do (out of "
-        "scope); naming the adjacent component's or another role's work is "
+        "scope); naming the adjacent part's or another role's work is "
         "enough, and it does not need to enumerate unrelated activities. A "
         "workflow step on the same artifact (reviewing, approving, sending it) "
         "is in scope; do not treat it as a separate artifact merely because it "
         "could be a standalone deliverable — only a distinct record or "
-        "deliverable of its own belongs in another component.",
+        "deliverable of its own belongs in another part.",
         "The thing belongs to the capacity whose job includes it, which may "
         "be the user. Use 'the person it belongs to' only when the thing is "
         "that person's own work; for a maintenance manager's sign-off sheet, "
@@ -93,9 +92,9 @@ class ComponentSpec(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "The end-to-end responsibility this component delivers — one "
+            "The end-to-end responsibility this part delivers — one "
             "coherent outcome for one group of people. It may include work "
-            "delegated to other components."
+            "delegated to other parts."
         ),
         min_length=1,
     )
@@ -105,7 +104,7 @@ class ComponentSpec(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "What this component itself does, as opposed to other components. "
+            "What this part itself does, as opposed to other parts. "
             "One artifact — the data members of the model it defines — and the "
             "operations that produce and change it; no part of the work that is "
             "itself an artifact (a section with its own content, audience, or "
@@ -135,7 +134,7 @@ class ComponentSpec(LLMValidated):
     ] = Field(
         ...,
         description=(
-            "Names of inputs this component needs from other components or from outside the workflow"
+            "Names of inputs this part needs from other parts or from outside the workflow"
         ),
     )
     component_type: Annotated[
