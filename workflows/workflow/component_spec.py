@@ -30,6 +30,12 @@ _ABSTRACT_ACTIVITY_NAMES = frozenset(
     }
 )
 
+# A suffix that names how the work is organised, not the artifact it
+# produces. "MeetingNotesWorkflow" and "Review Process" are containers for
+# work; the artifact is "MeetingNotes" and "Review Notes".
+_ABSTRACT_PROCESS_SUFFIXES = frozenset({"workflow", "process", "system"})
+
+
 class ComponentSpec(LLMValidated):
     """A part of the work: what it covers, who owns it, and what it produces."""
 
@@ -174,12 +180,30 @@ class ComponentSpec(LLMValidated):
     @field_validator("name")
     @classmethod
     def _name_is_a_concrete_artifact(cls, value: str) -> str:
-        words = value.strip().casefold().split()
-        if words and words[-1] in _ABSTRACT_ACTIVITY_NAMES:
+        words = value.strip().split()
+        if not words:
+            return value
+        last = words[-1]
+        folded = last.casefold()
+        if folded in _ABSTRACT_ACTIVITY_NAMES:
             raise ValueError(
-                f"'{value}' ends with the activity '{words[-1]}'. Name the "
+                f"'{value}' ends with the activity '{folded}'. Name the "
                 "artifact it produces, for example 'Minutes Distribution "
                 "Record', 'Approval Record', 'Review Notes'."
+            )
+        for suffix in _ABSTRACT_PROCESS_SUFFIXES:
+            if not folded.endswith(suffix):
+                continue
+            stem = last[: -len(suffix)].rstrip("-_ ")
+            example = " ".join([*words[:-1], stem] if stem else words[:-1]) or None
+            hint = (
+                f"Name the artifact itself, for example '{example}'."
+                if example
+                else "Name the artifact it produces."
+            )
+            raise ValueError(
+                f"'{value}' names a {suffix}, not the artifact the work "
+                f"produces. {hint}"
             )
         return value
 
