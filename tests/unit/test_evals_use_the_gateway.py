@@ -1,5 +1,7 @@
 """Every eval routes through the house gateway, never a provider endpoint."""
 
+# lucidlint: ignore-file fakefs the subject is the checked-in config.json the eval suite ships
+
 from __future__ import annotations
 
 import json

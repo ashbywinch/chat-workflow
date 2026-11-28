@@ -14,7 +14,6 @@ ModelType = TypeVar("ModelType", bound=BaseModel)
 @atomic_workflow
 def refine(
     initial_object: Annotated[ModelType, "The object to review and potentially modify based on user feedback"],
-    max_turns: Annotated[int, "Maximum number of refinement turns"] = 5,
 ) -> ModelType:
     """You are running a short refinement conversation for an existing object.
     Goal: Check whether the user wants to keep this version of the object or change

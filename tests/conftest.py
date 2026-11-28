@@ -13,10 +13,11 @@ from pydantic_ai.messages import ModelMessage, ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 from chat_workflow import (
-    AgentResponse,
+    AgentAnswer,
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
     Conversation,
+    FinalAnswer,
     TurnResult,
 )
 from workflows.evaluation_criteria import Criterion, EvaluationCriteria
@@ -75,6 +76,8 @@ class FakeConfig:
     request_timeout_seconds = 30
     debug = False
     extra_headers: dict[str, str] = {}
+    temperature: float | None = None
+    model_client: Any = None
 
 
 def make_valid_criteria() -> EvaluationCriteria:
@@ -89,7 +92,7 @@ def make_valid_criteria() -> EvaluationCriteria:
 
 
 def _success(action) -> TurnResult:
-    """The success callback: a success turn always carries a result."""
+    """The success callback: a success turn carries its result, not a message."""
     if action.result is None:
         raise AtomicWorkflowFailedError("SUCCESS intent returned no result")
     return TurnResult[EvaluationCriteria].success(action.result)
@@ -97,13 +100,13 @@ def _success(action) -> TurnResult:
 
 def make_atomic_workflow_config(
     response_model_override: type | None = None,
-    max_turns: int = 10,
+    max_turns: int | None = 10,
     **overrides: Any,
 ) -> AtomicWorkflowConfig:
     """Create a standard AtomicWorkflowConfig for testing."""
     kwargs = dict(
         system_prompt="Test prompt",
-        response_model=response_model_override or AgentResponse[EvaluationCriteria],
+        response_model=response_model_override or AgentAnswer[EvaluationCriteria],
         max_turns=max_turns,
         on_continue=lambda action: TurnResult[EvaluationCriteria].continuing(action.message or ""),
         on_success=_success,
@@ -120,8 +123,11 @@ def text_response(payload: Any) -> ModelResponse:
     a tool's schema and ignore ``response_format``. The schema wraps the
     intents' union in an object under ``response``, so the arguments do too.
     """
-    if isinstance(payload, dict) and "response" not in payload:
-        payload = {"response": payload}
+    response = payload
+    if isinstance(response, dict) and response.get("intent") == "success":
+        # A success carries its result and no message. Scripted tests focus on
+        # the result, so the helper drops any prose a test wrote by habit.
+        response.pop("message", None)
     return ModelResponse(parts=[ToolCallPart("answer", payload)])
 
 
@@ -155,6 +161,7 @@ def make_conversation(
     responses: list[Any],
     *,
     output_type: type | None = None,
+    final_output_type: type | None = None,
     **overrides: Any,
 ) -> Any:
     """A Conversation on a scripted model: no network, no provider."""
@@ -162,7 +169,8 @@ def make_conversation(
     conversation = Conversation(
         model="scripted-model",
         instructions="Test instructions",
-        output_type=output_type or AgentResponse[EvaluationCriteria],
+        output_type=output_type or AgentAnswer[EvaluationCriteria],
+        final_output_type=final_output_type or FinalAnswer[EvaluationCriteria],
         model_client=FunctionModel(script),
         **overrides,
     )

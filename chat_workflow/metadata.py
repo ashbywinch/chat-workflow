@@ -14,8 +14,16 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+__all__ = [
+    "format_param_value",
+    "format_type_name",
+    "get_param_description",
+    "get_typed_hint",
+    "unwrap_annotated",
+]
 
-def _get_typed_hint(func: Callable[..., Any], param_name: str) -> Any:
+
+def get_typed_hint(func: Callable[..., Any], param_name: str) -> Any:
     """Resolve the type hint for a parameter, preserving ``Annotated`` metadata.
 
     Uses ``typing.get_type_hints`` with ``include_extras=True`` so that
@@ -33,11 +41,12 @@ def _get_typed_hint(func: Callable[..., Any], param_name: str) -> Any:
     try:
         hints = typing.get_type_hints(func, include_extras=True)
         return hints.get(param_name)
+    # lucidlint: ignore broad-except a hint that cannot resolve is absent at discovery; the parameter falls back to text
     except Exception:
         return None
 
 
-def _unwrap_annotated(hint: Any) -> Any:
+def unwrap_annotated(hint: Any) -> Any:
     """Strip an ``Annotated`` wrapper to get the bare type.
 
     If *hint* is ``Annotated[T, ...]``, returns ``T``. Otherwise returns
@@ -55,7 +64,7 @@ def _unwrap_annotated(hint: Any) -> Any:
     return hint
 
 
-def _get_param_description(func: Callable[..., Any], param_name: str) -> str | None:
+def get_param_description(func: Callable[..., Any], param_name: str) -> str | None:
     """Extract an optional description string from ``Annotated[T, "desc"]``.
 
     Looks for a ``str`` among the extra arguments of an ``Annotated`` type
@@ -68,7 +77,7 @@ def _get_param_description(func: Callable[..., Any], param_name: str) -> str | N
     Returns:
         The description string if one is found, or ``None``.
     """
-    hint = _get_typed_hint(func, param_name)
+    hint = get_typed_hint(func, param_name)
     if hint is None:
         return None
     origin = typing.get_origin(hint)
@@ -81,7 +90,7 @@ def _get_param_description(func: Callable[..., Any], param_name: str) -> str | N
     return None
 
 
-def _format_type_name(hint: Any) -> str:
+def format_type_name(hint: Any) -> str:
     """Render a type hint as a human-readable name.
 
     Strips any ``Annotated`` wrapper, then returns the ``__name__`` of the
@@ -93,7 +102,7 @@ def _format_type_name(hint: Any) -> str:
     Returns:
         A human-readable string representation of the type.
     """
-    hint = _unwrap_annotated(hint)
+    hint = unwrap_annotated(hint)
     if hint is None:
         return "Any"
     if isinstance(hint, TypeVar):
@@ -103,7 +112,7 @@ def _format_type_name(hint: Any) -> str:
     return str(hint)
 
 
-def _format_param_value(value: Any) -> str:
+def format_param_value(value: Any) -> str:
     """Render a parameter value for inclusion in the system prompt.
 
     Strings are JSON-encoded to preserve escaping. Pydantic models are

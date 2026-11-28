@@ -12,6 +12,8 @@ Mirrors the pattern from workflows/evaluation_criteria/evaluation_criteria.py:43
 which uses Self as a classmethod return type.
 """
 
+# lucidlint: ignore-file fakefs importlib execs the temp module this test writes, which needs a real file
+
 import importlib.util
 import os
 import sys
@@ -43,7 +45,6 @@ class TestWorkflow:
     def generate(
         cls,
         context: str,
-        max_turns: int = 10,
     ) -> Self:
         \"\"\"You are a helpful assistant.\"\"\"
         pass
@@ -100,7 +101,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """
@@ -142,7 +143,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """
@@ -187,7 +188,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """
@@ -236,7 +237,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """

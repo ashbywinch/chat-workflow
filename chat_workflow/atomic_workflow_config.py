@@ -3,15 +3,19 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar
 
 from .conversation import Conversation
-from .debug import StreamingDebug
 from .exceptions import AtomicWorkflowFailedError
 from .model_provider import ProviderType
 from .models import Continue, Failure, Success, TurnResult
+from .streamingdebug import StreamingDebug
+from .turn_budget import TurnBudget
 
 TResult = TypeVar("TResult")
 
+__all__ = ["AtomicWorkflowConfig"]
+
 
 @dataclass
+# lucidlint: ignore duplicate-module the module holds exactly its namesake class; a module and its class are not copies
 class AtomicWorkflowConfig(Generic[TResult]):
     """Configuration for an :class:`AtomicWorkflow`.
 
@@ -29,13 +33,28 @@ class AtomicWorkflowConfig(Generic[TResult]):
     # A model or a union alias: what the request's schema is built from, so it
     # is not `type[...]` — that is the point of the field.
     response_model: Any
-    max_turns: int
+    # The local conversation bound when an AtomicWorkflow is constructed
+    # directly, as unit tests do. In the normal path the session owns one
+    # budget shared by every step. ``None`` is no bound: the step ends on
+    # success or failure, never because a count ran out, so there is no final
+    # turn to force.
+    max_turns: int | None
     # Each turn's outcome reaches the handler that asked for it, so a handler
     # reads the fields that shape actually has: a continue has a message and
     # no result, a success the reverse.
     on_continue: Callable[[Continue], TurnResult[TResult]]
     on_success: Callable[[Success[TResult]], TurnResult[TResult]]
     on_failure: Callable[[Failure], AtomicWorkflowFailedError]
+    # The call frame: the step's name, and the user-facing parameters it was
+    # called with. The transcript records these so a multi-step run can be read
+    # as calls going in and out, not as one undifferentiated conversation.
+    step_name: str = "step"
+    step_inputs: dict[str, Any] | None = None
+    # The session-wide budget. A direct AtomicWorkflow without one gets a
+    # local budget from ``max_turns``.
+    budget: TurnBudget | None = None
+    # A one-turn shape: the step has no `continue` and must finish this turn.
+    single_turn: bool = False
     initial_messages: list[dict[str, str]] | None = None
     debug: StreamingDebug | None = None
     model: str = "default-model"

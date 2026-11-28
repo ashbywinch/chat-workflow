@@ -1,0 +1,355 @@
+# ruff: noqa: E501 — LLM prompt docstrings contain long example dialogue lines
+from __future__ import annotations
+
+from typing import Annotated, ClassVar, Self
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
+
+from chat_workflow import atomic_workflow_step, composite_workflow_step
+from chat_workflow.annotations import UserLabel
+from chat_workflow.confirmation import confirm_draft
+from chat_workflow.conversation_rules import WARM_OPEN
+from chat_workflow.mixins import LLMValidated
+from chat_workflow.rendering import RenderContext
+
+from ..conversation_rules import CONFIRM_THE_DRAFT, SELF_ONLY_ROLE
+
+# lucidlint: ignore-file global-state the no-executor rule is a prompt constant shared by the class and module-level steps
+_NO_EXECUTOR_MODE: tuple[str, str] = (
+    "No executor mode",
+    "The assistant defines what good looks like — it does not generate "
+    "content or execute the work for the user.",
+)
+
+class ProcessStage(BaseModel):
+    """One broad stage of the work, with the concrete steps inside it."""
+
+    name: Annotated[str, UserLabel(phrase="the stage", aliases="stage")] = Field(
+        ...,
+        description=(
+            "A broad stage of the work, named as the user names it (for "
+            "example 'Plan', 'Shop', 'Cook')."
+        ),
+        min_length=1,
+    )
+    steps: Annotated[list[str], UserLabel(phrase="the steps", aliases="steps")] = Field(
+        ...,
+        description=(
+            "The concrete steps inside this stage, in the user's words (for "
+            "example 'check the fridge', 'write a list'). A step is not the "
+            "stage's name repeated."
+        ),
+        min_length=1,
+    )
+
+
+class ProcessDefinition(LLMValidated):
+    """The stages of the user's work, each with its concrete steps."""
+
+    model_config = ConfigDict(title="the stages of your work")
+
+    _validation_rules: ClassVar[list[str]] = [
+        "The stages are broad; each stage lists the concrete steps inside it, "
+        "and can be assigned to a part of the work.",
+        "Every step is concrete enough that one part of the work could "
+        "produce it.",
+        "No stage name is repeated as one of the steps.",
+        "The participants may name the user as 'You'. In this conversation "
+        "that is the user's own role, not a placeholder, and it is valid "
+        "alongside other named participants. A role the user does themselves "
+        "is written '<role> (You)' — for example 'Expense Reporter (You)' — "
+        "so it reads as the user, not a separate person. It is optional: a "
+        "list of the other participants is complete without it.",
+        "The person in charge is the person or role that keeps the work moving. The user's own role is valid when they do the work end "
+        "to end; it is written '<role> (You)' (for example 'Freelance Writer "
+        "(You)'), or 'You' when there is no role name. A job title the user "
+        "states, such as 'Project Manager', is their own role and is "
+        "accepted with the user marker. It is not "
+        "the name of the work as a whole ('Meal Planning', 'Content Creation'), "
+        "a label that is only generic ('Manager', 'Coordinator'), "
+        "or a software product the user does not use. A role that names what "
+        "it coordinates is specific ('Meeting Minutes Coordinator'), not "
+        "generic. When the user names their own role as 'me', 'I', or "
+        "'myself', that is their answer and is accepted; do not demand a job "
+        "title. A separate coordinator is optional.",
+    ]
+
+    stages: Annotated[
+        list[ProcessStage],
+        UserLabel(phrase="the main stages", aliases="stages", guard=False),
+    ] = Field(
+        ...,
+        description=(
+            "The broad stages of the work, in order, each with the concrete "
+            "steps inside it. A stage is not itself one of those steps."
+        ),
+        min_length=1,
+    )
+
+    @property
+    def phases(self) -> list[str]:
+        """The stage names, for consumers that need the flat order."""
+        return [stage.name for stage in self.stages]
+
+    @property
+    def activities(self) -> list[str]:
+        """Every step, in stage order, for consumers that need the flat list."""
+        return [step for stage in self.stages for step in stage.steps]
+
+    orchestrating_component: Annotated[
+        str,
+        UserLabel(
+            phrase="who is in charge",
+            aliases=("orchestrating component", "orchestrating"),
+            guard=False,
+        ),
+    ] = Field(
+        ...,
+        description=(
+            "The person or role that keeps the work moving. A role the user "
+            "does themselves is written '<role> (You)', for example 'Expense "
+            "Reporter (You)', or 'You' when there is no role name; the user "
+            "marker is what makes it the user, not a separate person. The "
+            "name of the work as a whole ('Meal Planning') is not a role. A "
+            "bare 'Coordinator' is too generic; 'Meeting Minutes Coordinator' "
+            "names what it coordinates and is specific enough."
+        ),
+        min_length=1,
+    )
+    participants: Annotated[
+        list[str],
+        UserLabel(phrase="everyone involved", aliases="participants", guard=False),
+    ] = Field(
+        ...,
+        description=(
+            "Everyone involved (people, roles, or systems). A role the user "
+            "does themselves is written '<role> (You)', for example 'Expense "
+            "Reporter (You)', or 'You' when there is no role name."
+        ),
+        min_length=1,
+    )
+
+    @model_validator(mode="after")
+    def _stages_are_distinct_from_steps(self) -> Self:
+        """A stage groups steps; a stage name is not one of the steps."""
+        names = [stage.name.strip().casefold() for stage in self.stages]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(
+                "Stage names must be distinct; these repeat: "
+                + ", ".join(duplicates)
+            )
+        steps = {step.strip().casefold() for step in self.activities}
+        overlap = sorted(set(names) & steps)
+        if overlap:
+            raise ValueError(
+                "The stage(s) "
+                + ", ".join(repr(name) for name in overlap)
+                + " also appear as one of their own steps. A stage is a broad "
+                "phase, not the action itself. Repair it in one of two ways: "
+                "rename the stage to the phase the action belongs to (for "
+                "example 'Prepare' or 'Submit') and keep the user's action as "
+                "a step; or drop the duplicate step when the stage name "
+                "already says it. Keep every other step the user described; do "
+                "not invent a step to fill the stage."
+            )
+        return self
+
+
+    def render(self, context: RenderContext) -> str:
+        """Say the breakdown as a picture, not a field dump."""
+        others = [
+            person for person in self.participants if not _is_user_role(person)
+        ]
+        if not others:
+            people = "You are the only person involved."
+        elif len(others) == 1:
+            people = f"You and {others[0]} are involved."
+        else:
+            people = f"You, {_series(others)} are involved."
+
+        owner = self.orchestrating_component.strip()
+        keeps = (
+            "You keep it moving."
+            if _is_user_role(owner)
+            else f"{owner} keeps it moving."
+        )
+
+        parts = [
+            f"{index} — {stage.name}: {'; '.join(stage.steps)}."
+            for index, stage in enumerate(self.stages, 1)
+        ]
+        return f"The work has {len(parts)} parts. " + " ".join(
+            [*parts, f"{people} {keeps}"]
+        )
+
+
+_USER_ROLE_WORDS = frozenset(
+    {"you", "yourself", "me", "i", "myself", "the user", "user"}
+)
+
+
+def _is_user_role(role: str) -> bool:
+    """True for 'You' and for a role marked as the user, 'Role (You)'."""
+    value = role.strip().casefold()
+    return value in _USER_ROLE_WORDS or value.endswith("(you)")
+
+
+def _series(items: list[str]) -> str:
+    """A, B, and C — a sentence, not a list of labels."""
+    values = [item.strip() for item in items if item.strip()]
+    if len(values) <= 1:
+        return values[0] if values else "nothing yet"
+    if len(values) == 2:
+        return f"{values[0]} and {values[1]}"
+    return ", ".join(values[:-1]) + f", and {values[-1]}"
+
+
+class GatheredNotes(BaseModel):
+    """What the user told us about their work, in their own words."""
+
+    notes: str = Field(
+        min_length=1,
+        description=(
+            "The user's description of how their work happens, in their own "
+            "words. Not your reply to them, and never a question."
+        ),
+    )
+
+    @field_validator("notes")
+    @classmethod
+    def _notes_are_a_description(cls, value: str) -> str:
+        """A question is not the user's description."""
+        if value.strip().endswith("?"):
+            raise ValueError(
+                "The notes are a question, not the user's description. Answer "
+                "their question, then ask what they do and record what they "
+                "tell you."
+            )
+        return value
+
+
+@atomic_workflow_step(
+    conversation_validation_rules=[WARM_OPEN, _NO_EXECUTOR_MODE],
+)
+def _gather_notes(
+    process_description: Annotated[
+        str, "What the person already told you about how their work happens"
+    ] = "",
+) -> GatheredNotes:
+    """Collect the user's description of how their work happens.
+
+The conversation has already opened; do not greet again. Say what you are doing. If the description parameter already holds their answer,
+it is what they already told you: do not ask "What do you do?" again; ask only "Is there anything else?" once, then return. Otherwise
+ask "What do you do?" once; after their first answer, return what they told you, in their words. If their answer is a high-level summary ("I plan team events"), ask them to walk you through one example from start to finish before you return. Ask for that one walk-through, not a list of details: do not interrogate the form's fields, the categories, or the approver in this step — the next step fills those gaps with one concrete possibility at a time. If their answer is a specific article, dish, or idea rather than what they do, ask one process question — "What
+do you actually do, step by step?" — and return their answer. If they ask for a template or an example rather than
+describing their work, say the template comes after you understand the work, and ask what they do step by step.
+
+Listen, and let them talk. Do not name stages, ask them to confirm anything, or structure what they say. This step collects the description; the next step turns it into the breakdown.
+
+Put the user's description in `notes`, in their words — not your reply to them. If you still need an answer, ask the question as a continue; never put a question in `notes`."""
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
+
+
+@atomic_workflow_step(chat=False, single_turn=True)
+def _draft_process_definition(
+    notes: Annotated[str, "What the person told you, in their words"],
+) -> ProcessDefinition:
+    """Turn the user's description into the stages and steps of their work.
+
+The notes are complete. Derive the breakdown from them yourself; do not ask the user anything. Return each stage with
+the steps inside it: `stages: [{name, steps}]`. Keep their names for stages and steps. If the notes name the stages, use
+those names and put the actions inside them as steps. When the notes give only steps, group them into a few broad
+stages. A stage is not one of its steps repeated as a heading. List only the people or roles the notes actually
+name; a step that says "submit for approval" does not name an approver, so leave the approver out and let the
+confirmation step ask about that gap. The role in charge is the person or role that keeps the work moving. If the notes
+say the user does it all, write the role they do with the user marker — for example "Expense Reporter (You)" — or "You"
+when the notes do not name a role; the marker makes it the user, not a separate person. Do not invent a bare job title.
+Do not invent people or
+steps the notes do not support. A consequence of the work — the boss gets annoyed, the team reads it — is not a stage,
+and the recipient is not a participant in the work; only what the user does, and the people who do it with them, is in
+the breakdown. A name the notes say the user is unsure about — "I don't know if JD is John or a
+project" — is not a participant; leave it out. An example is not a fact.
+
+Return the complete ProcessDefinition."""
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
+
+
+@atomic_workflow_step(
+    conversation_validation_rules=[
+        _NO_EXECUTOR_MODE,
+        SELF_ONLY_ROLE,
+        CONFIRM_THE_DRAFT,
+    ]
+)
+def _confirm_process_definition(
+    draft: Annotated[
+        ProcessDefinition,
+        "The complete breakdown derived from the user's description",
+    ],
+) -> ProcessDefinition:
+    """
+The draft has been shown with one confirm-or-correct question, and the user is answering it. Do not show the draft again and do not repeat that question.
+
+If the draft leaves a gap the notes imply but do not name — for example, "submit for approval" with no approver — ask about that gap and offer one concrete possibility: "Is the approver your manager, or someone else?" If the user says
+they do not handle a step, propose a concrete role for it and ask them to confirm. Name one concrete improvement
+grounded in the breakdown — a capture format, a template, or a checklist — and ask whether it fits; keep it to a
+practice and do not invent a tool the user did not mention. If the user asks what the output looks like, say in one
+sentence that the shape comes next and return to the stages and steps. If they describe domain content, do not comment
+on it; say "Noted." and return. If they confirm, return the draft. If they correct a value, update it and return the
+corrected result; the framework shows the change and asks for confirmation. Do not re-present the whole draft and do not
+ask them to name the stages or steps.
+    
+    """
+    ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
+
+
+@composite_workflow_step
+def generate_from_chat(
+    *,
+    session: Annotated[Session, "The chat session"],
+    process_description: Annotated[
+        str, "What the person already told you about how their work happens"
+    ] = "",
+) -> ProcessDefinition:
+    """Orchestrate gathering notes and generating the stages and steps of the work.
+
+    First explores how the user works openly, then synthesizes a structured
+    ProcessDefinition from the gathered notes. When `process_description` is
+    provided, start from it instead of asking the user to repeat it.
+    """
+    # Exploration follows the user's threads: one question per new part of
+    # the work, and it stops when they have nothing new. The session budget is
+    # the only limit.
+    if process_description:
+        gathered = _gather_notes(
+            process_description=process_description,
+            session=session,
+        )
+    else:
+        gathered = _gather_notes(session=session)
+    answer = session.io.prompt("Is there anything else?")
+    if answer.strip():
+        gathered = gathered.model_copy(
+            update={"notes": f"{gathered.notes}\n{answer}"}
+        )
+    draft = _draft_process_definition(notes=gathered.notes, session=session)
+    # The proposal is the model's own draft, shown in the user's words before
+    # the confirmation turn. A confirmation turn that skips the presentation
+    # would leave the user (and the judge) with no proposal at all.
+    session.propose(draft)
+    return confirm_draft(
+        session=session,
+        draft=draft,
+        step=_confirm_process_definition,
+    )
+
+
+# Import Session at runtime to break circular dependency
+from chat_workflow import Session  # noqa: E402 — imported after the models to break the chat_workflow cycle

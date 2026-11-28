@@ -1,0 +1,254 @@
+# User Guide: Chat Workflow
+
+This guide is for end users who want to use the Chat Workflow library to generate structured evaluation criteria through natural conversation with an LLM.
+
+## Quick Start
+
+Get started in three simple steps:
+
+```bash
+# 1. Install
+git clone <repo> && cd chat-workflow && make
+
+# 2. Configure
+# Edit config.json to set your provider + model
+export OPENROUTER_API_KEY=your-key    # or OPENAI_API_KEY, etc.
+
+# 3. Activate and run
+source .venv/bin/activate
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers"
+```
+
+## Installation
+
+### Prerequisites
+
+- Python 3.8 or higher
+- Git
+- An API key from an LLM provider (OpenRouter, OpenAI, Anthropic, etc.)
+
+### Step-by-Step Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/your-org/chat-workflow.git
+   cd chat-workflow
+   ```
+
+2. **Set up the environment**:
+   ```bash
+   make
+   ```
+   This command creates a Python virtual environment and installs all dependencies.
+
+3. **Activate the virtual environment**:
+   ```bash
+   source .venv/bin/activate
+   ```
+
+## Configuration
+
+### API Keys
+
+This project routes all LLM traffic through **Cloudflare AI Gateway**
+(`skill://cloudflare-ai-gateway`). The gateway holds the provider keys, so
+you only need the gateway token and its compat endpoint. `make setup`
+copies `.env.example` to `.env`; fill in the token there or export it:
+
+```bash
+export OPENAI_BASE_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat
+export OPENAI_API_KEY=<gateway token>
+```
+
+Forking to a direct provider? Set its key instead (`OPENROUTER_API_KEY`,
+`ANTHROPIC_API_KEY`, …) and switch the active preset.
+
+### Provider Configuration
+
+`config.json` uses presets. The default active preset is `cloudflare`:
+
+```json
+{
+  "llm": {
+    "active": "cloudflare",
+    "presets": {
+      "cloudflare": {
+        "provider": "openai",
+        "model": "openai/dynamic/fallback2",
+        "api_key_env": "OPENAI_API_KEY"
+      },
+      "openrouter": {
+        "provider": "openrouter",
+        "model": "openrouter/google/gemini-2.5-flash-lite",
+        "api_key_env": "OPENROUTER_API_KEY"
+      }
+    },
+    "temperature": 0.7,
+    "max_retries": 3
+  }
+}
+```
+
+`model` is `openai/dynamic/fallback2`: litellm strips the `openai/` prefix and
+sends `dynamic/fallback2` to `OPENAI_BASE_URL`, where the gateway selects the
+route. `api_base` may be set explicitly in a preset to override the
+environment variable.
+
+**Available providers**: `openrouter`, `openai`, `anthropic`, `groq`,
+`together`, `azure`
+
+**Temperature**: Controls randomness (0.0 = deterministic, 1.0 = creative)
+
+## Using the CLI
+
+The `chat-workflow` command provides an interactive conversation interface to generate evaluation criteria.
+
+### Basic Usage
+
+Start a conversation with a context:
+
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
+```
+
+The LLM will guide you through a conversation to generate structured evaluation criteria for your decision.
+
+### Command Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--context` | Initial context for the conversation | "" |
+| `--max-turns` | Session-wide runaway guard | 100 |
+| `--max-refinements` | Maximum number of refinement rounds | 3 |
+
+### Examples
+
+**Interactive conversation**:
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
+```
+
+**Customize conversation length**:
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
+```
+
+**Combine options**:
+```bash
+chat-workflow evaluation-criteria generate-reviewed-criteria --context "evaluating job offers" --max-turns 8 --max-refinements 2
+```
+
+The LLM will guide you through a conversation to generate structured evaluation criteria for your decision.
+
+## Conversation Flow
+
+When you run `chat-workflow evaluation-criteria generate-reviewed-criteria`, here's what happens:
+
+1. **Initialization**: The LLM introduces itself and explains the process
+2. **Context gathering**: You provide initial context about your decision
+3. **Criteria generation**: The LLM helps you identify evaluation criteria
+4. **Refinement**: You can refine, add, or remove criteria
+5. **Completion**: The conversation ends with structured criteria
+
+### During the Conversation
+
+- **Type your responses** when prompted
+- **Press Enter** to submit each response
+- **Press Ctrl+C** to cancel at any time
+- **Answer questions** to help the LLM understand your needs
+
+### Conversation Limits
+
+- **Default**: 100 model turns for the whole session
+- **Configurable**: set a lower guard with `--max-turns`
+
+The limit is one budget for the whole conversation, shared by every step; it is
+there to stop a runaway loop, not to allot turns to each part of the work. If
+it is reached, the run stops with a turn-limit message.
+
+## Output Files
+
+The generated criteria are displayed at the end of the conversation. You can copy and save them manually if needed:
+
+```json
+{
+  "context": "choosing a laptop",
+  "criteria": [
+    {
+      "name": "Budget",
+      "description": "Maximum amount I'm willing to spend",
+      "weight": 0.3
+    },
+    {
+      "name": "Performance",
+      "description": "Processing speed and multitasking capability",
+      "weight": 0.25
+    }
+  ]
+}
+```
+
+### File Structure
+
+- **context**: Your original conversation context
+- **criteria**: Array of evaluation criteria objects
+- Each criterion includes:
+  - `name`: Short name of the criterion
+  - `description`: Detailed explanation
+  - `weight`: Importance relative to other criteria (0.0 to 1.0)
+
+## Troubleshooting
+
+### Common Issues
+
+**"API key error"**:
+- Check that your API key environment variable is set
+- Verify the key is valid and has sufficient credits
+- Ensure you're using the correct provider name in `config.json`
+
+**"Provider not supported"**:
+- Check the provider name in `config.json`
+- Ensure you have the required environment variable set
+- Verify the provider is supported by the litellm library
+
+**"Configuration file error"**:
+- Ensure `config.json` exists in the project root
+- Check that the JSON syntax is valid
+- Verify all required fields are present
+
+**"Conversation failed"**:
+- The LLM may have encountered an error
+- Try again with a simpler context
+- Check your internet connection
+
+### Debug Mode
+
+Enable debug logging to see detailed LLM interactions:
+
+```bash
+CHAT_WORKFLOW_DEBUG=1 chat-workflow evaluation-criteria generate-reviewed-criteria --context "test"
+```
+
+This streams all LLM requests and responses to stderr with timing information.
+
+## Next Steps
+
+After generating evaluation criteria, you can:
+
+1. **Review the JSON output** to understand your decision framework
+2. **Use the criteria** to evaluate options systematically
+3. **Modify the criteria** manually if needed
+4. **Run again** with different contexts for other decisions
+
+## Getting Help
+
+- **Documentation**: See other guides in the `docs/` directory
+- **Issues**: Report problems on the GitHub repository
+- **Questions**: Check the README for contact information
+
+---
+
+**Note**: This guide covers end-user usage only. For information on:
+- Building your own workflows: See `workflow-author-guide.md`
+- Contributing to the library: See `contributor-guide.md`
+- Example workflow details: See `example-evaluation-criteria.md`

@@ -5,18 +5,21 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
+__all__ = ["resolve_return_type"]
+
 
 def resolve_return_type(
     raw_func: Callable[..., Any],
     func: Callable[..., Any],
     args: tuple[Any, ...],
+    # lucidlint: ignore record-shape the call-time kwargs are arbitrary per decorated function; they have no fixed shape
     kwargs: dict[str, Any],
 ) -> Any | None:
     """Resolve the actual return type of a function.
 
     Handles Self, TypeVar, and concrete BaseModel return types.
     """
-    return_type = typing.get_type_hints(raw_func).get("return")
+    return_type = typing.get_type_hints(raw_func, include_extras=True).get("return")
 
     if return_type is typing.Self:
         return resolve_self_type(raw_func, func)
@@ -35,9 +38,16 @@ def resolve_generic_type(raw_func, func, args, kwargs, return_type):
             f"Leaf function '{func.__name__}' TypeVar bound must be a Pydantic model, bound is {bound_type}"
         )
     actual_return_type: type[BaseModel] = return_type
-    param_hints = typing.get_type_hints(raw_func)
+    param_hints = typing.get_type_hints(raw_func, include_extras=True)
+    def _bare(annotation: Any) -> Any:
+        if typing.get_origin(annotation) is typing.Annotated:
+            return typing.get_args(annotation)[0]
+        return annotation
+
     typevar_params = [
-        name for name, annotation in param_hints.items() if name != "return" and annotation == return_type
+        name
+        for name, annotation in param_hints.items()
+        if name != "return" and _bare(annotation) is return_type
     ]
     for param_name in typevar_params:
         if param_name in kwargs:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 from pydantic_ai.messages import (
     ModelMessage,
@@ -14,11 +14,40 @@ from pydantic_ai.usage import RunUsage
 
 from .atomic_workflow_config import AtomicWorkflowConfig
 from .conversation import Conversation
-from .exceptions import AtomicWorkflowFailedError
+from .exceptions import (
+    AtomicWorkflowFailedError,
+    InvalidResponseError,
+    MaxRetriesExceededError,
+)
 from .models import AgentIntent, Continue, Failure, Success, TurnResult
 from .transcript import render
+from .turn_budget import TurnBudget
 
 TResult = TypeVar("TResult")
+
+__all__ = ["AtomicWorkflow"]
+
+def _rejection_correction(exc: MaxRetriesExceededError) -> str:
+    """The turn a rejected result earns: ask for the facts it could not hold.
+
+    Resampling cannot fix a rule that failed for data the conversation does
+    not contain — every retry answers from the same history. The rejection
+    is therefore fed back as a turn, where the model can ask the user and
+    the user can answer, bounded by the step's turn budget like any
+    correction.
+    """
+    reasons = " ".join(exc.reason.split())
+    limit = AtomicWorkflow._REJECTION_CORRECTION_LIMIT
+    if len(reasons) > limit:
+        reasons = reasons[: limit - 1].rstrip() + "…"
+    return (
+        "Your result was rejected by its own rules:\n"
+        f"{reasons}\n\n"
+        "The missing values are the user's, not yours: do not send the same "
+        "result again and do not invent them. Ask for what is still missing, "
+        "then return the completed result."
+    )
+
 
 
 class AtomicWorkflow(Generic[TResult]):
@@ -33,13 +62,31 @@ class AtomicWorkflow(Generic[TResult]):
     rules (intent, turn limit) and nothing about the model.
     """
 
+    # A rejection's own words are the rule that was broken, with its evidence
+    # and a suggested repair; the turn keeps the rule and drops the bulk.
+    _REJECTION_CORRECTION_LIMIT: ClassVar[int] = 2000
+
+    # Whether this step had a user of its own. A chat-off step's turns are
+    # internal; the transcript projection must not show them as conversation.
+    chat: bool = True
+
     def __init__(
         self,
         *,
         config: AtomicWorkflowConfig[TResult],
+        chat: bool = True,
     ):
         self.turn_count = 0
+        self.chat = chat
         self.max_turns = config.max_turns
+        # The session-wide guard. A direct AtomicWorkflow without a session
+        # budget gets its own from the config.
+        self.budget = config.budget or TurnBudget(config.max_turns)
+        self.single_turn = config.single_turn
+        self.step_name = config.step_name
+        self.step_inputs = config.step_inputs or {}
+        # A failure is provisional until the step has had one turn to continue.
+        self._failure_given_a_turn = False
         self.model = config.model
         self.response_model = config.response_model
         self.on_continue: Callable[[Continue], TurnResult[TResult]] = config.on_continue
@@ -63,51 +110,109 @@ class AtomicWorkflow(Generic[TResult]):
             timeout_seconds=config.request_timeout_seconds,
             extra_headers=config.extra_headers,
             temperature=config.temperature,
+            thinking=True,
             final_output_type=config.final_response_model,
             tools=config.tools,
             deps=config.deps,
         )
+        # The session history this step was given. Only the turns the step
+        # adds are folded back into the session, so a step's prompt and its
+        # initial history are not recorded twice.
+        self.initial_message_count = len(self._conversation.messages)
 
     @property
     def messages(self) -> list[ModelMessage]:
         """The transcript: the conversation's message list, not a rendering."""
         return self._conversation.messages
 
-    def process_turn(self, user_input: str) -> TurnResult[TResult]:
-        from .exceptions import InvalidResponseError, TurnLimitExceededError
+    def _has_turn_room(self) -> bool:
+        """True while the session budget has another model turn.
 
-        if self.turn_count >= self.max_turns:
-            raise TurnLimitExceededError(self.max_turns)
+        ``max_turns=None`` removes the bound: the step ends when the model
+        returns success or failure, so there is no last turn to force.
+        """
+        return not self.budget.exhausted
 
-        self.turn_count += 1
-        # The last turn is told so: a model that would ask again is given one
-        # turn to answer with what it has, and the step still fails if it will not.
-        final_turn = self.turn_count >= self.max_turns
-        response = self._call_llm(user_input, final_turn=final_turn)
+    def process_turn(self, user_input: str | None = None) -> TurnResult[TResult]:
+        """Take the next turn, with the corrections that turn needs.
 
-        if response.intent == AgentIntent.CONTINUE:
-            return self.on_continue(response)
-        if response.intent == AgentIntent.SUCCESS:
-            return self.on_success(response)
-        if response.intent == AgentIntent.FAILURE:
-            error = self.on_failure(response)
-            error.messages = list(self.messages)
-            error.message = (
-                f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━\n"
-                f"{render(self.messages)}"
+        A correction — a rejected result, an answer that promises content it
+        does not give, an early finish — is a turn of its own and consumes the
+        session's shared budget. The budget is what ends a model that will not
+        stop asking; no branch can add a turn past it or pass it to a callee.
+        A session with ``max_turns=None`` has no such budget: it ends only on
+        success or failure, and never receives a forced final turn.
+        """
+        while True:
+            last_turn = self.budget.take()
+            self.turn_count += 1
+            # The last turn is told so: a model that would ask again is given
+            # one turn to answer with what it has, and the step still fails if
+            # it will not. A one-turn step is always on its last turn, even
+            # when the session budget has room.
+            final_turn = self.single_turn or last_turn
+            try:
+                response = self._call_llm(user_input, final_turn=final_turn)
+            except MaxRetriesExceededError as exc:
+                # A rejection is about the result, not the sample: every retry
+                # answered with what the user had already given. Resampling
+                # cannot produce data the conversation does not hold, so the
+                # rejection becomes a turn — the model asks for what the result
+                # is missing and the user gets to answer it. Without this, a
+                # draft that omits a required fact ends the run and loses the
+                # conversation.
+                # A chat-off step has no user to ask for the missing values;
+                # the output retries already gave it the rejection.
+                if final_turn or not self.chat:
+                    raise
+                user_input = _rejection_correction(exc)
+                continue
+
+            if response.intent == AgentIntent.CONTINUE:
+                if not self.chat:
+                    raise InvalidResponseError(
+                        "A chat-off step returned 'continue'; its output schema "
+                        "does not permit a question."
+                    )
+                return self.on_continue(response)
+            if response.intent == AgentIntent.SUCCESS:
+                return self.on_success(response)
+            if response.intent == AgentIntent.FAILURE:
+                if not self._failure_given_a_turn and self._has_turn_room():
+                    # A step sometimes calls failure when the conversation is
+                    # hard — a skeptical user, a thin description, a correction
+                    # it did not want. Give it one turn to continue before
+                    # accepting that the result cannot be produced.
+                    self._failure_given_a_turn = True
+                    user_input = (
+                        "You returned failure. Continue with what you were "
+                        "given: propose the result, or ask the one question you "
+                        "still need. Failure is only for a user who refuses to "
+                        "engage or input that cannot be interpreted."
+                    )
+                    continue
+                error = self.on_failure(response)
+                error.messages = list(self.messages)
+                error.message = (
+                    f"{error.message}\n\n━━━ CONVERSATION TRANSCRIPT ━━━\n"
+                    f"{render(self.messages)}"
+                )
+                if self.debug:
+                    self.debug.on_error(error)
+                raise error
+
+            raise InvalidResponseError(
+                f"Invalid intent received: {response.intent}"
             )
-            if self.debug:
-                self.debug.on_error(error)
-            raise error
-
-        raise InvalidResponseError(f"Invalid intent received: {response.intent}")
 
     def _call_llm(self, user_input: str | None = None, *, final_turn: bool = False) -> Any:
         """One turn with the model, timed for the debug stream."""
         started = time.monotonic()
         if self.debug:
             self.debug.on_request(self.messages, self.model)
-        turn = self._conversation.send(user_input, final_turn=final_turn)
+        turn = self._conversation.send(
+            user_input, final_turn=final_turn, chat_off=not self.chat
+        )
         self.usage.incr(turn.usage)
         if self.debug:
             duration_ms = (time.monotonic() - started) * 1000

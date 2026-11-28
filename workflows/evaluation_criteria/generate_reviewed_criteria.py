@@ -12,12 +12,11 @@ from .refine import refine
 @composite_workflow
 def generate_reviewed_criteria(
     context: str = "",
-    max_turns: int = 10,
     max_refinements: int = 3,
     *,
     session: Session,
 ) -> EvaluationCriteria:
-    criteria = EvaluationCriteria.generate_from_chat(context=context, max_turns=max_turns, session=session)
+    criteria = EvaluationCriteria.generate_from_chat(context=context, session=session)
 
     for _ in range(max_refinements):
         echo_criteria(
@@ -28,7 +27,6 @@ def generate_reviewed_criteria(
 
         refined = refine(
             initial_object=criteria,
-            max_turns=max_turns,
             session=session,
         )
 

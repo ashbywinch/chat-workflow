@@ -22,7 +22,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
 )
 
-from chat_workflow import Conversation, FinalResponse, MaxRetriesExceededError, Success
+from chat_workflow import Conversation, FinalAnswer, MaxRetriesExceededError, Success
 from chat_workflow.models import AgentIntent
 from tests.conftest import make_conversation, make_valid_criteria
 from workflows.evaluation_criteria import EvaluationCriteria
@@ -395,13 +395,41 @@ class TestTheLastTurn(unittest.TestCase):
         with: the same answer that was accepted mid-conversation is rejected."""
         conversation = make_conversation(
             [{"intent": "continue", "message": "One more question?"}, VALID],
-            final_output_type=FinalResponse[EvaluationCriteria],
+            final_output_type=FinalAnswer[EvaluationCriteria],
         )
 
         turn = conversation.send("hello", final_turn=True)
 
         self.assertEqual(turn.output.intent, AgentIntent.SUCCESS)
         self.assertEqual(len(conversation.script.calls), 2)
+
+    def test_a_final_success_without_a_result_names_the_final_turn(self):
+        """The error says what to do on the last turn, not only that a result
+        is missing."""
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError) as context:
+            FinalAnswer[EvaluationCriteria](intent=AgentIntent.SUCCESS)
+
+        message = str(context.exception)
+        self.assertIn("This is the final turn", message)
+        self.assertIn("apply the user's last correction", message)
+        self.assertIn("return failure", message)
+
+    def test_a_final_success_cannot_carry_a_message(self):
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError) as context:
+            FinalAnswer[EvaluationCriteria](
+                intent=AgentIntent.SUCCESS,
+                message="Does that look right?",
+                result=make_valid_criteria(),
+            )
+
+        self.assertIn(
+            "A success carries its result and no message",
+            str(context.exception),
+        )
 
 
 class TestTheUserView(unittest.TestCase):
@@ -478,7 +506,29 @@ class TestRequestSettings(unittest.TestCase):
         settings = conversation.model_settings()
 
         self.assertNotIn("temperature", settings)
+        self.assertNotIn("openai_reasoning_effort", settings)
         self.assertEqual(settings["max_retries"], 2)
+
+    def test_thinking_on_the_gateway_asks_for_medium_effort(self):
+        """A gateway route has no profile, so the portable switch needs the effort."""
+        conversation = make_conversation(
+            [VALID], thinking=True, provider="openai"
+        )
+
+        settings = conversation.model_settings()
+
+        self.assertTrue(settings["thinking"])
+        self.assertEqual(settings["openai_reasoning_effort"], "medium")
+
+    def test_a_non_gateway_provider_leaves_the_effort_to_its_profile(self):
+        conversation = make_conversation(
+            [VALID], thinking=True, provider="openrouter"
+        )
+
+        settings = conversation.model_settings()
+
+        self.assertTrue(settings["thinking"])
+        self.assertNotIn("openai_reasoning_effort", settings)
 
     def test_the_request_limit_bounds_one_turn(self):
         conversation = make_conversation([VALID], max_requests=1)

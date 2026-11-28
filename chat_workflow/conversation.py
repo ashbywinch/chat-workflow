@@ -27,7 +27,8 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Generic, TypeVar
+from http import HTTPStatus
+from typing import Any, ClassVar, Generic, TypeVar, cast, override
 
 import pydantic_ai
 from pydantic_ai import Agent, AgentRunResult, RetryModelRequest, ToolFailed, UsageLimits
@@ -37,6 +38,7 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    SystemPromptPart,
     TextPart,
     ToolCallPart,
     UserPromptPart,
@@ -49,7 +51,7 @@ from pydantic_ai.usage import RunUsage
 
 from .exceptions import MaxRetriesExceededError
 from .model_provider import ProviderType, build_model
-from .models import ANSWER_TOOL
+from .models import AgentAnswer, FinalAnswer, as_final, as_turn
 
 T = TypeVar("T")
 
@@ -58,26 +60,22 @@ T = TypeVar("T")
 # the upstream failed, so the call is transport-retried like a 503. A 400 with
 # any other body is the request's fault and is raised unchanged.
 _UPSTREAM_FAILURE_CODES = frozenset({2005})
-_UPSTREAM_FAILURE_TEXT = "failed to get response from provider"
-
-# A response whose visible text is under this fraction of its length is a
-# stall — whitespace to the token limit — not an answer.
-_NEGLIGIBLE_TEXT = 0.05
 
 
 def _is_upstream_failure(exc: ModelHTTPError) -> bool:
     """Whether a rejected request is really the gateway's upstream failing."""
-    if exc.status_code != 400:
+    if exc.status_code != HTTPStatus.BAD_REQUEST:
         return False
+    failure_text = "failed to get response from provider"
     body = exc.body
     entries = body if isinstance(body, list) else [body]
     for entry in entries:
         if isinstance(entry, dict):
             if entry.get("code") in _UPSTREAM_FAILURE_CODES:
                 return True
-            if _UPSTREAM_FAILURE_TEXT in str(entry.get("message", "")).lower():
+            if failure_text in str(entry.get("message", "")).lower():
                 return True
-        elif _UPSTREAM_FAILURE_TEXT in str(entry).lower():
+        elif failure_text in str(entry).lower():
             return True
     return False
 
@@ -85,17 +83,12 @@ def _is_upstream_failure(exc: ModelHTTPError) -> bool:
 # first-run banner is for a person wiring an agent by hand, not for a workflow
 # CLI or a server's logs. (The documented switch, set once before any run;
 # `setattr` because the flag reads as a module constant to a checker.)
-setattr(pydantic_ai, "BANNER_ENABLED", False)  # noqa: B010 — a module constant to the checker
+def _disable_banner() -> None:
+    enabled = False
+    setattr(pydantic_ai, "BANNER_ENABLED", enabled)  # noqa: B010 — a module constant to the checker
 
-# A step may return a long generated module or a full structured result. The
-# provider default is often small enough to truncate the JSON mid-string, which
-# looks like a syntax error rather than a token limit.
-DEFAULT_MAX_TOKENS = 16384
 
-# The prompt a provider needs when the step opens the conversation: a request
-# that ends on the instructions alone is answered with an empty completion.
-OPENING_PROMPT = "Start the conversation."
-
+_disable_banner()
 
 @dataclass(frozen=True)
 class Resend:
@@ -144,6 +137,7 @@ class _ResendUnusable(AbstractCapability[Any]):
         self._max_resends = max_resends
         self.resends: list[Resend] = []
 
+    @override
     async def after_model_request(
         self,
         ctx: RunContext[Any],
@@ -184,8 +178,9 @@ def _has_usable_content(response: ModelResponse) -> bool:
     # A stall emits the opening token and then whitespace to the token limit
     # (measured on the gateway: `{"response":` followed by 5,392 lines of
     # newlines). It is no answer, however long the response is.
+    negligible = 0.05
     visible = len(text.strip())
-    return visible > 0 and visible >= len(text) * _NEGLIGIBLE_TEXT
+    return visible > 0 and visible >= len(text) * negligible
 
 
 def _arguments_are_object(part: ToolCallPart) -> bool:
@@ -211,19 +206,12 @@ def _unusable_cause(response: ModelResponse) -> str:
     if any(isinstance(part, ToolCallPart) and not _arguments_are_object(part) for part in response.parts):
         return "tool arguments were not JSON"
     text = "".join(part.content for part in response.parts if isinstance(part, TextPart))
-    if text and len(text.strip()) < len(text) * _NEGLIGIBLE_TEXT:
+    negligible = 0.05
+    if text and len(text.strip()) < len(text) * negligible:
         return "whitespace instead of an answer"
     if any(isinstance(part, TextPart) for part in response.parts):
         return "blank response"
     return "thinking only, no output"
-
-
-def _has_user_turn(messages: Sequence[ModelMessage]) -> bool:
-    return any(
-        isinstance(message, ModelRequest)
-        and any(isinstance(part, UserPromptPart) for part in message.parts)
-        for message in messages
-    )
 
 
 def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
@@ -246,6 +234,7 @@ def _failed_as_result(tool: Callable[..., Any]) -> Callable[..., Any]:
         except ToolFailed:
             # a tool that raised ToolFailed itself already says what failed
             raise
+        # lucidlint: ignore broad-except a step's tool may raise anything; the model reads it as a failure result
         except Exception as exc:  # noqa: BLE001 — any failure is the tool's answer
             raise ToolFailed(f"{type(exc).__name__}: {exc}") from exc
 
@@ -281,6 +270,7 @@ class _ProviderLog:
                 # it here does not consume what the transport reads next.
                 await response.aread()
                 body = response.json()
+            # lucidlint: ignore broad-except a provider log must never break the call
             except Exception:  # noqa: BLE001 — a log must never break a call
                 return
             if isinstance(body, dict):
@@ -303,6 +293,20 @@ class _ProviderLog:
         return f" (served by {', '.join(parts)})"
 
 
+def _rejection(exc: BaseException) -> str:
+    """The rejection that consumed the last retry, not only the retry count.
+
+    ``UnexpectedModelBehavior`` is raised ``from`` the validation error that
+    spent the final retry, so its cause names the fields or rules the answer
+    broke. That sentence is what a caller needs to tell the model *why* the
+    sample was refused; the count alone says a retry happened and nothing
+    about what to do next.
+    """
+    cause = exc.__cause__
+    text = str(cause).strip() if cause is not None else ""
+    return text or str(exc)
+
+
 class Conversation(Generic[T]):
     """A model, its instructions, and the transcript of one conversation.
 
@@ -318,6 +322,21 @@ class Conversation(Generic[T]):
     model that never concludes fails instead of billing forever.
     """
 
+    # The effort every reasoning request asks for. Medium is enough for this
+    # work; thinking is what matters, not the level.
+    REASONING_EFFORT = "medium"
+
+    # A step may return a long generated module or a full structured result. The
+    # provider default is often small enough to truncate the JSON mid-string,
+    # which looks like a syntax error rather than a token limit.
+    _DEFAULT_MAX_TOKENS: ClassVar[int] = 16384
+
+    # The prompt a provider needs when the step opens the conversation: a
+    # request that ends on the instructions alone is answered with an empty
+    # completion.
+    OPENING_PROMPT: ClassVar[str] = "Start the conversation."
+
+    # lucidlint: ignore long-param-list the parameters are independent knobs; one production site names each
     def __init__(
         self,
         *,
@@ -332,7 +351,7 @@ class Conversation(Generic[T]):
         transport_retries: int = 2,
         unusable_resends: int = 1,
         max_requests: int = 12,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
+        max_tokens: int | None = None,
         timeout_seconds: float = 30.0,
         temperature: float | None = None,
         extra_headers: Mapping[str, str] | None = None,
@@ -347,13 +366,13 @@ class Conversation(Generic[T]):
         self._provider = provider
         self._api_base = api_base
         self._api_key_env = api_key_env
-        self._instructions = instructions
+        self._instructions = instructions  # lucidlint: ignore duplicate-block each line initialises a distinct field
         self._output_type = output_type
         self._output_retries = output_retries
         self._transport_retries = transport_retries
         self._unusable_resends = unusable_resends
         self._max_requests = max_requests
-        self._max_tokens = max_tokens
+        self._max_tokens = max_tokens if max_tokens is not None else self._DEFAULT_MAX_TOKENS
         self._timeout_seconds = timeout_seconds
         self._temperature = temperature
         self._extra_headers = dict(extra_headers) if extra_headers else None
@@ -368,7 +387,13 @@ class Conversation(Generic[T]):
         # keeps it for the conversation's later turns.
         self._model: Model | None = model_client
 
-    def send(self, prompt: str | None = None, *, final_turn: bool = False) -> ModelTurn[T]:
+    def send(
+        self,
+        prompt: str | None = None,
+        *,
+        final_turn: bool = False,
+        chat_off: bool = False,
+    ) -> ModelTurn[T]:
         """One turn: *prompt* (or the opening prompt), then the typed result.
 
         ``prompt`` may be ``None`` when the transcript already ends with a user
@@ -377,7 +402,12 @@ class Conversation(Generic[T]):
         would otherwise keep asking is told to answer with what it has.
         """
         if not prompt or not prompt.strip():
-            prompt = None if _has_user_turn(self.messages) else OPENING_PROMPT
+            has_user_turn = any(
+                isinstance(message, ModelRequest)
+                and any(isinstance(part, UserPromptPart) for part in message.parts)
+                for message in self.messages
+            )
+            prompt = None if has_user_turn else self.OPENING_PROMPT
 
         resender = _ResendUnusable(self._unusable_resends)
         if self._model is None:
@@ -387,25 +417,35 @@ class Conversation(Generic[T]):
                 api_base=self._api_base,
                 api_key_env=self._api_key_env,
             )
-            self._provider_log = _ProviderLog.attach(self._model)
+        self._provider_log = _ProviderLog.attach(self._model)
+        one_turn = final_turn or chat_off
+        output_type = (
+            (self._final_output_type or self._output_type)
+            if one_turn
+            else self._output_type
+        )
+        # A workflow step's answer is a tool call; a plain-text model call (an
+        # eval's user simulation) is not a structured answer and must not be
+        # forced through the tool schema.
+        output_spec: Any = (
+            str
+            if output_type is str
+            else ToolOutput(output_type, name=AgentAnswer.TOOL_NAME, strict=True)
+        )
         agent: Agent[Any, T] = Agent(
             self._model,
             tools=self._tools,
-            output_type=ToolOutput(
-                (self._final_output_type or self._output_type) if final_turn else self._output_type,
-                name=ANSWER_TOOL,
-                strict=True,
-            ),
+            output_type=output_spec,
             system_prompt=self._instructions
             + (
                 "\n\n## Final turn\n"
-                "No further turn will be offered. Answer now with what the user "
-                "has given: intent='success' with the complete result, or "
-                "intent='failure' if it cannot be produced. Do not ask another "
-                "question."
+                "No further turn will be offered. Return intent='success' with "
+                "the complete result and no message, or intent='failure' with "
+                "the reason it cannot be produced."
                 if final_turn
                 else ""
             ),
+            # lucidlint: ignore record-shape this is PydanticAI's retry-budget mapping, a library wire shape
             retries={"output": self._output_retries, "tools": self._output_retries},
             capabilities=[resender],
         )
@@ -413,11 +453,17 @@ class Conversation(Generic[T]):
             result = self._run_with_transport_retries(agent, prompt, final_turn=final_turn)
         except UnexpectedModelBehavior as exc:
             raise MaxRetriesExceededError(
-                self._output_retries, reason=f"{exc}{self._provider_log.suffix()}"
+                self._output_retries,
+                reason=f"{_rejection(exc)}{self._provider_log.suffix()}",
             ) from exc
 
+        output: Any = result.output
+        if isinstance(output, AgentAnswer):
+            output = as_turn(output)
+        elif isinstance(output, FinalAnswer):
+            output = as_final(output)
         turn = ModelTurn(
-            output=result.output,
+            output=output,
             messages=result.new_messages(),
             usage=result.usage,
             resends=tuple(resender.resends),
@@ -454,9 +500,21 @@ class Conversation(Generic[T]):
         not leave sockets to the garbage collector.
         """
         async with agent:
+            history = list(self.messages)
+            if prompt is None and not any(
+                isinstance(message, ModelRequest)
+                and any(isinstance(part, SystemPromptPart) for part in message.parts)
+                for message in history
+            ):
+                # When the model is given a history and no new prompt,
+                # PydanticAI does not add the agent's system prompt. The
+                # instructions are part of the request, not an optional extra.
+                history.insert(
+                    0, ModelRequest(parts=[SystemPromptPart(self._instructions)])
+                )
             return await agent.run(
                 prompt,
-                message_history=list(self.messages),
+                message_history=history,
                 model_settings=self.model_settings(),
                 deps=self._deps,
                 usage_limits=UsageLimits(request_limit=self._max_requests),
@@ -464,14 +522,27 @@ class Conversation(Generic[T]):
 
     def model_settings(self) -> ModelSettings:
         """The settings every request carries (budgets, limits, headers)."""
-        settings = ModelSettings(
-            max_tokens=self._max_tokens,
-            timeout=self._timeout_seconds,
-            max_retries=self._transport_retries,
-            thinking=self._thinking,
+        # A plain dict because the reasoning effort is a provider-specific key:
+        # PydanticAI's portable ``ModelSettings`` type does not name it, but the
+        # OpenAI model reads it, and a dynamic gateway route needs it.
+        settings: dict[str, Any] = dict(
+            ModelSettings(
+                max_tokens=self._max_tokens,
+                timeout=self._timeout_seconds,
+                max_retries=self._transport_retries,
+                thinking=self._thinking,
+            )
         )
         if self._temperature is not None:
             settings["temperature"] = self._temperature
+        # ``thinking=True`` is the portable switch, but PydanticAI only maps it
+        # to an effort for a model id its profile knows. A gateway route such as
+        # ``openai/dynamic/fallback2`` is unknown, so the request would carry no
+        # effort and the provider would reason not at all. Medium is enough for
+        # this work; the response's reasoning is then parsed from its
+        # ``reasoning``/``reasoning_content`` field.
+        if self._thinking and self._provider == "openai":
+            settings["openai_reasoning_effort"] = self.REASONING_EFFORT
         if self._extra_headers:
             settings["extra_headers"] = self._extra_headers
-        return settings
+        return cast(ModelSettings, settings)

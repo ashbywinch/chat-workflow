@@ -2,8 +2,8 @@
 import unittest
 
 from chat_workflow import (
+    AgentAnswer,
     AgentIntent,
-    AgentResponse,
     AtomicWorkflow,
     AtomicWorkflowConfig,
     AtomicWorkflowFailedError,
@@ -13,6 +13,7 @@ from chat_workflow import (
     TurnResult,
 )
 from chat_workflow.session import UserIO
+from chat_workflow.turn_budget import TurnBudget
 from tests.conftest import timeout
 from tests.evals.helpers import eval_timeout, make_config
 from workflows.evaluation_criteria import EvaluationCriteria
@@ -59,9 +60,10 @@ class TestRealAPI(unittest.TestCase):
                     "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
                     "Use intent='continue' to ask questions, intent='success' to return criteria, "
-                    "intent='failure' if unable to help."
+                    "intent='failure' if unable to help. On success, return the "
+                    "result and no message."
                 ),
-                response_model=AgentResponse[EvaluationCriteria],
+                response_model=AgentAnswer[EvaluationCriteria],
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -128,7 +130,6 @@ class TestRealAPI(unittest.TestCase):
 
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
-            max_turns=6,
             session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
         )
 
@@ -149,9 +150,10 @@ class TestRealAPI(unittest.TestCase):
                     "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
                     "Use intent='continue' to ask questions, intent='success' to return criteria, "
-                    "intent='failure' if unable to help."
+                    "intent='failure' if unable to help. On success, return the "
+                    "result and no message."
                 ),
-                response_model=AgentResponse[EvaluationCriteria],
+                response_model=AgentAnswer[EvaluationCriteria],
                 max_turns=3,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -174,8 +176,13 @@ class TestRealAPI(unittest.TestCase):
         result = orchestrator.process_turn("")
 
         self.assertIsInstance(result, TurnResult)
-        self.assertIsNotNone(result.message)
-        self.assertTrue(len(result.message) > 0)
+        if result.is_complete:
+            self.assertIsNone(result.message)
+            self.assertIsInstance(result.result, EvaluationCriteria)
+        else:
+            self.assertIsNotNone(result.message)
+            self.assertTrue(result.message)
+            self.assertIsNone(result.result)
 
         if result.result:
             self.assertIsInstance(result.result, EvaluationCriteria)
@@ -199,7 +206,6 @@ class TestRealAPI(unittest.TestCase):
 
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift for a 7-year-old",
-            max_turns=10,
             session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
         )
 
@@ -225,8 +231,13 @@ class TestRealAPI(unittest.TestCase):
         with self.assertRaises((TurnLimitExceededError, AtomicWorkflowFailedError)):
             EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop for programming",
-                max_turns=3,
-                session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
+                session=Session(
+                    io=mock_io,
+                    state=SessionLog(),
+                    config=_CONFIG,
+                    # The runaway guard is the caller's to set.
+                    budget=TurnBudget(3),
+                ),
             )
 
     @timeout(eval_timeout(_CONFIG))
@@ -238,9 +249,10 @@ class TestRealAPI(unittest.TestCase):
                     "When returning intent='success' with criteria, you MUST include "
                     "a criterion named 'budget' (lowercase). "
                     "Use intent='continue' to ask questions, intent='success' to return criteria, "
-                    "intent='failure' if unable to help."
+                    "intent='failure' if unable to help. On success, return the "
+                    "result and no message."
                 ),
-                response_model=AgentResponse[EvaluationCriteria],
+                response_model=AgentAnswer[EvaluationCriteria],
                 max_turns=5,
                 model=_CONFIG.model,
                 provider=_CONFIG.provider,
@@ -262,7 +274,7 @@ class TestRealAPI(unittest.TestCase):
 
         result = orchestrator.process_turn("Please include budget as a criterion")
         self.assertIsInstance(result, TurnResult)
-        self.assertIsNotNone(result.message)
+        self.assertIsNone(result.message)
 
 
 if __name__ == "__main__":

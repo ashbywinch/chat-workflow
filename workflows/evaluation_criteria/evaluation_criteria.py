@@ -4,7 +4,10 @@ from typing import Annotated, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-from chat_workflow import atomic_workflow
+from chat_workflow import ValidationError, atomic_workflow
+
+__all__ = ["Criterion", "EvaluationCriteria"]
+# lucidlint: ignore-file class-module Criterion is part of the EvaluationCriteria model family; they change together
 
 
 class Criterion(BaseModel):
@@ -58,7 +61,6 @@ class EvaluationCriteria(BaseModel):
     def generate_from_chat(
         cls,
         context: Annotated[str, "The topic or domain for which to generate evaluation criteria"],
-        max_turns: Annotated[int, "Maximum number of conversation turns before giving up"] = 10,
     ) -> Self:
         """You are a helpful assistant guiding the user to create evaluation criteria.
         Assume the user is an expert on their topic but they know nothing about
@@ -68,11 +70,28 @@ class EvaluationCriteria(BaseModel):
         - Ask one question at a time.
         - Start broad, then ask specific follow-ups.
         - Base output only on information explicitly provided by the user.
-        - If the user is vague, ask clarifying questions.
-        - If the user is uncooperative or refuses to provide useful information within max_turns,
+          `context` names the topic; it is not the user's answers and is not
+          enough to fill the criteria.
+        - Each factor the user names is already a criterion: use their words
+          for its name and description. Do not ask for sub-details (a number of
+          hours, a processor model) before accepting a factor.
+        - A weight or ideal value the user does not give takes the schema's
+          default; never interrogate for an optional field. A named factor is
+          enough: do not ask what it means or for a sub-detail of it. Never ask
+          for weights: a missing weight is not a missing value and is never a
+          reason to fail.
+        - If the user says "that's all", "please finalize", or otherwise asks
+          to finish, return intent="success" with the criteria from the answers
+          they gave; do not ask another question.
+        - If the user is vague, ask clarifying questions. If they answer a
+          question with a vague non-answer, ask once more; if they still name no
+          factor, return intent="failure" rather than inventing one from the
+          context. Return failure only when no factor was named at all or the
+          user refuses to engage — a thin answer is not a failure.
+        - If the user is uncooperative or refuses to provide useful information,
             use intent="failure".
         """
-        ...  # type: ignore[reportReturnType]
+        ...  # type: ignore[reportReturnType]  # the step decorator supplies the body
 
     @model_validator(mode="after")
     def validate_business_rules(self):
@@ -81,8 +100,6 @@ class EvaluationCriteria(BaseModel):
         Raises:
             ValidationError: If no criterion is named 'budget'.
         """
-        from chat_workflow import ValidationError
-
         if not any(c.name.lower() == "budget" for c in self.criteria):
             raise ValidationError("Must include a criterion named 'budget' (case-insensitive)")
         return self
