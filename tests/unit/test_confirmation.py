@@ -37,7 +37,7 @@ class TestConfirmDraft(unittest.TestCase):
     def test_an_unchanged_draft_is_not_presented_again(self):
         session = _Session()
 
-        def step(*, draft, session, max_turns):
+        def step(*, draft, session):
             return draft
 
         result = confirm_draft(session=session, draft=_Draft("one"), step=step)
@@ -50,7 +50,7 @@ class TestConfirmDraft(unittest.TestCase):
         session = _Session()
         replies = [_Draft("two"), _Draft("two")]
 
-        def step(*, draft, session, max_turns):
+        def step(*, draft, session):
             return replies.pop(0)
 
         result = confirm_draft(session=session, draft=_Draft("one"), step=step)

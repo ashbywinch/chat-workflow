@@ -11,6 +11,7 @@ from typing import override
 
 from pyfakefs.fake_filesystem_unittest import TestCase
 
+from chat_workflow.turn_budget import DEFAULT_SESSION_MAX_TURNS
 from chat_workflow_cli.workflowconsole import WorkflowConsole
 from tests.conftest import FakeConfig
 
@@ -82,6 +83,42 @@ class _FakeErrorHandler:
 
     def __call__(self, error: Exception) -> None:
         self.errors.append(error)
+
+
+class TestSessionTurnBudgetOption(unittest.TestCase):
+    """The CLI option is the session guard, not a workflow parameter."""
+
+    def _sessions(self):
+        sessions = []
+
+        def session_factory(**kwargs):
+            sessions.append(kwargs)
+            return object()
+
+        console = WorkflowConsole(
+            config_factory=lambda _path: FakeConfig(),
+            io_factory=_FakeIO,
+            session_factory=session_factory,
+            component_factory=_NoWrapComponent,
+            console=_FakeConsole(),
+        )
+        return console, sessions
+
+    def test_max_turns_sets_the_session_budget(self):
+        console, sessions = self._sessions()
+
+        console.run(func=lambda **kwargs: None, user_params={"max_turns": 7})
+
+        self.assertEqual(sessions[0]["budget"].max_turns, 7)
+
+    def test_default_is_the_framework_guard(self):
+        console, sessions = self._sessions()
+
+        console.run(func=lambda **kwargs: None, user_params={})
+
+        self.assertEqual(
+            sessions[0]["budget"].max_turns, DEFAULT_SESSION_MAX_TURNS
+        )
 
 
 class TestWorkflowConsoleErrorHandling(TestCase):

@@ -242,7 +242,6 @@ def _gather_notes(
     process_description: Annotated[
         str, "What the person already told you about how their work happens"
     ] = "",
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> GatheredNotes:
     """Collect the user's description of how their work happens.
 
@@ -261,7 +260,6 @@ Put the user's description in `notes`, in their words — not your reply to them
 @atomic_workflow_step(chat=False, single_turn=True)
 def _draft_process_definition(
     notes: Annotated[str, "What the person told you, in their words"],
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> ProcessDefinition:
     """Turn the user's description into the stages and steps of their work.
 
@@ -295,7 +293,6 @@ def _confirm_process_definition(
         ProcessDefinition,
         "The complete breakdown derived from the user's description",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
     """
 The draft has been shown with one confirm-or-correct question, and the user is answering it. Do not show the draft again and do not repeat that question.
@@ -320,7 +317,6 @@ def generate_from_chat(
     process_description: Annotated[
         str, "What the person already told you about how their work happens"
     ] = "",
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ProcessDefinition:
     """Orchestrate gathering notes and generating the stages and steps of the work.
 
@@ -335,10 +331,9 @@ def generate_from_chat(
         gathered = _gather_notes(
             process_description=process_description,
             session=session,
-            max_turns=max_turns,
         )
     else:
-        gathered = _gather_notes(session=session, max_turns=max_turns)
+        gathered = _gather_notes(session=session)
     answer = session.io.prompt("Is there anything else?")
     if answer.strip():
         gathered = gathered.model_copy(
@@ -353,7 +348,6 @@ def generate_from_chat(
         session=session,
         draft=draft,
         step=_confirm_process_definition,
-        max_turns=max_turns,
     )
 
 

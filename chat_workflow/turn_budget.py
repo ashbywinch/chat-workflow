@@ -11,7 +11,12 @@ from dataclasses import dataclass
 
 from .exceptions import TurnLimitExceededError
 
-__all__ = ["TurnBudget"]
+# lucidlint: ignore-file global-state this module is the session-budget catalogue; callers import the default
+__all__ = ["DEFAULT_SESSION_MAX_TURNS", "TurnBudget"]
+
+# The framework's session-wide runaway guard. A caller (an eval, the CLI, or a
+# host application) can replace it; a step cannot.
+DEFAULT_SESSION_MAX_TURNS = 100
 
 
 @dataclass

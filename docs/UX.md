@@ -33,8 +33,8 @@ prompts.
 
 - If the user does not know an answer, offer one plausible option and mark
   it as a suggestion.
-- If the turn limit is reached, fail with a message that names the limit and
-  what remains open — never return a partial object.
+- If the session turn budget is exhausted, fail with a message that names the
+  limit and what remains open — never return a partial object.
 - If validation fails, say which rule failed in the user's language and ask
   for the specific correction.
 

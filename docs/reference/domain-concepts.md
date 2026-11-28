@@ -30,7 +30,7 @@ steps owned by other components.
 
 ## Atomic Workflow Step
 
-**What it is:** The smallest unit of LLM-driven conversation that produces a validated Pydantic object. An atomic workflow step runs a multi-turn loop (user ↔ LLM) until the LLM signals success with a valid result or failure, or the turn limit is reached when the step declares one.
+**What it is:** The smallest unit of LLM-driven conversation that produces a validated Pydantic object. An atomic workflow step runs a multi-turn loop (user ↔ LLM) until the LLM signals success with a valid result or failure, or the session's turn budget is exhausted.
 
 **Broadly known as:** In other frameworks this concept appears as a *structured output agent loop*, a *function-calling agent*, a *tool-use loop*, or a *run* (OpenAI SDK). Vercel's AI SDK calls it a multi-step *generation* with `stopWhen`. LangGraph implements it as a *StateGraph* that loops until a condition is met. LlamaIndex has *FunctionAgent* for the same pattern.
 
@@ -125,11 +125,11 @@ workflow spec lists the component specs that will define them.
 
 **Broadly known as:** *Turn* is the standard term (OpenAI SDK, Agent Client Protocol, Microsoft Agent Framework). Vercel's AI SDK calls it a *step*. LangGraph calls it a *super-step*.
 
-**In the code:** `turn_count` (field), `TurnLimitExceededError`, `TurnResult`, `process_turn()`. The concept is already correctly named.
+**In the code:** `TurnBudget`, `turn_count` (field), `TurnLimitExceededError`, `TurnResult`, `process_turn()`. The concept is already correctly named.
 
 ## Session
 
-**What it is:** One conversation. A session wraps IO (how to talk to the user), its own state log (the messages and audit events of that conversation), and config (provider, model, timeout). A session may create child sessions: a meeting inside a conversation is the same concept at a deeper level. A child starts with clean context and receives its brief as parameters; it does not inherit the parent's messages. The tree of sessions is the whole the user saw.
+**What it is:** One conversation. A session wraps IO (how to talk to the user), its own state log (the messages and audit events of that conversation), and config (provider, model, timeout), plus one turn budget shared by every step in the session tree. A session may create child sessions: a meeting inside a conversation is the same concept at a deeper level. A child starts with clean context and receives its brief as parameters; it does not inherit the parent's messages, but it shares the parent's turn budget. The tree of sessions is the whole the user saw.
 
 **Broadly known as:** *Session* is widely used (OpenAI SDK, Microsoft Agent Framework, Agent Client Protocol). It represents durable, multi-turn state that survives individual LLM calls. Other frameworks call the same concept *runtime context* or *invocation context*; the recursive child session is their *sub-session* or *nested run*.
 

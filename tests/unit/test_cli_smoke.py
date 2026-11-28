@@ -39,6 +39,12 @@ class TestCliSmoke(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
         self.assertIn("--context", _strip_ansi(result.output))
 
+    def test_workflow_function_help_exposes_the_session_budget(self):
+        """The session guard is a CLI option, not a workflow parameter."""
+        result = self.runner.invoke(app, ["evaluation-criteria", "generate-reviewed-criteria", "--help"])
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("--max-turns", _strip_ansi(result.output))
+
     def test_invalid_workflow_name_errors(self):
         result = self.runner.invoke(app, ["nonexistent-workflow"])
         self.assertNotEqual(result.exit_code, 0)

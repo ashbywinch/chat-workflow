@@ -182,7 +182,6 @@ class ComponentDomainSpec(LLMValidated):
             list[Deliverable] | None,
             "What the user makes, with the check they gave for it",
         ] = None,
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> ComponentDomainSpec:
         """Derive the artifact's domain spec, then confirm it."""
@@ -196,7 +195,6 @@ class ComponentDomainSpec(LLMValidated):
             session=session,
             draft=draft,
             step=_confirm_domain_spec,
-            max_turns=max_turns,
         )
 
 
@@ -210,7 +208,6 @@ def _draft_domain_spec(
         list[Deliverable] | None,
         "What the user makes, with the check they gave for it",
     ] = None,
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> ComponentDomainSpec:
     """Derive the artifact's domain spec from the agreed responsibilities.
 
@@ -226,7 +223,6 @@ def _confirm_domain_spec(
         ComponentDomainSpec,
         "The complete domain spec already shown to the user",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentDomainSpec:
     """
 The domain spec was shown with one confirm-or-correct question, and the user is

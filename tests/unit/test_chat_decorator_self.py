@@ -45,7 +45,6 @@ class TestWorkflow:
     def generate(
         cls,
         context: str,
-        max_turns: int = 10,
     ) -> Self:
         \"\"\"You are a helpful assistant.\"\"\"
         pass
@@ -102,7 +101,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """
@@ -144,7 +143,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """
@@ -189,7 +188,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """
@@ -238,7 +237,7 @@ class DummyModel(BaseModel):
 
 
 @atomic_workflow
-def generate(context: str, max_turns: int = 10) -> ModelType:
+def generate(context: str) -> ModelType:
     \"\"\"You are a helpful assistant.\"\"\"
     pass
 """

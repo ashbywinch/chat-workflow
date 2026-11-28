@@ -61,7 +61,6 @@ class EvaluationCriteria(BaseModel):
     def generate_from_chat(
         cls,
         context: Annotated[str, "The topic or domain for which to generate evaluation criteria"],
-        max_turns: Annotated[int, "Maximum number of conversation turns before giving up"] = 10,
     ) -> Self:
         """You are a helpful assistant guiding the user to create evaluation criteria.
         Assume the user is an expert on their topic but they know nothing about
@@ -89,7 +88,7 @@ class EvaluationCriteria(BaseModel):
           factor, return intent="failure" rather than inventing one from the
           context. Return failure only when no factor was named at all or the
           user refuses to engage — a thin answer is not a failure.
-        - If the user is uncooperative or refuses to provide useful information within max_turns,
+        - If the user is uncooperative or refuses to provide useful information,
             use intent="failure".
         """
         ...  # type: ignore[reportReturnType]  # the step decorator supplies the body

@@ -46,6 +46,7 @@ from .session import Session
 from .session_component import SessionComponent
 from .session_log import SessionLog
 from .streamingdebug import StreamingDebug
+from .turn_budget import TurnBudget
 
 __all__ = [
     "APIKeyError",
@@ -79,6 +80,7 @@ __all__ = [
     "Success",
     "StreamingDebug",
     "TextReply",
+    "TurnBudget",
     "TurnLimitExceededError",
     "TurnResult",
     "UserLabel",

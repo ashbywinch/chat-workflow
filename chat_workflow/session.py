@@ -198,8 +198,8 @@ class Session:
         correction and retried within the turn budget.
         """
         result: TurnResult[TResult] | None = None
-        # A direct Session.run gets the step's budget; a wrapped session was
-        # already given the top-level step's max_turns before the greeting.
+        # A direct Session.run gets the session guard; a wrapped session was
+        # already given it before the greeting and keeps one budget.
         if self.budget is None:
             self.budget = TurnBudget(workflow.max_turns)
         try:

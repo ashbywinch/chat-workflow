@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable
 from functools import wraps
 from typing import Annotated, Any, get_args, get_origin
@@ -18,7 +17,7 @@ from .models import AgentAnswer, FinalAnswer, Success, TurnResult
 from .prompt_builder import build_params_section, format_docstring
 from .streamingdebug import StreamingDebug
 from .transcript import conversation_messages
-from .turn_budget import TurnBudget
+from .turn_budget import DEFAULT_SESSION_MAX_TURNS, TurnBudget
 from .types_meta import resolve_return_type
 
 
@@ -40,29 +39,6 @@ def _is_result_model(return_type: Any) -> bool:
         return True
     inner = _inner_model(return_type)
     return isinstance(inner, type) and issubclass(inner, BaseModel)
-
-
-def _checked_max_turns(value: Any, func_name: str) -> int | None:
-    """A turn bound is an int, or ``None`` for no bound."""
-    if value is None or isinstance(value, int):
-        return value
-    raise TypeError(
-        f"@atomic_workflow function '{func_name}' declares max_turns={value!r}; "
-        "it must be an int or None (None means no turn limit)."
-    )
-
-
-def _declared_max_turns(func: Callable[..., Any], *, single_turn: bool) -> int | None:
-    """The step's declared turn bound, or the framework's default.
-
-    A component author declares ``max_turns: int | None = None`` to let the
-    conversation run until the step succeeds or fails. A step that does not
-    declare the parameter gets the framework's runaway guard.
-    """
-    parameter = inspect.signature(func).parameters.get("max_turns")
-    if parameter is None or parameter.default is inspect.Parameter.empty:
-        return 1 if single_turn else 10
-    return _checked_max_turns(parameter.default, func.__name__)
 
 
 def _build_checklist_section(rules: dict[str, str]) -> str:
@@ -218,7 +194,6 @@ def _turn_policy_sections(chat: bool, return_type: Any) -> list[str]:
 def _setup_atomic_workflow(
     system_prompt: str,
     actual_return_type: Any,
-    max_turns: int | None,
     debug: Any,
     session: Any,
     *,
@@ -237,6 +212,7 @@ def _setup_atomic_workflow(
     parameters, and replaying the session would invite it to answer the
     conversation again.
     """
+    budget = getattr(session, "budget", None) or TurnBudget(DEFAULT_SESSION_MAX_TURNS)
     conversation = Conversation(
         model=session.config.model,
         provider=session.config.provider,
@@ -268,8 +244,8 @@ def _setup_atomic_workflow(
             system_prompt=system_prompt,
             response_model=AgentAnswer[actual_return_type],
             final_response_model=FinalAnswer[actual_return_type],
-            max_turns=max_turns,
-            budget=getattr(session, "budget", None),
+            max_turns=budget.max_turns,
+            budget=budget,
             single_turn=single_turn,
             step_name=step_name,
             step_inputs=step_inputs,
@@ -305,7 +281,7 @@ def atomic_workflow(
 ) -> Callable[..., Any]:
     """Auto-orchestrates an LLM atomic workflow using its docstring as system prompt.
 
-    ``session``, ``debug``, ``max_turns``, ``tools`` and ``deps`` are the
+    ``session``, ``debug``, ``tools`` and ``deps`` are the
     decorator's own parameters: they are removed before the prompt's params
     section is built, so a step cannot also name one of them.
 
@@ -358,15 +334,10 @@ def atomic_workflow(
                 chat=chat,
                 instructions=session.instructions,
             )
-            if "max_turns" in kwargs:
-                max_turns = _checked_max_turns(kwargs.pop("max_turns"), f.__name__)
-            else:
-                max_turns = _declared_max_turns(raw_func, single_turn=single_turn)
-
             if getattr(session, "budget", None) is None:
                 # A step called directly, outside SessionComponent, owns the
-                # session's runaway guard.
-                session.budget = TurnBudget(max_turns)
+                # session's runaway guard. Steps do not declare a limit.
+                session.budget = TurnBudget(DEFAULT_SESSION_MAX_TURNS)
 
             if debug is None and session.config.debug:
                 debug = StreamingDebug()
@@ -374,7 +345,6 @@ def atomic_workflow(
             workflow = _setup_atomic_workflow(
                 system_prompt,
                 actual_return_type,
-                max_turns,
                 debug,
                 session,
                 chat=chat,
@@ -415,6 +385,8 @@ def composite_workflow(func: Callable[..., Any]) -> Callable[..., Any]:
     def wrapper(*args, **kwargs):
         session = kwargs.get("session")
         if session is not None:
+            if getattr(session, "budget", None) is None:
+                session.budget = TurnBudget(DEFAULT_SESSION_MAX_TURNS)
             return raw_func(*args, **kwargs)
 
         raise TypeError(

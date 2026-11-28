@@ -121,9 +121,9 @@
    "severity": "error"
   },
   {
-   "line": 43,
+   "line": 44,
    "column": 9,
-   "stop_line": 43,
+   "stop_line": 44,
    "stop_column": 13,
    "path": "tests/evals/test_real_api.py",
    "code": -2,
@@ -133,9 +133,9 @@
    "severity": "error"
   },
   {
-   "line": 46,
+   "line": 47,
    "column": 9,
-   "stop_line": 46,
+   "stop_line": 47,
    "stop_column": 15,
    "path": "tests/evals/test_real_api.py",
    "code": -2,

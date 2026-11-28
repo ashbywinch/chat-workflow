@@ -61,7 +61,6 @@ class TestVocabularyPrompt(unittest.TestCase):
 
         def step(
             analysis: Annotated[LabelledInput, "What the person told you"],
-            max_turns: int = 10,
         ) -> LabelledResult:
             ...
 

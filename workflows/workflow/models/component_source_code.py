@@ -55,7 +55,6 @@ class ComponentSourceCode(LLMValidated):
             ComponentSpec,
             "The component requirements specifying name, purpose, inputs, outputs, and type",
         ],
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> ComponentSourceCode:
         """You are a software architect designing a Python business component.
 

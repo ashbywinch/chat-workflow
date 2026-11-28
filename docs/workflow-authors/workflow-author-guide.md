@@ -286,36 +286,35 @@ def my_workflow_step(
     context: Annotated[
         str, "The topic or domain for which to generate data"
     ] = "",
-    max_turns: Annotated[
-        int, "Maximum number of conversation turns before giving up"
-    ] = 10,
 ) -> MyModel:
     ...
 ```
 
-## The Turn Bound
+## The Session Turn Budget
 
-`max_turns` is the step's conversation bound: the number of model turns it may
-take before the run fails. Declare it as `int | None` and set it to `None` when
-the conversation should end only when the step succeeds or fails — for
-example, a step where the user may need to correct the draft more times than a
-fixed budget allows:
+A step does not declare a turn limit. The session owns one runaway guard: every
+model turn in the session tree takes from the same counter, and the run stops
+with `TurnLimitExceededError` only when that counter is exhausted. The
+framework default is generous enough for a normal conversation; a step cannot
+shorten it.
+
+The caller can replace the guard when it hosts the session:
 
 ```python
-from chat_workflow import atomic_workflow_step
+from chat_workflow import Session, SessionLog, TurnBudget
 
-
-@atomic_workflow_step
-def generate_from_chat(
-    context: str,
-    max_turns: int | None = None,
-) -> MyModel:
-    ...
+result = my_workflow_step(
+    context="example",
+    session=Session(
+        io=MyIO(),
+        state=SessionLog(),
+        budget=TurnBudget(40),
+    ),
+)
 ```
 
-The caller can also pass `max_turns=None`. The value declared in the signature
-is the step's default; a step that does not declare the parameter keeps the
-framework's guard of 10 turns (one for a `single_turn` step).
+A `single_turn=True` step still returns after one model response because of its
+shape, not because it has a budget of one.
 
 ## Generic Refinement with TypeVar
 
@@ -333,7 +332,6 @@ ModelType = TypeVar("ModelType", bound=BaseModel)
 @atomic_workflow_step
 def refine(
     initial_object: Annotated[ModelType, "The object to review"],
-    max_turns: Annotated[int, "Maximum refinement turns"] = 5,
 ) -> ModelType:
     """System prompt for refinement..."""
     pass
@@ -368,7 +366,6 @@ class MyIO(UserIO):
 # Use in workflow
 result = my_workflow_step(
     context="example",
-    max_turns=10,
     session=Session(io=MyIO(), state=SessionLog()),
 )
 ```
@@ -392,7 +389,6 @@ class MyData(BaseModel):
 @atomic_workflow_step
 def generate_data(
     topic: Annotated[str, "Topic for data generation"] = "",
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> MyData:
     """Help the user create structured data about {topic}.
     
@@ -406,7 +402,6 @@ ModelType = TypeVar("ModelType", bound=BaseModel)
 @atomic_workflow_step
 def refine_data(
     initial_data: Annotated[ModelType, "Data to refine"],
-    max_turns: Annotated[int, "Refinement turns"] = 5,
 ) -> ModelType:
     """Review and improve the provided object.
     
@@ -417,14 +412,13 @@ def refine_data(
 @composite_workflow_step
 def generate_reviewed_data(
     topic: str = "",
-    max_turns: int = 10,
     session: Session,
 ) -> MyData:
     # Generate initial data
-    data = generate_data(topic=topic, max_turns=max_turns, session=session)
+    data = generate_data(topic=topic, session=session)
     
     # Refine it
-    refined_data = refine_data(initial_data=data, max_turns=5, session=session)
+    refined_data = refine_data(initial_data=data, session=session)
     
     return refined_data
 ```
@@ -759,7 +753,6 @@ from chat_workflow import Session, atomic_workflow_step, composite_workflow_step
 @atomic_workflow_step
 def refine(
     initial_object: Annotated[EvaluationCriteria, "Object to review"],
-    max_turns: Annotated[int, "Maximum refinement turns"] = 5,
 ) -> EvaluationCriteria:
     """Review this object with the user. Ask if they want to change anything.
     Return the object with any requested updates. If they are happy,
@@ -769,14 +762,13 @@ def refine(
 @composite_workflow_step
 def generate_reviewed_criteria(
     context: str = "",
-    max_turns: int = 10,
     max_refinements: int = 3,
     *,
     session: Session,
 ) -> EvaluationCriteria:
     # Step 1: Generate the initial object
     criteria = EvaluationCriteria.generate_from_chat(
-        context=context, max_turns=max_turns, session=session,
+        context=context, session=session,
     )
 
     # Step 2: Refinement loop
@@ -786,7 +778,6 @@ def generate_reviewed_criteria(
 
         refined = refine(
             initial_object=criteria,
-            max_turns=max_turns,
             session=session,
         )
 
@@ -806,7 +797,7 @@ The same pattern appears in `WorkflowSpec._create_diagram()` in `workflows/workf
 from pathlib import Path
 
 for _ in range(max_refinements):
-    refined = refine(initial_object=workflow, max_turns=5, session=session)
+    refined = refine(initial_object=workflow, session=session)
 
     if refined.model_dump() == workflow.model_dump():
         return refined

@@ -194,7 +194,6 @@ class ComponentSpec(LLMValidated):
 
     @composite_workflow_step
     @classmethod
-    # lucidlint: ignore long-param-list the step's inputs are independent records, named at its one call site
     def identify_from_chat(
         cls,
         analysis: Annotated[
@@ -207,7 +206,6 @@ class ComponentSpec(LLMValidated):
             list[str] | None,
             "Parts already identified; include them and add any that are missing",
         ] = None,
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
         """Derive the parts of the user's work, then confirm the set.
@@ -244,7 +242,6 @@ class ComponentSpec(LLMValidated):
             session=session,
             draft=draft,
             step=_confirm_components,
-            max_turns=max_turns,
         )
 
 
@@ -265,7 +262,6 @@ def _draft_components(
         list[str] | None,
         "Parts already identified; include them and add any that are missing",
     ] = None,
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
     """Derive the parts of the user's work from the analysis.
 
@@ -298,7 +294,6 @@ def _confirm_components(
         list[ComponentSpec],
         "The complete set of parts already derived from the analysis",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[ComponentSpec], Field(min_length=1)]:
     """
 The parts were shown with one confirm-or-correct question, and the user is

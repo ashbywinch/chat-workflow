@@ -91,7 +91,6 @@ class TestDebugStreaming(unittest.TestCase):
         try:
             criteria = EvaluationCriteria.generate_from_chat(
                 context="choosing a laptop",
-                max_turns=10,
                 session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
                 debug=debug,
             )
@@ -122,7 +121,6 @@ class TestDebugStreaming(unittest.TestCase):
 
         criteria = EvaluationCriteria.generate_from_chat(
             context="choosing a birthday gift",
-            max_turns=6,
             session=Session(io=mock_io, state=SessionLog(), config=_CONFIG),
             debug=debug,
         )

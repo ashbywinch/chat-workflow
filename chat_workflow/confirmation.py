@@ -47,7 +47,6 @@ def confirm_draft(
     session: ConfirmationSession,
     draft: T,
     step: Callable[..., T],
-    max_turns: int = 4,
     # One correction round plus its confirmation. A user who keeps changing the
     # draft is in a different task, not a confirmation.
     max_changes: int = 2,
@@ -55,7 +54,7 @@ def confirm_draft(
     """Run a confirmation step, presenting every changed draft it returns."""
     current = draft
     for _ in range(max_changes + 1):
-        confirmed = step(draft=current, session=session, max_turns=max_turns)
+        confirmed = step(draft=current, session=session)
         if _same(confirmed, current):
             return confirmed
         current = confirmed

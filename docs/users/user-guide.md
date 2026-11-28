@@ -118,7 +118,7 @@ The LLM will guide you through a conversation to generate structured evaluation 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--context` | Initial context for the conversation | "" |
-| `--max-turns` | Maximum number of conversation turns | 10 |
+| `--max-turns` | Session-wide runaway guard | 100 |
 | `--max-refinements` | Maximum number of refinement rounds | 3 |
 
 ### Examples
@@ -159,11 +159,12 @@ When you run `chat-workflow evaluation-criteria generate-reviewed-criteria`, her
 
 ### Conversation Limits
 
-- **Default**: 10 turns (back-and-forth exchanges)
-- **Maximum**: 20 turns (configurable with `--max-turns`)
-- **Minimum**: 1 turn
+- **Default**: 100 model turns for the whole session
+- **Configurable**: set a lower guard with `--max-turns`
 
-If you reach the turn limit, the conversation ends and any criteria generated so far are saved.
+The limit is one budget for the whole conversation, shared by every step; it is
+there to stop a runaway loop, not to allot turns to each part of the work. If
+it is reached, the run stops with a turn-limit message.
 
 ## Output Files
 

@@ -19,7 +19,6 @@ class InnerShape(BaseModel):
 
 def example_workflow(
     inner: Annotated[InnerShape, "The inner shape"],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 3,
 ):
     """Do the example task."""
 
@@ -28,7 +27,7 @@ class TestBuildParamsSection(unittest.TestCase):
     def test_includes_pydantic_model_shape(self):
         section = build_params_section(
             example_workflow,
-            {"inner": InnerShape(name="x"), "max_turns": 3},
+            {"inner": InnerShape(name="x")},
         )
 
         self.assertIn("The name of the thing", section)
@@ -38,7 +37,7 @@ class TestBuildParamsSection(unittest.TestCase):
     def test_skips_shape_already_in_output_schema(self):
         section = build_params_section(
             example_workflow,
-            {"inner": InnerShape(name="x"), "max_turns": 3},
+            {"inner": InnerShape(name="x")},
             skip_shapes=frozenset({"InnerShape"}),
         )
 
@@ -50,7 +49,7 @@ class TestBuildSystemPrompt(unittest.TestCase):
     def test_includes_procedure_checklist_and_object_rules(self):
         prompt = _build_system_prompt(
             example_workflow,
-            {"inner": InnerShape(name="x"), "max_turns": 3},
+            {"inner": InnerShape(name="x")},
             return_type=InnerShape,
             conversation_rules={"No repetition": "Do not repeat."},
             chat=True,
@@ -64,7 +63,7 @@ class TestBuildSystemPrompt(unittest.TestCase):
     def test_session_instructions_come_first(self):
         prompt = _build_system_prompt(
             example_workflow,
-            {"inner": InnerShape(name="x"), "max_turns": 3},
+            {"inner": InnerShape(name="x")},
             return_type=InnerShape,
             conversation_rules={"No repetition": "Do not repeat."},
             chat=True,
@@ -82,7 +81,7 @@ class TestBuildSystemPrompt(unittest.TestCase):
     def test_chat_off_omits_conversation_checklist(self):
         prompt = _build_system_prompt(
             example_workflow,
-            {"inner": InnerShape(name="x"), "max_turns": 3},
+            {"inner": InnerShape(name="x")},
             return_type=InnerShape,
             conversation_rules={"No repetition": "Do not repeat."},
             chat=False,
@@ -99,7 +98,7 @@ class TestNoProtocolText(unittest.TestCase):
     def test_prompt_does_not_state_the_response_protocol(self):
         prompt = _build_system_prompt(
             example_workflow,
-            {"inner": InnerShape(name="x"), "max_turns": 3},
+            {"inner": InnerShape(name="x")},
             return_type=InnerShape,
             conversation_rules={"No repetition": "Do not repeat."},
             chat=True,

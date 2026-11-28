@@ -221,7 +221,8 @@ class TestMethodGenerator(unittest.TestCase):
     1. The function is importable and callable
     2. It returns a string containing @atomic_workflow_step and @classmethod
     3. The generated code includes generate_from_chat method name
-    4. The generated code includes context, max_turns, and session parameters
+    4. The generated code includes context and session parameters, and no
+       per-step max_turns
     5. The generated code is syntactically valid Python
     """
 
@@ -270,12 +271,12 @@ class TestMethodGenerator(unittest.TestCase):
         result = generate_workflow_method("TestWorkflow")
         self.assertIn("context", result)
 
-    def test_generate_workflow_method_contains_max_turns_param(self):
-        """Generated code should include max_turns parameter (will FAIL)."""
+    def test_generate_workflow_method_does_not_declare_max_turns(self):
+        """Generated code must not declare a per-step max_turns."""
         from chat_workflow.code_generator import generate_workflow_method
 
         result = generate_workflow_method("TestWorkflow")
-        self.assertIn("max_turns", result)
+        self.assertNotIn("max_turns", result)
 
     def test_generate_workflow_method_contains_session_param(self):
         """Generated code should include session parameter (will FAIL)."""

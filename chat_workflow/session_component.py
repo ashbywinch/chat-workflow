@@ -11,7 +11,6 @@ does not greet or sign off unless the caller asks for it.
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable
 from inspect import cleandoc
 from typing import ClassVar, TypeVar
@@ -20,22 +19,10 @@ from .conversation_rules import WARM_OPEN
 from .decorators import atomic_workflow, composite_workflow
 from .models import TextReply
 from .session import Session
-from .turn_budget import TurnBudget
+from .turn_budget import DEFAULT_SESSION_MAX_TURNS, TurnBudget
 
 T = TypeVar("T")
 
-
-def _declared_max_turns(step: Callable[..., object]) -> int | None:
-    """The top-level step's declared runaway guard, or the framework default."""
-    try:
-        parameter = inspect.signature(step).parameters.get("max_turns")
-    except (TypeError, ValueError):
-        return 10
-    if parameter is not None:
-        default = parameter.default
-        if default is None or isinstance(default, int):
-            return default
-    return 10
 
 class SessionComponent:
     """Runs one conversation: a greeting, the step, and a closing."""
@@ -52,7 +39,7 @@ class SessionComponent:
         conversation_validation_rules=[WARM_OPEN],
     )
     # lucidlint: ignore detached-method the step decorator injects the session; the method stays on the component
-    def greet(self, *, session: Session, max_turns: int = 1) -> TextReply:
+    def greet(self, *, session: Session) -> TextReply:
         """Open the conversation.
 
         Give one short greeting, say in one sentence what you are here to help
@@ -70,7 +57,7 @@ class SessionComponent:
 
     @atomic_workflow(chat=False, single_turn=True)
     # lucidlint: ignore detached-method the step decorator injects the session; the method stays on the component
-    def sign_off(self, *, session: Session, max_turns: int = 1) -> TextReply:
+    def sign_off(self, *, session: Session) -> TextReply:
         """Close the conversation.
 
         The conversation already happened; you are only closing it, and its
@@ -110,11 +97,11 @@ class SessionComponent:
         if session.instructions is None:
             session.instructions = cleandoc(self.converse.__doc__ or "")
 
-        # The budget belongs to the session, so it is set once from the
-        # top-level step, before the greeting and any nested step can consume
-        # a turn or reset it.
+        # The budget belongs to the session. A caller may set it; otherwise
+        # the framework's guard is the session default. A step cannot set or
+        # reset it.
         if session.budget is None:
-            session.budget = TurnBudget(_declared_max_turns(step))
+            session.budget = TurnBudget(DEFAULT_SESSION_MAX_TURNS)
 
         # A top-level step that makes no user turns is not a conversation: it
         # has nothing to greet or close. Composite steps default to chat-on.

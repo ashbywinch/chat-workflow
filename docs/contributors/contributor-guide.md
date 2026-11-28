@@ -97,7 +97,7 @@ The architecture follows these principles. Because we are building a **system th
 
 #### `chat_workflow/atomic_workflow.py` — Conversation Logic
 - Core class: `AtomicWorkflow`
-- Manages turn state (`max_turns` configurable)
+- Consumes the session-wide turn budget; it has no per-step limit of its own
 - Receives system prompt from `@atomic_workflow_step` decorator
 - Three outcomes: continue/success/failure
 
@@ -108,7 +108,7 @@ The architecture follows these principles. Because we are building a **system th
 
 #### `chat_workflow_cli/cli.py` — CLI with Auto-Discovery
 - Discovers `@composite_workflow_step` functions in `workflows/` directory
-- Converts function parameters to CLI options (excluding `session`, `io`, `state`, `debug`)
+- Converts function parameters to CLI options (excluding `session`, `io`, `state`, `debug`); every command also exposes `--max-turns` for the session budget
 - Uses `__signature__` override with `typing.get_type_hints()` for type resolution
 - Handles `from __future__ import annotations` string annotations
 
@@ -137,7 +137,7 @@ make coverage       # Unit tests + coverage.xml
 - **Tests fail (not skip) without API keys** — this exposes missing infrastructure intentionally
 - **Custom exceptions** for all error cases — CLI formats them, orchestrator raises them
 - `AgentResponse` is a Generic BaseModel with `intent: AgentIntent` and a `model_validator` for consistency
-- `AtomicWorkflow.process_turn()` checks turn limit, calls LLM, handles intent
+- `AtomicWorkflow.process_turn()` checks the session turn budget, calls LLM, handles intent
 - Turn limit raises `TurnLimitExceededError`; failure intent raises `AtomicWorkflowFailedError`
 
 ## Testing Strategy

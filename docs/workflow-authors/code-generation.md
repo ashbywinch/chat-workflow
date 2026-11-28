@@ -60,7 +60,7 @@ class Criterion(BaseModel):
 
     @atomic_workflow_step
     @classmethod
-    def generate_from_chat(cls, context:str, max_turns:int=10, session=None):
+    def generate_from_chat(cls, context:str, session=None):
         """Generate criterion from chat conversation."""
         ...
 ```
@@ -203,7 +203,7 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
 
     @atomic_workflow_step
     @classmethod
-    def generate_from_chat(cls, context: str, max_turns: int = 10, session=None):
+    def generate_from_chat(cls, context: str, session=None):
         """Generate a WorkflowSpec from a process description."""
         ...
 ```
@@ -297,7 +297,6 @@ Output:
 def generate_from_chat(
     cls,
     context: str,
-    max_turns: int = 10,
     session = None,
 ):
     """Workflow method for Task."""
@@ -361,7 +360,6 @@ class Task(BaseModel):
     def generate_from_chat(
         cls,
         context: str,
-        max_turns: int = 10,
         session = None,
     ):
         """Generate a Task from chat conversation."""

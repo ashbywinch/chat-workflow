@@ -95,7 +95,6 @@ class GapAnalysis(LLMValidated):
         existing_components: Annotated[
             list[str] | None, "Names of parts that already exist"
         ] = None,
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> GapAnalysis:
         """You help someone spot what is missing from their work.
 

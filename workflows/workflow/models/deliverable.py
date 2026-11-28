@@ -147,7 +147,6 @@ class Deliverable(LLMValidated):
             ProcessDefinition | None,
             "What the person has already told you about how their work happens",
         ] = None,
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> Annotated[list[Deliverable], Field(min_length=1)]:
         """Gather what the user makes, propose its shape, then confirm it.
@@ -160,7 +159,6 @@ class Deliverable(LLMValidated):
         gathered = _gather_deliverable(
             analysis=analysis,
             session=session,
-            max_turns=max_turns,
         )
         draft = _draft_deliverables(
             notes=gathered.notes,
@@ -172,7 +170,6 @@ class Deliverable(LLMValidated):
             session=session,
             draft=draft,
             step=_confirm_deliverables,
-            max_turns=max_turns,
         )
 
 
@@ -197,7 +194,6 @@ def _gather_deliverable(
         ProcessDefinition | None,
         "What the person has already told you about how their work happens",
     ] = None,
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> DeliverableNotes:
     """Collect what the user makes, in their own words.
 
@@ -224,7 +220,6 @@ def _draft_deliverables(
         ProcessDefinition | None,
         "What you already know about how their work happens",
     ] = None,
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> Annotated[list[Deliverable], Field(min_length=1)]:
     """Propose the concrete shape of what the user makes.
 
@@ -253,7 +248,6 @@ def _confirm_deliverables(
         list[Deliverable],
         "The complete proposal already shown to the user",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[Deliverable], Field(min_length=1)]:
     """Confirm or correct the proposal that was just shown.
 

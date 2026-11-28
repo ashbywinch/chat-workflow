@@ -12,6 +12,7 @@ from chat_workflow.session import Session
 from chat_workflow.session_component import SessionComponent
 from chat_workflow.session_log import SessionLog
 from chat_workflow.session_logging import SessionRecord, log_session
+from chat_workflow.turn_budget import DEFAULT_SESSION_MAX_TURNS, TurnBudget
 
 from .runner import TyperUserIO, handle_error
 
@@ -68,7 +69,13 @@ class WorkflowConsole:
         self._console.echo("Starting conversation... (Ctrl+C to quit)")
         io = self._io_factory()
         config = self._config_factory(self.config_path)
-        session = self._session_factory(io=io, state=self._session_log, config=config)
+        max_turns = user_params.pop("max_turns", DEFAULT_SESSION_MAX_TURNS)
+        session = self._session_factory(
+            io=io,
+            state=self._session_log,
+            config=config,
+            budget=TurnBudget(max_turns),
+        )
         user_params.pop("session", None)
         self._context = user_params.get("context", "")
 

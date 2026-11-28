@@ -571,7 +571,6 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
         inputs: Annotated[list[Resource], "The workflow inputs"],
         outputs: Annotated[list[Deliverable], "The workflow outputs"],
         gap_analysis: Annotated[GapAnalysis | None, "Optional gap analysis to incorporate"] = None,
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
     ) -> WorkflowSpec:
         """No user conversation: generate the workflow record and diagram from
         the provided analysis.
@@ -709,11 +708,10 @@ class WorkflowSpec(BlobSyncMixin, LLMValidated):
 
         for _ in range(max_refinements):
             # A rejected diagram costs turns: the model has to explain what it
-            # is changing and ask when the user's answer left a rule unmet. Five
-            # turns ran out mid-repair, so give the conversation room to finish.
+            # is changing and ask when the user's answer left a rule unmet. The
+            # session's budget, not a per-step limit, gives it room to finish.
             refined = refine(
                 initial_object=workflow,
-                max_turns=8,
                 session=session,
             )
 

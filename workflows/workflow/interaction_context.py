@@ -91,7 +91,6 @@ class ComponentInteractionContext(BaseModel):
             ComponentStructure,
             ("The structural design — what fields and rules the artifact follows"),
         ],
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> ComponentInteractionContext:
         """Ask the three fixed questions, show the derived picture, confirm it."""
@@ -111,7 +110,6 @@ class ComponentInteractionContext(BaseModel):
             session=session,
             draft=draft,
             step=_confirm_interaction_context,
-            max_turns=max_turns,
         )
 
 
@@ -126,7 +124,6 @@ def _draft_interaction_context(
         "What fields and rules the artifact follows",
     ],
     answer: Annotated[str, "The user's answer to the three questions"],
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> ComponentInteractionContext:
     """Derive the interaction picture from the user's answer.
 
@@ -143,7 +140,6 @@ def _confirm_interaction_context(
         ComponentInteractionContext,
         "The complete interaction proposal already shown to the user",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentInteractionContext:
     """
 The proposal was shown with one confirm-or-correct question, and the user is

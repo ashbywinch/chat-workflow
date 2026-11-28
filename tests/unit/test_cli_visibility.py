@@ -28,7 +28,7 @@ class TestModuleLevelVisibility(unittest.TestCase):
         """A public @atomic_workflow_step function is discovered by its name."""
         mod = types.ModuleType("test_mod")
 
-        def public_wf(context: str = "", max_turns: int = 10):
+        def public_wf(context: str = ""):
             pass
 
         public_wf._is_workflow_step = True  # type: ignore[attr-defined]  # the test marks a plain function as a workflow step

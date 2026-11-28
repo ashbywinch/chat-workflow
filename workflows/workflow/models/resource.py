@@ -104,7 +104,6 @@ class Resource(LLMValidated):
             ProcessDefinition | None,
             "What the person has already told you about how their work happens",
         ] = None,
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> Annotated[list[Resource], Field(min_length=1)]:
         """Derive what people usually start with, then confirm the list."""
@@ -118,7 +117,6 @@ class Resource(LLMValidated):
             session=session,
             draft=draft,
             step=_confirm_resources,
-            max_turns=max_turns,
         )
 
 
@@ -129,7 +127,6 @@ def _draft_resources(
         ProcessDefinition | None,
         "What the person has already told you about how their work happens",
     ] = None,
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> Annotated[list[Resource], Field(min_length=1)]:
     """Derive the things people usually start with for this kind of work.
 
@@ -159,7 +156,6 @@ def _confirm_resources(
         list[Resource],
         "The complete list of things they start with, already shown to the user",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> Annotated[list[Resource], Field(min_length=1)]:
     """
 The list of things they start with was shown with one confirm-or-correct question, and the user is answering it. Do not show the list again and do not repeat that question.

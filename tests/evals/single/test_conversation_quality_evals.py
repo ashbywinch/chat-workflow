@@ -94,7 +94,7 @@ class TestConfusionHandlingEval(unittest.TestCase):
         """Deliverable.generate_from_chat drops jargon when user is confused."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 16},
+            method_kwargs={"max_turns": 24},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=CONFUSION_JUDGE_RULES,
         )
@@ -126,7 +126,7 @@ class TestJargonFreeEval(unittest.TestCase):
         """Deliverable conversation uses plain language, not field names."""
         result = run_multi_turn_eval(
             model_method=Deliverable.generate_from_chat,
-            method_kwargs={"max_turns": 16},
+            method_kwargs={"max_turns": 24},
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,
         )
@@ -191,7 +191,7 @@ class TestJargonFreeEval(unittest.TestCase):
                 "analysis": analysis,
                 "inputs": [],
                 "outputs": outputs,
-                "max_turns": 16,
+                "max_turns": 24,
             },
             user_persona=CONFUSED_USER_PERSONA,
             judge_rules=JARGON_FREE_RULES,

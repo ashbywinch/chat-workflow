@@ -18,7 +18,6 @@ class Letter(InteractiveEntity):
     def generate_from_chat(
         cls,
         context: str,
-        max_turns: int = 10,
         session=None,
     ):
         """Letter workflow."""

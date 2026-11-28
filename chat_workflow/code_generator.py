@@ -141,7 +141,6 @@ def generate_workflow_method(class_name: str) -> str:
         "def generate_from_chat(\n"
         "    cls,\n"
         "    context: str,\n"
-        "    max_turns: int = 10,\n"
         "    session = None,\n"
         "):\n"
         f'    """Workflow method for {class_name}."""\n'
@@ -360,7 +359,6 @@ def generate_class(
     )
     lines.append("        cls,")
     lines.append("        context: str,")
-    lines.append("        max_turns: int = 10,")
     lines.append("        session = None,")
     lines.append("    ):")
     lines.append(f'        """{name} workflow."""')

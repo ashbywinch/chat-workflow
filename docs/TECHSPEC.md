@@ -46,9 +46,9 @@ layering change updates the test in the same commit.
 | Concept | Owner | Contract |
 |---|---|---|
 | `Config` | `chat_workflow/config.py` | Reads `config.json`; resolves provider/model/api key env/api base |
-| `Session` | `chat_workflow/session.py` | One conversation: IO, its own PydanticAI transcript, config, optional parent/children, `instructions`, `active`; `spawn` creates a clean child |
+| `Session` | `chat_workflow/session.py` | One conversation: IO, its own PydanticAI transcript, config, its turn budget, optional parent/children, `instructions`, `active`; `spawn` creates a clean child that shares the budget |
 | `SessionComponent` | `chat_workflow/session_component.py` | Runs a session: `greet`, `converse(step)`, `present`, `sign_off`; stateless and usable at any depth |
-| `AtomicWorkflow` | `chat_workflow/atomic_workflow.py` | One turn loop over a `Conversation`: intent, turn limit, the last-turn shape |
+| `AtomicWorkflow` | `chat_workflow/atomic_workflow.py` | One turn loop over a `Conversation`: intent, the session turn budget, the last-turn shape |
 | `Conversation` | `chat_workflow/conversation.py` | The one model call: transcript, answer tool, transport/unusable/output budgets |
 | `CompositeWorkflow` | `chat_workflow/decorators.py` | Calls atomic and composite children with the same `Session` |
 | `AgentResponse` / `AgentIntent` | `chat_workflow/models.py` | A discriminated union: continue, success + value, or failure; the answer is a tool call |
@@ -86,10 +86,12 @@ Eight rules shape a conversation, independent of any one step's prompt:
   field: the object is the answer. A success cannot ask a question because
   there is no prose to ask with; a question belongs to `Continue`, and a
   failure carries its reason.
-- **The turn bound is the author's call.** `max_turns` bounds the step's
-  model turns. `None` removes the bound: the step ends only on success or
-  failure, so there is no last turn and no forced final shape. The
-  conversation is as long as the task and the user need.
+- **The turn bound belongs to the session.** One budget is shared by every
+  step in the session tree; entering a step does not reset it. The framework
+  default is a runaway guard, not a task allotment, and a step cannot shorten
+  it. The caller that hosts the session may replace it with a `TurnBudget`, or
+  with `None` for no bound: then the conversation ends only on success or
+  failure, with no last turn and no forced final shape.
 - **Changed drafts are shown again; unchanged drafts finish.** A confirmation
   step returns the draft it was given or a corrected one. The framework shows
   a changed draft through the same proposal turn and asks once more; an
@@ -112,10 +114,10 @@ Eight rules shape a conversation, independent of any one step's prompt:
   not the sample: every retry answers from the same history, so a rule that
   failed for a fact the user has not given cannot be repaired by resampling.
   The rejection is fed back as a correction turn — ask for what is missing —
-  and the conversation continues, bounded by `max_turns` when the step
-  declares one. On the last turn the run fails rather than asking a question
-  it cannot get answered; a step with `max_turns=None` has no last turn and
-  ends on success or failure.
+  and the conversation continues until the session's budget is exhausted. On
+  the last turn the run fails rather than asking a question it cannot get
+  answered; a session with no bound has no last turn and ends on success or
+  failure.
 
 A question the schema already fixes (the three interaction preferences) is
 asked by the framework, not left to the model: the answer is a parameter to
@@ -176,17 +178,18 @@ user simulation are all conversations. Nothing else imports a provider SDK.
   rejected answer is a visible retry carrying the validator's own complaint; a
   tool failure is a tool result the model adapts to. `max_requests` bounds one
   turn's model steps.
-- The last allowed turn offers `FinalResponse` (success or failure, no
-  continue), so a step that has run out of turns cannot ask another question.
+- The session's last allowed turn offers `FinalResponse` (success or failure,
+  no continue), so a run that has used its budget cannot ask another question.
 
 ## Session and prompt architecture
 
 There is one recursive `Session` concept. The top-level conversation and a
 meeting spawned inside it are the same class:
 
-- `parent`, `children`, `instructions`, `active` and `spawn` are the tree. A
-  child gets the same user and config, a new `SessionLog`, and empty
-  `state.messages`; the brief is passed as parameters to the child's step.
+- `parent`, `children`, `budget`, `instructions`, `active` and `spawn` are the
+  tree. A child gets the same user, config and turn budget, a new `SessionLog`,
+  and empty `state.messages`; the brief is passed as parameters to the child's
+  step.
 - `active` is the one flag. The wrapper sets it while the session runs. The
   greeting condition is `not state.messages`, not a second flag.
 - `SessionComponent` is behaviour, not a different session. `converse` sets

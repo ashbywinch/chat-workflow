@@ -11,6 +11,8 @@ from typing import Any
 
 import typer
 
+from chat_workflow.turn_budget import DEFAULT_SESSION_MAX_TURNS
+
 from .workflowconsole import WorkflowConsole
 
 # Parameters injected by the framework, not exposed as CLI options
@@ -91,6 +93,17 @@ def _register_command(app: typer.Typer, func_name: str, func: Callable[..., Any]
                 annotation=annotation,
             )
         )
+
+    # The runaway guard belongs to the session, so every command exposes it
+    # as a session option rather than as a workflow parameter.
+    sig_params.append(
+        inspect.Parameter(
+            "max_turns",
+            inspect.Parameter.KEYWORD_ONLY,
+            default=DEFAULT_SESSION_MAX_TURNS,
+            annotation=int,
+        )
+    )
 
     def run_cmd(*args, _func=func, **workflow_params):
         runner = WorkflowConsole()

@@ -21,7 +21,6 @@ from chat_workflow import (
     Success,
     TurnLimitExceededError,
     TurnResult,
-    atomic_workflow_step,
 )
 from chat_workflow.session import UserIO
 from tests.conftest import (
@@ -307,7 +306,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         result = EvaluationCriteria.generate_from_chat(
-            context="test", max_turns=5, session=session
+            context="test", session=session
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
@@ -332,7 +331,7 @@ class TestWorkflowIntegration(unittest.TestCase):
         )
 
         result = EvaluationCriteria.generate_from_chat(
-            context="test", max_turns=5, session=session
+            context="test", session=session
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
@@ -346,7 +345,6 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         result = generate_reviewed_criteria(
             context="test context",
-            max_turns=5,
             session=session,
         )
 
@@ -380,7 +378,6 @@ class TestWorkflowIntegration(unittest.TestCase):
 
         result = generate_reviewed_criteria(
             context="test context",
-            max_turns=5,
             session=session,
         )
 
@@ -461,52 +458,13 @@ class TestChatDecoratorTypeVarResolution(unittest.TestCase):
         )
         session = _CapturingSession(criteria)
 
-        result = refine(initial_object=criteria, max_turns=3, session=session)
+        result = refine(initial_object=criteria, session=session)
 
         self.assertIsInstance(result, EvaluationCriteria)
         self.assertEqual(len(session.workflows), 1)
         response_model = session.workflows[0].response_model
         self.assertIsNotNone(response_model, "response_model should be set")
         self.assertEqual(response_model, AgentAnswer[EvaluationCriteria])
-
-    def test_a_caller_can_remove_the_turn_limit(self):
-        session = _CapturingSession(make_valid_criteria())
-
-        EvaluationCriteria.generate_from_chat(
-            context="test", max_turns=None, session=session
-        )
-
-        self.assertIsNone(session.workflows[0].max_turns)
-
-    def test_a_step_declared_default_is_the_turn_bound(self):
-        from workflows.evaluation_criteria import Criterion
-        from workflows.evaluation_criteria.refine import refine
-
-        criteria = EvaluationCriteria(
-            context="test",
-            criteria=[
-                Criterion(name="budget", description="Budget constraint", weight=8.0),
-                Criterion(name="quality", description="Quality level", weight=7.0),
-            ],
-        )
-        session = _CapturingSession(criteria)
-
-        refine(initial_object=criteria, session=session)
-
-        self.assertEqual(session.workflows[0].max_turns, 5)
-
-    def test_a_step_can_declare_no_turn_limit(self):
-        @atomic_workflow_step
-        def step(context: str, max_turns: int | None = None) -> EvaluationCriteria:
-            """Build criteria from {context}."""
-            return make_valid_criteria()
-
-        session = _CapturingSession(make_valid_criteria())
-
-        step(context="test", session=session)
-
-        self.assertIsNone(session.workflows[0].max_turns)
-
 
 class TestAutoParamInjection(unittest.TestCase):
     """Tests for automatic parameter injection via build_params_section."""
@@ -515,16 +473,14 @@ class TestAutoParamInjection(unittest.TestCase):
         """Params without Annotated metadata show type, name, and value."""
         from chat_workflow.prompt_builder import build_params_section
 
-        def sample(context: str = "", max_turns: int = 10):
+        def sample(context: str = "", audience: str = "family"):
             pass
 
-        section = build_params_section(sample, {"context": "party", "max_turns": 5})
+        section = build_params_section(sample, {"context": "party"})
 
         self.assertIn("## Parameters", section)
         self.assertIn("`context` (str)", section)
         self.assertIn('"party"', section)
-        self.assertIn("`max_turns` (int)", section)
-        self.assertIn("5", section)
 
     def testbuild_params_section_with_annotated(self):
         """Annotated[T, 'desc'] descriptions appear in the output."""
@@ -534,16 +490,13 @@ class TestAutoParamInjection(unittest.TestCase):
 
         def sample(
             context: Annotated[str, "The party theme"] = "",
-            max_turns: Annotated[int, "Turn limit"] = 10,
         ):
             pass
 
         section = build_params_section(sample, {"context": "birthday"})
 
         self.assertIn("The party theme", section)
-        self.assertIn("Turn limit", section)
         self.assertIn("`context` (str)", section)
-        self.assertIn("`max_turns` (int)", section)
 
     def testbuild_params_section_excludes_internal(self):
         """tools, io, state, debug are excluded from the section."""
@@ -567,12 +520,12 @@ class TestAutoParamInjection(unittest.TestCase):
         """When a param is not in kwargs, its default is shown instead."""
         from chat_workflow.prompt_builder import build_params_section
 
-        def sample(max_turns: int = 10):
+        def sample(context: str = "default"):
             pass
 
         section = build_params_section(sample, {})
 
-        self.assertIn("Default: 10", section)
+        self.assertIn("Default: ", section)
 
     def test_chat_decorator_includes_params_section_in_system_prompt(self):
         """The @chat decorator appends the params section to the system prompt."""
@@ -588,7 +541,7 @@ class TestAutoParamInjection(unittest.TestCase):
         session = _CapturingSession(valid_criteria)
 
         result = EvaluationCriteria.generate_from_chat(
-            context="birthday ideas", max_turns=5, session=session
+            context="birthday ideas", session=session
         )
 
         self.assertIsInstance(result, EvaluationCriteria)
@@ -596,7 +549,6 @@ class TestAutoParamInjection(unittest.TestCase):
         prompt = session.workflows[0]._conversation._instructions
         self.assertIn("## Parameters", prompt)
         self.assertIn("`context` (str)", prompt)
-        self.assertIn("`max_turns` (int)", prompt)
         self.assertNotIn("session", prompt)
 
     def test_the_opening_leaves_the_first_move_to_the_step(self):
@@ -626,7 +578,7 @@ class TestAutoParamInjection(unittest.TestCase):
         )
         session = _CapturingSession(criteria)
 
-        result = refine(initial_object=criteria, max_turns=3, session=session)
+        result = refine(initial_object=criteria, session=session)
 
         self.assertIsInstance(result, EvaluationCriteria)
         self.assertEqual(len(session.workflows), 1)
@@ -635,7 +587,6 @@ class TestAutoParamInjection(unittest.TestCase):
         self.assertIn("quality", prompt)
         self.assertIn("## Parameters", prompt)
         self.assertIn("`initial_object` (~ModelType)", prompt)
-        self.assertIn("`max_turns` (int)", prompt)
 
 
 class TestTheStepOnTheTranscript(unittest.TestCase):

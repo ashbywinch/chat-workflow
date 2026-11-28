@@ -41,7 +41,7 @@ class MinutesDraft(LLMValidated):
 
     @atomic_workflow_step
     @classmethod
-    def create(cls, context: str, max_turns: int = 10) -> MinutesDraft:
+    def create(cls, context: str) -> MinutesDraft:
         """You help someone turn sketchy notes into minutes. Start from what
         they already told you; ask only for what is missing. Suggest sensible
         defaults where the user is unsure, and draw out details they only

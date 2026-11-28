@@ -160,7 +160,6 @@ class ComponentStructure(BaseModel):
                 " world, its fields, and what makes it excellent"
             ),
         ],
-        max_turns: Annotated[int, "Maximum conversation turns"] = 10,
         session: Annotated[Session, "The chat session"] = None,  # type: ignore[assignment]  # the step decorator injects the session
     ) -> ComponentStructure:
         """Derive the structure from the domain spec, then confirm it."""
@@ -170,7 +169,6 @@ class ComponentStructure(BaseModel):
             session=session,
             draft=draft,
             step=_confirm_structure,
-            max_turns=max_turns,
         )
 
 
@@ -180,7 +178,6 @@ def _draft_structure(
         ComponentDomainSpec,
         "What the artifact means in the user's world, its fields, and what makes it excellent",
     ],
-    max_turns: Annotated[int, "Maximum turns"] = 1,
 ) -> ComponentStructure:
     """Derive the structure from the domain spec.
 
@@ -201,7 +198,6 @@ def _confirm_structure(
         ComponentStructure,
         "The complete structure already shown to the user",
     ],
-    max_turns: Annotated[int, "Maximum conversation turns"] = 10,
 ) -> ComponentStructure:
     """
 The structure was shown with one confirm-or-correct question, and the user is

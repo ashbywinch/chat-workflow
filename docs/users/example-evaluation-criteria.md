@@ -74,7 +74,7 @@ class EvaluationCriteria(BaseModel):
 # Interactive conversation
 chat-workflow evaluation-criteria generate-reviewed-criteria --context "choosing a laptop"
 
-# Custom max turns
+# Custom session turn budget
 chat-workflow evaluation-criteria generate-reviewed-criteria --context "gift ideas" --max-turns 5
 
 # Custom refinement rounds
@@ -96,7 +96,6 @@ class MyIO(UserIO):
 
 criteria = generate_reviewed_criteria(
     context="evaluating coffee makers",
-    max_turns=10,
     session=Session(io=MyIO(), state=SessionLog()),
 )
 ```
@@ -112,9 +111,6 @@ def generate_criteria(
     context: Annotated[
         str, "The topic or domain for which to generate evaluation criteria"
     ] = "",
-    max_turns: Annotated[
-        int, "Maximum number of conversation turns before giving up"
-    ] = 10,
 ) -> EvaluationCriteria:
     """You are a helpful assistant guiding the user to create evaluation criteria.
 
@@ -136,7 +132,6 @@ def refine(
     initial_object: Annotated[
         ModelType, "The object to review and potentially modify based on user feedback"
     ],
-    max_turns: Annotated[int, "Maximum number of refinement turns"] = 5,
 ) -> ModelType:
     """You are running a short refinement conversation for an existing object.
     Goal: Check whether the user wants to keep this version of the object or change anything about it. Return the object with any updates.
@@ -155,12 +150,11 @@ def refine(
 @composite_workflow_step
 def generate_reviewed_criteria(
     context: str = "",
-    max_turns: int = 10,
     max_refinements: int = 3,
     *,
     session: Session,
 ) -> EvaluationCriteria:
-    criteria = generate_criteria(context=context, max_turns=max_turns, session=session)
+    criteria = generate_criteria(context=context, session=session)
 
     for _ in range(max_refinements):
         print_criteria(
@@ -171,7 +165,6 @@ def generate_reviewed_criteria(
 
         refined = refine(
             initial_object=criteria,
-            max_turns=max_turns,
             session=session,
         )
 
@@ -183,7 +176,7 @@ def generate_reviewed_criteria(
     return criteria
 ```
 
-**Note**: Functions decorated with `@composite_workflow_step` are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
+**Note**: Functions decorated with `@composite_workflow_step` are automatically discovered by the CLI. Their parameters (excluding `session`, `io`, `state`, `debug`) become CLI options. `--max-turns` is a session option, not a workflow parameter: it replaces the framework's runaway guard for the whole conversation. The function name is converted to kebab-case for the command name (e.g., `generate_reviewed_criteria` → `generate-reviewed-criteria`).
 
 ## Critical Code Locations
 
@@ -268,7 +261,7 @@ Normalized weights (sum to 1.0):
 
 The workflow handles several error cases:
 
-- **Turn limit exceeded**: Conversation reaches `max_turns` without success
+- **Turn limit exceeded**: Conversation reaches the session turn budget without success
 - **Conversation failed**: User is uncooperative or LLM returns `intent=AgentIntent.FAILURE`
 - **Validation error**: Generated criteria don't satisfy business rules
 - **Configuration error**: Missing API key or invalid provider settings

@@ -218,12 +218,12 @@ class _StubComponent(SessionComponent):
         self._closing = closing or (lambda: TextReply(text="I have what I need."))
 
     @override
-    def greet(self, *, session: Session, max_turns: int = 1) -> TextReply:
+    def greet(self, *, session: Session) -> TextReply:
         self.called.append("greet")
         return self._greeting()
 
     @override
-    def sign_off(self, *, session: Session, max_turns: int = 1) -> TextReply:
+    def sign_off(self, *, session: Session) -> TextReply:
         self.called.append("close")
         return self._closing()
 
@@ -236,24 +236,6 @@ class _ChatOffStep:
     def __call__(self, *, session: Session) -> str:
         session.say("a step with nothing to ask")
         return "done"
-
-
-class TestDeclaredBudget(unittest.TestCase):
-    def test_a_declared_none_is_no_limit(self):
-        from chat_workflow.session_component import _declared_max_turns
-
-        def step(*, session, max_turns: int | None = None):
-            ...
-
-        self.assertIsNone(_declared_max_turns(step))
-
-    def test_a_declared_int_is_the_limit(self):
-        from chat_workflow.session_component import _declared_max_turns
-
-        def step(*, session, max_turns: int = 5):
-            ...
-
-        self.assertEqual(_declared_max_turns(step), 5)
 
 
 class TestSessionComponent(unittest.TestCase):

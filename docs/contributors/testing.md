@@ -222,23 +222,19 @@ the cost impact of prompt changes.
 
 ## Eval Design Principles
 
-### Turn count strategy
+### Session turn budget
 
-Different eval types need different `max_turns` values. A blanket reduction
-across all evals breaks them. Use these guidelines:
+An eval's `max_turns` is the whole session's runaway guard, passed by
+`run_multi_turn_eval` to `Session.budget`. It is not a per-step allowance and
+no step can shorten it, so it must fit the whole conversation the eval drives —
+including every child step in the session tree.
 
-| Eval Type | max_turns | Rationale |
-|-----------|-----------|-----------|
-| Conversation quality / structure | 8 | Need enough turns to demonstrate warm opening, domain proposal, and adaptive patterns across multiple user responses |
-| Component exploration / design / gathering | 8 | Each sub-workflow needs multiple back-and-forth turns to probe, propose, and confirm domain details |
-| Process definition (composite) | 6 | Sub-workflows for gathering and synthesis each need a few turns within the composite limit |
-| Workflow components (Resource, Deliverable, etc.) | 10 | ADHD user personas go off-topic; standard user personas need turns for proposing and confirming multiple fields |
-| End-to-end (full pipeline + run generated workflow) | 5 | User personas are front-loaded with complete domain details; component-level evals already test each phase in depth |
-
-**Key insight**: End-to-end evals can use fewer turns because:
-- The component-level evals already cover each phase in detail
-- The user persona in the end-to-end test provides comprehensive information upfront
-- The test's purpose is to verify the pipeline works, not to re-test conversation quality
+Size the budget from the conversation, not from a table: start from the
+framework default and lower it only when the transcript shows the eval does
+not need the room. A budget that cuts a healthy conversation short turns a
+prompt defect into a turn-limit failure, and a budget that is too generous only
+costs time when the workflow is already looping. Do not use the budget to force
+a step to finish; the ending is the step's success or failure.
 
 ### Front-loaded user personas
 
@@ -266,8 +262,10 @@ Use multiple layers of protection (belt and braces):
    Each test has its own generous timeout (120s for component evals, 300s for
    end-to-end pipeline evals).
 
-2. **Per-workflow max_turns** — Each `@atomic_workflow_step` has a `max_turns`
-   parameter that limits conversation length regardless of LLM behavior.
+2. **Session turn budget** — `run_multi_turn_eval`'s `max_turns` constructs a
+   `TurnBudget` for the whole session; the framework default is the guard for
+   a run that does not set one. Every step in the session tree takes from that
+   one counter, so a runaway conversation still stops.
 
 3. **Overall suite timeout** — `scripts/run_with_timeout.py` wraps the entire
    eval suite with a hard kill (14400s by default for `make evals` and

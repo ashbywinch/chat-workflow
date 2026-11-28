@@ -1266,7 +1266,6 @@ class ComponentSourceCode(LLMValidated):
             "Pydantic structure, and interaction context. The design is fully "
             "assembled; no further user input is needed.",
         ],
-        max_turns: Annotated[int, "Maximum conversation turns"] = 3,
     ) -> ComponentSourceCode:
         """Generate the module from the design spec: one LLMValidated class
         for the artifact, and one or more @atomic_workflow_step classmethods for
